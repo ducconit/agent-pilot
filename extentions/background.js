@@ -6,6 +6,15 @@
 // Track attached debugger sessions and buffered devtools events
 const attachedTabs = new Set();
 const devtoolsBuffers = new Map(); // tabId -> { console: [], network: [], performance: {} }
+const agentControlledTabs = new Set(); // Track tabs opened or controlled by AI Agent
+const tabLockStates = new Map(); // tabId -> { manualLock: boolean, autoCount: number, unlockTimer: any, currentAction: string }
+
+function getTabLockState(tabId) {
+  if (!tabLockStates.has(tabId)) {
+    tabLockStates.set(tabId, { manualLock: false, autoCount: 0, unlockTimer: null, currentAction: "" });
+  }
+  return tabLockStates.get(tabId);
+}
 
 // Enable Side Panel behavior on icon click natively
 function enableSidePanelBehavior() {
@@ -175,6 +184,32 @@ chrome.debugger.onDetach.addListener((source, reason) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   attachedTabs.delete(tabId);
   devtoolsBuffers.delete(tabId);
+  agentControlledTabs.delete(tabId);
+  const state = tabLockStates.get(tabId);
+  if (state && state.unlockTimer) clearTimeout(state.unlockTimer);
+  tabLockStates.delete(tabId);
+});
+
+// Re-notify agent tabs and restore lock state when navigation completes
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status === "complete") {
+    if (agentControlledTabs.has(tabId)) {
+      if (typeof agentBridge !== "undefined" && agentBridge && typeof agentBridge.sendTabMessageWithRetry === "function") {
+        agentBridge.sendTabMessageWithRetry(tabId, { action: "set_agent_tab_status", isAgentTab: true }).catch(() => {});
+      }
+    }
+    // Restore lock state if tab was locked during navigation (Finding 2)
+    const lockState = tabLockStates.get(tabId);
+    if (lockState && (lockState.manualLock || lockState.autoCount > 0)) {
+      if (typeof agentBridge !== "undefined" && agentBridge && typeof agentBridge.sendTabMessageWithRetry === "function") {
+        agentBridge.sendTabMessageWithRetry(tabId, {
+          action: "set_agent_busy",
+          busy: true,
+          currentAction: lockState.currentAction || "AI Agent đang thao tác..."
+        }).catch(() => {});
+      }
+    }
+  }
 });
 
 // Listen for CDP events (Console, Network, Runtime)
@@ -306,6 +341,29 @@ function broadcastToExtension(message) {
  */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const { action } = request;
+
+  if (action === "agent_emergency_unlocked") {
+    const tabId = sender?.tab?.id;
+    if (tabId && tabLockStates.has(tabId)) {
+      const state = tabLockStates.get(tabId);
+      if (state.unlockTimer) {
+        clearTimeout(state.unlockTimer);
+        state.unlockTimer = null;
+      }
+      state.manualLock = false;
+      state.autoCount = 0;
+      state.currentAction = "";
+    }
+    broadcastToExtension({
+      type: "AGENT_ACTION_LOG",
+      action: "EMERGENCY_UNLOCK",
+      status: "warning",
+      details: `Người dùng đã chiếm quyền điều khiển trên Tab ${tabId || ""}`,
+      timestamp: Date.now()
+    });
+    sendResponse({ success: true });
+    return true;
+  }
 
   // 1. Tab Operations
   if (action === "list_tabs") {
@@ -864,6 +922,66 @@ class AgentBridgeClient {
     });
   }
 
+  async setTabLock(tabId, busy, action = "") {
+    if (!tabId) return false;
+    const state = getTabLockState(tabId);
+    state.manualLock = Boolean(busy);
+    state.currentAction = action;
+    if (state.unlockTimer) {
+      clearTimeout(state.unlockTimer);
+      state.unlockTimer = null;
+    }
+
+    if (busy) {
+      return await this.sendTabMessageWithRetry(tabId, {
+        action: "set_agent_busy",
+        busy: true,
+        currentAction: action || "AI Agent đang thao tác..."
+      });
+    } else {
+      if (state.autoCount === 0) {
+        return await this.sendTabMessageWithRetry(tabId, { action: "set_agent_busy", busy: false });
+      }
+      return { success: true, pendingAutoCount: state.autoCount };
+    }
+  }
+
+  async runWithTabLock(tabId, actionName, runner) {
+    if (!tabId) return await runner();
+
+    const state = getTabLockState(tabId);
+    if (state.unlockTimer) {
+      clearTimeout(state.unlockTimer);
+      state.unlockTimer = null;
+    }
+
+    const wasBusy = state.manualLock || state.autoCount > 0;
+    state.autoCount++;
+    state.currentAction = actionName;
+
+    if (!wasBusy) {
+      await this.sendTabMessageWithRetry(tabId, {
+        action: "set_agent_busy",
+        busy: true,
+        currentAction: actionName
+      }).catch(() => {});
+    }
+
+    try {
+      return await runner();
+    } finally {
+      state.autoCount = Math.max(0, state.autoCount - 1);
+      if (!state.manualLock && state.autoCount === 0) {
+        state.unlockTimer = setTimeout(() => {
+          state.unlockTimer = null;
+          if (!state.manualLock && state.autoCount === 0) {
+            this.sendTabMessageWithRetry(tabId, { action: "set_agent_busy", busy: false }).catch(() => {});
+          }
+        }, 150);
+      }
+    }
+  }
+
   async handleAgentMessage(msg) {
     const { id, method, params = {} } = msg;
 
@@ -917,8 +1035,15 @@ class AgentBridgeClient {
             url = "https://" + url;
           }
           chrome.tabs.create({ url, active: params.active !== false }, (tab) => {
-            if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
-            else respond(tab);
+            if (chrome.runtime.lastError) {
+              respond(null, chrome.runtime.lastError);
+            } else {
+              if (tab && tab.id) {
+                agentControlledTabs.add(tab.id);
+                this.sendTabMessageWithRetry(tab.id, { action: "set_agent_tab_status", isAgentTab: true }).catch(() => {});
+              }
+              respond(tab);
+            }
           });
           break;
         }
@@ -974,12 +1099,14 @@ class AgentBridgeClient {
         case "page.moveMouse": {
           const tabId = params.tabId || (await this.getActiveTabId());
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.sendTabMessageWithRetry(tabId, {
-            action: "move_cursor",
-            x: params.x,
-            y: params.y,
-            duration: params.duration || 300
-          })
+          this.runWithTabLock(tabId, "page.moveMouse", () =>
+            this.sendTabMessageWithRetry(tabId, {
+              action: "move_cursor",
+              x: params.x,
+              y: params.y,
+              duration: params.duration || 300
+            })
+          )
             .then(res => respond(res || { success: true }))
             .catch(err => respond(null, err));
           break;
@@ -988,12 +1115,14 @@ class AgentBridgeClient {
         case "page.click": {
           const tabId = params.tabId || (await this.getActiveTabId());
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.sendTabMessageWithRetry(tabId, {
-            action: "click_cursor",
-            x: params.x,
-            y: params.y,
-            selector: params.selector
-          })
+          this.runWithTabLock(tabId, "page.click", () =>
+            this.sendTabMessageWithRetry(tabId, {
+              action: "click_cursor",
+              x: params.x,
+              y: params.y,
+              selector: params.selector
+            })
+          )
             .then(res => respond(res || { success: true }))
             .catch(err => respond(null, err));
           break;
@@ -1002,12 +1131,14 @@ class AgentBridgeClient {
         case "page.type": {
           const tabId = params.tabId || (await this.getActiveTabId());
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.sendTabMessageWithRetry(tabId, {
-            action: "type_text",
-            selector: params.selector,
-            text: params.text,
-            delay: params.delay || 50
-          })
+          this.runWithTabLock(tabId, "page.type", () =>
+            this.sendTabMessageWithRetry(tabId, {
+              action: "type_text",
+              selector: params.selector,
+              text: params.text,
+              delay: params.delay || 50
+            })
+          )
             .then(res => respond(res || { success: true }))
             .catch(err => respond(null, err));
           break;
@@ -1016,14 +1147,25 @@ class AgentBridgeClient {
         case "page.scroll": {
           const tabId = params.tabId || (await this.getActiveTabId());
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.sendTabMessageWithRetry(tabId, {
-            action: "scroll_page",
-            deltaX: params.deltaX || 0,
-            deltaY: params.deltaY || 0,
-            smooth: params.smooth !== false
-          })
+          this.runWithTabLock(tabId, "page.scroll", () =>
+            this.sendTabMessageWithRetry(tabId, {
+              action: "scroll_page",
+              deltaX: params.deltaX || 0,
+              deltaY: params.deltaY || 0,
+              smooth: params.smooth !== false
+            })
+          )
             .then(res => respond(res || { success: true }))
             .catch(err => respond(null, err));
+          break;
+        }
+
+        case "page.setBusy":
+        case "agent.setBusy": {
+          const tabId = params.tabId || (await this.getActiveTabId());
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          const res = await this.setTabLock(tabId, params.busy !== false, params.action || "");
+          respond(res || { success: true });
           break;
         }
 

@@ -373,6 +373,18 @@ const MCP_TOOLS = [
       },
       required: ["instanceId"]
     }
+  },
+  {
+    name: "browser_set_busy",
+    description: "Lock or unlock human interactions on a browser tab with a sleek ChatGPT Operator-style overlay banner while the agent is executing workflows",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tabId: { type: "integer", description: "Optional target Tab ID" },
+        busy: { type: "boolean", description: "True to lock user input, false to unlock", default: true },
+        action: { type: "string", description: "Optional description of the active action to display on the banner" }
+      }
+    }
   }
 ];
 
@@ -410,6 +422,9 @@ async function handleMcpToolCall(name, args) {
 
     case "browser_select_instance":
       return await sendCommandToExtension("instances.select", args);
+
+    case "browser_set_busy":
+      return await sendCommandToExtension("page.setBusy", args);
 
     default:
       throw new Error(`Unsupported tool: ${name}`);

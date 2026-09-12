@@ -32,6 +32,12 @@
   let lockedElement = null;
   let cropState = { active: false, startX: 0, startY: 0, currentRect: null };
 
+  let isAgentTab = false;
+  let isAgentBusy = false;
+  let isAgentDispatching = false;
+  let tabBadgeEl = null;
+  let lockOverlayEl = null;
+
   // =========================================================================
   // 1. Virtual Mouse Subsystem
   // =========================================================================
@@ -54,6 +60,28 @@
   cursorLayer.appendChild(virtualCursor);
   updateCursorTransform(currentMouseX, currentMouseY);
 
+  let cursorHideTimeout = null;
+
+  function activateCursor(timeoutMs = 2500) {
+    if (cursorHideTimeout) {
+      clearTimeout(cursorHideTimeout);
+      cursorHideTimeout = null;
+    }
+    virtualCursor.classList.add("visible");
+    cursorHideTimeout = setTimeout(() => {
+      virtualCursor.classList.remove("visible");
+      cursorHideTimeout = null;
+    }, timeoutMs);
+  }
+
+  function hideCursor() {
+    if (cursorHideTimeout) {
+      clearTimeout(cursorHideTimeout);
+      cursorHideTimeout = null;
+    }
+    virtualCursor.classList.remove("visible");
+  }
+
   function updateCursorTransform(x, y) {
     currentMouseX = x;
     currentMouseY = y;
@@ -66,6 +94,7 @@
    * Animate Virtual Mouse to (targetX, targetY) with smooth trajectory
    */
   function moveVirtualMouse(targetX, targetY, duration = CONFIG.DEFAULT_MOVE_DURATION) {
+    activateCursor();
     return new Promise((resolve) => {
       const startX = currentMouseX;
       const startY = currentMouseY;
@@ -95,7 +124,8 @@
   /**
    * Trigger click animation & dispatch synthetic events on DOM element
    */
-  async function virtualClick(x = currentMouseX, y = currentMouseY) {
+  async function virtualClick(x = currentMouseX, y = currentMouseY, selector = null) {
+    activateCursor();
     await moveVirtualMouse(x, y, CONFIG.CLICK_DELAY);
 
     // Render Ripple Effect
@@ -109,10 +139,18 @@
     setTimeout(() => ripple.remove(), 550);
 
     // Find and dispatch event on element under pointer
-    // Temporarily hide cursor layer to accurately get elementFromPoint
-    cursorLayer.style.display = "none";
-    const el = document.elementFromPoint(x, y);
-    cursorLayer.style.display = "block";
+    let el = selector ? document.querySelector(selector) : null;
+    if (!el) {
+      const prevCursorDisplay = cursorLayer.style.display;
+      const prevOverlayDisplay = lockOverlayEl ? lockOverlayEl.style.display : null;
+      cursorLayer.style.display = "none";
+      if (lockOverlayEl) lockOverlayEl.style.display = "none";
+
+      el = document.elementFromPoint(x, y);
+
+      cursorLayer.style.display = prevCursorDisplay;
+      if (lockOverlayEl && prevOverlayDisplay !== null) lockOverlayEl.style.display = prevOverlayDisplay;
+    }
 
     if (el) {
       // Focus if form control
@@ -132,11 +170,16 @@
         button: 0
       };
 
-      el.dispatchEvent(new PointerEvent("pointerdown", eventInit));
-      el.dispatchEvent(new MouseEvent("mousedown", eventInit));
-      el.dispatchEvent(new PointerEvent("pointerup", eventInit));
-      el.dispatchEvent(new MouseEvent("mouseup", eventInit));
-      el.dispatchEvent(new MouseEvent("click", eventInit));
+      try {
+        isAgentDispatching = true;
+        el.dispatchEvent(new PointerEvent("pointerdown", eventInit));
+        el.dispatchEvent(new MouseEvent("mousedown", eventInit));
+        el.dispatchEvent(new PointerEvent("pointerup", eventInit));
+        el.dispatchEvent(new MouseEvent("mouseup", eventInit));
+        el.dispatchEvent(new MouseEvent("click", eventInit));
+      } finally {
+        isAgentDispatching = false;
+      }
 
       return {
         success: true,
@@ -156,13 +199,20 @@
    * Virtual Type text into an element with human-like typing
    */
   async function virtualType(selector, text) {
+    activateCursor();
     let el = null;
     if (selector) {
       el = document.querySelector(selector);
     } else {
+      const prevCursorDisplay = cursorLayer.style.display;
+      const prevOverlayDisplay = lockOverlayEl ? lockOverlayEl.style.display : null;
       cursorLayer.style.display = "none";
+      if (lockOverlayEl) lockOverlayEl.style.display = "none";
+
       el = document.elementFromPoint(currentMouseX, currentMouseY);
-      cursorLayer.style.display = "block";
+
+      cursorLayer.style.display = prevCursorDisplay;
+      if (lockOverlayEl && prevOverlayDisplay !== null) lockOverlayEl.style.display = prevOverlayDisplay;
     }
 
     if (!el) return { success: false, error: "Target element not found" };
@@ -174,15 +224,25 @@
     el.focus();
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) {
       for (const char of text) {
-        if (el.isContentEditable) {
-          document.execCommand("insertText", false, char);
-        } else {
-          el.value = (el.value || "") + char;
-          el.dispatchEvent(new Event("input", { bubbles: true }));
+        try {
+          isAgentDispatching = true;
+          if (el.isContentEditable) {
+            document.execCommand("insertText", false, char);
+          } else {
+            el.value = (el.value || "") + char;
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        } finally {
+          isAgentDispatching = false;
         }
         await new Promise((r) => setTimeout(r, CONFIG.TYPING_INTERVAL));
       }
-      el.dispatchEvent(new Event("change", { bubbles: true }));
+      try {
+        isAgentDispatching = true;
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      } finally {
+        isAgentDispatching = false;
+      }
       return { success: true, textEntered: text };
     } else {
       return { success: false, error: "Element is not an input or editable field" };
@@ -193,7 +253,12 @@
    * Virtual Scroll
    */
   function virtualScroll(deltaX = 0, deltaY = CONFIG.SCROLL_AMOUNT) {
-    window.scrollBy({ top: deltaY, left: deltaX, behavior: "smooth" });
+    try {
+      isAgentDispatching = true;
+      window.scrollBy({ top: deltaY, left: deltaX, behavior: "smooth" });
+    } finally {
+      isAgentDispatching = false;
+    }
     return { success: true, scrollX: window.scrollX, scrollY: window.scrollY };
   }
 
@@ -546,7 +611,181 @@
   }
 
   // =========================================================================
-  // 6. Antigravity-First Global Bridge API (`window.__AGENT_PILOT__`)
+  // 6. Agent Tab Badge & Human Input Lock Subsystem (ChatGPT Operator Style)
+  // =========================================================================
+
+  function renderAgentTabBadge() {
+    if (tabBadgeEl) return tabBadgeEl;
+    tabBadgeEl = document.createElement("div");
+    tabBadgeEl.id = "agent-pilot-tab-badge";
+    tabBadgeEl.innerHTML = `
+      <span class="agent-pilot-badge-icon">🤖</span>
+      <span class="agent-pilot-badge-title">Agent Pilot</span>
+      <span class="agent-pilot-badge-divider">|</span>
+      <span>Tab tự động</span>
+      <span class="agent-pilot-badge-status">
+        <span class="agent-pilot-badge-dot" id="agent-pilot-badge-dot"></span>
+        <span id="agent-pilot-badge-status-text">Sẵn sàng</span>
+      </span>
+    `;
+    (document.body || document.documentElement).appendChild(tabBadgeEl);
+    return tabBadgeEl;
+  }
+
+  function updateAgentTabBadge(busy, actionText = "") {
+    if (!tabBadgeEl) return;
+    const dot = document.getElementById("agent-pilot-badge-dot");
+    const statusText = document.getElementById("agent-pilot-badge-status-text");
+    if (dot && statusText) {
+      if (busy) {
+        dot.className = "agent-pilot-badge-dot busy";
+        statusText.textContent = actionText || "Đang thao tác...";
+        statusText.style.color = "#f59e0b";
+      } else {
+        dot.className = "agent-pilot-badge-dot";
+        statusText.textContent = "Sẵn sàng";
+        statusText.style.color = "#94a3b8";
+      }
+    }
+  }
+
+  function getActionDescription(action) {
+    switch (action) {
+      case "page.click":
+      case "click_cursor":
+      case "browser_click":
+        return "Đang thực hiện click phần tử...";
+      case "page.type":
+      case "type_text":
+      case "browser_type":
+        return "Đang nhập dữ liệu tự động...";
+      case "page.moveMouse":
+      case "move_cursor":
+        return "Đang di chuyển con trỏ chuột...";
+      case "page.scroll":
+      case "scroll_page":
+      case "browser_scroll":
+        return "Đang cuộn nội dung trang...";
+      case "page.screenshot":
+      case "browser_screenshot":
+        return "Đang chụp ảnh màn hình...";
+      case "tabs.update":
+      case "browser_navigate":
+        return "Đang chuyển hướng trang...";
+      default:
+        return action ? `Đang thực thi: ${action}` : "AI Agent đang thực hiện thao tác...";
+    }
+  }
+
+  function showLockOverlay(action = "") {
+    if (!lockOverlayEl) {
+      lockOverlayEl = document.createElement("div");
+      lockOverlayEl.id = "agent-pilot-lock-overlay";
+      lockOverlayEl.innerHTML = `
+        <div class="agent-pilot-lock-card">
+          <div class="agent-pilot-lock-spinner"></div>
+          <div class="agent-pilot-lock-info">
+            <div class="agent-pilot-lock-title">
+              <span>🤖</span>
+              <span id="agent-pilot-lock-title-text">AI Agent đang thao tác...</span>
+            </div>
+            <div class="agent-pilot-lock-desc" id="agent-pilot-lock-action-desc">
+              Vui lòng không can thiệp chuột hoặc bàn phím lúc này.
+            </div>
+          </div>
+          <button class="agent-pilot-unlock-btn" id="agent-pilot-emergency-unlock" title="Lấy lại quyền điều khiển thủ công">
+            <span>🔓</span> Chiếm quyền
+          </button>
+        </div>
+      `;
+      (document.body || document.documentElement).appendChild(lockOverlayEl);
+
+      const unlockBtn = lockOverlayEl.querySelector("#agent-pilot-emergency-unlock");
+      if (unlockBtn) {
+        unlockBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          setAgentBusyState(false);
+          try {
+            chrome.runtime.sendMessage({ action: "agent_emergency_unlocked" }).catch(() => {});
+          } catch (_) {}
+        });
+      }
+    }
+
+    const descEl = document.getElementById("agent-pilot-lock-action-desc");
+    if (descEl) {
+      const desc = getActionDescription(action);
+      descEl.textContent = `${desc} Vui lòng không can thiệp.`;
+    }
+    lockOverlayEl.style.display = "flex";
+  }
+
+  function hideLockOverlay() {
+    if (lockOverlayEl) {
+      lockOverlayEl.style.display = "none";
+    }
+  }
+
+  // Intercept human input events in capture phase
+  const BLOCKED_INPUT_EVENTS = [
+    "mousedown", "mouseup", "click", "dblclick", "contextmenu",
+    "keydown", "keyup", "keypress",
+    "wheel", "pointerdown", "pointerup",
+    "touchstart", "touchend", "touchmove"
+  ];
+
+  function handleCaptureInput(e) {
+    if (!isAgentBusy) return;
+
+    // Allow synthetic events dispatched by Agent Pilot
+    if (isAgentDispatching || !e.isTrusted) {
+      return;
+    }
+
+    // Allow emergency takeover button clicks
+    if (e.target && typeof e.target.closest === "function" && e.target.closest("#agent-pilot-emergency-unlock")) {
+      return;
+    }
+
+    // Block human interactions
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }
+
+  let areBlockersAttached = false;
+
+  function attachInputBlockers() {
+    if (areBlockersAttached) return;
+    areBlockersAttached = true;
+    BLOCKED_INPUT_EVENTS.forEach((evtName) => {
+      window.addEventListener(evtName, handleCaptureInput, { capture: true, passive: false });
+    });
+  }
+
+  function detachInputBlockers() {
+    if (!areBlockersAttached) return;
+    areBlockersAttached = false;
+    BLOCKED_INPUT_EVENTS.forEach((evtName) => {
+      window.removeEventListener(evtName, handleCaptureInput, { capture: true, passive: false });
+    });
+  }
+
+  function setAgentBusyState(busy, action = "") {
+    isAgentBusy = Boolean(busy);
+    if (isAgentBusy) {
+      attachInputBlockers();
+      showLockOverlay(action);
+      updateAgentTabBadge(true, action ? "Đang xử lý..." : "Đang thao tác...");
+    } else {
+      detachInputBlockers();
+      hideLockOverlay();
+      updateAgentTabBadge(false);
+    }
+  }
+
+  // =========================================================================
+  // 7. Antigravity-First Global Bridge API (`window.__AGENT_PILOT__`)
   // =========================================================================
 
   window.__AGENT_PILOT__ = {
@@ -563,7 +802,15 @@
     startRegionCrop: startRegionCrop,
     pickColor: pickColor,
     getLockedElement: () => (lockedElement ? getDetailedElementInfo(lockedElement) : null),
-    getCursorPosition: () => ({ x: currentMouseX, y: currentMouseY })
+    getCursorPosition: () => ({ x: currentMouseX, y: currentMouseY }),
+    setBusy: (busy, action) => setAgentBusyState(busy, action),
+    isBusy: () => isAgentBusy,
+    isAgentTab: () => isAgentTab,
+    setAgentTab: (enabled) => {
+      isAgentTab = Boolean(enabled);
+      if (isAgentTab) renderAgentTabBadge();
+      return isAgentTab;
+    }
   };
 
   // Bridge to Main World so page scripts, DevTools Console and Agents can access window.__AGENT_PILOT__
@@ -597,7 +844,10 @@
           toggleInspector: (enabled) => sendBridgeRequest("toggle_inspector", { enabled }),
           getElement: (selector) => sendBridgeRequest("get_element_info", { selector }),
           pickColor: () => sendBridgeRequest("pick_color", {}),
-          getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {})
+          getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {}),
+          isBusy: () => sendBridgeRequest("is_busy", {}),
+          isAgentTab: () => sendBridgeRequest("is_agent_tab", {}),
+          setBusy: (busy, action) => sendBridgeRequest("set_busy", { busy, action })
         };
       })();
     `;
@@ -621,6 +871,9 @@
     }
     else if (action === "pick_color") result = await pickColor();
     else if (action === "get_cursor_pos") result = { x: currentMouseX, y: currentMouseY };
+    else if (action === "is_busy") result = isAgentBusy;
+    else if (action === "is_agent_tab") result = isAgentTab;
+    else if (action === "set_busy") { setAgentBusyState(data.busy, data.action); result = { success: true, isAgentBusy }; }
 
     window.dispatchEvent(new CustomEvent("__AGENT_PILOT_RESP__", {
       detail: { reqId, result }
@@ -643,7 +896,7 @@
           req.y = rect.top + rect.height / 2;
         }
       }
-      virtualClick(req.x, req.y).then(sendResponse);
+      virtualClick(req.x, req.y, req.selector).then(sendResponse);
       return true;
     }
 
@@ -681,8 +934,23 @@
       return true;
     }
 
+    if (req.action === "set_agent_tab_status") {
+      isAgentTab = Boolean(req.isAgentTab);
+      if (isAgentTab) {
+        renderAgentTabBadge();
+      }
+      sendResponse({ success: true, isAgentTab });
+      return true;
+    }
+
+    if (req.action === "set_agent_busy") {
+      setAgentBusyState(req.busy, req.currentAction || "");
+      sendResponse({ success: true, isAgentBusy });
+      return true;
+    }
+
     if (req.action === "ping") {
-      sendResponse({ success: true, status: "ready" });
+      sendResponse({ success: true, status: "ready", isAgentTab, isAgentBusy });
       return true;
     }
   });

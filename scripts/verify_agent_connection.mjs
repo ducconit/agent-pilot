@@ -249,11 +249,104 @@ async function run() {
     const tabsList = await sendAgentCommand("tabs.query", {});
     console.log(`[Test] Active tabs count: ${tabsList.length}, targetTabId: ${tabId}`);
 
-    // 6. Test Agent Command: page.moveMouse
-    const moveRes = await sendAgentCommand("page.moveMouse", { tabId, x: 380, y: 240, duration: 150 });
-    record("4. Agent Command: page.moveMouse", moveRes?.success === true, `Virtual cursor moved to (380, 240)`);
+    // Verify Virtual Cursor is HIDDEN by default on page load
+    let initialCursorHidden = false;
+    let initialOpacity = "1";
+    if (testPage) {
+      initialOpacity = await testPage.evaluate(() => {
+        const cursor = document.querySelector(".agent-pilot-virtual-cursor");
+        return cursor ? window.getComputedStyle(cursor).opacity : null;
+      });
+      initialCursorHidden = initialOpacity === "0";
+    }
+    record("4. Cursor Initial Hidden State", initialCursorHidden, `Initial cursor opacity: ${initialOpacity} (Expected 0)`);
 
-    // 7. Test Agent Command: page.click (Click the test button on page)
+    // Verify Agent Tab Badge on tab created by agent
+    let hasAgentTabBadge = false;
+    if (testPage) {
+      for (let i = 0; i < 15; i++) {
+        hasAgentTabBadge = await testPage.evaluate(() => !!document.getElementById("agent-pilot-tab-badge"));
+        if (hasAgentTabBadge) break;
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
+    record("5. Agent Tab Badge", hasAgentTabBadge, `Badge element #agent-pilot-tab-badge exists: ${hasAgentTabBadge}`);
+
+    // Test Human Input Lock (page.setBusy)
+    const lockRes = await sendAgentCommand("page.setBusy", { tabId, busy: true, action: "Kiểm thử tự động" });
+    let lockOverlayDetails = {};
+    if (testPage) {
+      // Wait briefly for DOM update
+      await new Promise(r => setTimeout(r, 100));
+      lockOverlayDetails = await testPage.evaluate(() => {
+        const overlay = document.getElementById("agent-pilot-lock-overlay");
+        return {
+          hasOverlay: !!overlay,
+          display: overlay ? window.getComputedStyle(overlay).display : null,
+          titleText: overlay ? overlay.querySelector("#agent-pilot-lock-title-text")?.textContent : "",
+          descText: overlay ? overlay.querySelector("#agent-pilot-lock-action-desc")?.textContent : ""
+        };
+      });
+    }
+    const lockOverlayActive = lockOverlayDetails.hasOverlay && lockOverlayDetails.display === "flex";
+    record("6. Agent Lock Overlay Active", lockOverlayActive, `Overlay: ${lockOverlayDetails.display}, Title: "${lockOverlayDetails.titleText}"`);
+
+    // 7. Test: Explicit Lock Persistence across automated action (Finding 1)
+    await sendAgentCommand("page.setBusy", { tabId, busy: true, action: "Khóa kiểm thử chuỗi thao tác" });
+    await sendAgentCommand("page.moveMouse", { tabId, x: 200, y: 150, duration: 100 });
+    // Wait > 200ms (longer than the 150ms auto-unlock timeout)
+    await new Promise(r => setTimeout(r, 250));
+    let lockSurvivesAction = false;
+    if (testPage) {
+      lockSurvivesAction = await testPage.evaluate(() => {
+        const overlay = document.getElementById("agent-pilot-lock-overlay");
+        return overlay && window.getComputedStyle(overlay).display === "flex";
+      });
+    }
+    record("7. Lock Persistence Across Action", lockSurvivesAction, `Lock maintained after moveMouse (150ms timeout did not destroy explicit lock)`);
+
+    // 8. Test: Lock Persistence Across Navigation (Finding 2)
+    await sendAgentCommand("tabs.update", { tabId, url: `http://127.0.0.1:${HTTP_PORT}/test-page.html?reloaded=1` });
+    await new Promise(r => setTimeout(r, 600));
+    let lockSurvivesNav = false;
+    if (testPage) {
+      for (let i = 0; i < 15; i++) {
+        lockSurvivesNav = await testPage.evaluate(() => {
+          const overlay = document.getElementById("agent-pilot-lock-overlay");
+          return overlay && window.getComputedStyle(overlay).display === "flex";
+        }).catch(() => false);
+        if (lockSurvivesNav) break;
+        await new Promise(r => setTimeout(r, 150));
+      }
+    }
+    record("8. Lock Persistence Across Navigation", lockSurvivesNav, `Lock overlay restored on page reload/navigation`);
+
+    // Re-bind testPage reference after navigation
+    const pagesAfterNav = await browser.pages();
+    testPage = pagesAfterNav.find(p => p.url().includes("test-page.html")) || testPage;
+    await testPage.waitForSelector("#btn-sample-click");
+
+    // Unlock tab
+    const unlockRes = await sendAgentCommand("page.setBusy", { tabId, busy: false });
+    let lockOverlayHidden = false;
+    if (testPage) {
+      await new Promise(r => setTimeout(r, 150));
+      lockOverlayHidden = await testPage.evaluate(() => {
+        const overlay = document.getElementById("agent-pilot-lock-overlay");
+        return overlay && window.getComputedStyle(overlay).display === "none";
+      });
+    }
+    record("9. Agent Lock Overlay Release", lockOverlayHidden, `Lock overlay dismissed (display: none)`);
+
+    // 10. Test Agent Command: page.moveMouse
+    const moveRes = await sendAgentCommand("page.moveMouse", { tabId, x: 380, y: 240, duration: 150 });
+    let cursorVisibleOnMove = false;
+    if (testPage) {
+      cursorVisibleOnMove = await testPage.evaluate(() => document.querySelector(".agent-pilot-virtual-cursor")?.classList.contains("visible"));
+    }
+    record("10. Agent Command: page.moveMouse", moveRes?.success === true && cursorVisibleOnMove, `Virtual cursor moved to (380, 240) & visible === true`);
+
+    // 11. Test Agent Command: page.click (Click the test button on page)
     const clickRes = await sendAgentCommand("page.click", { tabId, selector: "#btn-sample-click" });
     await new Promise(r => setTimeout(r, 600));
 
@@ -263,9 +356,9 @@ async function run() {
       clickCounterText = await testPage.evaluate(() => document.getElementById("click-counter-text")?.textContent);
     }
     const clickSuccess = clickCounterText.includes("1 lần");
-    record("5. Agent Command: page.click", clickSuccess, `Button Counter: "${clickCounterText}"`);
+    record("11. Agent Command: page.click", clickSuccess, `Button Counter: "${clickCounterText}"`);
 
-    // 8. Test Agent Command: page.type (Type into input field)
+    // 12. Test Agent Command: page.type (Type into input field)
     const typeRes = await sendAgentCommand("page.type", {
       tabId,
       selector: "#test-search-input",
@@ -276,14 +369,14 @@ async function run() {
       typedValue = await testPage.evaluate(() => document.getElementById("test-search-input")?.value);
     }
     const typeSuccess = typedValue === "Controlled via Port 58765 by Antigravity";
-    record("6. Agent Command: page.type", typeSuccess, `Input Value: "${typedValue}"`);
+    record("12. Agent Command: page.type", typeSuccess, `Input Value: "${typedValue}"`);
 
-    // 9. Test Agent Command: page.getElement
+    // 13. Test Agent Command: page.getElement
     const elInfo = await sendAgentCommand("page.getElement", { tabId, selector: "#inspector-special-box" });
     const getElSuccess = elInfo && elInfo.rect?.width > 0 && elInfo.selector?.includes("inspector-special-box");
-    record("7. Agent Command: page.getElement", getElSuccess, `Selector: ${elInfo?.selector}, BoundingBox: ${elInfo?.rect?.width}x${elInfo?.rect?.height}px`);
+    record("13. Agent Command: page.getElement", getElSuccess, `Selector: ${elInfo?.selector}, BoundingBox: ${elInfo?.rect?.width}x${elInfo?.rect?.height}px`);
 
-    // 10. Test Agent Command: page.screenshot
+    // 14. Test Agent Command: page.screenshot
     const shotRes = await sendAgentCommand("page.screenshot", { tabId, mode: "visible" });
     const shotSuccess = shotRes?.success && shotRes?.dataUrl && shotRes.dataUrl.startsWith("data:image/png;base64,");
     if (shotSuccess) {
@@ -291,14 +384,14 @@ async function run() {
       const buf = Buffer.from(base64, "base64");
       const outPath = path.join(PROJECT_DIR, "assets", "verified_agent_screenshot.png");
       fs.writeFileSync(outPath, buf);
-      record("8. Agent Command: page.screenshot", true, `Captured ${buf.length} bytes -> assets/verified_agent_screenshot.png`);
+      record("14. Agent Command: page.screenshot", true, `Captured ${buf.length} bytes -> assets/verified_agent_screenshot.png`);
     } else {
-      record("8. Agent Command: page.screenshot", false, shotRes?.error || "Screenshot failed");
+      record("14. Agent Command: page.screenshot", false, shotRes?.error || "Screenshot failed");
     }
 
-    // 11. Test Agent Command: cdp.attach & devtools.getData
+    // 15. Test Agent Command: cdp.attach & devtools.getData
     const attachRes = await sendAgentCommand("cdp.attach", { tabId });
-    record("9. Agent Command: cdp.attach", attachRes?.success === true, `CDP Attached to Tab ${tabId}`);
+    record("15. Agent Command: cdp.attach", attachRes?.success === true, `CDP Attached to Tab ${tabId}`);
 
     // Trigger a console log and fetch devtools data over bridge
     if (testPage) {
@@ -308,9 +401,9 @@ async function run() {
 
     const devtoolsRes = await sendAgentCommand("devtools.getData", { tabId });
     const hasLog = devtoolsRes?.console?.some(c => c.text.includes("LOG_VIA_AGENT_PORT_58765_TOKEN"));
-    record("10. Agent Command: devtools.getData", hasLog, `Captured ${devtoolsRes?.console?.length} log entries over bridge`);
+    record("16. Agent Command: devtools.getData", hasLog, `Captured ${devtoolsRes?.console?.length} log entries over bridge`);
 
-    // 12. Test HTTP API Endpoint (POST http://127.0.0.1:58765/api)
+    // 17. Test HTTP API Endpoint (POST http://127.0.0.1:58765/api)
     const httpRes = await new Promise((resolve) => {
       const req = http.request(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
         method: "POST",
@@ -326,9 +419,9 @@ async function run() {
       req.write(JSON.stringify({ method: "ping" }));
       req.end();
     });
-    record("11. HTTP REST/JSON-RPC API Endpoint", httpRes?.success === true && httpRes?.result?.pong === true, `POST /api response: pong=true`);
+    record("17. HTTP REST/JSON-RPC API Endpoint", httpRes?.success === true && httpRes?.result?.pong === true, `POST /api response: pong=true`);
 
-    // 13. Test Side Panel UI displays Agent Connection Status
+    // 18. Test Side Panel UI displays Agent Connection Status
     const swTarget = await browser.waitForTarget(t => t.type() === "service_worker");
     const extId = swTarget.url().split("/")[2];
     const sidepanelPage = await browser.newPage();
@@ -344,7 +437,7 @@ async function run() {
     });
 
     const isSidepanelConnected = sidepanelBridgeStatus.dotClass?.includes("connected") && sidepanelBridgeStatus.portVal === String(BRIDGE_PORT);
-    record("12. Side Panel Agent Status Indicator", isSidepanelConnected, `Badge: "${sidepanelBridgeStatus.text}", Dot: ${sidepanelBridgeStatus.dotClass}`);
+    record("18. Side Panel Agent Status Indicator", isSidepanelConnected, `Badge: "${sidepanelBridgeStatus.text}", Dot: ${sidepanelBridgeStatus.dotClass}`);
 
     await sidepanelPage.close();
 
