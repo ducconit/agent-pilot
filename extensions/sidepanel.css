@@ -316,10 +316,42 @@ body {
   border-bottom: 1px solid var(--border-color);
 }
 
+.card-header:last-child {
+  border-bottom: none;
+}
+
 .card-title {
   font-weight: 700;
   font-size: 12px;
   color: var(--text-primary);
+}
+
+.tooltip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: help;
+  transition: all 0.2s ease;
+  line-height: 1;
+  user-select: none;
+  flex-shrink: 0;
+  outline: none;
+}
+
+.tooltip-icon:hover,
+.tooltip-icon:focus {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
 }
 
 .card-badge {
