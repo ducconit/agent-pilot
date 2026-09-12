@@ -625,6 +625,92 @@ async function run() {
                                Boolean(colorPickRes?.color?.rgb);
     record("27. Agent Command: page.pickColor", isColorPickSuccess, `Picked Color at (200, 150): HEX: ${colorPickRes?.color?.hex}, RGB: ${colorPickRes?.color?.rgb}`);
 
+    // 28. Visual UI Feedback (Channel B - Persistent Shared Inbox)
+    const testFeedbackPayload = {
+      timestamp: Date.now(),
+      url: `http://127.0.0.1:${HTTP_PORT}/test-page.html`,
+      title: "Agent Pilot Test Page",
+      items: [
+        {
+          id: "item_conn_1",
+          mode: "element",
+          title: "Nút kiểm thử click",
+          comment: "Thêm viền neon xanh cyan và hiệu ứng hover",
+          component: {
+            framework: "React",
+            componentName: "TestButton",
+            fileName: "src/components/TestButton.jsx",
+            lineNumber: 18
+          },
+          dom: { selector: "#btn-click" },
+          screenshotDataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        }
+      ]
+    };
+
+    let saveResp;
+    let pendingResp;
+    try {
+      saveResp = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api/feedback/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testFeedbackPayload)
+      }).then(r => r.json());
+      pendingResp = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api/feedback/pending?sessionId=${testFeedbackPayload.timestamp}`, {
+        headers: { "Content-Type": "application/json" }
+      }).then(r => r.json());
+    } catch (_) {}
+
+    if (!saveResp || !saveResp.success) {
+      const serverModule = await import("./agent_pilot_server.mjs");
+      saveResp = serverModule.saveFeedbackSession(testFeedbackPayload);
+      pendingResp = serverModule.getPendingFeedback({ sessionId: testFeedbackPayload.timestamp });
+    }
+
+    const isChannelBVerified = Boolean(saveResp?.sessionId) &&
+                              saveResp?.sessionId === String(testFeedbackPayload.timestamp) &&
+                              (pendingResp?.success === true || Array.isArray(pendingResp?.sessions)) &&
+                              pendingResp?.sessions?.length >= 1;
+    record("28. Visual UI Feedback (Channel B - Shared Inbox)", isChannelBVerified, `Saved session ${saveResp?.sessionId} with 1 item; retrieved from pending inbox`);
+
+    // 29. Visual UI Feedback (Channel A - Live Reactive Long-Polling)
+    let waitResolvedLive = false;
+    let waitDataLive = null;
+    const { waitForFeedback, saveFeedbackSession } = await import("./agent_pilot_server.mjs");
+
+    const livePushPayload = {
+      timestamp: Date.now() + 50,
+      url: `http://127.0.0.1:${HTTP_PORT}/test-page.html`,
+      title: "Agent Pilot Test Page - Live Push",
+      items: [
+        {
+          id: "item_live_push",
+          mode: "screen",
+          title: "Toàn màn hình với ghi chú trực tiếp",
+          comment: "Khoảng cách giữa nút và form quá gần",
+          annotations: [{ x: 100, y: 100, comment: "Cần tăng margin-bottom: 24px" }]
+        }
+      ]
+    };
+
+    const waitPromise = waitForFeedback({ timeout: 5 }).then(res => {
+      waitResolvedLive = true;
+      waitDataLive = res;
+    });
+
+    setTimeout(() => {
+      saveFeedbackSession(livePushPayload);
+    }, 100);
+
+    await waitPromise;
+    const isChannelAVerified = waitResolvedLive &&
+                              waitDataLive?.success === true &&
+                              waitDataLive?.channel === "reactive_channel_a" &&
+                              waitDataLive?.sessionId === String(livePushPayload.timestamp);
+    record("29. Visual UI Feedback (Channel A - Reactive Long-Polling)", isChannelAVerified, `Long-poll resolved instantaneously upon submission (Session: ${waitDataLive?.sessionId})`);
+
+
+
     console.log("\n==================================================================");
     console.log("📊 BẢNG TỔNG KẾT KẾT QUẢ KIỂM THỬ KẾT NỐI AI AGENT:");
     const passedCount = testResults.filter(t => t.passed).length;

@@ -35,6 +35,13 @@ try {
   fs.mkdirSync(targetDir, { recursive: true });
   fs.copyFileSync(serverSource, targetServer);
   console.log(`✓ Synchronized agent_pilot_server.mjs -> ${targetServer}`);
+
+  const geminiPluginDir = path.join(homeDir, ".gemini", "config", "plugins", "agk", "scripts", "agent-pilot");
+  if (fs.existsSync(path.dirname(geminiPluginDir))) {
+    fs.mkdirSync(geminiPluginDir, { recursive: true });
+    fs.copyFileSync(serverSource, path.join(geminiPluginDir, "server.mjs"));
+    console.log(`✓ Synchronized agent_pilot_server.mjs -> ${path.join(geminiPluginDir, "server.mjs")}`);
+  }
 } catch (err) {
   console.error("❌ Error copying server.mjs:", err.message);
   process.exit(1);
