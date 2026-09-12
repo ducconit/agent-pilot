@@ -50,9 +50,9 @@
 
   <!-- Main Navigation Tabs -->
   <nav class="tabs-nav">
-    <button class="tab-btn active" data-tab="tab-agent">🤖 AI Agent</button>
+    <button class="tab-btn active" data-tab="tab-agent">🤖 Agent</button>
     <button class="tab-btn" data-tab="tab-devtools">⚡ DevTools</button>
-    <button class="tab-btn" data-tab="tab-inspector">🎯 Inspector & Màu</button>
+    <button class="tab-btn" data-tab="tab-inspector">🎯 Inspector</button>
     <button class="tab-btn" data-tab="tab-screenshot">📸 Chụp ảnh</button>
   </nav>
 
@@ -64,7 +64,7 @@
       <!-- Agent Bridge Connection Status Card -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Kết nối AI Agent (Antigravity Bridge)</span>
+          <span class="card-title">Kết nối AI Agent</span>
           <span class="card-badge" id="agent-status-badge">Chờ kết nối</span>
         </div>
         <div class="card-body">
@@ -75,16 +75,16 @@
             </div>
             <div class="info-row">
               <span class="info-label">Giao thức:</span>
-              <span class="info-val">JSON-RPC 2.0 / MCP Bridge</span>
+              <span class="info-val">JSON-RPC 2.0 / MCP</span>
             </div>
             <div class="info-row">
               <span class="info-label">Tab điều khiển:</span>
-              <span class="info-val font-mono" id="agent-info-target">Đang tải tab...</span>
+              <span class="info-val" id="agent-info-target">Đang tải tab...</span>
             </div>
           </div>
           <div class="btn-grid mt-2">
-            <button class="btn btn-outline" id="btn-ping-agent">⚡ Ping kiểm tra kết nối</button>
-            <button class="btn btn-primary" id="btn-self-test-agent">🧪 Tự kiểm tra hệ thống</button>
+            <button class="btn btn-outline btn-sm" id="btn-ping-agent">⚡ Ping kết nối</button>
+            <button class="btn btn-primary btn-sm" id="btn-self-test-agent">🧪 Tự kiểm tra</button>
           </div>
           <div class="script-output mt-2" id="agent-test-log" style="display:none;"></div>
         </div>

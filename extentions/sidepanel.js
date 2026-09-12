@@ -808,11 +808,11 @@
     if (agentBridgeDot && agentBridgeText) {
       if (status.connected) {
         agentBridgeDot.className = "status-dot connected";
-        agentBridgeText.textContent = `AI Agent: Đã kết nối (ws://127.0.0.1:${status.port})`;
+        agentBridgeText.textContent = "AI Agent: Đã kết nối";
         agentBridgeText.style.color = "var(--accent-green)";
       } else {
         agentBridgeDot.className = "status-dot disconnected";
-        agentBridgeText.textContent = `AI Agent: Chờ kết nối (Port ${status.port})`;
+        agentBridgeText.textContent = "AI Agent: Chờ kết nối";
         agentBridgeText.style.color = "var(--text-secondary)";
       }
     }
