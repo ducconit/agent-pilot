@@ -1,0 +1,16 @@
+{
+  "name": "browser_select_instance",
+  "description": "Switch active target browser instance when multiple browsers or windows are connected",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "instanceId": {
+        "type": "string",
+        "description": "The instanceId from browser_list_instances to select"
+      }
+    },
+    "required": [
+      "instanceId"
+    ]
+  }
+}

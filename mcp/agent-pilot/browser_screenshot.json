@@ -1,0 +1,21 @@
+{
+  "name": "browser_screenshot",
+  "description": "Capture a screenshot of a specified tab or active tab, even if running in the background while the user works on another tab (returns PNG data)",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "tabId": {
+        "type": "integer",
+        "description": "Optional Tab ID to capture. If omitted, captures the tab controlled by the agent (even if in background) or active tab"
+      },
+      "mode": {
+        "type": "string",
+        "enum": [
+          "visible",
+          "region"
+        ],
+        "description": "Screenshot mode (default visible)"
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "browser_list_instances",
+  "description": "List all connected browser instances (Chrome, Edge, Brave, separate profiles or windows) and see which one is currently active",
+  "parameters": {
+    "type": "object",
+    "properties": {}
+  }
+}

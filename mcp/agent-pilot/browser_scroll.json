@@ -1,0 +1,21 @@
+{
+  "name": "browser_scroll",
+  "description": "Scroll the agent's tab or specified tab smoothly",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "tabId": {
+        "type": "integer",
+        "description": "Optional target Tab ID"
+      },
+      "deltaX": {
+        "type": "number",
+        "description": "Horizontal scroll amount"
+      },
+      "deltaY": {
+        "type": "number",
+        "description": "Vertical scroll amount (e.g. 300 to scroll down)"
+      }
+    }
+  }
+}

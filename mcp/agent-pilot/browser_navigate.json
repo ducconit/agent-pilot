@@ -1,0 +1,20 @@
+{
+  "name": "browser_navigate",
+  "description": "Navigate active tab or specific tab to a URL",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Destination URL"
+      },
+      "tabId": {
+        "type": "integer",
+        "description": "Optional Tab ID. Defaults to current active tab"
+      }
+    },
+    "required": [
+      "url"
+    ]
+  }
+}

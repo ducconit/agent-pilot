@@ -88,6 +88,14 @@ async function run() {
     }
   } catch (_) {}
 
+  let initialClientCount = 0;
+  if (isLiveServer) {
+    try {
+      const h = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/health`).then(r => r.json());
+      initialClientCount = h.clientCount || (h.extensionConnected ? 1 : 0);
+    } catch (_) {}
+  }
+
   let bridgeServer = null;
   let wss = null;
   let onExtensionConnected = null;
@@ -97,18 +105,33 @@ async function run() {
       for (let i = 0; i < 40; i++) {
         await new Promise(r => setTimeout(r, 250));
         try {
-          const h = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/health`, { signal: AbortSignal.timeout(1000) }).then(r => r.json());
-          if (h && h.extensionConnected) {
+          const listResp = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ method: "instances.list" }),
+            signal: AbortSignal.timeout(1000)
+          });
+          const listData = await listResp.json();
+          const clients = Array.isArray(listData?.result) ? listData.result : (listData?.result?.clients || []);
+          if (clients.length > initialClientCount || (!initialClientCount && clients.length > 0)) {
+            const targetClient = clients[clients.length - 1];
+            await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ method: "instances.select", params: { instanceId: targetClient.instanceId } }),
+              signal: AbortSignal.timeout(1000)
+            });
+            console.log(`[Test] Selected test browser instance: ${targetClient.instanceId}`);
             return {
               type: "HANDSHAKE",
               agent: "AgentPilot-Extension",
-              version: h.version || "1.0.0",
+              version: "1.0.0",
               capabilities: ["tabs", "cdp", "cursor", "type", "inspector", "screenshot"]
             };
           }
         } catch (_) {}
       }
-      throw new Error("Timeout waiting for extension to connect to live bridge server");
+      throw new Error("Timeout waiting for test extension to connect to live bridge server");
     })();
   } else {
     bridgeServer = http.createServer((req, res) => {
@@ -218,7 +241,7 @@ async function run() {
     console.log("[Test] Waiting for extension to connect via WebSocket...");
     const handshake = await Promise.race([
       onExtensionConnected,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout waiting for extension connection")), 7000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout waiting for extension connection")), 15000))
     ]);
 
     const isConnected = (isLiveServer || !!extensionSocket) && handshake?.type === "HANDSHAKE";

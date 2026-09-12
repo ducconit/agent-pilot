@@ -1,0 +1,25 @@
+{
+  "name": "browser_click",
+  "description": "Simulate virtual mouse movement and click at (x, y) coordinates or on a CSS selector on the agent's tab or specified tab",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "tabId": {
+        "type": "integer",
+        "description": "Optional target Tab ID"
+      },
+      "x": {
+        "type": "number",
+        "description": "Target X pixel coordinate"
+      },
+      "y": {
+        "type": "number",
+        "description": "Target Y pixel coordinate"
+      },
+      "selector": {
+        "type": "string",
+        "description": "Optional CSS selector to click"
+      }
+    }
+  }
+}

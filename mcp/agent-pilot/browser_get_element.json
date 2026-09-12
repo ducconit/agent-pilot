@@ -1,0 +1,20 @@
+{
+  "name": "browser_get_element",
+  "description": "Inspect a DOM element on the agent's tab or specified tab, returning bounding box, dimensions, CSS selector, and XPath",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "tabId": {
+        "type": "integer",
+        "description": "Optional target Tab ID"
+      },
+      "selector": {
+        "type": "string",
+        "description": "CSS selector to inspect"
+      }
+    },
+    "required": [
+      "selector"
+    ]
+  }
+}

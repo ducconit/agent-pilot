@@ -1,0 +1,13 @@
+{
+  "name": "browser_pick_color",
+  "description": "Trigger the high-precision eyedropper color picker on the page",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "tabId": {
+        "type": "integer",
+        "description": "Optional target Tab ID"
+      }
+    }
+  }
+}

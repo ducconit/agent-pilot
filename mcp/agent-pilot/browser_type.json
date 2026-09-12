@@ -1,0 +1,29 @@
+{
+  "name": "browser_type",
+  "description": "Simulate human-like typing into an input or textarea element on the agent's tab or specified tab",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "tabId": {
+        "type": "integer",
+        "description": "Optional target Tab ID"
+      },
+      "selector": {
+        "type": "string",
+        "description": "CSS selector of the input field"
+      },
+      "text": {
+        "type": "string",
+        "description": "Text string to type"
+      },
+      "delay": {
+        "type": "number",
+        "description": "Typing delay between keys in ms (default 50)"
+      }
+    },
+    "required": [
+      "selector",
+      "text"
+    ]
+  }
+}
