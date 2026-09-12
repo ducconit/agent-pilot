@@ -103,6 +103,33 @@ body {
   text-overflow: ellipsis;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+#btn-open-guide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+#btn-open-guide:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-cyan);
+  transform: translateY(-1px);
+}
+
 .debugger-toggle {
   display: flex;
   align-items: center;

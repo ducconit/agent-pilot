@@ -140,6 +140,25 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
     };
   }
 
+  // Open / Focus Application Guide Page
+  const btnOpenGuide = document.getElementById("btn-open-guide");
+  if (btnOpenGuide) {
+    btnOpenGuide.onclick = () => {
+      const guideUrl = chrome.runtime.getURL("guide.html");
+      chrome.tabs.query({}, (tabs) => {
+        const existingTab = tabs.find(t => t.url && t.url.startsWith(guideUrl));
+        if (existingTab && existingTab.id) {
+          chrome.tabs.update(existingTab.id, { active: true });
+          if (existingTab.windowId) {
+            chrome.windows.update(existingTab.windowId, { focused: true });
+          }
+        } else {
+          chrome.tabs.create({ url: guideUrl, active: true });
+        }
+      });
+    };
+  }
+
   // =========================================================================
   // 3. Global Messages Router
   // =========================================================================

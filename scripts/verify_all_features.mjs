@@ -202,6 +202,8 @@ async function run() {
 
       return {
         brand: document.querySelector(".brand-title")?.textContent,
+        brandSub: document.querySelector(".brand-sub")?.textContent.trim(),
+        hasGuideBtn: !!document.getElementById("btn-open-guide"),
         tabBtns: Array.from(document.querySelectorAll(".tab-btn")).map(b => b.textContent.trim()),
         hasAgentMonitor: !!document.getElementById("agent-activity-log"),
         hasInspectorBtn: !!document.getElementById("btn-toggle-inspector"),
@@ -215,15 +217,45 @@ async function run() {
         hasAutoCopySwitch: !!document.getElementById("toggle-auto-copy-shot")
       };
     });
+
+    // Test clicking guide button: opens guide.html and focuses on repeated clicks
+    const guideTest = await sidepanelPage.evaluate(async () => {
+      const btn = document.getElementById("btn-open-guide");
+      if (!btn) return { opened: false, singleTab: false };
+      btn.click();
+      await new Promise(r => setTimeout(r, 300));
+      return new Promise((resolve) => {
+        chrome.tabs.query({}, (tabs) => {
+          const guideTabs = tabs.filter(t => t.url && t.url.includes("guide.html"));
+          // Click again to verify existing tab is focused rather than duplicated
+          btn.click();
+          setTimeout(() => {
+            chrome.tabs.query({}, (tabsAfter) => {
+              const guideTabsAfter = tabsAfter.filter(t => t.url && t.url.includes("guide.html"));
+              resolve({
+                opened: guideTabs.length >= 1,
+                singleTab: guideTabsAfter.length === 1,
+                guideUrl: guideTabs[0]?.url
+              });
+            });
+          }, 300);
+        });
+      });
+    });
+
     const sidepanelOk = sidepanelCheck.brand === "AGENT PILOT" &&
+                        sidepanelCheck.brandSub === "Next-Gen AI Browser Companion" &&
+                        sidepanelCheck.hasGuideBtn === true &&
                         sidepanelCheck.tabBtns.length === 3 &&
                         sidepanelCheck.hasAgentMonitor &&
                         sidepanelCheck.subtabBtns.length === 2 &&
                         sidepanelCheck.isCssTabActive &&
                         sidepanelCheck.hasCssSearch &&
                         sidepanelCheck.captureElementText === "🎯 Chụp phần tử" &&
-                        sidepanelCheck.hasAutoCopySwitch === true;
-    record("8. Side Panel Control Center UI (3 Main Tabs + Inspector Subtabs + '🎯 Chụp phần tử' + Auto-Copy Switch)", sidepanelOk, `Brand: ${sidepanelCheck.brand}, Button: "${sidepanelCheck.captureElementText}", Auto-Copy Switch: ${sidepanelCheck.hasAutoCopySwitch}`);
+                        sidepanelCheck.hasAutoCopySwitch === true &&
+                        guideTest.opened === true &&
+                        guideTest.singleTab === true;
+    record("8. Side Panel Control Center UI (Slogan, Guide Page Tab Focus & 3 Main Tabs)", sidepanelOk, `Slogan: "${sidepanelCheck.brandSub}", Guide Button: ${sidepanelCheck.hasGuideBtn}, Guide Tab Open/Focus: ${guideTest.singleTab}`);
     // Keep sidepanelPage open to test Extension IPC messaging
     // 10. Test Chrome DevTools Protocol (CDP) via Background Service Worker
     console.log("\n--- KIỂM THỬ CHROME DEVTOOLS PROTOCOL (CDP ENGINE) ---");
