@@ -55,6 +55,9 @@ browser-control/
 │   ├── CDP_GUIDE.md                    # Hướng dẫn Chrome DevTools Protocol (CDP)
 │   ├── API_REFERENCE.md                # Danh mục tin nhắn & đặc tả JSON Action
 │   └── USAGE_GUIDE.md                  # Sổ tay hướng dẫn sử dụng từng tính năng
+├── skills/                             # Kỹ năng chuẩn Agent Skills Ecosystem (skills.sh)
+│   └── agent-pilot/
+│       └── SKILL.md                    # Hướng dẫn & cấu hình skill cho npx skills add
 ├── extensions/                         # Toàn bộ mã nguồn Chrome Extension (Manifest V3)
 │   ├── manifest.json                   # Cấu hình chuẩn Chrome Extension MV3
 │   ├── guide.html                      # Trang Thông tin & Hướng dẫn sử dụng responsive
@@ -139,6 +142,22 @@ Dự án có sẵn tệp `test-page.html` được thiết kế đặc biệt đ
    - Thử nghiệm **DevTools**: Nhấp các nút sinh `console.log`, `warn`, `error` hoặc nút gửi API để thấy nhật ký và network nhảy tức thì trong Side Panel.
    - Thử nghiệm **Lấy màu**: Bật nút lấy mã màu và nhặt màu từ dải các ô màu rực rỡ trên trang.
    - Thử nghiệm **Chụp ảnh**: Thử chụp toàn màn hình, kéo khung crop box hoặc chụp riêng khối `#inspector-special-box`.
+
+---
+
+## ⚡ Cài Đặt Kỹ Năng Cho AI Agents (`npx skills add`)
+
+Agent Pilot tương thích hoàn toàn với chuẩn **Agent Skills Open Ecosystem** ([skills.sh](https://skills.sh/)). Mọi trợ lý AI coding (như **Claude Code**, **Cursor**, **Codex**, **OpenCode**, **Antigravity**, **Amp**, **Roo Code**, **Devin**, v.v.) đều có thể tự động tải và cài đặt kỹ năng điều khiển trình duyệt của Agent Pilot chỉ với một lệnh duy nhất:
+
+```bash
+# Cài đặt trực tiếp cho dự án hiện tại
+npx skills add https://github.com/ducconit/agent-pilot-extension
+
+# Hoặc cài đặt toàn cục (Global) cho tất cả coding agents trên máy
+npx skills add https://github.com/ducconit/agent-pilot-extension -g --all
+```
+
+Khi được kích hoạt, AI Agent sẽ tự động phát hiện bộ công cụ MCP `agent-pilot` và có thể tự chủ điều khiển tab, click chuột ảo, gõ bàn phím, cuộn trang, trích xuất DOM, chụp ảnh màn hình và theo dõi Chrome DevTools để phục vụ công việc lập trình và kiểm thử tự động.
 
 ---
 

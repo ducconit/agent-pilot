@@ -23,19 +23,24 @@
       --radius-sm: 6px;
       --radius-md: 10px;
       --radius-lg: 16px;
+      --scrollbar-thumb: color-mix(in srgb, var(--text-sub) 30%, transparent);
+      --scrollbar-thumb-hover: color-mix(in srgb, var(--accent-cyan) 60%, transparent);
     }
 
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+    }
+
+    html, body {
       scrollbar-width: thin;
-      scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+      scrollbar-color: var(--scrollbar-thumb) transparent;
     }
 
     ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
     }
 
     ::-webkit-scrollbar-track {
@@ -43,13 +48,12 @@
     }
 
     ::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.25);
+      background: var(--scrollbar-thumb);
       border-radius: 9999px;
-      transition: background-color 0.2s ease;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(56, 189, 248, 0.55);
+      background: var(--scrollbar-thumb-hover);
     }
 
     ::-webkit-scrollbar-corner {
@@ -563,6 +567,22 @@
       </div>
 
       <div class="cards-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">🚀</span>
+            <h3 class="card-title">Cài Đặt Kỹ Năng Agent (skills.sh)</h3>
+          </div>
+          <p class="card-desc">
+            Tương thích chuẩn Agent Skills mở cho Claude Code, Cursor, Codex, OpenCode, Antigravity, Amp, Roo, Devin. Cài đặt tự động chỉ với một dòng lệnh:
+          </p>
+          <div class="code-box">npx skills add https://github.com/ducconit/agent-pilot-extension</div>
+          <ul class="features-list">
+            <li>Tự động cấu hình và kích hoạt kỹ năng <code>agent-pilot</code></li>
+            <li>Hỗ trợ cài đặt theo từng dự án hoặc toàn cục máy tính (<code>-g --all</code>)</li>
+            <li>Trang bị đầy đủ 14 công cụ MCP điều khiển trình duyệt chuyên sâu</li>
+          </ul>
+        </div>
+
         <div class="card">
           <div class="card-header">
             <span class="card-icon">⚡</span>

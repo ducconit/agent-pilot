@@ -40,6 +40,21 @@ try {
   process.exit(1);
 }
 
+// Synchronize skills/agent-pilot/SKILL.md
+const skillSource = path.join(ROOT_DIR, "skills", "agent-pilot", "SKILL.md");
+const targetSkillDir = path.join(agkDir, "skills", "agent-pilot");
+const targetSkillFile = path.join(targetSkillDir, "SKILL.md");
+
+if (fs.existsSync(skillSource)) {
+  try {
+    fs.mkdirSync(targetSkillDir, { recursive: true });
+    fs.copyFileSync(skillSource, targetSkillFile);
+    console.log(`✓ Synchronized SKILL.md -> ${targetSkillFile}`);
+  } catch (err) {
+    console.warn("⚠️ Note: Could not copy SKILL.md to AGK:", err.message);
+  }
+}
+
 // On Unix-like environments (Linux, macOS), set executable permissions and build plugin
 if (process.platform !== "win32") {
   try {
