@@ -100,6 +100,8 @@ async function run() {
   let wss = null;
   let onExtensionConnected = null;
 
+  let selectedTestInstanceId = null;
+
   if (isLiveServer) {
     const MAX_CLIENT_POLL_RETRIES = 40;
     const CLIENT_POLL_INTERVAL_MS = 250;
@@ -117,6 +119,7 @@ async function run() {
           const clients = Array.isArray(listData?.result) ? listData.result : (listData?.result?.clients || []);
           if (clients.length > initialClientCount || (!initialClientCount && clients.length > 0)) {
             const targetClient = clients[clients.length - 1];
+            selectedTestInstanceId = targetClient.instanceId;
             await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -188,10 +191,14 @@ async function run() {
 
   async function sendAgentCommand(method, params = {}, timeoutMs = 8000) {
     if (isLiveServer) {
+      const payloadParams = { ...params };
+      if (selectedTestInstanceId && payloadParams.instanceId === undefined) {
+        payloadParams.instanceId = selectedTestInstanceId;
+      }
       const resp = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ method, params }),
+        body: JSON.stringify({ method, params: payloadParams }),
         signal: AbortSignal.timeout(timeoutMs)
       });
       const data = await resp.json();
@@ -447,9 +454,35 @@ async function run() {
       // Expected to throw or return error
     }
     record("19. Privacy Isolation for Background Screenshot", !privacyLeakDetected, `Invalid background tab correctly rejected without leaking foreground user screen`);
+    // 20. Test Background Tab Operations without focus (Click, Type & Scroll in hidden background tab)
+    const isTargetHidden = await testPage.evaluate(() => document.hidden);
+    const isUserActive = await userActivePage.evaluate(() => !document.hidden);
+
+    const bgClickRes = await sendAgentCommand("page.click", { tabId, selector: "#btn-sample-click" });
+    const bgTypeRes = await sendAgentCommand("page.type", {
+      tabId,
+      selector: "#test-search-input",
+      text: "Background execution without focus"
+    });
+    const bgScrollRes = await sendAgentCommand("page.scroll", { tabId, deltaY: 200 });
+
+    let bgClickCounter = "";
+    let bgTypedVal = "";
+    let bgScrollY = 0;
+    if (testPage) {
+      bgClickCounter = await testPage.evaluate(() => document.getElementById("click-counter-text")?.textContent);
+      bgTypedVal = await testPage.evaluate(() => document.getElementById("test-search-input")?.value);
+      bgScrollY = await testPage.evaluate(() => window.scrollY);
+    }
+    const bgOpsSuccess = isTargetHidden &&
+                         isUserActive &&
+                         bgClickCounter.includes("2 lần") &&
+                         bgTypedVal.includes("Background execution without focus") &&
+                         bgScrollY > 0;
+    record("20. Background Tab Control Without Focus", bgOpsSuccess, `Tab operated silently in background without stealing focus (Target hidden: ${isTargetHidden}, User active: ${isUserActive}, Counter: "${bgClickCounter}", ScrollY: ${bgScrollY})`);
     await userActivePage.close();
 
-    // 20. Test HTTP API Endpoint (POST http://127.0.0.1:58765/api)
+    // 21. Test HTTP API Endpoint (POST http://127.0.0.1:58765/api)
     const httpRes = await new Promise((resolve) => {
       const req = http.request(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
         method: "POST",
@@ -465,9 +498,9 @@ async function run() {
       req.write(JSON.stringify({ method: "ping" }));
       req.end();
     });
-    record("20. HTTP REST/JSON-RPC API Endpoint", httpRes?.success === true && httpRes?.result?.pong === true, `POST /api response: pong=true`);
+    record("21. HTTP REST/JSON-RPC API Endpoint", httpRes?.success === true && httpRes?.result?.pong === true, `POST /api response: pong=true`);
 
-    // 21. Test Side Panel UI displays Agent Connection Status
+    // 22. Test Side Panel UI displays Agent Connection Status
     const swTarget = await browser.waitForTarget(t => t.type() === "service_worker");
     const extId = swTarget.url().split("/")[2];
     const sidepanelPage = await browser.newPage();
@@ -483,7 +516,7 @@ async function run() {
     });
 
     const isSidepanelConnected = sidepanelBridgeStatus.dotClass?.includes("connected") && sidepanelBridgeStatus.portVal === String(BRIDGE_PORT);
-    record("21. Side Panel Agent Status Indicator", isSidepanelConnected, `Badge: "${sidepanelBridgeStatus.text}", Dot: ${sidepanelBridgeStatus.dotClass}`);
+    record("22. Side Panel Agent Status Indicator", isSidepanelConnected, `Badge: "${sidepanelBridgeStatus.text}", Dot: ${sidepanelBridgeStatus.dotClass}`);
 
     await sidepanelPage.close();
 

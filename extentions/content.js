@@ -62,6 +62,7 @@
   let cursorHideTimeout = null;
 
   function activateCursor(timeoutMs = 2500) {
+    if (document.hidden) return;
     if (cursorHideTimeout) {
       clearTimeout(cursorHideTimeout);
       cursorHideTimeout = null;
@@ -94,6 +95,13 @@
    */
   function moveVirtualMouse(targetX, targetY, duration = CONFIG.DEFAULT_MOVE_DURATION) {
     activateCursor();
+    // Chromium pauses requestAnimationFrame in background tabs (document.hidden = true).
+    // In background mode, immediately update coordinates without waiting for rAF.
+    if (document.hidden) {
+      updateCursorTransform(targetX, targetY);
+      return Promise.resolve({ success: true, x: targetX, y: targetY });
+    }
+
     return new Promise((resolve) => {
       const startX = currentMouseX;
       const startY = currentMouseY;
@@ -127,15 +135,17 @@
     activateCursor();
     await moveVirtualMouse(x, y, CONFIG.CLICK_DELAY);
 
-    // Render Ripple Effect
-    const ripple = document.createElement("div");
-    ripple.className = "agent-pilot-click-ripple";
-    ripple.style.left = `${x}px`;
-    ripple.style.top = `${y}px`;
-    ripple.style.width = "48px";
-    ripple.style.height = "48px";
-    cursorLayer.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 550);
+    // Render Ripple Effect (skipped when tab is in background)
+    if (!document.hidden) {
+      const ripple = document.createElement("div");
+      ripple.className = "agent-pilot-click-ripple";
+      ripple.style.left = `${x}px`;
+      ripple.style.top = `${y}px`;
+      ripple.style.width = "48px";
+      ripple.style.height = "48px";
+      cursorLayer.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 550);
+    }
 
     // Find and dispatch event on element under pointer
     let el = selector ? document.querySelector(selector) : null;
@@ -254,7 +264,11 @@
   function virtualScroll(deltaX = 0, deltaY = CONFIG.SCROLL_AMOUNT) {
     try {
       isAgentDispatching = true;
-      window.scrollBy({ top: deltaY, left: deltaX, behavior: "smooth" });
+      window.scrollBy({
+        top: deltaY,
+        left: deltaX,
+        behavior: document.hidden ? "auto" : "smooth"
+      });
     } finally {
       isAgentDispatching = false;
     }

@@ -253,7 +253,9 @@ export function sendCommandToExtension(method, params = {}, timeoutMs = 15000) {
       }
     });
 
-    client.ws.send(JSON.stringify({ id, method, params }));
+    const cleanParams = { ...params };
+    delete cleanParams.instanceId;
+    client.ws.send(JSON.stringify({ id, method, params: cleanParams }));
   });
 }
 

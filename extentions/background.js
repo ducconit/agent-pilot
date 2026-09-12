@@ -1127,7 +1127,9 @@ class AgentBridgeClient {
           break;
 
         case "tabs.query": {
-          chrome.tabs.query(params, (tabs) => {
+          const queryParams = { ...params };
+          delete queryParams.instanceId;
+          chrome.tabs.query(queryParams, (tabs) => {
             if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
             else respond(tabs);
           });
