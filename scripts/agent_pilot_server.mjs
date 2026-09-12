@@ -57,6 +57,7 @@ const server = http.createServer(async (req, res) => {
       .map(c => ({
         instanceId: c.id,
         browser: c.details?.browser || "Chromium",
+        os: c.details?.os || "linux",
         windowCount: c.details?.windowCount || 1,
         activeTabTitle: c.details?.activeTabTitle || "Unknown",
         activeTabUrl: c.details?.activeTabUrl || "",
@@ -125,7 +126,7 @@ wss.on("connection", (ws, req) => {
     lastActive: Date.now(),
     agent: "AgentPilot-Extension",
     version: "1.0.0",
-    details: { browser: "Chromium", windowCount: 1, activeTabTitle: "", activeTabUrl: "" }
+    details: { browser: "Chromium", os: "linux", windowCount: 1, activeTabTitle: "", activeTabUrl: "" }
   };
   connectedClients.set(clientId, clientInfo);
   if (!activeClientId) activeClientId = clientId;
@@ -154,7 +155,7 @@ wss.on("connection", (ws, req) => {
         clientInfo.version = msg.version || clientInfo.version;
         if (msg.details) Object.assign(clientInfo.details, msg.details);
         clientInfo.lastActive = Date.now();
-        console.error(`[BridgeServer] 🤝 Handshake from ${clientInfo.agent} [${clientId}] (${clientInfo.details.browser}) - Tab: "${clientInfo.details.activeTabTitle}"`);
+        console.error(`[BridgeServer] 🤝 Handshake from ${clientInfo.agent} [${clientId}] (${clientInfo.details.browser} on ${clientInfo.details.os}) - Tab: "${clientInfo.details.activeTabTitle}"`);
       } else if (msg.type === "WINDOW_FOCUS") {
         clientInfo.lastActive = Date.now();
         activeClientId = clientId;
@@ -204,6 +205,7 @@ export function sendCommandToExtension(method, params = {}, timeoutMs = 15000) {
         .map(c => ({
           instanceId: c.id,
           browser: c.details?.browser || "Chromium",
+          os: c.details?.os || "linux",
           windowCount: c.details?.windowCount || 1,
           activeTabTitle: c.details?.activeTabTitle || "Unknown",
           activeTabUrl: c.details?.activeTabUrl || "",
@@ -455,7 +457,10 @@ async function handleMcpToolCall(name, args) {
 }
 
 // Start stdio interface and HTTP server when executed directly as main script
-const isMainScript = Boolean(process.argv[1] && (path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)));
+const isMainScript = Boolean(
+  process.argv[1] &&
+  path.resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase()
+);
 
 if (isMainScript) {
   // Enable MCP stdio interface (always active for Antigravity & MCP clients)
@@ -597,6 +602,7 @@ if (isMainScript) {
 
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGBREAK", () => shutdown("SIGBREAK")); // Windows Ctrl+Break
 }
 
 export { server, wss, PORT, HOST };

@@ -15,20 +15,8 @@ const __dirname = path.dirname(__filename);
 const PORT = 8765;
 const PROJECT_DIR = path.resolve(__dirname, "..");
 const EXT_DIR = path.join(PROJECT_DIR, "extentions");
-function resolveChromiumBin() {
-  if (process.env.CHROME_BIN && fs.existsSync(process.env.CHROME_BIN)) return process.env.CHROME_BIN;
-  if (process.env.CHROMIUM_BIN && fs.existsSync(process.env.CHROMIUM_BIN)) return process.env.CHROMIUM_BIN;
-  const candidates = [
-    "/tmp/browsers/chromium/linux-1696738/chrome-linux/chrome",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser"
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
-  }
-  return "/tmp/browsers/chromium/linux-1696738/chrome-linux/chrome";
-}
 
+import { resolveChromiumBin, getChromiumLaunchArgs } from "./browser_resolver.mjs";
 const CHROMIUM_BIN = resolveChromiumBin();
 
 function startHttpServer() {
@@ -77,14 +65,7 @@ async function run() {
     browser = await puppeteer.launch({
       executablePath: CHROMIUM_BIN,
       headless: false,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--ozone-platform=x11",
-        "--disable-gpu",
-        `--disable-extensions-except=${EXT_DIR}`,
-        `--load-extension=${EXT_DIR}`
-      ]
+      args: getChromiumLaunchArgs(EXT_DIR)
     });
 
     // 1. Verify Extension Background Service Worker Loaded

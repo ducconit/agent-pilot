@@ -20,6 +20,27 @@ function getTabLockState(tabId) {
   return tabLockStates.get(tabId);
 }
 
+/**
+ * Cross-platform URL normalizer supporting Windows/Mac/Linux local file URLs
+ * as well as edge://, chrome://, brave://, and standard web protocols.
+ */
+function normalizeUrl(url) {
+  if (!url) return "";
+  const trimmed = String(url).trim();
+  if (/^(https?|file|chrome|edge|brave|about|data):/i.test(trimmed)) {
+    return trimmed;
+  }
+  return "https://" + trimmed;
+}
+
+// Cached host platform: "win", "mac", "linux", "cros"
+let currentPlatform = "linux";
+if (typeof chrome !== "undefined" && chrome.runtime?.getPlatformInfo) {
+  chrome.runtime.getPlatformInfo((info) => {
+    if (info && info.os) currentPlatform = info.os;
+  });
+}
+
 // Enable Side Panel behavior on icon click natively
 function enableSidePanelBehavior() {
   if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
@@ -405,10 +426,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (action === "new_tab") {
-    let url = request.url || "https://google.com";
-    if (url && !url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("chrome://")) {
-      url = "https://" + url;
-    }
+    const url = normalizeUrl(request.url || "https://google.com");
     chrome.tabs.create({ url }, (tab) => {
       if (chrome.runtime.lastError) {
         sendResponse({ success: false, error: chrome.runtime.lastError.message });
@@ -421,10 +439,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (action === "navigate") {
     const tabId = request.tabId;
-    let url = request.url || "";
-    if (url && !url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("chrome://")) {
-      url = "https://" + url;
-    }
+    const url = normalizeUrl(request.url || "");
     chrome.tabs.update(tabId, { url }, (tab) => {
       if (chrome.runtime.lastError) {
         sendResponse({ success: false, error: chrome.runtime.lastError.message });
@@ -803,6 +818,7 @@ class AgentBridgeClient {
           capabilities: ["tabs", "cdp", "cursor", "type", "click", "scroll", "inspector", "eyedropper", "screenshot"],
           details: {
             browser: browserName,
+            os: currentPlatform,
             windowCount: 1,
             activeTabTitle: "Active Tab",
             activeTabUrl: ""
@@ -1164,10 +1180,7 @@ class AgentBridgeClient {
         }
 
         case "tabs.create": {
-          let url = params.url || "https://google.com";
-          if (url && !url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("chrome://")) {
-            url = "https://" + url;
-          }
+          const url = normalizeUrl(params.url || "https://google.com");
           const makeActive = params.active !== false;
           chrome.tabs.create({ url, active: makeActive }, async (tab) => {
             if (chrome.runtime.lastError) {
@@ -1189,12 +1202,8 @@ class AgentBridgeClient {
         case "tabs.update": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
-          let url = params.url || "";
-          if (url && !url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("chrome://")) {
-            url = "https://" + url;
-          }
           const updateProps = {};
-          if (url) updateProps.url = url;
+          if (params.url) updateProps.url = normalizeUrl(params.url);
           if (params.active !== undefined) updateProps.active = Boolean(params.active);
 
           chrome.tabs.update(tabId, updateProps, async (tab) => {

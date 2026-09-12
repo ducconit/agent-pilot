@@ -231,8 +231,10 @@
     await virtualClick(rect.left + rect.width / 2, rect.top + rect.height / 2);
 
     el.focus();
+    const cleanText = String(text ?? "").replace(/\r\n/g, "\n");
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) {
-      for (const char of text) {
+      for (const char of cleanText) {
+        if (char === "\r") continue;
         try {
           isAgentDispatching = true;
           if (el.isContentEditable) {
@@ -252,7 +254,7 @@
       } finally {
         isAgentDispatching = false;
       }
-      return { success: true, textEntered: text };
+      return { success: true, textEntered: cleanText };
     } else {
       return { success: false, error: "Element is not an input or editable field" };
     }

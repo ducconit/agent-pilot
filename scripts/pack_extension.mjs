@@ -52,13 +52,46 @@ if (fs.existsSync(zipFilePath)) {
 
 // 3. Zip extentions/ contents
 console.log(`→ Creating zip archive: dist/${zipFileName}...`);
+
+function packZip(extDir, outputZip) {
+  const isWindows = process.platform === "win32";
+
+  if (isWindows) {
+    // Strategy 1 (Windows 10 1803+ / Windows 11): tar.exe with auto-compression
+    try {
+      execSync(`tar -a -c -f "${outputZip}" -C "${extDir}" .`, { stdio: "inherit" });
+      return;
+    } catch (_) {}
+
+    // Strategy 2: PowerShell Compress-Archive
+    try {
+      const psCmd = `powershell -NoProfile -NonInteractive -Command "Compress-Archive -Path '${extDir}\\*' -DestinationPath '${outputZip}' -Force"`;
+      execSync(psCmd, { stdio: "inherit" });
+      return;
+    } catch (_) {}
+  }
+
+  // Linux & macOS: Standard zip utility
+  try {
+    execSync(`cd "${extDir}" && zip -r -9 "${outputZip}" . -x "*.DS_Store" "*Thumbs.db" "*.git*"`, {
+      stdio: "inherit"
+    });
+    return;
+  } catch (_) {}
+
+  // Fallback to tar with auto-compression
+  try {
+    execSync(`tar -a -c -f "${outputZip}" -C "${extDir}" .`, { stdio: "inherit" });
+    return;
+  } catch (err) {
+    throw new Error(`Failed to create zip archive with zip or tar: ${err.message}`);
+  }
+}
+
 try {
-  // Zip contents inside extentions/ (so manifest.json is at the root of the zip)
-  execSync(`cd "${EXT_DIR}" && zip -r -9 "${zipFilePath}" . -x "*.DS_Store" "*Thumbs.db" "*.git*"`, {
-    stdio: "inherit"
-  });
+  packZip(EXT_DIR, zipFilePath);
 } catch (err) {
-  console.error("❌ Failed to create zip with system zip utility:", err.message);
+  console.error("❌ Failed to create zip archive:", err.message);
   process.exit(1);
 }
 
