@@ -111,7 +111,17 @@ export async function ensureContentScript(tabId) {
 
     if (!results || !results[0] || !results[0].result) {
       await chrome.scripting.insertCSS({ target: { tabId }, files: ["content.css"] }).catch(() => {});
-      await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] }).catch(() => {});
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: [
+          "content/toast.js",
+          "content/lock-shield.js",
+          "content/cursor-simulator.js",
+          "content/dom-inspector.js",
+          "content/eyedropper.js",
+          "content.js"
+        ]
+      }).catch(() => {});
       await new Promise(r => setTimeout(r, 80));
     }
     return true;
