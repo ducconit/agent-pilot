@@ -28,13 +28,15 @@ if (!fs.existsSync(pkgPath) || !fs.existsSync(manifestPath)) {
 const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
 
+const manifestVer = manifest.version_name || manifest.version;
+
 console.log("==================================================================");
 console.log("📦 AGENT PILOT - PACKAGING EXTENSION FOR RELEASE");
 console.log(`📌 package.json version : v${pkg.version}`);
-console.log(`📌 manifest.json version: v${manifest.version}`);
+console.log(`📌 manifest.json version: v${manifest.version}${manifest.version_name ? ` (${manifest.version_name})` : ""}`);
 
-if (pkg.version !== manifest.version) {
-  console.warn(`⚠️ Warning: package.json (${pkg.version}) and manifest.json (${manifest.version}) versions do not match!`);
+if (pkg.version !== manifest.version && pkg.version !== manifest.version_name) {
+  console.warn(`⚠️ Warning: package.json (${pkg.version}) and manifest.json (${manifestVer}) versions do not match!`);
 }
 
 // 2. Prepare dist directory

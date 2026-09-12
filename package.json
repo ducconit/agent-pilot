@@ -1,7 +1,7 @@
 {
   "name": "agent-pilot",
-  "version": "1.0.0",
-  "description": "Agent Pilot - Universal AI Agent Browser Controller (Antigravity First)",
+  "version": "1.0.0-beta",
+  "description": "Agent Pilot (Beta) - Universal AI Agent Browser Controller (Antigravity First)",
   "type": "module",
   "scripts": {
     "test": "node scripts/run_test.mjs scripts/verify_all_features.mjs",

@@ -202,6 +202,7 @@ async function run() {
 
       return {
         brand: document.querySelector(".brand-title")?.textContent,
+        hasBetaBadge: document.querySelector(".badge-beta")?.textContent.trim() === "BETA",
         brandSub: document.querySelector(".brand-sub")?.textContent.trim(),
         hasGuideBtn: !!document.getElementById("btn-open-guide"),
         tabBtns: Array.from(document.querySelectorAll(".tab-btn")).map(b => b.textContent.trim()),
@@ -244,6 +245,7 @@ async function run() {
     });
 
     const sidepanelOk = sidepanelCheck.brand === "AGENT PILOT" &&
+                        sidepanelCheck.hasBetaBadge === true &&
                         sidepanelCheck.brandSub === "Next-Gen AI Browser Companion" &&
                         sidepanelCheck.hasGuideBtn === true &&
                         sidepanelCheck.tabBtns.length === 3 &&
@@ -255,7 +257,7 @@ async function run() {
                         sidepanelCheck.hasAutoCopySwitch === true &&
                         guideTest.opened === true &&
                         guideTest.singleTab === true;
-    record("8. Side Panel Control Center UI (Slogan, Guide Page Tab Focus & 3 Main Tabs)", sidepanelOk, `Slogan: "${sidepanelCheck.brandSub}", Guide Button: ${sidepanelCheck.hasGuideBtn}, Guide Tab Open/Focus: ${guideTest.singleTab}`);
+    record("8. Side Panel Control Center UI (Beta Badge, Slogan, Guide Tab Focus & 3 Main Tabs)", sidepanelOk, `Badge: "BETA" (${sidepanelCheck.hasBetaBadge}), Slogan: "${sidepanelCheck.brandSub}", Guide Button: ${sidepanelCheck.hasGuideBtn}`);
     // Keep sidepanelPage open to test Extension IPC messaging
     // 10. Test Chrome DevTools Protocol (CDP) via Background Service Worker
     console.log("\n--- KIỂM THỬ CHROME DEVTOOLS PROTOCOL (CDP ENGINE) ---");
