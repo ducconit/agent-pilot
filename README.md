@@ -199,7 +199,16 @@ Chúng tôi hoan nghênh mọi sự đóng góp để giúp Agent Pilot ngày c�
 
 ---
 
+## 👤 Tác Giả & Quản Trị Dự Án (Author & Maintainer)
+
+* **Tác giả (Owner)**: **DNT**
+* **GitHub**: [@ducconit](https://github.com/ducconit) ([https://github.com/ducconit](https://github.com/ducconit))
+* **Dự án**: [Agent Pilot Extension](https://github.com/ducconit/agent-pilot-extension)
+
+---
+
 ## 📄 Bản Quyền & Giấy Phép
 
 Dự án được phát hành theo giấy phép mã nguồn mở [MIT License](LICENSE).
+Copyright (c) 2026 **DNT** ([@ducconit](https://github.com/ducconit)) & Agent Pilot Contributors.
 Tương thích hoàn hảo với Antigravity, Chrome 116+ (hỗ trợ đầy đủ Side Panel API).

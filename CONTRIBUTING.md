@@ -110,6 +110,6 @@ Chúng tôi áp dụng chuẩn **[Conventional Commits](https://www.conventional
 5. Commit thay đổi theo chuẩn Conventional Commits.
 6. Push lên nhánh trên fork của bạn và mở **Pull Request** trỏ về nhánh `main` của repository gốc.
 7. Điền đầy đủ thông tin vào mẫu checklist trong PR Template.
-8. Các maintainer sẽ đánh giá PR và phản hồi trong thời gian sớm nhất!
+8. Quản trị viên dự án (**DNT** - [@ducconit](https://github.com/ducconit)) sẽ đánh giá PR và phản hồi trong thời gian sớm nhất!
 
 Xin chân thành cảm ơn sự đồng hành và đóng góp của bạn cho **Agent Pilot**! 🚀

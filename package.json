@@ -14,7 +14,10 @@
     "sync:agk": "node scripts/sync_agk.mjs"
   },
   "keywords": ["browser-control", "ai-agent", "chrome-extension", "antigravity", "cdp", "mcp"],
-  "author": "Antigravity & Agent Pilot Contributors",
+  "author": {
+    "name": "DNT",
+    "url": "https://github.com/ducconit"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
