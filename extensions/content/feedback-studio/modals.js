@@ -142,13 +142,23 @@
   `;
   document.documentElement.appendChild(annotatorModal);
 
+  const MIN_BOX_SIZE = 10;
+  const BADGE_BASE_WIDTH = 24;
+  const BADGE_CHAR_WIDTH = 7;
+  const BADGE_HEIGHT = 18;
+  const BADGE_TOP_THRESHOLD = 22;
+
   let activeTool = "pin"; // "pin" | "box"
   let currentAnnotations = [];
   let annotatorCaptureData = null;
   let boxDragState = { dragging: false, startX: 0, startY: 0, currentRect: null };
 
   function setActiveTool(tool) {
+    if (activeTool === tool) return;
     activeTool = tool; // "pin" | "box"
+    boxDragState.dragging = false;
+    boxDragState.currentRect = null;
+    renderSvgAnnotations();
     const btnPin = document.getElementById("ap-tool-pin");
     const btnBox = document.getElementById("ap-tool-box");
     if (btnPin) btnPin.classList.toggle("active", tool === "pin");
@@ -253,14 +263,14 @@
           </g>
         `;
       } else if (ann.type === "box") {
-        const badgeW = 24 + (String(num).length * 7);
-        const badgeY = ann.y < 22 ? ann.y + 4 : ann.y - 20;
+        const badgeW = BADGE_BASE_WIDTH + (String(num).length * BADGE_CHAR_WIDTH);
+        const badgeY = ann.y < BADGE_TOP_THRESHOLD ? ann.y + 4 : ann.y - 20;
         svgHtml += `
           <g class="ap-svg-ann-box" data-idx="${idx}">
             <rect x="${ann.x}" y="${ann.y}" width="${ann.width}" height="${ann.height}" rx="4"
                   fill="rgba(56, 189, 248, 0.16)" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4,2"/>
             <g transform="translate(${ann.x}, ${Math.max(2, badgeY)})">
-              <rect x="0" y="0" width="${badgeW}" height="18" rx="4" fill="#0284c7" stroke="#38bdf8" stroke-width="1"/>
+              <rect x="0" y="0" width="${badgeW}" height="${BADGE_HEIGHT}" rx="4" fill="#0284c7" stroke="#38bdf8" stroke-width="1"/>
               <text x="${badgeW / 2}" y="13" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">#${num}</text>
             </g>
           </g>
@@ -272,13 +282,13 @@
     if (boxDragState.dragging && boxDragState.currentRect && boxDragState.currentRect.width > 2 && boxDragState.currentRect.height > 2) {
       const r = boxDragState.currentRect;
       const num = currentAnnotations.length + 1;
-      const badgeY = r.y < 22 ? r.y + 4 : r.y - 20;
+      const badgeY = r.y < BADGE_TOP_THRESHOLD ? r.y + 4 : r.y - 20;
       svgHtml += `
         <g class="ap-svg-ann-draft-box">
           <rect x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" rx="4"
                 fill="rgba(245, 158, 11, 0.16)" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5,3"/>
           <g transform="translate(${r.x}, ${Math.max(2, badgeY)})">
-            <rect x="0" y="0" width="70" height="18" rx="4" fill="#d97706"/>
+            <rect x="0" y="0" width="70" height="${BADGE_HEIGHT}" rx="4" fill="#d97706"/>
             <text x="35" y="13" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">#${num} (Khung)</text>
           </g>
         </g>
@@ -507,7 +517,7 @@
     const rect = boxDragState.currentRect;
     boxDragState.currentRect = null;
 
-    if (rect && rect.width >= 10 && rect.height >= 10) {
+    if (rect && rect.width >= MIN_BOX_SIZE && rect.height >= MIN_BOX_SIZE) {
       currentAnnotations.push({
         type: "box",
         x: rect.x,
