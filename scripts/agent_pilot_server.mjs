@@ -567,11 +567,13 @@ export const MCP_TOOLS = [
   },
   {
     name: "browser_pick_color",
-    description: "Trigger the high-precision eyedropper color picker on the page",
+    description: "Trigger the interactive magnifying loupe color picker on the page, or sample pixel color directly at (x, y)",
     inputSchema: {
       type: "object",
       properties: {
-        tabId: { type: "integer", description: "Optional target Tab ID" }
+        tabId: { type: "integer", description: "Optional target Tab ID" },
+        x: { type: "number", description: "Optional X coordinate to pick pixel color directly without opening interactive loupe" },
+        y: { type: "number", description: "Optional Y coordinate to pick pixel color directly without opening interactive loupe" }
       }
     }
   },

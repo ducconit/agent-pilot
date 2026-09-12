@@ -154,11 +154,35 @@ async function run() {
     const inspectOk = inspectRes && inspectRes.rect?.width > 0 && inspectRes.selector?.includes("inspector-special-box") && inspectRes.autoTurnOff;
     record("6. Element Inspector (Bounding Rect, Selector, XPath, Auto Turn-Off)", inspectOk, `Selector: ${inspectRes?.selector}, Auto Turn-Off: ${inspectRes?.autoTurnOff}`);
 
-    // 8. Test Color Eyedropper API
-    const colorCheck = await page.evaluate(() => {
-      return typeof window.__AGENT_PILOT__.pickColor === "function";
+    // 7. Test Color Eyedropper Subsystem (Interactive Magnifying Loupe, Pixel Grid & Auto Turn-Off)
+    const colorCheck = await page.evaluate(async () => {
+      if (typeof window.__AGENT_PILOT__.pickColor !== "function") return null;
+
+      // Launch interactive eyedropper mode
+      const pickPromise = window.__AGENT_PILOT__.pickColor();
+      const wasActive = await window.__AGENT_PILOT__.isEyedropperActive();
+      const loupeEl = document.getElementById("agent-pilot-eyedropper-loupe");
+      const canvasEl = document.getElementById("agent-pilot-loupe-canvas");
+
+      // Dispatch mousemove to render loupe
+      window.dispatchEvent(new MouseEvent("mousemove", { clientX: 200, clientY: 200 }));
+      await new Promise((r) => setTimeout(r, 60));
+
+      // Simulate user clicking on screen to pick color
+      window.dispatchEvent(new MouseEvent("click", { clientX: 200, clientY: 200, bubbles: true, cancelable: true }));
+      const pickedColor = await pickPromise;
+      const isNowActive = await window.__AGENT_PILOT__.isEyedropperActive();
+
+      return {
+        hasApi: true,
+        wasActive,
+        hasLoupe: Boolean(loupeEl && canvasEl),
+        pickedColor,
+        autoTurnOff: wasActive === true && isNowActive === false
+      };
     });
-    record("7. Color Eyedropper Subsystem", colorCheck, "API window.__AGENT_PILOT__.pickColor ready");
+    const colorOk = colorCheck && colorCheck.wasActive && colorCheck.hasLoupe && colorCheck.pickedColor?.hex && colorCheck.autoTurnOff;
+    record("7. Color Eyedropper (Interactive Loupe, Pixel Sampling, Auto Turn-Off)", colorOk, `Hex: ${colorCheck?.pickedColor?.hex}, Loupe: ${colorCheck?.hasLoupe}, Auto Turn-Off: ${colorCheck?.autoTurnOff}`);
 
     // 9. Test Side Panel UI
     console.log("\n--- KIỂM THỬ GIAO DIỆN BẢNG ĐIỀU KHIỂN (SIDE PANEL) ---");

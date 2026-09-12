@@ -32,7 +32,9 @@
     startRegionCrop: () => {}
   };
   const eyedropper = modules.eyedropper || {
-    pickColor: () => Promise.resolve(null)
+    pickColor: () => Promise.resolve(null),
+    stopEyedropper: () => {},
+    isEyedropperActive: () => false
   };
 
   let isAgentTab = false;
@@ -53,7 +55,9 @@
       return inspector.getDetailedElementInfo(el);
     },
     startRegionCrop: () => inspector.startRegionCrop(),
-    pickColor: () => eyedropper.pickColor(),
+    pickColor: (x, y) => eyedropper.pickColor(x, y),
+    stopEyedropper: () => eyedropper.stopEyedropper(),
+    isEyedropperActive: () => eyedropper.isEyedropperActive(),
     getLockedElement: () => inspector.getLockedElement(),
     getCursorPosition: () => cursor.getCursorPosition(),
     setBusy: (busy, action) => shield.setAgentBusyState(busy, action),
@@ -95,7 +99,9 @@
           scroll: (deltaX, deltaY) => sendBridgeRequest("virtual_scroll", { deltaX, deltaY }),
           toggleInspector: (enabled) => sendBridgeRequest("toggle_inspector", { enabled }),
           getElement: (selector) => sendBridgeRequest("get_element_info", { selector }),
-          pickColor: () => sendBridgeRequest("pick_color", {}),
+          pickColor: (x, y) => sendBridgeRequest("pick_color", { x, y }),
+          stopEyedropper: () => sendBridgeRequest("stop_eyedropper", {}),
+          isEyedropperActive: () => sendBridgeRequest("is_eyedropper_active", {}),
           getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {}),
           isBusy: () => sendBridgeRequest("is_busy", {}),
           isAgentTab: () => sendBridgeRequest("is_agent_tab", {}),
@@ -122,7 +128,9 @@
       const el = document.querySelector(data.selector);
       result = inspector.getDetailedElementInfo(el);
     }
-    else if (action === "pick_color") result = await eyedropper.pickColor();
+    else if (action === "pick_color") result = await eyedropper.pickColor(data.x, data.y);
+    else if (action === "stop_eyedropper") { eyedropper.stopEyedropper(); result = { success: true }; }
+    else if (action === "is_eyedropper_active") result = eyedropper.isEyedropperActive();
     else if (action === "get_cursor_pos") result = cursor.getCursorPosition();
     else if (action === "is_busy") result = shield.isBusy();
     else if (action === "is_agent_tab") result = isAgentTab;
@@ -227,7 +235,18 @@
     }
 
     if (req.action === "pick_color") {
-      eyedropper.pickColor().then((color) => sendResponse({ success: !!color, color }));
+      eyedropper.pickColor(req.x, req.y).then((color) => sendResponse({ success: !!color, color }));
+      return true;
+    }
+
+    if (req.action === "stop_eyedropper") {
+      eyedropper.stopEyedropper();
+      sendResponse({ success: true });
+      return true;
+    }
+
+    if (req.action === "is_eyedropper_active") {
+      sendResponse({ active: eyedropper.isEyedropperActive() });
       return true;
     }
 

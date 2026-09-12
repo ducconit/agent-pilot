@@ -327,7 +327,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (action === "capture_screenshot") {
     (async () => {
       try {
-        const targetTabId = request.tabId || (agentBridge ? await agentBridge.getTargetTabId() : null);
+        const targetTabId = request.tabId || sender.tab?.id || (agentBridge ? await agentBridge.getTargetTabId() : null);
         if (!targetTabId) return sendResponse({ success: false, error: "No target tab found" });
         const res = await captureTabScreenshot(targetTabId, request);
         sendResponse(res);

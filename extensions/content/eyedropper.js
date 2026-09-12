@@ -1,6 +1,6 @@
 /**
  * Agent Pilot - Content Script Color Eyedropper Module
- * Extracts pixel colors from web pages with hex, rgb, and hsl conversions
+ * Interactive Magnifying Loupe with Realtime Pixel Grid, Live Color Badge, and Auto Turn-Off
  */
 (function () {
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
@@ -9,6 +9,13 @@
     if (window.__AP_INTERNAL__.showToast) {
       window.__AP_INTERNAL__.showToast(msg);
     }
+  }
+
+  function rgbToHex(r, g, b) {
+    return "#" + [r, g, b].map((x) => {
+      const h = Math.max(0, Math.min(255, Math.round(x))).toString(16);
+      return h.length === 1 ? "0" + h : h;
+    }).join("").toUpperCase();
   }
 
   function hexToRgb(hex) {
@@ -39,42 +46,427 @@
     return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
   }
 
-  async function pickColor() {
-    if (window.EyeDropper) {
+  // Eyedropper & Loupe Geometry Constants
+  const GRID_RADIUS = 5; // 11x11 grid (-5 to +5)
+  const GRID_COUNT = 11;
+  const PIXEL_ZOOM = 12; // Each screen pixel enlarged to 12x12px
+  const LOUPE_CANVAS_SIZE = 132; // 11 * 12 = 132px
+  const LOUPE_WIDTH = 144;
+  const LOUPE_HEIGHT = 180;
+  const OFFSET_X = 22;
+  const OFFSET_Y_TOP = 170;
+  const OFFSET_Y_BOTTOM = 24;
+  const EDGE_MARGIN = 12;
+  const RETICLE_CENTER = 60; // Center pixel starts at 60px (5 * 12)
+
+  // State Management
+  let isActive = false;
+  let activeResolve = null;
+
+  // DOM Elements
+  let loupeEl = null;
+  let loupeCanvas = null;
+  let loupeCtx = null;
+  let loupeSwatch = null;
+  let loupeHex = null;
+  let loupeRgb = null;
+
+  // Snapshot State
+  let snapshotCanvas = null;
+  let snapshotCtx = null;
+  let snapshotScaleX = 1;
+  let snapshotScaleY = 1;
+  let isSnapshotReady = false;
+  let currentSample = null;
+  let lastClientX = null;
+  let lastClientY = null;
+  let scrollDebounce = null;
+
+  function initLoupeUI() {
+    if (loupeEl && document.getElementById("agent-pilot-eyedropper-loupe")) {
+      return;
+    }
+
+    loupeEl = document.getElementById("agent-pilot-eyedropper-loupe");
+    if (!loupeEl) {
+      loupeEl = document.createElement("div");
+      loupeEl.id = "agent-pilot-eyedropper-loupe";
+      loupeEl.className = "agent-pilot-loupe-container";
+      loupeEl.innerHTML = `
+        <div class="agent-pilot-loupe-lens">
+          <canvas id="agent-pilot-loupe-canvas" width="132" height="132"></canvas>
+        </div>
+        <div class="agent-pilot-loupe-badge">
+          <div class="agent-pilot-loupe-color-row">
+            <span class="agent-pilot-loupe-swatch" id="agent-pilot-loupe-swatch"></span>
+            <span class="agent-pilot-loupe-hex" id="agent-pilot-loupe-hex">#38BDF8</span>
+          </div>
+          <div class="agent-pilot-loupe-rgb" id="agent-pilot-loupe-rgb">rgb(56, 189, 248)</div>
+          <div class="agent-pilot-loupe-hint">Click để chọn • Esc để hủy</div>
+        </div>
+      `;
+      (document.body || document.documentElement).appendChild(loupeEl);
+    }
+
+    loupeCanvas = document.getElementById("agent-pilot-loupe-canvas");
+    if (loupeCanvas) {
+      loupeCtx = loupeCanvas.getContext("2d");
+    }
+    loupeSwatch = document.getElementById("agent-pilot-loupe-swatch");
+    loupeHex = document.getElementById("agent-pilot-loupe-hex");
+    loupeRgb = document.getElementById("agent-pilot-loupe-rgb");
+  }
+
+  async function refreshSnapshot() {
+    isSnapshotReady = false;
+    try {
+      const res = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ action: "capture_screenshot", mode: "visible" }, resolve);
+      });
+
+      if (res && res.success && res.dataUrl) {
+        await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            if (!snapshotCanvas) {
+              snapshotCanvas = document.createElement("canvas");
+            }
+            snapshotCanvas.width = img.naturalWidth;
+            snapshotCanvas.height = img.naturalHeight;
+            snapshotCtx = snapshotCanvas.getContext("2d", { willReadFrequently: true });
+            snapshotCtx.drawImage(img, 0, 0);
+
+            snapshotScaleX = snapshotCanvas.width / Math.max(1, window.innerWidth);
+            snapshotScaleY = snapshotCanvas.height / Math.max(1, window.innerHeight);
+            isSnapshotReady = true;
+            resolve();
+          };
+          img.onerror = resolve;
+          img.src = res.dataUrl;
+        });
+      }
+    } catch (err) {
+      console.warn("[AgentPilot] Eyedropper snapshot notice:", err);
+    }
+  }
+
+  function sampleFallbackColor(clientX, clientY) {
+    let color = "rgb(255, 255, 255)";
+    try {
+      const el = document.elementFromPoint(clientX, clientY);
+      if (el) {
+        let curr = el;
+        while (curr && curr !== document.documentElement) {
+          const bg = window.getComputedStyle(curr).backgroundColor;
+          if (bg && bg !== "transparent" && !bg.startsWith("rgba(0, 0, 0, 0)")) {
+            color = bg;
+            break;
+          }
+          curr = curr.parentElement;
+        }
+      }
+    } catch (_) {}
+
+    const match = color.match(/\d+/g);
+    const r = match ? parseInt(match[0], 10) : 255;
+    const g = match ? parseInt(match[1], 10) : 255;
+    const b = match ? parseInt(match[2], 10) : 255;
+    const hex = rgbToHex(r, g, b);
+    const rgb = `rgb(${r}, ${g}, ${b})`;
+    const hsl = rgbToHsl(r, g, b);
+    return { r, g, b, hex, rgb, hsl, sx: 0, sy: 0, fromFallback: true };
+  }
+
+  function samplePixelAt(clientX, clientY) {
+    if (isSnapshotReady && snapshotCtx && snapshotCanvas) {
+      const sx = Math.max(0, Math.min(snapshotCanvas.width - 1, Math.round(clientX * snapshotScaleX)));
+      const sy = Math.max(0, Math.min(snapshotCanvas.height - 1, Math.round(clientY * snapshotScaleY)));
       try {
-        const eyeDropper = new window.EyeDropper();
-        const result = await eyeDropper.open();
-        const hex = result.sRGBHex;
-        const rgb = hexToRgb(hex);
+        const pixel = snapshotCtx.getImageData(sx, sy, 1, 1).data;
+        const r = pixel[0];
+        const g = pixel[1];
+        const b = pixel[2];
+        const hex = rgbToHex(r, g, b);
+        const rgb = `rgb(${r}, ${g}, ${b})`;
+        const hsl = rgbToHsl(r, g, b);
+        return { r, g, b, hex, rgb, hsl, sx, sy, fromFallback: false };
+      } catch (_) {}
+    }
+    return sampleFallbackColor(clientX, clientY);
+  }
 
-        // Parse RGB numbers for HSL
-        const matches = rgb.match(/\d+/g);
-        const hsl = matches ? rgbToHsl(parseInt(matches[0]), parseInt(matches[1]), parseInt(matches[2])) : "";
+  function renderLoupe(clientX, clientY, sampled) {
+    if (!loupeEl || !loupeCtx) return;
 
-        // Copy to clipboard
-        navigator.clipboard.writeText(hex).catch(() => {});
+    // 1. Position loupe around cursor with edge collision avoidance
+    let posX = clientX + OFFSET_X;
+    let posY = clientY - OFFSET_Y_TOP;
 
-        showToast(`🎨 Đã lấy màu: <b>${hex}</b> (đã copy vào clipboard)`);
+    // If too close to top, position below cursor
+    if (posY < EDGE_MARGIN) {
+      posY = clientY + OFFSET_Y_BOTTOM;
+    }
+    // If too close to right, position to left of cursor
+    if (posX + LOUPE_WIDTH > window.innerWidth - EDGE_MARGIN) {
+      posX = clientX - LOUPE_WIDTH - OFFSET_X;
+    }
+    // Clamp inside viewport
+    posX = Math.max(8, Math.min(window.innerWidth - LOUPE_WIDTH - 8, posX));
+    posY = Math.max(8, Math.min(window.innerHeight - LOUPE_HEIGHT - 8, posY));
 
-        chrome.runtime.sendMessage({
-          type: "COLOR_PICKED",
-          color: { hex, rgb, hsl, timestamp: Date.now() }
-        }).catch(() => {});
+    loupeEl.style.transform = `translate(${posX}px, ${posY}px)`;
+    loupeEl.style.display = "block";
 
-        return { hex, rgb, hsl };
-      } catch (err) {
-        // User canceled picker
-        return null;
+    // 2. Draw zoomed 11x11 pixel slice
+    loupeCtx.clearRect(0, 0, LOUPE_CANVAS_SIZE, LOUPE_CANVAS_SIZE);
+
+    if (isSnapshotReady && snapshotCtx && snapshotCanvas && !sampled.fromFallback) {
+      const sw = snapshotCanvas.width;
+      const sh = snapshotCanvas.height;
+      const minX = Math.max(0, sampled.sx - GRID_RADIUS);
+      const minY = Math.max(0, sampled.sy - GRID_RADIUS);
+      const maxX = Math.min(sw, sampled.sx + GRID_RADIUS + 1);
+      const maxY = Math.min(sh, sampled.sy + GRID_RADIUS + 1);
+      const width = maxX - minX;
+      const height = maxY - minY;
+
+      // Base background for out-of-bounds pixels
+      loupeCtx.fillStyle = "#0f172a";
+      loupeCtx.fillRect(0, 0, LOUPE_CANVAS_SIZE, LOUPE_CANVAS_SIZE);
+
+      if (width > 0 && height > 0) {
+        try {
+          const imgData = snapshotCtx.getImageData(minX, minY, width, height);
+          const data = imgData.data;
+
+          for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+              const idx = (y * width + x) * 4;
+              const r = data[idx];
+              const g = data[idx + 1];
+              const b = data[idx + 2];
+
+              const gridX = (minX + x) - (sampled.sx - GRID_RADIUS);
+              const gridY = (minY + y) - (sampled.sy - GRID_RADIUS);
+
+              loupeCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+              loupeCtx.fillRect(gridX * PIXEL_ZOOM, gridY * PIXEL_ZOOM, PIXEL_ZOOM, PIXEL_ZOOM);
+            }
+          }
+        } catch (_) {
+          loupeCtx.fillStyle = sampled.hex || "#38bdf8";
+          loupeCtx.fillRect(0, 0, LOUPE_CANVAS_SIZE, LOUPE_CANVAS_SIZE);
+        }
       }
     } else {
-      showToast("⚠️ Trình duyệt chưa hỗ trợ native EyeDropper API!");
-      return null;
+      loupeCtx.fillStyle = sampled.hex || "#38bdf8";
+      loupeCtx.fillRect(0, 0, LOUPE_CANVAS_SIZE, LOUPE_CANVAS_SIZE);
     }
+
+    // 3. Draw grid lines separating individual magnified pixels
+    loupeCtx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+    loupeCtx.lineWidth = 1;
+    for (let i = 1; i < GRID_COUNT; i++) {
+      const p = i * PIXEL_ZOOM;
+      loupeCtx.beginPath();
+      loupeCtx.moveTo(p, 0);
+      loupeCtx.lineTo(p, LOUPE_CANVAS_SIZE);
+      loupeCtx.stroke();
+
+      loupeCtx.beginPath();
+      loupeCtx.moveTo(0, p);
+      loupeCtx.lineTo(LOUPE_CANVAS_SIZE, p);
+      loupeCtx.stroke();
+    }
+
+    // 4. Center reticle/target box over the exact targeted pixel
+    // Dark outer border for contrast on light pixels
+    loupeCtx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+    loupeCtx.lineWidth = 2.5;
+    loupeCtx.strokeRect(RETICLE_CENTER - 0.5, RETICLE_CENTER - 0.5, PIXEL_ZOOM + 1, PIXEL_ZOOM + 1);
+    // Inner vibrant cyan border for contrast on dark pixels
+    loupeCtx.strokeStyle = "#38bdf8";
+    loupeCtx.lineWidth = 1.5;
+    loupeCtx.strokeRect(RETICLE_CENTER, RETICLE_CENTER, PIXEL_ZOOM, PIXEL_ZOOM);
+
+    // Reticle crosshair ticks
+    const centerPoint = RETICLE_CENTER + (PIXEL_ZOOM / 2);
+    loupeCtx.strokeStyle = "#ffffff";
+    loupeCtx.lineWidth = 1.5;
+    loupeCtx.beginPath();
+    loupeCtx.moveTo(centerPoint, RETICLE_CENTER - 12); loupeCtx.lineTo(centerPoint, RETICLE_CENTER - 2); // Top tick
+    loupeCtx.moveTo(centerPoint, RETICLE_CENTER + PIXEL_ZOOM + 2); loupeCtx.lineTo(centerPoint, RETICLE_CENTER + PIXEL_ZOOM + 12); // Bottom tick
+    loupeCtx.moveTo(RETICLE_CENTER - 12, centerPoint); loupeCtx.lineTo(RETICLE_CENTER - 2, centerPoint); // Left tick
+    loupeCtx.moveTo(RETICLE_CENTER + PIXEL_ZOOM + 2, centerPoint); loupeCtx.lineTo(RETICLE_CENTER + PIXEL_ZOOM + 12, centerPoint); // Right tick
+    loupeCtx.stroke();
+
+    // 5. Update live color badge
+    if (loupeSwatch) loupeSwatch.style.backgroundColor = sampled.hex;
+    if (loupeHex) loupeHex.textContent = sampled.hex;
+    if (loupeRgb) loupeRgb.textContent = sampled.rgb;
+  }
+
+  function onMouseMove(e) {
+    if (!isActive) return;
+    lastClientX = e.clientX;
+    lastClientY = e.clientY;
+    currentSample = samplePixelAt(e.clientX, e.clientY);
+    renderLoupe(e.clientX, e.clientY, currentSample);
+  }
+
+  function onClick(e) {
+    if (!isActive) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const sample = samplePixelAt(e.clientX, e.clientY);
+    selectAndFinish(sample);
+  }
+
+  function onKeyDown(e) {
+    if (!isActive) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelAndFinish();
+    }
+  }
+
+  function onScroll() {
+    if (!isActive) return;
+    clearTimeout(scrollDebounce);
+    scrollDebounce = setTimeout(() => {
+      if (isActive) {
+        refreshSnapshot().then(() => {
+          if (isActive && lastClientX !== null && lastClientY !== null) {
+            currentSample = samplePixelAt(lastClientX, lastClientY);
+            renderLoupe(lastClientX, lastClientY, currentSample);
+          }
+        });
+      }
+    }, 120);
+  }
+
+  function selectAndFinish(sample) {
+    const finalSample = sample || currentSample || sampleFallbackColor(0, 0);
+
+    // Copy to clipboard
+    try {
+      navigator.clipboard.writeText(finalSample.hex).catch(() => {});
+    } catch (_) {}
+
+    showToast(`🎨 Đã chọn màu: <b>${finalSample.hex}</b> (đã copy vào clipboard)`);
+
+    chrome.runtime.sendMessage({
+      type: "COLOR_PICKED",
+      color: {
+        hex: finalSample.hex,
+        rgb: finalSample.rgb,
+        hsl: finalSample.hsl,
+        timestamp: Date.now()
+      }
+    }).catch(() => {});
+
+    chrome.runtime.sendMessage({
+      type: "EYEDROPPER_STATUS_CHANGED",
+      active: false
+    }).catch(() => {});
+
+    stopEyedropper(finalSample);
+  }
+
+  function cancelAndFinish() {
+    showToast("Đã hủy chế độ lấy mã màu");
+
+    chrome.runtime.sendMessage({
+      type: "EYEDROPPER_STATUS_CHANGED",
+      active: false
+    }).catch(() => {});
+
+    stopEyedropper(null);
+  }
+
+  function stopEyedropper(result = null) {
+    if (!isActive) return;
+    isActive = false;
+
+    window.removeEventListener("mousemove", onMouseMove, true);
+    window.removeEventListener("click", onClick, true);
+    window.removeEventListener("keydown", onKeyDown, true);
+    window.removeEventListener("scroll", onScroll, true);
+
+    if (loupeEl) {
+      loupeEl.style.display = "none";
+    }
+    document.documentElement.classList.remove("agent-pilot-eyedropper-active");
+
+    if (activeResolve) {
+      const resolve = activeResolve;
+      activeResolve = null;
+      resolve(result);
+    }
+  }
+
+  async function pickColor(x, y) {
+    // 1. Direct one-shot coordinate sampling (Automated AI Agent call)
+    if (typeof x === "number" && typeof y === "number") {
+      await refreshSnapshot();
+      const sample = samplePixelAt(x, y);
+      try {
+        navigator.clipboard.writeText(sample.hex).catch(() => {});
+      } catch (_) {}
+
+      chrome.runtime.sendMessage({
+        type: "COLOR_PICKED",
+        color: {
+          hex: sample.hex,
+          rgb: sample.rgb,
+          hsl: sample.hsl,
+          timestamp: Date.now()
+        }
+      }).catch(() => {});
+
+      return { hex: sample.hex, rgb: sample.rgb, hsl: sample.hsl };
+    }
+
+    // 2. Interactive user loupe mode
+    if (isActive) {
+      stopEyedropper(null);
+    }
+
+    initLoupeUI();
+    isActive = true;
+    document.documentElement.classList.add("agent-pilot-eyedropper-active");
+
+    window.addEventListener("mousemove", onMouseMove, true);
+    window.addEventListener("click", onClick, true);
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("scroll", onScroll, true);
+
+    chrome.runtime.sendMessage({
+      type: "EYEDROPPER_STATUS_CHANGED",
+      active: true
+    }).catch(() => {});
+
+    // Initial snapshot in background
+    refreshSnapshot().then(() => {
+      if (isActive && lastClientX !== null && lastClientY !== null) {
+        currentSample = samplePixelAt(lastClientX, lastClientY);
+        renderLoupe(lastClientX, lastClientY, currentSample);
+      }
+    });
+
+    return new Promise((resolve) => {
+      activeResolve = resolve;
+    });
   }
 
   window.__AP_INTERNAL__.eyedropper = {
     pickColor,
+    stopEyedropper,
+    isEyedropperActive: () => isActive,
     hexToRgb,
-    rgbToHsl
+    rgbToHsl,
+    rgbToHex
   };
 })();

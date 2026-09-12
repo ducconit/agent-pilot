@@ -30,7 +30,9 @@
     toggleInspector: (enabled) => sendBridgeRequest("toggle_inspector", { enabled }),
     isInspectorActive: () => sendBridgeRequest("is_inspector_active", {}),
     getElement: (selector) => sendBridgeRequest("get_element_info", { selector }),
-    pickColor: () => sendBridgeRequest("pick_color", {}),
+    pickColor: (x, y) => sendBridgeRequest("pick_color", { x, y }),
+    stopEyedropper: () => sendBridgeRequest("stop_eyedropper", {}),
+    isEyedropperActive: () => sendBridgeRequest("is_eyedropper_active", {}),
     getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {})
   };
 })();

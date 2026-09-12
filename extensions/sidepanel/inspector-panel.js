@@ -27,6 +27,7 @@ export class InspectorPanel {
     this.paletteChips = document.getElementById("palette-chips");
 
     this.isInspectorActive = false;
+    this.isEyedropperActive = false;
     this.selectedElementDetails = null;
     this.colorHistory = [];
 
@@ -79,8 +80,32 @@ export class InspectorPanel {
       this.btnPickColor.onclick = () => {
         const activeTabId = this.getActiveTabId();
         if (!activeTabId) return;
-        chrome.tabs.sendMessage(activeTabId, { action: "pick_color" });
+        if (this.isEyedropperActive) {
+          chrome.tabs.sendMessage(activeTabId, { action: "stop_eyedropper" }, () => {
+            this.setEyedropperActiveState(false);
+          });
+        } else {
+          this.setEyedropperActiveState(true);
+          chrome.tabs.sendMessage(activeTabId, { action: "pick_color" }, (res) => {
+            if (res && res.color) {
+              this.addColorToPalette(res.color);
+            }
+            this.setEyedropperActiveState(false);
+          });
+        }
       };
+    }
+  }
+
+  setEyedropperActiveState(active) {
+    this.isEyedropperActive = Boolean(active);
+    if (!this.btnPickColor) return;
+    if (this.isEyedropperActive) {
+      this.btnPickColor.textContent = "🎯 Đang chọn màu...";
+      this.btnPickColor.classList.replace("btn-secondary", "btn-warning");
+    } else {
+      this.btnPickColor.textContent = "🎨 Lấy mã màu";
+      this.btnPickColor.classList.replace("btn-warning", "btn-secondary");
     }
   }
 
@@ -163,6 +188,7 @@ export class InspectorPanel {
   }
 
   addColorToPalette(colorObj) {
+    this.setEyedropperActiveState(false);
     if (this.colorSwatchCurrent) this.colorSwatchCurrent.style.background = colorObj.hex;
     if (this.colorHex) this.colorHex.textContent = `HEX: ${colorObj.hex}`;
     if (this.colorRgb) this.colorRgb.textContent = `RGB: ${colorObj.rgb}`;

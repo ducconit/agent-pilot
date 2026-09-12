@@ -167,6 +167,10 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
       if (inspectorTabBtn) inspectorTabBtn.click();
     }
 
+    if (msg.type === "EYEDROPPER_STATUS_CHANGED" && msg.active !== undefined) {
+      inspectorPanel.setEyedropperActiveState(msg.active);
+    }
+
     if (msg.type === "REGION_CROP_REQUESTED" && msg.clip) {
       chrome.runtime.sendMessage({ action: "capture_screenshot", mode: "visible" }, (res) => {
         if (res && res.success && res.dataUrl) {

@@ -616,6 +616,15 @@ async function run() {
     const isToggleWorking = isDefaultEnabled && isBypassed && isRestored;
     record("26. Secret Filter Config Dynamic Toggle", isToggleWorking, "Verified default enabled: true, bypass when toggled false, and clean restoration");
 
+    // 27. Agent Command: page.pickColor (Precision Eyedropper Pixel Sampling)
+    const pickColorParams = { tabId, x: 200, y: 150 };
+    if (selectedTestInstanceId) pickColorParams.instanceId = selectedTestInstanceId;
+    const colorPickRes = await sendAgentCommand("page.pickColor", pickColorParams);
+    const isColorPickSuccess = colorPickRes?.success === true &&
+                               Boolean(colorPickRes?.color?.hex) &&
+                               Boolean(colorPickRes?.color?.rgb);
+    record("27. Agent Command: page.pickColor", isColorPickSuccess, `Picked Color at (200, 150): HEX: ${colorPickRes?.color?.hex}, RGB: ${colorPickRes?.color?.rgb}`);
+
     console.log("\n==================================================================");
     console.log("📊 BẢNG TỔNG KẾT KẾT QUẢ KIỂM THỬ KẾT NỐI AI AGENT:");
     const passedCount = testResults.filter(t => t.passed).length;

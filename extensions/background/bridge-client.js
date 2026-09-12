@@ -529,7 +529,7 @@ export class AgentBridgeClient {
         case "page.pickColor": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.sendTabMessageWithRetry(tabId, { action: "pick_color" })
+          this.sendTabMessageWithRetry(tabId, { action: "pick_color", x: params.x, y: params.y })
             .then(res => respond(res || null))
             .catch(err => respond(null, err));
           break;
