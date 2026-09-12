@@ -261,6 +261,9 @@
     if (req.action === "copy_image_to_clipboard" && req.dataUrl) {
       (async () => {
         try {
+          if (!navigator.clipboard || !navigator.clipboard.write) {
+            throw new Error("Tính năng sao chép yêu cầu trang web chạy trong bối cảnh an toàn (HTTPS/Localhost)");
+          }
           const parts = req.dataUrl.split(",");
           const binStr = atob(parts[1]);
           const u8arr = new Uint8Array(binStr.length);

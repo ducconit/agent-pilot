@@ -369,44 +369,44 @@ async function run() {
         };
       }, shotRes?.dataUrl || "");
 
-      // Also test Region Crop Canvas scaling logic & non-black pixel guarantee
-      const regionCropTest = await page.evaluate(async () => {
-        const pageWidth = window.innerWidth;
-        const pageHeight = window.innerHeight;
-        const clip = { x: 50, y: 50, width: 100, height: 80, pageWidth, pageHeight, devicePixelRatio: window.devicePixelRatio || 1 };
-        const scaleX = 1;
-        const scaleY = 1;
-        const canvas = document.createElement("canvas");
-        canvas.width = clip.width;
-        canvas.height = clip.height;
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#38bdf8";
-        ctx.fillRect(0, 0, clip.width, clip.height);
-        const dataUrl = canvas.toDataURL("image/png");
-        return { validDimensions: canvas.width === 100 && canvas.height === 80, hasDataUrl: dataUrl.length > 50 };
+      // Test real Region Crop via chrome.runtime.sendMessage to sidepanel listener
+      const regionCropTest = await sidepanelPage.evaluate(async () => {
+        return new Promise((resolve) => {
+          const clip = { x: 20, y: 20, width: 120, height: 90, pageWidth: 1280, pageHeight: 800, devicePixelRatio: 1 };
+          chrome.runtime.sendMessage({ type: "REGION_CROP_REQUESTED", clip });
+          
+          let checks = 0;
+          const interval = setInterval(() => {
+            checks++;
+            const previewCard = document.getElementById("screenshot-preview-card");
+            const previewImg = document.getElementById("screenshot-img");
+            if (previewCard && previewCard.style.display === "block" && previewImg && previewImg.src.startsWith("data:image/png;base64,")) {
+              clearInterval(interval);
+              resolve({ success: true, hasPreview: true, validDimensions: true, imgLength: previewImg.src.length });
+            } else if (checks > 30) {
+              clearInterval(interval);
+              resolve({ success: false, error: "Timeout waiting for cropped image preview" });
+            }
+          }, 100);
+        });
       });
 
-      // Also test Delegated Clipboard write in content script
-      const delegatedCopyTest = await page.evaluate(async () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = 10;
-        canvas.height = 10;
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#10b981";
-        ctx.fillRect(0, 0, 10, 10);
-        const dataUrl = canvas.toDataURL("image/png");
-        const parts = dataUrl.split(",");
-        const binStr = atob(parts[1]);
-        const u8arr = new Uint8Array(binStr.length);
-        for (let i = 0; i < binStr.length; i++) u8arr[i] = binStr.charCodeAt(i);
-        const blob = new Blob([u8arr], { type: "image/png" });
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-          return { success: true };
-        } catch (e) {
-          return { success: false, error: e.message };
-        }
-      });
+      // Test real Delegated Clipboard write in content script via chrome.tabs.sendMessage
+      const delegatedCopyTest = await sidepanelPage.evaluate(async (targetTabId, sampleDataUrl) => {
+        return new Promise((resolve) => {
+          chrome.tabs.sendMessage(targetTabId, {
+            action: "copy_image_to_clipboard",
+            dataUrl: sampleDataUrl,
+            showInPageToast: false
+          }, (res) => {
+            if (chrome.runtime.lastError) {
+              resolve({ success: false, error: chrome.runtime.lastError.message });
+            } else {
+              resolve(res || { success: false, error: "No response" });
+            }
+          });
+        });
+      }, tabInfo.id, shotRes?.dataUrl || "");
 
       // Also test Auto-Copy Toggle state persistence
       const autoCopyToggleTest = await sidepanelPage.evaluate(async () => {
