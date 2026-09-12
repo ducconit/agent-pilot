@@ -50,11 +50,59 @@ jobs:
       - name: Package Extension Archive
         run: npm run pack
 
-      - name: Extract Release Notes
-        id: release_notes
+      - name: Generate Release Body with User Guide
+        id: release_body
         run: |
           VERSION="${{ github.ref_name }}"
-          echo "TAG=$VERSION" >> $GITHUB_OUTPUT
+          cat << 'BODY_EOF' > dist/release_body.md
+          # 🚀 Agent Pilot $VERSION
+          
+          **Universal AI Agent Browser Controller (Antigravity-First)**
+          
+          ---
+          
+          ### 📦 Tài Nguyên Bản Phát Hành (Release Assets)
+          - `agent-pilot-$VERSION.zip`: Gói tiện ích mở rộng Chrome Manifest V3 đã đóng gói hoàn chỉnh.
+          - `checksums.txt`: Mã băm SHA-256 xác minh tính toàn vẹn của bản tải về.
+          
+          ---
+          
+          ### 🚀 Hướng Dẫn Cài Đặt Nhanh (Installation)
+          1. **Tải tệp ZIP**: Tải file `agent-pilot-$VERSION.zip` bên dưới và giải nén ra một thư mục.
+          2. **Mở quản lý tiện ích**: Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
+          3. **Bật chế độ phát triển**: Bật công tắc **Developer mode** ở góc trên bên phải.
+          4. **Nạp tiện ích**: Nhấn nút **Load unpacked** và chọn thư mục vừa giải nén.
+          5. **Khởi động Side Panel**: Nhấn phím tắt <kbd>Ctrl + Shift + P</kbd> (hoặc <kbd>Cmd + Shift + P</kbd> trên macOS).
+          
+          ---
+          
+          ### 🤖 Hướng Dẫn Kết Nối AI Agent (Antigravity / MCP)
+          - Cổng kết nối an toàn mặc định: **`58765`**.
+          - Cấu hình trong file MCP settings (`mcp_config.json`):
+          ```json
+          {
+            "mcpServers": {
+              "agent-pilot": {
+                "command": "node",
+                "args": ["scripts/agent_pilot_server.mjs"],
+                "env": {
+                  "AGENT_PILOT_PORT": "58765"
+                }
+              }
+            }
+          }
+          ```
+          
+          ---
+          
+          ### 🎮 Phím Tắt & Tính Năng Nổi Bật
+          - **Mở nhanh Side Panel**: <kbd>Ctrl + Shift + P</kbd> (Mac: <kbd>Cmd + Shift + P</kbd>).
+          - **Chuột ảo Neon**: Di chuyển mượt mà kèm huy hiệu tọa độ và sóng click ripple.
+          - **Soi phần tử DOM**: Bắt bounding box, CSS Selector và XPath.
+          - **DevTools Realtime**: Bắt log Console, Network requests và JS heap qua CDP.
+          - **Quản lý đa trình duyệt**: Tự động chuyển focus hoặc dùng `browser_list_instances`.
+          BODY_EOF
+          sed -i "s/\$VERSION/$VERSION/g" dist/release_body.md
 
       - name: Create GitHub Release & Upload Assets
         uses: softprops/action-gh-release@v2
@@ -62,7 +110,8 @@ jobs:
           files: |
             dist/agent-pilot-*.zip
             dist/checksums.txt
-          name: "Agent Pilot ${{ steps.release_notes.outputs.TAG }}"
+          name: "Agent Pilot ${{ github.ref_name }}"
+          body_path: dist/release_body.md
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
