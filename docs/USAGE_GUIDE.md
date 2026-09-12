@@ -23,10 +23,13 @@ Do Agent Pilot được phát triển dưới dạng mã nguồn mở chuẩn Ma
 
 ## 2. Khởi Động Bảng Điều Khiển (Side Panel)
 
-Có 3 cách đơn giản để mở trung tâm điều khiển Side Panel:
-1. **Cách 1 (Nhanh nhất)**: Nhấn tổ hợp phím tắt <kbd>Alt + Shift + A</kbd> (hoặc <kbd>Option + Shift + A</kbd> trên macOS).
-2. **Cách 2**: Nhấp vào biểu tượng Agent Pilot trên thanh công cụ -> Nhấn nút **🚀 Mở Bảng Điều Khiển (Side Panel)**.
-3. **Cách 3**: Nhấp chuột phải vào bất kỳ đâu trên trang web -> Chọn **Mở Agent Pilot (Side Panel)**.
+Bạn có thể dễ dàng mở trung tâm điều khiển Side Panel bằng 2 cách trực quan:
+1. **Cách 1 (Nhanh & thuận tiện nhất)**: Nhấp chuột trực tiếp vào biểu tượng **Agent Pilot (📌)** đã ghim trên thanh công cụ Chrome. Bảng điều khiển sẽ trượt mở tức thì bên phải.
+2. **Cách 2 (Menu chuột phải)**: Nhấp chuột phải vào bất kỳ vị trí nào trên trang web $\rightarrow$ Chọn **Mở Agent Pilot (Side Panel)**.
+
+> 💡 **Cấu hình phím tắt (Tùy chọn)**: Để tránh hoàn toàn xung đột với các phím tắt hệ điều hành hoặc trình quản lý cửa sổ (như rofi, i3wm), tiện ích không gán phím tắt mặc định. Nếu bạn muốn gán phím tắt riêng:
+> - Mở tab mới và nhập: `chrome://extensions/shortcuts`
+> - Tìm dòng **Agent Pilot** và tự do nhập tổ hợp phím bạn yêu thích!
 
 ---
 

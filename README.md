@@ -90,8 +90,9 @@ chrome://extensions
    ```
 
 ### Bước 3: Khởi động Bảng điều khiển (Side Panel)
-* Nhấn phím tắt nhanh: <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> (hoặc <kbd>Option</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> trên Mac).
-* Hoặc nhấp vào biểu tượng Agent Pilot trên thanh công cụ và chọn **🚀 Mở Bảng Điều Khiển (Side Panel)**.
+* **Cách 1 (Nhanh nhất)**: Nhấp chuột vào biểu tượng **Agent Pilot (📌)** trên thanh công cụ Chrome (Side Panel sẽ trượt mở tức thì).
+* **Cách 2 (Menu chuột phải)**: Nhấp chuột phải trên bất kỳ trang web nào $\rightarrow$ Chọn **Mở Agent Pilot (Side Panel)**.
+* *(Tùy chọn)*: Để gán phím tắt riêng không lo xung đột phần mềm khác, truy cập `chrome://extensions/shortcuts` để cài đặt.
 
 ---
 

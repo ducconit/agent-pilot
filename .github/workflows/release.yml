@@ -72,7 +72,7 @@ jobs:
           2. **Mở quản lý tiện ích**: Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
           3. **Bật chế độ phát triển**: Bật công tắc **Developer mode** ở góc trên bên phải.
           4. **Nạp tiện ích**: Nhấn nút **Load unpacked** và chọn thư mục vừa giải nén.
-          5. **Khởi động Side Panel**: Nhấn phím tắt <kbd>Alt + Shift + A</kbd> (hoặc <kbd>Option + Shift + A</kbd> trên macOS).
+          5. **Khởi động Side Panel**: Ghim icon và nhấp chuột trực tiếp vào biểu tượng **Agent Pilot (📌)** trên thanh công cụ (hoặc click chuột phải chọn *Mở Agent Pilot*). Tùy chỉnh phím tắt tại `chrome://extensions/shortcuts`.
           
           ---
           
