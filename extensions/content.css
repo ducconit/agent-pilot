@@ -478,30 +478,46 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(9, 13, 22, 0.92);
+  background: rgba(9, 13, 22, 0.95);
   border: 1px solid rgba(56, 189, 248, 0.45);
   border-radius: 9999px;
   padding: 6px 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(56, 189, 248, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.75), 0 0 15px rgba(56, 189, 248, 0.2);
   backdrop-filter: blur(12px);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   user-select: none;
   color: #f8fafc;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+  box-sizing: border-box;
+  line-height: normal;
 }
 
 .ap-hud-drag-handle {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-right: 6px;
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  padding-right: 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: grab;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.ap-hud-drag-handle:active {
+  cursor: grabbing;
 }
 
 .ap-hud-badge {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.5px;
   color: #38bdf8;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .ap-hud-status {
@@ -511,13 +527,18 @@
   color: #38bdf8;
   border: 1px solid rgba(56, 189, 248, 0.3);
   border-radius: 9999px;
-  padding: 1px 6px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.2;
 }
 
 .ap-hud-modes {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .ap-hud-btn {
@@ -531,6 +552,7 @@
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .ap-hud-btn:hover {
@@ -549,12 +571,15 @@
   width: 1px;
   height: 18px;
   background: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
 }
 
 .ap-hud-actions {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .ap-hud-action-btn {
@@ -568,6 +593,7 @@
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .ap-hud-action-btn:hover {
@@ -610,19 +636,25 @@
 
 .ap-hud-close-btn {
   background: rgba(244, 63, 94, 0.15);
-  border: 1px solid rgba(244, 63, 94, 0.3);
+  border: 1px solid rgba(244, 63, 94, 0.35);
   color: #f43f5e;
-  border-radius: 6px;
-  padding: 4px 8px;
+  border-radius: 9999px;
+  padding: 4px 10px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .ap-hud-close-btn:hover {
   background: #f43f5e;
   color: #fff;
+  border-color: #f43f5e;
 }
 
 /* Feedback Element Highlighter */
@@ -704,6 +736,22 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  cursor: grab;
+  user-select: none;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ap-popover-header:active {
+  cursor: grabbing;
+}
+
+.ap-popover-drag-icon {
+  font-size: 13px;
+  color: #64748b;
+  cursor: grab;
+  letter-spacing: -1px;
+  margin-right: 2px;
 }
 
 .ap-popover-title-row {

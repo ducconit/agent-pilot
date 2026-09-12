@@ -87,12 +87,13 @@
   commentPopover.id = "agent-pilot-feedback-popover";
   commentPopover.className = "agent-pilot-feedback-popover hidden";
   commentPopover.innerHTML = `
-    <div class="ap-popover-header">
+    <div class="ap-popover-header" title="Nhấp giữ và kéo để di chuyển tự do">
       <div class="ap-popover-title-row">
+        <span class="ap-popover-drag-icon">⋮⋮</span>
         <span class="ap-popover-icon">💬</span>
         <span class="ap-popover-title" id="ap-popover-title">Ghi chú sửa giao diện</span>
       </div>
-      <button class="ap-popover-close" id="ap-popover-btn-close">✕</button>
+      <button class="ap-popover-close" id="ap-popover-btn-close" title="Đóng">✕</button>
     </div>
     <div class="ap-popover-body">
       <div class="ap-popover-preview">
@@ -1070,6 +1071,90 @@
         listModal.classList.add("hidden");
       }
     }
+  });
+
+  // =========================================================================
+  // Free Dragging Controller for Quick Comment Popover and HUD Toolbar
+  // =========================================================================
+
+  function makeDraggable(element, handle, onStart) {
+    if (!element || !handle) return;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let initLeft = 0;
+    let initTop = 0;
+
+    handle.addEventListener("mousedown", (e) => {
+      // Don't drag if clicking buttons, inputs, links, or textareas
+      if (e.target.closest("button, input, textarea, a, select")) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      const rect = element.getBoundingClientRect();
+      initLeft = rect.left;
+      initTop = rect.top;
+
+      if (typeof onStart === "function") {
+        onStart(initLeft, initTop);
+      } else {
+        element.style.left = `${initLeft}px`;
+        element.style.top = `${initTop}px`;
+        element.style.right = "auto";
+        element.style.bottom = "auto";
+      }
+
+      handle.style.cursor = "grabbing";
+      document.body.style.userSelect = "none";
+
+      const onMouseMove = (moveEvent) => {
+        if (!isDragging) return;
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+
+        const elWidth = element.offsetWidth || 340;
+        const elHeight = element.offsetHeight || 200;
+
+        let newLeft = initLeft + dx;
+        let newTop = initTop + dy;
+
+        // Keep inside viewport bounds
+        newLeft = Math.max(6, Math.min(window.innerWidth - elWidth - 6, newLeft));
+        newTop = Math.max(6, Math.min(window.innerHeight - elHeight - 6, newTop));
+
+        element.style.left = `${newLeft}px`;
+        element.style.top = `${newTop}px`;
+      };
+
+      const onMouseUp = () => {
+        isDragging = false;
+        handle.style.cursor = "grab";
+        document.body.style.userSelect = "";
+        window.removeEventListener("mousemove", onMouseMove, true);
+        window.removeEventListener("mouseup", onMouseUp, true);
+      };
+
+      window.addEventListener("mousemove", onMouseMove, true);
+      window.addEventListener("mouseup", onMouseUp, true);
+    });
+  }
+
+  // 1. Quick Comment Popover: free dragging via header
+  const popoverHeader = commentPopover.querySelector(".ap-popover-header");
+  makeDraggable(commentPopover, popoverHeader);
+
+  // 2. Floating HUD Toolbar: free dragging via drag-handle
+  const hudDragHandle = hud.querySelector(".ap-hud-drag-handle");
+  makeDraggable(hud, hudDragHandle, (left, top) => {
+    hud.style.transform = "none";
+    hud.style.left = `${left}px`;
+    hud.style.top = `${top}px`;
+    hud.style.right = "auto";
+    hud.style.bottom = "auto";
   });
 
   // =========================================================================
