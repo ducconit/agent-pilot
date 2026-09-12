@@ -145,18 +145,47 @@
   let activeTool = "pin"; // "pin" | "box"
   let currentAnnotations = [];
   let annotatorCaptureData = null;
+  let boxDragState = { dragging: false, startX: 0, startY: 0, currentRect: null };
+
+  function setActiveTool(tool) {
+    activeTool = tool; // "pin" | "box"
+    const btnPin = document.getElementById("ap-tool-pin");
+    const btnBox = document.getElementById("ap-tool-box");
+    if (btnPin) btnPin.classList.toggle("active", tool === "pin");
+    if (btnBox) btnBox.classList.toggle("active", tool === "box");
+  }
+
+  function syncSvgDimensions() {
+    const img = document.getElementById("ap-annotator-img");
+    const svg = document.getElementById("ap-annotator-svg");
+    if (img && svg) {
+      const w = img.clientWidth || img.offsetWidth || img.naturalWidth;
+      const h = img.clientHeight || img.offsetHeight || img.naturalHeight;
+      if (w > 0 && h > 0) {
+        svg.style.width = `${w}px`;
+        svg.style.height = `${h}px`;
+        svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      }
+    }
+  }
 
   function openAnnotatorModal(mode, title, dataUrl) {
     annotatorCaptureData = { mode, title, dataUrl };
     currentAnnotations = [];
+    setActiveTool("pin");
 
     document.getElementById("ap-annotator-title").textContent = title;
-    document.getElementById("ap-annotator-img").src = dataUrl;
+    const img = document.getElementById("ap-annotator-img");
+    img.onload = () => {
+      syncSvgDimensions();
+    };
+    img.src = dataUrl;
     document.getElementById("ap-annotator-comment").value = "";
     document.getElementById("ap-annotator-svg").innerHTML = "";
     renderPinsList();
 
     annotatorModal.classList.remove("hidden");
+    setTimeout(syncSvgDimensions, 60);
   }
 
   function closeAnnotatorModal() {
@@ -169,16 +198,26 @@
   function renderPinsList() {
     const list = document.getElementById("ap-pins-list");
     if (!currentAnnotations.length) {
-      list.innerHTML = `<div class="ap-empty-hint">Chưa có ghim nào. Nhấp vào ảnh để đặt điểm cần sửa.</div>`;
+      list.innerHTML = `<div class="ap-empty-hint">Chưa có đánh dấu nào. Chọn "Ghim điểm" hoặc "Khung" để đánh dấu vị trí cần sửa trên ảnh.</div>`;
       return;
     }
-    list.innerHTML = currentAnnotations.map((ann, idx) => `
-      <div class="ap-pin-row">
-        <span class="ap-pin-num">${idx + 1}</span>
-        <input type="text" class="ap-pin-input" data-idx="${idx}" placeholder="Ghi chú cho điểm ${idx + 1}..." value="${escapeHtml(ann.comment || "")}">
-        <button class="ap-pin-del" data-idx="${idx}">🗑️</button>
+    list.innerHTML = currentAnnotations.map((ann, idx) => {
+      const num = idx + 1;
+      const isBox = ann.type === "box";
+      const icon = isBox ? "⬜" : "📍";
+      const typeClass = isBox ? "type-box" : "";
+      const placeholder = isBox
+        ? `Ghi chú cho khung #${num} (${ann.width}×${ann.height}px)...`
+        : `Ghi chú cho điểm #${num}...`;
+
+      return `
+      <div class="ap-pin-row" data-idx="${idx}">
+        <span class="ap-pin-num ${typeClass}" title="${isBox ? "Khung vùng" : "Điểm ghim"}">${icon} ${num}</span>
+        <input type="text" class="ap-pin-input" data-idx="${idx}" placeholder="${placeholder}" value="${escapeHtml(ann.comment || "")}">
+        <button class="ap-pin-del" data-idx="${idx}" title="Xóa đánh dấu #${num}">🗑️</button>
       </div>
-    `).join("");
+    `;
+    }).join("");
 
     list.querySelectorAll(".ap-pin-input").forEach((input) => {
       input.oninput = (e) => {
@@ -199,17 +238,54 @@
 
   function renderSvgAnnotations() {
     const svg = document.getElementById("ap-annotator-svg");
-    svg.innerHTML = currentAnnotations.map((ann, idx) => {
+    syncSvgDimensions();
+
+    let svgHtml = "";
+
+    // 1. Render all committed annotations
+    currentAnnotations.forEach((ann, idx) => {
+      const num = idx + 1;
       if (ann.type === "pin") {
-        return `
+        svgHtml += `
           <g transform="translate(${ann.x}, ${ann.y})">
             <circle r="12" fill="#f43f5e" stroke="#fff" stroke-width="2" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.5))"/>
-            <text text-anchor="middle" dy="4" fill="#fff" font-size="11" font-weight="bold">${idx + 1}</text>
+            <text text-anchor="middle" dy="4" fill="#fff" font-size="11" font-weight="bold">${num}</text>
+          </g>
+        `;
+      } else if (ann.type === "box") {
+        const badgeW = 24 + (String(num).length * 7);
+        const badgeY = ann.y < 22 ? ann.y + 4 : ann.y - 20;
+        svgHtml += `
+          <g class="ap-svg-ann-box" data-idx="${idx}">
+            <rect x="${ann.x}" y="${ann.y}" width="${ann.width}" height="${ann.height}" rx="4"
+                  fill="rgba(56, 189, 248, 0.16)" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4,2"/>
+            <g transform="translate(${ann.x}, ${Math.max(2, badgeY)})">
+              <rect x="0" y="0" width="${badgeW}" height="18" rx="4" fill="#0284c7" stroke="#38bdf8" stroke-width="1"/>
+              <text x="${badgeW / 2}" y="13" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">#${num}</text>
+            </g>
           </g>
         `;
       }
-      return "";
-    }).join("");
+    });
+
+    // 2. Render live drafting box if currently dragging
+    if (boxDragState.dragging && boxDragState.currentRect && boxDragState.currentRect.width > 2 && boxDragState.currentRect.height > 2) {
+      const r = boxDragState.currentRect;
+      const num = currentAnnotations.length + 1;
+      const badgeY = r.y < 22 ? r.y + 4 : r.y - 20;
+      svgHtml += `
+        <g class="ap-svg-ann-draft-box">
+          <rect x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" rx="4"
+                fill="rgba(245, 158, 11, 0.16)" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5,3"/>
+          <g transform="translate(${r.x}, ${Math.max(2, badgeY)})">
+            <rect x="0" y="0" width="70" height="18" rx="4" fill="#d97706"/>
+            <text x="35" y="13" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">#${num} (Khung)</text>
+          </g>
+        </g>
+      `;
+    }
+
+    svg.innerHTML = svgHtml;
   }
 
   // =========================================================================
@@ -374,13 +450,89 @@
     closeCommentPopover();
   };
 
-  // Annotator click & buttons
+  // Annotator tool switching buttons
+  const btnToolPin = document.getElementById("ap-tool-pin");
+  if (btnToolPin) {
+    btnToolPin.onclick = () => setActiveTool("pin");
+  }
+
+  const btnToolBox = document.getElementById("ap-tool-box");
+  if (btnToolBox) {
+    btnToolBox.onclick = () => setActiveTool("box");
+  }
+
+  // Annotator Canvas Mouse Interaction (Pin Click & Box Drag-to-Draw)
   const canvasWrapper = document.getElementById("ap-canvas-wrapper");
-  canvasWrapper.onclick = (e) => {
+
+  canvasWrapper.addEventListener("mousedown", (e) => {
+    if (activeTool !== "box") return;
+    const img = document.getElementById("ap-annotator-img");
+    if (!img) return;
+    const imgRect = img.getBoundingClientRect();
+
+    if (e.clientX < imgRect.left || e.clientX > imgRect.right || e.clientY < imgRect.top || e.clientY > imgRect.bottom) {
+      return;
+    }
+
+    e.preventDefault();
+    boxDragState.dragging = true;
+    const startX = Math.max(0, Math.min(img.clientWidth, Math.round(e.clientX - imgRect.left)));
+    const startY = Math.max(0, Math.min(img.clientHeight, Math.round(e.clientY - imgRect.top)));
+    boxDragState.startX = startX;
+    boxDragState.startY = startY;
+    boxDragState.currentRect = { x: startX, y: startY, width: 0, height: 0 };
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!boxDragState.dragging || activeTool !== "box") return;
+    const img = document.getElementById("ap-annotator-img");
+    if (!img) return;
+    const imgRect = img.getBoundingClientRect();
+
+    const curX = Math.max(0, Math.min(img.clientWidth, Math.round(e.clientX - imgRect.left)));
+    const curY = Math.max(0, Math.min(img.clientHeight, Math.round(e.clientY - imgRect.top)));
+
+    const x = Math.min(boxDragState.startX, curX);
+    const y = Math.min(boxDragState.startY, curY);
+    const width = Math.abs(curX - boxDragState.startX);
+    const height = Math.abs(curY - boxDragState.startY);
+
+    boxDragState.currentRect = { x, y, width, height };
+    renderSvgAnnotations();
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (!boxDragState.dragging || activeTool !== "box") return;
+    boxDragState.dragging = false;
+    const rect = boxDragState.currentRect;
+    boxDragState.currentRect = null;
+
+    if (rect && rect.width >= 10 && rect.height >= 10) {
+      currentAnnotations.push({
+        type: "box",
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        comment: ""
+      });
+      renderPinsList();
+    }
+    renderSvgAnnotations();
+  });
+
+  canvasWrapper.addEventListener("click", (e) => {
     if (activeTool !== "pin") return;
-    const rect = canvasWrapper.getBoundingClientRect();
-    const x = Math.round(e.clientX - rect.left);
-    const y = Math.round(e.clientY - rect.top);
+    const img = document.getElementById("ap-annotator-img");
+    if (!img) return;
+    const imgRect = img.getBoundingClientRect();
+
+    if (e.clientX < imgRect.left || e.clientX > imgRect.right || e.clientY < imgRect.top || e.clientY > imgRect.bottom) {
+      return;
+    }
+
+    const x = Math.round(e.clientX - imgRect.left);
+    const y = Math.round(e.clientY - imgRect.top);
 
     currentAnnotations.push({
       type: "pin",
@@ -391,7 +543,7 @@
 
     renderSvgAnnotations();
     renderPinsList();
-  };
+  });
 
   document.getElementById("ap-annotator-btn-close").onclick = closeAnnotatorModal;
   document.getElementById("ap-annotator-btn-cancel").onclick = closeAnnotatorModal;

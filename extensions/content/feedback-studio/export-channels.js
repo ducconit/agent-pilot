@@ -57,9 +57,14 @@
       }
 
       if (item.annotations && item.annotations.length) {
-        md += `- **Các điểm đánh dấu (Pins)**:\n`;
+        md += `- **Các điểm & khung đánh dấu (Annotations)**:\n`;
         item.annotations.forEach((ann, pinIdx) => {
-          md += `  - Điểm ${pinIdx + 1} (x:${ann.x}, y:${ann.y}): ${ann.comment || "Cần sửa vị trí này"}\n`;
+          const num = pinIdx + 1;
+          if (ann.type === "box") {
+            md += `  - ⬜ Khung #${num} (${ann.width}×${ann.height}px tại x:${ann.x}, y:${ann.y}): ${ann.comment || "Cần sửa khu vực này"}\n`;
+          } else {
+            md += `  - 📍 Điểm #${num} (x:${ann.x}, y:${ann.y}): ${ann.comment || "Cần sửa vị trí này"}\n`;
+          }
         });
       }
 
