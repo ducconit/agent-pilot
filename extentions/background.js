@@ -7,13 +7,33 @@
 const attachedTabs = new Set();
 const devtoolsBuffers = new Map(); // tabId -> { console: [], network: [], performance: {} }
 
-// Enable Side Panel behavior on icon click if supported
-if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+// Enable Side Panel behavior on icon click natively
+function enableSidePanelBehavior() {
+  if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => {
+      console.warn("Error setting panel behavior:", err);
+    });
+  }
+}
+enableSidePanelBehavior();
+
+// Open Side Panel directly when action icon is clicked
+if (chrome.action && chrome.action.onClicked) {
+  chrome.action.onClicked.addListener(async (tab) => {
+    if (chrome.sidePanel && chrome.sidePanel.open) {
+      try {
+        const openOptions = (tab && tab.windowId) ? { windowId: tab.windowId } : { tabId: tab?.id };
+        await chrome.sidePanel.open(openOptions);
+      } catch (err) {
+        console.warn("Failed to open side panel on action click:", err);
+      }
+    }
+  });
 }
 
 // Context Menu setup for quick inspection
 chrome.runtime.onInstalled.addListener(() => {
+  enableSidePanelBehavior();
   chrome.contextMenus.create({
     id: "agent_pilot_open_sidepanel",
     title: "Mở Agent Pilot (Side Panel)",
@@ -31,16 +51,21 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (!tab || !tab.id) return;
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (!tab) return;
   if (info.menuItemId === "agent_pilot_open_sidepanel") {
     if (chrome.sidePanel && chrome.sidePanel.open) {
-      chrome.sidePanel.open({ tabId: tab.id });
+      try {
+        const openOptions = tab.windowId ? { windowId: tab.windowId } : { tabId: tab.id };
+        await chrome.sidePanel.open(openOptions);
+      } catch (err) {
+        console.warn("Failed to open side panel via context menu:", err);
+      }
     }
   } else if (info.menuItemId === "agent_pilot_inspect_element") {
-    chrome.tabs.sendMessage(tab.id, { action: "toggle_inspector", enabled: true }).catch(() => {});
+    if (tab.id) chrome.tabs.sendMessage(tab.id, { action: "toggle_inspector", enabled: true }).catch(() => {});
   } else if (info.menuItemId === "agent_pilot_pick_color") {
-    chrome.tabs.sendMessage(tab.id, { action: "pick_color" }).catch(() => {});
+    if (tab.id) chrome.tabs.sendMessage(tab.id, { action: "pick_color" }).catch(() => {});
   }
 });
 
