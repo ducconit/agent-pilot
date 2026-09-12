@@ -6,7 +6,9 @@
 import {
   agentControlledTabs,
   normalizeUrl,
-  DEFAULT_LOAD_TIMEOUT_MS
+  DEFAULT_LOAD_TIMEOUT_MS,
+  attachedTabs,
+  getBuffer
 } from "./constants.js";
 import { attachDebugger, sendCdpCommand } from "./cdp-manager.js";
 import {
@@ -329,6 +331,62 @@ export async function executeBatchActions(params, bridgeClient = null) {
           const cdpRes = await sendCdpCommand(targetTabId, act.cdpMethod || act.method, act.cdpParams || act.params || {});
           stepResult.success = true;
           stepResult.result = cdpRes;
+          break;
+        }
+
+        case "devtools":
+        case "get_devtools_data": {
+          const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
+          if (!targetTabId) throw new Error("No active tab for devtools");
+          if (!attachedTabs.has(targetTabId)) {
+            await attachDebugger(targetTabId).catch((err) => {
+              console.warn("[AgentPilot] Batch auto-attach failed:", err);
+            });
+          }
+          const buffer = getBuffer(targetTabId);
+          const devType = act.devtoolsType || (["all", "console", "network", "performance"].includes(act.type) ? act.type : "all");
+          const limit = Math.min(Math.max(Number(act.limit) || 50, 1), 200);
+
+          let consoleData = undefined;
+          let networkData = undefined;
+          let perfData = undefined;
+
+          if (devType === "all" || devType === "console") {
+            consoleData = buffer.console.slice(-limit);
+            if (act.clear) buffer.console = [];
+          }
+          if (devType === "all" || devType === "network") {
+            networkData = Array.from(buffer.network.values()).slice(-limit);
+            if (act.clear) buffer.network.clear();
+          }
+          if (devType === "all" || devType === "performance") {
+            try {
+              const pRes = await sendCdpCommand(targetTabId, "Performance.getMetrics");
+              const mMap = {};
+              (pRes.metrics || []).forEach(m => { mMap[m.name] = m.value; });
+              perfData = {
+                metrics: mMap,
+                jsHeapUsedMB: mMap.JSHeapUsedSize ? +(mMap.JSHeapUsedSize / (1024 * 1024)).toFixed(2) : undefined,
+                domNodes: mMap.Nodes,
+                timestamp: Date.now()
+              };
+            } catch (pErr) {
+              perfData = { error: pErr.message };
+            }
+          }
+
+          stepResult.success = true;
+          stepResult.tabId = targetTabId;
+          stepResult.attached = attachedTabs.has(targetTabId);
+          stepResult.summary = {
+            consoleEntries: consoleData ? consoleData.length : 0,
+            networkRequests: networkData ? networkData.length : 0,
+            jsHeapUsedMB: perfData?.jsHeapUsedMB,
+            domNodes: perfData?.domNodes
+          };
+          if (consoleData !== undefined) stepResult.console = consoleData;
+          if (networkData !== undefined) stepResult.network = networkData;
+          if (perfData !== undefined) stepResult.performance = perfData;
           break;
         }
 

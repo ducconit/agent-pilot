@@ -414,7 +414,8 @@ async function run() {
 
     const devtoolsRes = await sendAgentCommand("devtools.getData", { tabId });
     const hasLog = devtoolsRes?.console?.some(c => c.text.includes("LOG_VIA_AGENT_PORT_58765_TOKEN"));
-    record("16. Agent Command: devtools.getData", hasLog, `Captured ${devtoolsRes?.console?.length} log entries over bridge`);
+    const hasPerf = devtoolsRes?.performance?.domNodes > 0 && typeof devtoolsRes?.performance?.jsHeapUsedMB === "number";
+    record("16. Agent Command: devtools.getData", hasLog && hasPerf, `Captured ${devtoolsRes?.console?.length} logs & Performance (Heap: ${devtoolsRes?.performance?.jsHeapUsedMB} MB, Nodes: ${devtoolsRes?.performance?.domNodes})`);
 
     // 17. Test Agent Command: tabs.listAll
     const listTabsRes = await sendAgentCommand("tabs.listAll", {});
@@ -507,34 +508,38 @@ async function run() {
     await sidepanelPage.close();
 
     // 23. Test Batch Action Execution via WebSocket (batch.run)
-    // Sequence: open -> wait_for_selector -> click -> type (with clear) -> screenshot -> close
+    // Sequence: open -> wait_for_selector -> click -> type (with clear) -> devtools -> screenshot -> close
     const batchRes = await sendAgentCommand("batch.run", {
       actions: [
         { type: "open", url: `http://127.0.0.1:${HTTP_PORT}/test-page.html` },
         { type: "wait_for_selector", selector: "#btn-sample-click", timeoutMs: 4000 },
         { type: "click", selector: "#btn-sample-click" },
         { type: "type", selector: "#test-search-input", text: "Batch Action Automation Verified", clear: true },
+        { type: "devtools", devtoolsType: "performance" },
         { type: "screenshot", label: "batch_test" },
         { type: "close" }
       ]
     });
 
     const isBatchSuccess = batchRes?.success === true &&
-                           batchRes?.results?.length === 6 &&
+                           batchRes?.results?.length === 7 &&
                            batchRes?.results[0]?.type === "open" &&
                            batchRes?.results[1]?.type === "wait_for_selector" &&
                            batchRes?.results[2]?.type === "click" &&
                            batchRes?.results[3]?.type === "type" &&
-                           batchRes?.results[4]?.dataUrl?.startsWith("data:image/png;base64,") &&
-                           batchRes?.results[5]?.type === "close";
+                           batchRes?.results[4]?.type === "devtools" &&
+                           batchRes?.results[4]?.performance?.domNodes > 0 &&
+                           batchRes?.results[5]?.dataUrl?.startsWith("data:image/png;base64,") &&
+                           batchRes?.results[6]?.type === "close";
 
-    record("23. Batch Actions Engine (Single Tool Call)", isBatchSuccess, `Executed 6-step batch (open -> wait -> click -> type -> screenshot -> close) in ${batchRes?.durationMs}ms`);
+    record("23. Batch Actions Engine (Single Tool Call)", isBatchSuccess, `Executed 7-step batch (open -> wait -> click -> type -> devtools -> screenshot -> close) in ${batchRes?.durationMs}ms`);
 
     // 24. Test Batch Actions via HTTP REST API (POST /api method: batch.run)
     const httpBatchParams = {
       actions: [
         { type: "open", url: `http://127.0.0.1:${HTTP_PORT}/test-page.html` },
         { type: "wait_for_selector", selector: "#btn-sample-click" },
+        { type: "devtools" },
         { type: "close" }
       ]
     };
@@ -563,8 +568,10 @@ async function run() {
 
     const isHttpBatchSuccess = httpBatchRes?.success === true &&
                                httpBatchRes?.result?.success === true &&
-                               httpBatchRes?.result?.executedActions === 3;
-    record("24. Batch Actions HTTP API Endpoint", isHttpBatchSuccess, `Executed 3 actions via HTTP /api in ${httpBatchRes?.result?.durationMs}ms`);
+                               httpBatchRes?.result?.executedActions === 4 &&
+                               Array.isArray(httpBatchRes?.result?.results[2]?.console) &&
+                               httpBatchRes?.result?.results[2]?.performance?.domNodes > 0;
+    record("24. Batch Actions HTTP API Endpoint", isHttpBatchSuccess, `Executed 4 actions (including default devtools) via HTTP /api in ${httpBatchRes?.result?.durationMs}ms`);
 
     // 25. Secret & API Key Sanitizer over WebSocket Bridge
     const secretEvalBatch = {

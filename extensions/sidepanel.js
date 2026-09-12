@@ -1,11 +1,10 @@
 /**
  * Agent Pilot - Side Panel Logic Controller (Modular Coordinator)
- * Coordinates AI Agent Monitor, DevTools CDP Inspector, DOM Inspector, and Screenshot Studio
+ * Coordinates AI Agent Monitor, DOM Inspector, and Screenshot Studio
  */
 
 import { showToast } from "./sidepanel/ui-helpers.js";
 import { AgentMonitor } from "./sidepanel/agent-monitor.js";
-import { DevToolsPanel } from "./sidepanel/devtools-panel.js";
 import { InspectorPanel } from "./sidepanel/inspector-panel.js";
 import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
 
@@ -24,18 +23,9 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
   const tabBtns = document.querySelectorAll(".tab-btn");
   const panels = document.querySelectorAll(".panel");
 
-  // Subtabs Nav
-  const subtabBtns = document.querySelectorAll(".subtab-btn");
-  const subpanels = document.querySelectorAll(".subpanel");
-
   // Initialize Subsystem Panels
   const agentMonitor = new AgentMonitor({
     getActiveTabId: () => activeTabId
-  });
-
-  const devtoolsPanel = new DevToolsPanel({
-    getActiveTabId: () => activeTabId,
-    getIsCdpAttached: () => isCdpAttached
   });
 
   let inspectorPanel;
@@ -61,20 +51,6 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
       const targetId = btn.getAttribute("data-tab");
       const targetPanel = document.getElementById(targetId);
       if (targetPanel) targetPanel.classList.add("active");
-    });
-  });
-
-  subtabBtns.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      subtabBtns.forEach((b) => b.classList.remove("active"));
-      subpanels.forEach((p) => p.classList.remove("active"));
-      btn.classList.add("active");
-      const targetId = btn.getAttribute("data-subtab");
-      const targetSubpanel = document.getElementById(targetId);
-      if (targetSubpanel) targetSubpanel.classList.add("active");
-      if (targetId === "devtools-perf" && isCdpAttached) {
-        devtoolsPanel.refreshPerformance();
-      }
     });
   });
 
@@ -155,8 +131,7 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
         chrome.runtime.sendMessage({ action: "attach_debugger", tabId: activeTabId }, (res) => {
           if (res && res.success) {
             setCdpState(true);
-            showToast("Đã gắn kết nối CDP (Console, Network, Performance sẵn sàng)!");
-            devtoolsPanel.refreshPerformance();
+            showToast("Đã gắn kết nối CDP (Sẵn sàng điều khiển qua Agent)!");
           } else {
             showToast("Lỗi gắn CDP: " + (res ? res.error : "Không xác định"));
           }
@@ -173,18 +148,6 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
     if (msg.type === "DEBUGGER_STATUS_CHANGED") {
       if (msg.tabId === activeTabId) {
         setCdpState(msg.attached);
-      }
-    }
-
-    if (msg.type === "DEVTOOLS_CONSOLE_EVENT") {
-      if (msg.tabId === activeTabId && msg.entry) {
-        devtoolsPanel.addConsoleEntry(msg.entry);
-      }
-    }
-
-    if (msg.type === "DEVTOOLS_NETWORK_EVENT") {
-      if (msg.tabId === activeTabId && msg.request) {
-        devtoolsPanel.addOrUpdateNetworkEntry(msg.request);
       }
     }
 

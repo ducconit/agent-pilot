@@ -49,7 +49,6 @@
   <!-- Main Navigation Tabs -->
   <nav class="tabs-nav">
     <button class="tab-btn active" data-tab="tab-agent">🤖 Agent</button>
-    <button class="tab-btn" data-tab="tab-devtools">⚡ DevTools</button>
     <button class="tab-btn" data-tab="tab-inspector">🎯 Inspector</button>
     <button class="tab-btn" data-tab="tab-screenshot">📸 Chụp ảnh</button>
   </nav>
@@ -126,72 +125,7 @@
       </div>
     </section>
 
-    <!-- ==================== PANEL 2: DEVTOOLS (CDP MONITOR) ==================== -->
-    <section class="panel" id="tab-devtools">
-      <div class="subtabs-nav">
-        <button class="subtab-btn active" data-subtab="devtools-console">Console (<span id="console-count">0</span>)</button>
-        <button class="subtab-btn" data-subtab="devtools-network">Network (<span id="network-count">0</span>)</button>
-        <button class="subtab-btn" data-subtab="devtools-perf">Performance</button>
-      </div>
 
-      <!-- 2.1 Console Subpanel -->
-      <div class="subpanel active" id="devtools-console">
-        <div class="filter-bar">
-          <select id="console-level-filter" class="form-select">
-            <option value="all">Tất cả Logs</option>
-            <option value="log">Info / Log</option>
-            <option value="warn">Warnings</option>
-            <option value="error">Errors</option>
-          </select>
-          <input type="text" id="console-search-filter" class="form-input" placeholder="Lọc nội dung...">
-          <button class="btn btn-sm btn-outline" id="btn-clear-console">Xóa</button>
-        </div>
-        <div class="log-stream-container" id="console-stream">
-          <div class="empty-hint">Chưa có console log. Hãy gắn CDP và thao tác trên trang web.</div>
-        </div>
-      </div>
-
-      <!-- 2.2 Network Subpanel -->
-      <div class="subpanel" id="devtools-network">
-        <div class="filter-bar">
-          <input type="text" id="network-search-filter" class="form-input" placeholder="Lọc URL...">
-          <button class="btn btn-sm btn-outline" id="btn-clear-network">Xóa</button>
-        </div>
-        <div class="network-stream-container" id="network-stream">
-          <div class="empty-hint">Chưa có request. Tải lại trang sau khi gắn CDP để theo dõi mạng.</div>
-        </div>
-      </div>
-
-      <!-- 2.3 Performance Subpanel -->
-      <div class="subpanel" id="devtools-perf">
-        <div class="perf-toolbar">
-          <span>Thời gian thực qua Chrome DevTools Protocol</span>
-          <button class="btn btn-sm btn-primary" id="btn-refresh-perf">Làm mới</button>
-        </div>
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div class="metric-label">JS Heap Memory</div>
-            <div class="metric-value" id="metric-heap">-- MB</div>
-            <div class="metric-sub" id="metric-heap-total">Tổng: -- MB</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">DOM Nodes</div>
-            <div class="metric-value" id="metric-nodes">--</div>
-            <div class="metric-sub">Phần tử trên cây DOM</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Layout Count</div>
-            <div class="metric-value" id="metric-layouts">--</div>
-            <div class="metric-sub">Lần tính toán bố cục</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Style Recalcs</div>
-            <div class="metric-value" id="metric-styles">--</div>
-            <div class="metric-sub">Lần tính toán lại CSS</div>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <!-- ==================== PANEL 3: ELEMENT INSPECTOR & COLOR PICKER ==================== -->
     <section class="panel" id="tab-inspector">

@@ -554,12 +554,84 @@ export class AgentBridgeClient {
 
         case "devtools.getData": {
           const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) {
+            respond(null, new Error("No target tab available for DevTools"));
+            break;
+          }
+
+          // Auto attach debugger if not attached
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, this.broadcast).catch((err) => {
+              console.warn("[AgentPilot] Auto attach debugger failed:", err);
+            });
+          }
+
           const buffer = getBuffer(tabId);
-          respond({
-            console: buffer.console,
-            network: Array.from(buffer.network.values()).slice(-100),
-            attached: attachedTabs.has(tabId)
-          });
+          const requestedType = params.type || "all";
+          const limit = Math.min(Math.max(Number(params.limit) || 50, 1), 200);
+
+          let consoleData = undefined;
+          let networkData = undefined;
+          let performanceData = undefined;
+
+          if (requestedType === "all" || requestedType === "console") {
+            consoleData = buffer.console.slice(-limit);
+            if (params.clear) {
+              buffer.console = [];
+            }
+          }
+
+          if (requestedType === "all" || requestedType === "network") {
+            networkData = Array.from(buffer.network.values()).slice(-limit);
+            if (params.clear) {
+              buffer.network.clear();
+            }
+          }
+
+          if (requestedType === "all" || requestedType === "performance") {
+            if (attachedTabs.has(tabId)) {
+              try {
+                const perfRes = await sendCdpCommand(tabId, "Performance.getMetrics");
+                const metricsMap = {};
+                (perfRes.metrics || []).forEach((m) => {
+                  metricsMap[m.name] = m.value;
+                });
+                performanceData = {
+                  metrics: metricsMap,
+                  jsHeapUsedMB: metricsMap.JSHeapUsedSize ? +(metricsMap.JSHeapUsedSize / (1024 * 1024)).toFixed(2) : undefined,
+                  jsHeapTotalMB: metricsMap.JSHeapTotalSize ? +(metricsMap.JSHeapTotalSize / (1024 * 1024)).toFixed(2) : undefined,
+                  domNodes: metricsMap.Nodes,
+                  documents: metricsMap.Documents,
+                  frames: metricsMap.Frames,
+                  layoutCount: metricsMap.LayoutCount,
+                  recalcStyleCount: metricsMap.RecalcStyleCount,
+                  timestamp: Date.now()
+                };
+              } catch (perfErr) {
+                performanceData = { error: perfErr.message };
+              }
+            } else {
+              performanceData = { error: "Debugger not attached to tab" };
+            }
+          }
+
+          const responsePayload = {
+            tabId,
+            attached: attachedTabs.has(tabId),
+            timestamp: Date.now(),
+            summary: {
+              consoleEntries: consoleData ? consoleData.length : 0,
+              networkRequests: networkData ? networkData.length : 0,
+              jsHeapUsedMB: performanceData?.jsHeapUsedMB,
+              domNodes: performanceData?.domNodes
+            }
+          };
+
+          if (consoleData !== undefined) responsePayload.console = consoleData;
+          if (networkData !== undefined) responsePayload.network = networkData;
+          if (performanceData !== undefined) responsePayload.performance = performanceData;
+
+          respond(responsePayload);
           break;
         }
 

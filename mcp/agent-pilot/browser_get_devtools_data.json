@@ -1,12 +1,30 @@
 {
   "name": "browser_get_devtools_data",
-  "description": "Retrieve real-time DevTools CDP inspection data (Console logs and Network requests)",
+  "description": "Retrieve real-time Chrome DevTools inspection data including Console logs, Network requests, and Performance metrics (JS Heap, DOM nodes, styles, layout)",
   "parameters": {
     "type": "object",
     "properties": {
       "tabId": {
         "type": "integer",
-        "description": "Optional Tab ID"
+        "description": "Optional Tab ID. If omitted, uses the tab controlled by the agent or active tab"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "all",
+          "console",
+          "network",
+          "performance"
+        ],
+        "description": "Data type to retrieve: 'all' (default), 'console' (logs/warnings/errors/traces), 'network' (HTTP requests/responses/failures), or 'performance' (JS heap size, node count, layout/style calculations)"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Maximum number of console log or network entries to return (default: 50, max: 200)"
+      },
+      "clear": {
+        "type": "boolean",
+        "description": "Optional: Clear buffer after reading so subsequent calls only return new events (default: false)"
       }
     }
   }

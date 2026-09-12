@@ -155,13 +155,12 @@ async function run() {
         brand: document.querySelector(".brand-title")?.textContent,
         tabBtns: Array.from(document.querySelectorAll(".tab-btn")).map(b => b.textContent.trim()),
         hasAgentMonitor: !!document.getElementById("agent-activity-log"),
-        hasDevToolsConsole: !!document.getElementById("console-stream"),
         hasInspectorBtn: !!document.getElementById("btn-toggle-inspector"),
         hasScreenshotBtns: !!document.getElementById("btn-capture-visible"),
         hasSelfTestBtn: !!document.getElementById("btn-self-test-agent")
       };
     });
-    const sidepanelOk = sidepanelCheck.brand === "AGENT PILOT" && sidepanelCheck.tabBtns.length === 4 && sidepanelCheck.hasAgentMonitor;
+    const sidepanelOk = sidepanelCheck.brand === "AGENT PILOT" && sidepanelCheck.tabBtns.length === 3 && sidepanelCheck.hasAgentMonitor;
     record("8. Side Panel Control Center UI", sidepanelOk, `Brand: ${sidepanelCheck.brand}, Tabs: [${sidepanelCheck.tabBtns.join(" | ")}]`);
     // Keep sidepanelPage open to test Extension IPC messaging
     // 10. Test Chrome DevTools Protocol (CDP) via Background Service Worker
