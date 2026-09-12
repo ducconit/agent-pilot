@@ -151,7 +151,9 @@
           addFeedbackItem: (item) => sendBridgeRequest("add_feedback_item", { item }),
           clearFeedbackItems: () => sendBridgeRequest("clear_feedback_items", {}),
           copyFeedbackPrompt: () => sendBridgeRequest("copy_feedback_prompt", {}),
-          generateFeedbackPrompt: (items) => sendBridgeRequest("generate_feedback_prompt", { items })
+          generateFeedbackPrompt: (items) => sendBridgeRequest("generate_feedback_prompt", { items }),
+          saveFeedbackToInbox: () => sendBridgeRequest("save_feedback_inbox", {}),
+          pushFeedbackToAgent: () => sendBridgeRequest("push_feedback_agent", {})
         });
       })();
     `;
@@ -194,6 +196,8 @@
       else if (action === "clear_feedback_items") { feedback.clearAll(); result = { success: true }; }
       else if (action === "copy_feedback_prompt") result = await feedback.copyPrompt();
       else if (action === "generate_feedback_prompt") result = feedback.generateMarkdownPrompt(data.items);
+      else if (action === "save_feedback_inbox") result = await feedback.saveToInbox();
+      else if (action === "push_feedback_agent") result = await feedback.pushToAgent();
     } catch (err) {
       console.warn("[AgentPilot] Bridge request error:", action, err);
       error = err?.message || String(err);
@@ -390,6 +394,16 @@
     if (req.action === "clear_feedback_items") {
       feedback.clearAll();
       sendResponse({ success: true, items: feedback.getItems() });
+      return true;
+    }
+
+    if (req.action === "save_feedback_inbox_tab") {
+      feedback.saveToInbox().then(sendResponse);
+      return true;
+    }
+
+    if (req.action === "push_feedback_agent_tab") {
+      feedback.pushToAgent().then(sendResponse);
       return true;
     }
 

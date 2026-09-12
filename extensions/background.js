@@ -422,4 +422,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true, enabled: getSecretFilterEnabled() });
     return true;
   }
+
+  // 8. Visual Feedback Actions (Channel B & A)
+  if (action === "save_feedback_inbox") {
+    (async () => {
+      try {
+        const res = await agentBridge.saveFeedbackInbox(request.payload);
+        sendResponse(res);
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  if (action === "push_feedback_live") {
+    (async () => {
+      try {
+        const res = await agentBridge.pushFeedbackLive(request.payload);
+        sendResponse(res);
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
 });
+

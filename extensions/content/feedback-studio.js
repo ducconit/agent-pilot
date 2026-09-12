@@ -901,6 +901,84 @@
   // Wire Popovers & Modal Events
   // =========================================================================
 
+  // Channel B: Save feedback items to ~/.agent-pilot/inbox/feedback/<timestamp>/*
+  async function saveFeedbackToInbox() {
+    if (feedbackItems.length === 0) {
+      showToast("⚠️ Chưa có mục feedback nào để lưu vào inbox. Hãy chọn phần tử hoặc kéo vùng trước!");
+      return { success: false, error: "No feedback items" };
+    }
+    showToast("💾 Đang lưu feedback vào inbox...");
+    const promptMd = generateMarkdownPrompt(feedbackItems);
+    const payload = {
+      timestamp: Date.now(),
+      url: window.location.href,
+      title: document.title,
+      items: feedbackItems,
+      prompt: promptMd
+    };
+
+    try {
+      const resp = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          action: "save_feedback_inbox",
+          payload
+        }, (res) => resolve(res || { success: false }));
+      });
+
+      if (resp && resp.success) {
+        if (resp.storage === "filesystem") {
+          showToast(`✓ Đã lưu ${feedbackItems.length} mục vào ~/.agent-pilot/inbox/feedback/${resp.sessionId}/`);
+        } else {
+          showToast(`✓ Đã lưu ${feedbackItems.length} mục vào bộ nhớ Extension!`);
+        }
+        return resp;
+      } else {
+        showToast(`❌ Lỗi lưu inbox: ${resp?.error || "Không thể lưu"}`);
+        return resp || { success: false };
+      }
+    } catch (err) {
+      showToast(`❌ Lỗi: ${err.message}`);
+      return { success: false, error: err.message };
+    }
+  }
+
+  // Channel A: Push feedback live to waiting agent
+  async function pushFeedbackToAgent() {
+    if (feedbackItems.length === 0) {
+      showToast("⚠️ Chưa có mục feedback nào để gửi. Hãy chọn phần tử hoặc kéo vùng trước!");
+      return { success: false, error: "No feedback items" };
+    }
+    showToast("🚀 Đang gửi feedback trực tiếp cho Agent...");
+    const promptMd = generateMarkdownPrompt(feedbackItems);
+    const payload = {
+      timestamp: Date.now(),
+      url: window.location.href,
+      title: document.title,
+      items: feedbackItems,
+      prompt: promptMd
+    };
+
+    try {
+      const resp = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          action: "push_feedback_live",
+          payload
+        }, (res) => resolve(res || { success: false }));
+      });
+
+      if (resp && resp.success) {
+        showToast(`✓ Đã truyền trực tiếp ${feedbackItems.length} mục phản hồi cho AI Agent!`);
+        return resp;
+      } else {
+        showToast(`⚠️ Không có Agent nào đang chờ (chạy browser_wait_for_feedback). Đã tự động lưu vào inbox!`);
+        return resp || { success: false };
+      }
+    } catch (err) {
+      showToast(`❌ Lỗi gửi: ${err.message}`);
+      return { success: false, error: err.message };
+    }
+  }
+
   // HUD mode buttons
   hud.querySelectorAll(".ap-hud-btn").forEach(btn => {
     btn.onclick = () => setMode(btn.dataset.mode);
@@ -908,6 +986,10 @@
 
   hud.querySelector("#ap-hud-btn-close").onclick = stopFeedbackStudio;
   hud.querySelector("#ap-hud-btn-copy").onclick = copyFeedbackPrompt;
+  const hudBtnInbox = hud.querySelector("#ap-hud-btn-inbox");
+  if (hudBtnInbox) hudBtnInbox.onclick = saveFeedbackToInbox;
+  const hudBtnSend = hud.querySelector("#ap-hud-btn-send");
+  if (hudBtnSend) hudBtnSend.onclick = pushFeedbackToAgent;
   hud.querySelector("#ap-hud-btn-list").onclick = () => {
     renderItemsListModal();
     listModal.classList.remove("hidden");
@@ -1004,6 +1086,8 @@
     copyPrompt: copyFeedbackPrompt,
     deleteItem: deleteFeedbackItem,
     clearAll: (skipConfirm = true) => clearAllFeedbackItems(skipConfirm),
-    generateMarkdownPrompt
+    generateMarkdownPrompt,
+    saveToInbox: saveFeedbackToInbox,
+    pushToAgent: pushFeedbackToAgent
   };
 })();

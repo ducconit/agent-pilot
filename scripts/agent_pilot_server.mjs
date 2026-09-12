@@ -8,6 +8,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline";
 import { WebSocketServer, WebSocket } from "ws";
@@ -27,6 +28,230 @@ let activeClientId = null;
 let pendingRequests = new Map();
 let requestIdCounter = 1;
 let lastSecretFilterState = true;
+let pendingFeedbackWaiters = [];
+
+export function getFeedbackStorageDir() {
+  const agentPilotHome = process.env.AGENT_PILOT_HOME || path.join(os.homedir(), ".agent-pilot");
+  return path.join(agentPilotHome, "inbox", "feedback");
+}
+
+export function saveFeedbackSession(payload) {
+  const timestamp = String(payload.timestamp || Date.now());
+  const feedbackDir = getFeedbackStorageDir();
+  const sessionDir = path.join(feedbackDir, timestamp);
+  fs.mkdirSync(sessionDir, { recursive: true });
+
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const savedItems = [];
+
+  items.forEach((item, index) => {
+    const itemNum = index + 1;
+    let imageFileName = null;
+    let imageAbsolutePath = null;
+
+    if (item.screenshotDataUrl && item.screenshotDataUrl.startsWith("data:image/")) {
+      const matches = item.screenshotDataUrl.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+      if (matches) {
+        const ext = matches[1] === "jpeg" ? "jpg" : "png";
+        imageFileName = `item_${itemNum}.${ext}`;
+        imageAbsolutePath = path.join(sessionDir, imageFileName);
+        fs.writeFileSync(imageAbsolutePath, Buffer.from(matches[2], "base64"));
+      }
+    }
+
+    savedItems.push({
+      id: item.id || `item_${itemNum}`,
+      mode: item.mode,
+      title: item.title,
+      comment: item.comment,
+      dom: item.dom,
+      component: item.component,
+      clip: item.clip,
+      annotations: item.annotations,
+      imageFile: imageFileName,
+      imagePath: imageAbsolutePath
+    });
+  });
+
+  const sessionMetadata = {
+    sessionId: timestamp,
+    savedAt: new Date().toISOString(),
+    url: payload.url || "",
+    title: payload.title || "",
+    count: savedItems.length,
+    items: savedItems
+  };
+  fs.writeFileSync(path.join(sessionDir, "session.json"), JSON.stringify(sessionMetadata, null, 2), "utf-8");
+
+  // Format prompt.md
+  let promptMd = payload.prompt || "";
+  if (!promptMd) {
+    promptMd = `### 🎯 YÊU CẦU CHỈNH SỬA GIAO DIỆN (Agent Pilot Visual Feedback)\n\n`;
+    promptMd += `- **URL**: \`${payload.url || ""}\`\n`;
+    promptMd += `- **Tiêu đề trang**: "${payload.title || ""}"\n`;
+    promptMd += `- **Thời gian ghi nhận**: ${new Date().toLocaleString("vi-VN")}\n`;
+    promptMd += `- **Tổng số mục phản hồi**: ${savedItems.length}\n\n---\n\n`;
+
+    savedItems.forEach((it, idx) => {
+      promptMd += `#### Mục ${idx + 1}: [${(it.mode || "").toUpperCase()}] ${it.title}\n`;
+      if (it.component) {
+        promptMd += `- **Component Framework**: \`${it.component.framework || "React"}\`\n`;
+        promptMd += `- **Component Name**: \`<${it.component.componentName} />\`\n`;
+        if (it.component.fileName) {
+          promptMd += `- **Đường dẫn tệp nguồn (Source File)**: \`${it.component.fileName}${it.component.lineNumber ? `:${it.component.lineNumber}` : ""}\`\n`;
+        }
+        if (it.component.hierarchy) {
+          const hierStr = Array.isArray(it.component.hierarchy) ? it.component.hierarchy.join(" > ") : String(it.component.hierarchy);
+          promptMd += `- **Cây Component**: \`${hierStr}\`\n`;
+        }
+      }
+      if (it.dom) {
+        promptMd += `- **CSS Selector**: \`${it.dom.selector || it.dom.tagName}\`\n`;
+        if (it.dom.xpath) promptMd += `- **XPath**: \`${it.dom.xpath}\`\n`;
+        if (it.dom.text) promptMd += `- **Nội dung text**: "${it.dom.text.replace(/\\n+/g, " ").slice(0, 150)}"\n`;
+      }
+      if (it.clip) {
+        promptMd += `- **Tọa độ / Kích thước**: ${it.clip.width}×${it.clip.height}px (x: ${it.clip.x}, y: ${it.clip.y})\n`;
+      }
+      if (it.annotations && it.annotations.length) {
+        promptMd += `- **Các điểm đánh dấu (Pins)**:\n`;
+        it.annotations.forEach((ann, pinIdx) => {
+          promptMd += `  - Điểm ${pinIdx + 1} (x:${ann.x}, y:${ann.y}): ${ann.comment || "Cần sửa vị trí này"}\n`;
+        });
+      }
+      promptMd += `- **Yêu cầu chỉnh sửa của người dùng (User Note)**:\n  > ${(it.comment || "*(Không có ghi chú)*").replace(/\\n/g, "\n  > ")}\n\n`;
+      if (it.imageFile) {
+        promptMd += `- **Ảnh chụp thực tế**: \n  ![Mục ${idx + 1}](${it.imageFile})\n\n`;
+      }
+      promptMd += `---\n\n`;
+    });
+  } else {
+    items.forEach((it, idx) => {
+      const saved = savedItems[idx];
+      if (saved?.imageFile && it?.screenshotDataUrl) {
+        promptMd = promptMd.split(it.screenshotDataUrl).join(saved.imageFile);
+      }
+    });
+  }
+  fs.writeFileSync(path.join(sessionDir, "prompt.md"), promptMd, "utf-8");
+
+  // Check if any Channel A waiters should be resolved
+  checkAndNotifyFeedbackWaiters({
+    sessionId: timestamp,
+    sessionDir,
+    metadata: sessionMetadata,
+    promptMd
+  });
+
+  return {
+    sessionId: timestamp,
+    sessionDir,
+    metadata: sessionMetadata,
+    promptMd,
+    savedItems
+  };
+}
+
+export function getPendingFeedback(args = {}) {
+  const feedbackDir = getFeedbackStorageDir();
+  if (!fs.existsSync(feedbackDir)) {
+    return {
+      success: true,
+      sessionsCount: 0,
+      sessions: [],
+      feedbackDir,
+      message: "No pending feedback found"
+    };
+  }
+
+  const dirs = fs.readdirSync(feedbackDir, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => d.name)
+    .sort((a, b) => Number(b) - Number(a));
+
+  const limit = Number(args.limit) || 10;
+  let targetIds = dirs;
+  if (args.sessionId) {
+    targetIds = dirs.filter(id => id === String(args.sessionId));
+  }
+  targetIds = targetIds.slice(0, limit);
+
+  const sessions = [];
+  for (const id of targetIds) {
+    const sDir = path.join(feedbackDir, id);
+    const metaPath = path.join(sDir, "session.json");
+    const promptPath = path.join(sDir, "prompt.md");
+    let meta = {};
+    if (fs.existsSync(metaPath)) {
+      try { meta = JSON.parse(fs.readFileSync(metaPath, "utf-8")); } catch (_) {}
+    }
+    let prompt = "";
+    if (fs.existsSync(promptPath)) {
+      try { prompt = fs.readFileSync(promptPath, "utf-8"); } catch (_) {}
+    }
+
+    sessions.push({
+      sessionId: id,
+      sessionDir: sDir,
+      ...meta,
+      prompt
+    });
+
+    if (args.clear) {
+      const agentPilotHome = process.env.AGENT_PILOT_HOME || path.join(os.homedir(), ".agent-pilot");
+      const archiveDir = path.join(agentPilotHome, "inbox", "feedback_archive");
+      fs.mkdirSync(archiveDir, { recursive: true });
+      try {
+        fs.renameSync(sDir, path.join(archiveDir, id));
+      } catch (_) {}
+    }
+  }
+
+  return {
+    success: true,
+    sessionsCount: sessions.length,
+    sessions,
+    feedbackDir
+  };
+}
+
+export function waitForFeedback(args = {}) {
+  const timeoutSec = Math.min(600, Math.max(5, Number(args.timeout) || 120));
+  return new Promise((resolve) => {
+    const waiterId = "wait_" + Math.random().toString(36).substr(2, 9);
+    const timer = setTimeout(() => {
+      pendingFeedbackWaiters = pendingFeedbackWaiters.filter(w => w.id !== waiterId);
+      resolve({
+        success: false,
+        timeout: true,
+        message: `Timed out waiting for feedback after ${timeoutSec}s. Human user has not submitted feedback yet.`
+      });
+    }, timeoutSec * 1000);
+
+    pendingFeedbackWaiters.push({
+      id: waiterId,
+      resolve,
+      timer,
+      tabId: args.tabId || null
+    });
+  });
+}
+
+export function checkAndNotifyFeedbackWaiters(feedbackData) {
+  if (!pendingFeedbackWaiters.length) return;
+  const waiters = [...pendingFeedbackWaiters];
+  pendingFeedbackWaiters = [];
+
+  for (const waiter of waiters) {
+    clearTimeout(waiter.timer);
+    waiter.resolve({
+      success: true,
+      delivered: true,
+      channel: "reactive_channel_a",
+      ...feedbackData
+    });
+  }
+}
 
 function getActiveClient(targetId = null) {
   if (targetId && connectedClients.has(targetId)) {
@@ -77,10 +302,16 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Helper to validate origin for loopback / extension requests
+  const isOriginAllowed = (origin) => {
+    if (!origin) return true;
+    return origin.startsWith("chrome-extension://") ||
+           origin.startsWith("http://127.0.0.1:") ||
+           origin.startsWith("http://localhost:");
+  };
+
   // HTTP API Endpoint for non-WebSocket scripts / curl
   if (req.url === "/api" && req.method === "POST") {
-    // CSRF Protection: Require application/json Content-Type.
-    // In browsers, non-preflighted requests cannot use application/json.
     const contentType = req.headers["content-type"] || "";
     if (!contentType.toLowerCase().includes("application/json")) {
       res.writeHead(415, { "Content-Type": "application/json" });
@@ -88,25 +319,18 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // CSRF Protection: If Origin is sent (by a browser web page), reject non-loopback/extension origins
-    const origin = req.headers["origin"];
-    if (origin) {
-      const allowed = origin.startsWith("chrome-extension://") ||
-                      origin.startsWith("http://127.0.0.1:") ||
-                      origin.startsWith("http://localhost:");
-      if (!allowed) {
-        res.writeHead(403, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Forbidden: Cross-origin request rejected" }));
-        return;
-      }
+    if (!isOriginAllowed(req.headers["origin"])) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Forbidden: Cross-origin request rejected" }));
+      return;
     }
 
     let body = "";
     req.on("data", chunk => {
       body += chunk;
-      if (body.length > 5 * 1024 * 1024) {
+      if (body.length > 25 * 1024 * 1024) {
         res.writeHead(413, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Payload too large (max 5MB)" }));
+        res.end(JSON.stringify({ error: "Payload too large (max 25MB)" }));
         req.destroy();
       }
     });
@@ -120,9 +344,151 @@ const server = http.createServer(async (req, res) => {
           return res.end(JSON.stringify({ error: "Missing method" }));
         }
 
+        // Direct feedback methods (Channel B & A)
+        if (method === "feedback.save") {
+          const result = saveFeedbackSession(params || {});
+          res.writeHead(200, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ success: true, result }));
+        }
+        if (method === "feedback.pending") {
+          const result = getPendingFeedback(params || {});
+          res.writeHead(200, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ success: true, result }));
+        }
+        if (method === "feedback.push") {
+          const result = saveFeedbackSession(params || {});
+          checkAndNotifyFeedbackWaiters(result);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ success: true, result }));
+        }
+        if (method === "feedback.wait") {
+          const result = await waitForFeedback(params || {});
+          res.writeHead(200, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ success: true, result }));
+        }
+
         const result = await sendCommandToExtension(method, params);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, result: sanitizeServerData(result) }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Dedicated endpoint: Save feedback session to inbox (Channel B)
+  if (req.url === "/api/feedback/save" && req.method === "POST") {
+    if (!isOriginAllowed(req.headers["origin"])) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Forbidden" }));
+    }
+    let body = "";
+    req.on("data", chunk => {
+      body += chunk;
+      if (body.length > 25 * 1024 * 1024) {
+        res.writeHead(413, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Payload too large" }));
+        req.destroy();
+      }
+    });
+    req.on("end", () => {
+      if (res.writableEnded) return;
+      try {
+        const payload = JSON.parse(body || "{}");
+        const result = saveFeedbackSession(payload);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, ...result }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Dedicated endpoint: Get pending feedback sessions from inbox (Channel B)
+  if ((req.url === "/api/feedback/pending" || req.url.startsWith("/api/feedback/pending?")) && (req.method === "GET" || req.method === "POST")) {
+    if (!isOriginAllowed(req.headers["origin"])) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Forbidden" }));
+    }
+    const parseUrl = new URL(req.url, `http://${CLIENT_HOST}:${PORT}`);
+    const queryParams = {
+      sessionId: parseUrl.searchParams.get("sessionId") || undefined,
+      limit: parseUrl.searchParams.get("limit") ? Number(parseUrl.searchParams.get("limit")) : undefined,
+      clear: parseUrl.searchParams.get("clear") === "true"
+    };
+
+    if (req.method === "GET") {
+      const result = getPendingFeedback(queryParams);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ success: true, ...result }));
+    }
+
+    let body = "";
+    req.on("data", chunk => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const postParams = JSON.parse(body || "{}");
+        const result = getPendingFeedback({ ...queryParams, ...postParams });
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, ...result }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Dedicated endpoint: Push live feedback (Channel A)
+  if (req.url === "/api/feedback/push" && req.method === "POST") {
+    if (!isOriginAllowed(req.headers["origin"])) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Forbidden" }));
+    }
+    let body = "";
+    req.on("data", chunk => {
+      body += chunk;
+      if (body.length > 25 * 1024 * 1024) {
+        res.writeHead(413, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Payload too large" }));
+        req.destroy();
+      }
+    });
+    req.on("end", () => {
+      if (res.writableEnded) return;
+      try {
+        const payload = JSON.parse(body || "{}");
+        const result = saveFeedbackSession(payload);
+        checkAndNotifyFeedbackWaiters(result);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, ...result }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Dedicated endpoint: Wait for feedback long-poll (Channel A)
+  if (req.url === "/api/feedback/wait" && req.method === "POST") {
+    if (!isOriginAllowed(req.headers["origin"])) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Forbidden" }));
+    }
+    let body = "";
+    req.on("data", chunk => { body += chunk; });
+    req.on("end", async () => {
+      if (res.writableEnded) return;
+      try {
+        const params = JSON.parse(body || "{}");
+        const result = await waitForFeedback(params);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, ...result }));
       } catch (err) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: false, error: err.message }));
@@ -190,6 +556,21 @@ wss.on("connection", (ws, req) => {
         // Streamed console log from CDP
         if (process.env.DEBUG_STREAM) {
           console.error(`[CDP:Console] [${msg.entry?.type}] ${msg.entry?.text}`);
+        }
+      } else if (msg.type === "FEEDBACK_SUBMISSION") {
+        clientInfo.lastActive = Date.now();
+        const saved = saveFeedbackSession(msg.payload || {});
+        checkAndNotifyFeedbackWaiters(saved);
+        console.error(`[BridgeServer] 🚀 Received live FEEDBACK_SUBMISSION from [${clientId}] - Session: ${saved.sessionId} (${saved.metadata?.count || 0} items)`);
+        if (msg.id && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ id: msg.id, result: { success: true, sessionId: saved.sessionId, count: saved.metadata?.count } }));
+        }
+      } else if (msg.type === "FEEDBACK_SAVE") {
+        clientInfo.lastActive = Date.now();
+        const saved = saveFeedbackSession(msg.payload || {});
+        console.error(`[BridgeServer] 💾 Saved FEEDBACK_SAVE from [${clientId}] - Session: ${saved.sessionId} (${saved.metadata?.count || 0} items)`);
+        if (msg.id && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ id: msg.id, result: { success: true, sessionId: saved.sessionId, count: saved.metadata?.count } }));
         }
       }
     } catch (err) {
@@ -684,6 +1065,29 @@ export const MCP_TOOLS = [
       },
       required: ["actions"]
     }
+  },
+  {
+    name: "browser_get_pending_feedback",
+    description: "Retrieve pending human visual UI feedback sessions saved in ~/.agent-pilot/inbox/feedback/<timestamp>/* (Channel B). Reads annotated component source files, CSS selectors, user notes, and screenshots recorded by human users.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sessionId: { type: "string", description: "Optional specific feedback session ID (timestamp). If omitted, returns latest sessions." },
+        limit: { type: "integer", description: "Maximum number of feedback sessions to retrieve (default: 5)" },
+        clear: { type: "boolean", description: "Whether to archive/clear the retrieved feedback sessions from the pending inbox (default: false)" }
+      }
+    }
+  },
+  {
+    name: "browser_wait_for_feedback",
+    description: "Wait reactively for human visual feedback (Channel A). Long-polls until the user submits feedback via Feedback Studio in the browser, or until timeout. Returns component source files, element selectors, user notes, and screenshots immediately upon submission.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        timeout: { type: "integer", description: "Maximum seconds to wait for user feedback (default 120, min 5, max 600)" },
+        tabId: { type: "integer", description: "Optional specific browser Tab ID to expect feedback from" }
+      }
+    }
   }
 ];
 
@@ -703,10 +1107,17 @@ const FORWARDER_METHOD_MAP = Object.freeze({
   browser_list_instances: { method: "instances.list", getParams: () => ({}) },
   browser_select_instance: { method: "instances.select", getParams: (a) => a },
   browser_set_busy: { method: "page.setBusy", getParams: (a) => a },
-  browser_run_actions: { method: "batch.run", getParams: (a) => a }
+  browser_run_actions: { method: "batch.run", getParams: (a) => a },
+  browser_get_pending_feedback: { method: "feedback.pending", getParams: (a) => a },
+  browser_wait_for_feedback: { method: "feedback.wait", getParams: (a) => a }
 });
 
 async function handleMcpToolCall(name, args) {
+  // Direct filesystem retrieval works identically across master and forwarder modes
+  if (name === "browser_get_pending_feedback") {
+    return getPendingFeedback(args);
+  }
+
   if (isForwarderMode) {
     const target = FORWARDER_METHOD_MAP[name];
     if (!target) throw new Error(`Unsupported tool: ${name}`);
@@ -766,6 +1177,12 @@ async function handleMcpToolCall(name, args) {
 
     case "browser_run_actions":
       return await sendCommandToExtension("batch.run", args);
+
+    case "browser_get_pending_feedback":
+      return getPendingFeedback(args);
+
+    case "browser_wait_for_feedback":
+      return await waitForFeedback(args);
 
     default:
       throw new Error(`Unsupported tool: ${name}`);
@@ -864,6 +1281,29 @@ if (isMainScript) {
               type: "text",
               text: JSON.stringify(cleanRes, null, 2)
             });
+          } else if (name === "browser_get_pending_feedback" && res?.sessions) {
+            content = [
+              {
+                type: "text",
+                text: res.sessionsCount === 0
+                  ? `No pending feedback sessions found in ${res.feedbackDir}.`
+                  : `Found ${res.sessionsCount} pending feedback session(s) in ${res.feedbackDir}:\n\n` +
+                    res.sessions.map((s, idx) => `=== SESSION ${idx + 1} (${s.sessionId}) ===\nURL: ${s.url}\nTitle: ${s.title}\nCount: ${s.count}\nDirectory: ${s.sessionDir}\n\n${s.prompt || ""}`).join("\n\n---\n\n")
+              }
+            ];
+          } else if (name === "browser_wait_for_feedback") {
+            if (res?.timeout) {
+              content = [{ type: "text", text: res.message || "Timeout waiting for feedback." }];
+            } else if (res?.promptMd || res?.metadata) {
+              content = [
+                {
+                  type: "text",
+                  text: `Received live feedback submission!\nSession ID: ${res.sessionId}\nDirectory: ${res.sessionDir}\nURL: ${res.metadata?.url}\nTitle: ${res.metadata?.title}\nItems count: ${res.metadata?.count}\n\n${res.promptMd || ""}`
+                }
+              ];
+            } else {
+              content = [{ type: "text", text: JSON.stringify(res, null, 2) }];
+            }
           } else {
             content = [
               { type: "text", text: typeof res === "object" ? JSON.stringify(res, null, 2) : String(res) }

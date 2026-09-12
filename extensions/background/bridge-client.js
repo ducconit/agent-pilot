@@ -668,4 +668,71 @@ export class AgentBridgeClient {
       respond(null, err);
     }
   }
+
+  /**
+   * Save feedback session to shared filesystem inbox ~/.agent-pilot/inbox/feedback/<timestamp>/* (Channel B)
+   * Falls back to chrome.storage.local if bridge server is not reachable.
+   */
+  async saveFeedbackInbox(payload) {
+    try {
+      const resp = await fetch(`http://127.0.0.1:${this.port}/api/feedback/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      if (data && data.success) {
+        return { success: true, ...data, storage: "filesystem" };
+      }
+      throw new Error(data?.error || "Bridge server returned failure");
+    } catch (err) {
+      // Fallback to chrome.storage.local
+      const timestamp = String(payload?.timestamp || Date.now());
+      const key = `ap_feedback_${timestamp}`;
+      await new Promise((resolve) => {
+        if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ [key]: payload }, resolve);
+        } else {
+          resolve();
+        }
+      });
+      return {
+        success: true,
+        storage: "extension_storage",
+        sessionId: timestamp,
+        warning: `Saved to browser extension storage (bridge server unreachable: ${err.message})`
+      };
+    }
+  }
+
+  /**
+   * Push feedback session live to waiting agent via WebSocket or HTTP long-poll (Channel A)
+   */
+  async pushFeedbackLive(payload) {
+    let sentWs = false;
+    if (this.connected && this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.send({
+        type: "FEEDBACK_SUBMISSION",
+        payload
+      });
+      sentWs = true;
+    }
+
+    try {
+      const resp = await fetch(`http://127.0.0.1:${this.port}/api/feedback/push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      return { success: true, ...data, sentWs };
+    } catch (err) {
+      if (sentWs) {
+        return { success: true, sentWs: true, sessionId: String(payload?.timestamp || Date.now()) };
+      }
+      // If server unreachable, save to extension storage as fallback
+      return await this.saveFeedbackInbox(payload);
+    }
+  }
 }
+

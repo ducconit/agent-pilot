@@ -42,6 +42,14 @@ export class FeedbackPanel {
       this.btnCopyPrompt.onclick = () => this.copyPromptToClipboard();
     }
 
+    if (this.btnSaveInbox) {
+      this.btnSaveInbox.onclick = () => this.saveToInbox();
+    }
+
+    if (this.btnPushAgent) {
+      this.btnPushAgent.onclick = () => this.pushToAgent();
+    }
+
     if (this.btnClearList) {
       this.btnClearList.onclick = () => this.clearAllItems();
     }
@@ -166,6 +174,28 @@ export class FeedbackPanel {
       this.ui.showToast("📋 Đã sao chép toàn bộ Feedback vào Clipboard!");
     } else {
       this.ui.showToast("Không thể sao chép prompt từ tab này.", "warning");
+    }
+  }
+
+  async saveToInbox() {
+    const res = await this.sendTabMessage({ action: "save_feedback_inbox_tab" });
+    if (res && res.success) {
+      if (res.storage === "filesystem") {
+        this.ui.showToast(`✓ Đã lưu ${this.items.length} mục vào inbox ~/.agent-pilot/inbox/feedback/!`);
+      } else {
+        this.ui.showToast(`✓ Đã lưu ${this.items.length} mục vào bộ nhớ Extension!`);
+      }
+    } else {
+      this.ui.showToast(`Lỗi: ${res?.error || "Không thể lưu inbox"}`, "warning");
+    }
+  }
+
+  async pushToAgent() {
+    const res = await this.sendTabMessage({ action: "push_feedback_agent_tab" });
+    if (res && res.success) {
+      this.ui.showToast(`🚀 Đã gửi trực tiếp ${this.items.length} mục feedback cho Agent!`);
+    } else {
+      this.ui.showToast(`Lỗi: ${res?.error || "Không có agent nào đang lắng nghe"}`, "warning");
     }
   }
 
