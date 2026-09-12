@@ -3,13 +3,16 @@
  * Exposes window.__AGENT_PILOT__ directly to the web page execution context
  */
 (() => {
-  if (window.__AGENT_PILOT__) return;
-
   function sendBridgeRequest(action, data = {}) {
     return new Promise((resolve) => {
       const reqId = "ap_" + Math.random().toString(36).substr(2, 9);
+      const timer = setTimeout(() => {
+        window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
+        resolve(null);
+      }, 5000);
       function onResponse(e) {
         if (e.detail && e.detail.reqId === reqId) {
+          clearTimeout(timer);
           window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
           resolve(e.detail.result);
         }
@@ -25,7 +28,8 @@
     ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
     : "1.0.1-beta";
 
-  window.__AGENT_PILOT__ = {
+  window.__AGENT_PILOT__ = window.__AGENT_PILOT__ || {};
+  Object.assign(window.__AGENT_PILOT__, {
     version: EXTENSION_VERSION,
     moveMouse: (x, y, duration) => sendBridgeRequest("virtual_mouse_move", { x, y, duration }),
     click: (x, y) => sendBridgeRequest("virtual_mouse_click", { x, y }),
@@ -40,6 +44,116 @@
     pickColor: (x, y) => sendBridgeRequest("pick_color", { x, y }),
     stopEyedropper: () => sendBridgeRequest("stop_eyedropper", {}),
     isEyedropperActive: () => sendBridgeRequest("is_eyedropper_active", {}),
-    getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {})
-  };
+    getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {}),
+    startFeedbackStudio: () => sendBridgeRequest("start_feedback_studio", {}),
+    stopFeedbackStudio: () => sendBridgeRequest("stop_feedback_studio", {}),
+    isFeedbackStudioActive: () => sendBridgeRequest("is_feedback_studio_active", {}),
+    getFeedbackItems: () => sendBridgeRequest("get_feedback_items", {}),
+    addFeedbackItem: (item) => sendBridgeRequest("add_feedback_item", { item }),
+    clearFeedbackItems: () => sendBridgeRequest("clear_feedback_items", {}),
+    copyFeedbackPrompt: () => sendBridgeRequest("copy_feedback_prompt", {}),
+    generateFeedbackPrompt: (items) => sendBridgeRequest("generate_feedback_prompt", { items })
+  });
+
+  // =========================================================================
+  // Framework Component Source Introspection (React, Vue, Astro, Svelte)
+  // =========================================================================
+
+  function extractFrameworkSource(target) {
+    if (!target || !(target instanceof Element)) return null;
+
+    // 1. React Fiber Dev Tools (_debugSource & component hierarchy)
+    const fiberKey = Object.keys(target).find(k => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$"));
+    if (fiberKey) {
+      let fiber = target[fiberKey];
+      const componentHierarchy = [];
+      let debugSource = null;
+      let mainComponent = null;
+
+      while (fiber) {
+        const name = fiber.type?.displayName || fiber.type?.name || (typeof fiber.type === "string" ? fiber.type : null);
+        if (name && typeof name === "string" && !["div", "span", "p", "button", "input", "a", "ul", "li", "section", "header", "footer", "main", "svg", "path", "form"].includes(name.toLowerCase())) {
+          if (!mainComponent) mainComponent = name;
+          if (!componentHierarchy.includes(name)) componentHierarchy.push(name);
+        }
+        if (!debugSource && fiber._debugSource) {
+          debugSource = {
+            fileName: fiber._debugSource.fileName,
+            lineNumber: fiber._debugSource.lineNumber,
+            columnNumber: fiber._debugSource.columnNumber
+          };
+        }
+        fiber = fiber.return;
+      }
+
+      if (debugSource || mainComponent) {
+        return {
+          framework: "React",
+          componentName: mainComponent || "ReactComponent",
+          hierarchy: componentHierarchy.slice(0, 5),
+          fileName: debugSource?.fileName || null,
+          lineNumber: debugSource?.lineNumber || null,
+          columnNumber: debugSource?.columnNumber || null
+        };
+      }
+    }
+
+    // 2. Vue 3 component metadata
+    if (target.__vueParentComponent || target.__vnode) {
+      const comp = target.__vueParentComponent;
+      const compName = comp?.type?.__name || comp?.type?.name || "VueComponent";
+      const fileName = comp?.type?.__file || null;
+      return {
+        framework: "Vue",
+        componentName: compName,
+        fileName,
+        lineNumber: null,
+        columnNumber: null
+      };
+    }
+
+    // 3. Astro source metadata
+    const astroEl = target.closest ? target.closest("[data-astro-source-file]") : null;
+    if (astroEl) {
+      const fileName = astroEl.getAttribute("data-astro-source-file");
+      const loc = astroEl.getAttribute("data-astro-source-loc") || "";
+      const parts = loc.split(":").map(Number);
+      return {
+        framework: "Astro",
+        componentName: target.tagName.toLowerCase(),
+        fileName,
+        lineNumber: parts[0] || null,
+        columnNumber: parts[1] || null
+      };
+    }
+
+    // 4. Svelte scope tag
+    if (target.classList) {
+      const svelteClass = Array.from(target.classList).find(c => c.startsWith("svelte-"));
+      if (svelteClass) {
+        return {
+          framework: "Svelte",
+          componentName: target.tagName.toLowerCase(),
+          scopeClass: svelteClass
+        };
+      }
+    }
+
+    return null;
+  }
+
+  // Handle source inspection requests from isolated content script
+  window.addEventListener("__AP_INSPECT_SOURCE_REQ__", (e) => {
+    const reqId = e.detail?.reqId;
+    const inspectAttr = "data-ap-inspect-target";
+    const el = document.querySelector(`[${inspectAttr}="${reqId}"]`);
+    let source = null;
+    if (el) {
+      source = extractFrameworkSource(el);
+      el.removeAttribute(inspectAttr);
+    }
+    window.dispatchEvent(new CustomEvent("__AP_INSPECT_SOURCE_RESP__", {
+      detail: { reqId, source }
+    }));
+  });
 })();

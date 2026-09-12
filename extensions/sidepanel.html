@@ -57,6 +57,7 @@
     <button class="tab-btn active" data-tab="tab-agent">🤖 Agent</button>
     <button class="tab-btn" data-tab="tab-inspector">🎯 Inspector</button>
     <button class="tab-btn" data-tab="tab-screenshot">📸 Chụp ảnh</button>
+    <button class="tab-btn" data-tab="tab-feedback">💬 Góp ý</button>
   </nav>
 
   <!-- Main Content Panels -->
@@ -247,6 +248,71 @@
             <img id="screenshot-img" src="" alt="Screenshot">
           </div>
           <div class="shot-meta mt-1" id="shot-dimensions">Kích thước: -- × -- px</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PANEL 4: VISUAL UI FEEDBACK STUDIO ==================== -->
+    <section class="panel" id="tab-feedback">
+      <!-- Session Master Controller -->
+      <div class="card">
+        <div class="card-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="card-title">💬 Feedback Studio Cho Agent</span>
+            <span class="tooltip-icon" tabindex="0" title="Chế độ tạo feedback trực quan: Chọn nhiều phần tử, kéo nhiều vùng, chụp màn hình hoặc toàn trang, ghi chú các điểm cần sửa và gửi chính xác file nguồn/component cho Agent.">?</span>
+          </div>
+          <span class="card-badge" id="feedback-status-badge">Đang tắt</span>
+        </div>
+        <div class="card-body">
+          <p class="panel-desc">
+            Chọn các phần tử, vùng chọn hoặc toàn màn hình trên trang web và nhập ghi chú. Chỉ khi bạn bấm <strong>Ngừng Feedback</strong> thì chế độ mới kết thúc.
+          </p>
+          <div class="btn-grid mt-2">
+            <button class="btn btn-primary" id="btn-toggle-feedback">🎯 Bật Chế Độ Feedback</button>
+            <button class="btn btn-outline" id="btn-copy-feedback-prompt" disabled>📋 Copy Prompt cho Agent</button>
+          </div>
+          <div class="btn-grid mt-2">
+            <button class="btn btn-outline btn-sm" id="btn-save-feedback-inbox" disabled title="Lưu vào ~/.agent-pilot/inbox/feedback/ (Kênh B)">💾 Lưu vào Inbox</button>
+            <button class="btn btn-success btn-sm" id="btn-push-feedback-agent" disabled title="Gửi trực tiếp cho Agent qua cổng 58765 (Kênh A)">🚀 Gửi Cho Agent</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mode Selector Card (Active when session is ON) -->
+      <div class="card mt-3" id="card-feedback-tools" style="display:none;">
+        <div class="card-header">
+          <span class="card-title">Công Cụ Chọn & Ghi Nhận</span>
+          <span class="card-badge badge-info" id="feedback-current-mode-badge">Phần tử</span>
+        </div>
+        <div class="card-body">
+          <div class="btn-grid">
+            <button class="btn btn-outline btn-sm" id="btn-panel-mode-element">🎯 Chọn Phần Tử</button>
+            <button class="btn btn-outline btn-sm" id="btn-panel-mode-region">⬚ Kéo Chọn Vùng</button>
+          </div>
+          <div class="btn-grid mt-2">
+            <button class="btn btn-outline btn-sm" id="btn-panel-mode-screen">🖥️ Màn Hình</button>
+            <button class="btn btn-outline btn-sm" id="btn-panel-mode-fullpage">📄 Toàn Trang (Full)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Collected Items List Card -->
+      <div class="card mt-3">
+        <div class="card-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="card-title">Các Mục Đã Ghi Nhận</span>
+            <span class="log-counter" id="feedback-items-counter">0</span>
+          </div>
+          <button class="btn btn-icon btn-xs" id="btn-clear-feedback-list" title="Xóa toàn bộ feedback" style="display:none;">🗑️</button>
+        </div>
+        <div class="card-body">
+          <div id="feedback-empty-state" class="empty-state">
+            <span class="empty-icon">🎯</span>
+            <p>Chưa có mục feedback nào.<br>Bấm <strong>Bật Chế Độ Feedback</strong> để bắt đầu chọn các vị trí cần sửa trên trang web.</p>
+          </div>
+          <div id="feedback-items-list" class="feedback-items-stream" style="display:none;">
+            <!-- Dynamic feedback cards -->
+          </div>
         </div>
       </div>
     </section>

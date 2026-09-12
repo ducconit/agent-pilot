@@ -7,6 +7,7 @@ import { showToast } from "./sidepanel/ui-helpers.js";
 import { AgentMonitor } from "./sidepanel/agent-monitor.js";
 import { InspectorPanel } from "./sidepanel/inspector-panel.js";
 import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
+import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
 
 (function () {
   let activeTabId = null;
@@ -39,9 +40,14 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
     onCaptureElement: (rect) => screenshotPanel.captureElementScreenshot(rect)
   });
 
+  const feedbackPanel = new FeedbackPanel({
+    showToast
+  });
+
   window.__INSPECTOR_PANEL__ = inspectorPanel;
   window.__SCREENSHOT_PANEL__ = screenshotPanel;
   window.__AGENT_MONITOR__ = agentMonitor;
+  window.__FEEDBACK_PANEL__ = feedbackPanel;
 
   // =========================================================================
   // 1. Tab & Navigation Handling
@@ -55,6 +61,9 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
       const targetId = btn.getAttribute("data-tab");
       const targetPanel = document.getElementById(targetId);
       if (targetPanel) targetPanel.classList.add("active");
+      if (targetId === "tab-feedback") {
+        feedbackPanel.refreshState();
+      }
     });
   });
 
@@ -65,6 +74,7 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
         if (activeTabTitle) activeTabTitle.textContent = res.tab.title || "Tab không tên";
         if (inputUrl) inputUrl.value = res.tab.url || "";
         agentMonitor.updateTargetTabDisplay(res.tab);
+        feedbackPanel.refreshState();
         checkCdpStatus();
       }
     });

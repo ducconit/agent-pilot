@@ -39,6 +39,7 @@
         "content/cursor-simulator.js",
         "content/dom-inspector.js",
         "content/eyedropper.js",
+        "content/feedback-studio.js",
         "content.js"
       ],
       "css": ["content.css"],

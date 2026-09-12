@@ -20,8 +20,10 @@ export async function captureTabScreenshot(tabId, params = {}) {
 
   const isTabActive = Boolean(targetTab && targetTab.active);
 
-  // If targetTab is running in background or CDP is attached, capture via CDP
-  if (!isTabActive || attachedTabs.has(tabId)) {
+  const isFullPage = mode === "full" || mode === "fullpage";
+
+  // If targetTab is running in background or CDP is attached or full page requested, capture via CDP
+  if (!isTabActive || attachedTabs.has(tabId) || isFullPage) {
     if (!attachedTabs.has(tabId)) {
       await attachDebugger(tabId).catch(() => {});
     }
@@ -30,7 +32,7 @@ export async function captureTabScreenshot(tabId, params = {}) {
       const cdpParams = {
         format: "png",
         fromSurface: true,
-        captureBeyondViewport: false
+        captureBeyondViewport: isFullPage
       };
       if ((mode === "element" || mode === "region") && params.clip) {
         cdpParams.clip = {

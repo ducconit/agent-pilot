@@ -299,7 +299,7 @@ async function run() {
                         sidepanelCheck.hasBetaBadge === true &&
                         sidepanelCheck.brandSub === "Next-Gen AI Browser Companion" &&
                         sidepanelCheck.hasGuideBtn === true &&
-                        sidepanelCheck.tabBtns.length === 3 &&
+                        sidepanelCheck.tabBtns.length === 4 &&
                         sidepanelCheck.hasAgentMonitor &&
                         sidepanelCheck.subtabBtns.length === 2 &&
                         sidepanelCheck.isCssTabActive &&
@@ -489,6 +489,97 @@ async function run() {
       } else {
         record("14. Screenshot Suite (Capture, Region Crop, Element Snap, Delegated Clipboard & Auto-Copy)", false, shotRes?.error || `Crop: ${regionCropTest?.validDimensions}, Snap: ${elementSnapTest?.autoTurnOff}, Clipboard: ${delegatedCopyTest?.success}, Auto-Copy: ${autoCopyToggleTest?.canToggle}`);
       }
+
+      // 15. Test Visual UI Feedback Studio & Channel C Clipboard Prompt
+      console.log("\n--- KIỂM THỬ GIAO DIỆN PHẢN HỒI TRỰC QUAN (FEEDBACK STUDIO & CHANNEL C) ---");
+      const feedbackTest = await page.evaluate(async () => {
+        // Start feedback studio
+        await window.__AGENT_PILOT__.startFeedbackStudio();
+        await new Promise(r => setTimeout(r, 100));
+
+        const hud = document.getElementById("agent-pilot-feedback-hud");
+        const hudVisible = hud && !hud.classList.contains("hidden");
+        const isActive = await window.__AGENT_PILOT__.isFeedbackStudioActive();
+
+        // Check mode buttons
+        const modeBtns = Array.from(hud ? hud.querySelectorAll(".ap-hud-btn") : []).map(b => b.dataset.mode);
+
+        // Switch mode to region
+        const regionBtn = hud?.querySelector('.ap-hud-btn[data-mode="region"]');
+        if (regionBtn) regionBtn.click();
+        const activeBtn = hud?.querySelector('.ap-hud-btn.active')?.dataset.mode;
+
+        // Add a mock feedback item directly via __AGENT_PILOT__
+        await window.__AGENT_PILOT__.clearFeedbackItems();
+        const mockItem = {
+          id: "fb_test_123",
+          mode: "element",
+          title: "Button: Gửi phản hồi",
+          comment: "Nút này cần đổi màu nền thành cyan và thêm icon tên lửa",
+          dom: {
+            selector: "#submit-btn",
+            xpath: '//*[@id="submit-btn"]',
+            tagName: "button",
+            text: "Gửi phản hồi",
+            rect: { x: 100, y: 200, width: 140, height: 40 }
+          },
+          component: {
+            framework: "React",
+            componentName: "SubmitButton",
+            fileName: "src/components/FeedbackModal.tsx",
+            lineNumber: 48,
+            hierarchy: "App > FeedbackModal > SubmitButton"
+          },
+          screenshotDataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          timestamp: new Date().toISOString()
+        };
+
+        const addRes = await window.__AGENT_PILOT__.addFeedbackItem(mockItem);
+        const items = await window.__AGENT_PILOT__.getFeedbackItems();
+
+        // Generate prompt
+        const prompt = await window.__AGENT_PILOT__.generateFeedbackPrompt([mockItem]);
+        const hasComponent = prompt && prompt.includes("src/components/FeedbackModal.tsx:48");
+        const hasComment = prompt && prompt.includes("Nút này cần đổi màu nền thành cyan");
+        const hasSelector = prompt && prompt.includes("#submit-btn");
+
+        // Test HUD stays active until explicitly stopped
+        const stillActive = await window.__AGENT_PILOT__.isFeedbackStudioActive();
+        await window.__AGENT_PILOT__.stopFeedbackStudio();
+        const stoppedActive = await window.__AGENT_PILOT__.isFeedbackStudioActive();
+        const hudHidden = hud?.classList.contains("hidden");
+
+        return {
+          hudVisible,
+          isActive,
+          modeBtns,
+          activeModeSwitched: activeBtn === "region",
+          hasComponent: Boolean(hasComponent),
+          hasComment: Boolean(hasComment),
+          hasSelector: Boolean(hasSelector),
+          stillActive,
+          stoppedActive: !stoppedActive && hudHidden
+        };
+      });
+
+      const feedbackOk = feedbackTest.hudVisible &&
+                         feedbackTest.isActive &&
+                         feedbackTest.modeBtns.includes("element") &&
+                         feedbackTest.modeBtns.includes("region") &&
+                         feedbackTest.modeBtns.includes("screen") &&
+                         feedbackTest.modeBtns.includes("fullpage") &&
+                         feedbackTest.activeModeSwitched &&
+                         feedbackTest.hasComponent &&
+                         feedbackTest.hasComment &&
+                         feedbackTest.hasSelector &&
+                         feedbackTest.stillActive &&
+                         feedbackTest.stoppedActive;
+
+      record(
+        "15. Visual UI Feedback Studio & Channel C Prompt (In-Page HUD, Multi-Mode, Source Detection & Prompt Export)",
+        feedbackOk,
+        `HUD: ${feedbackTest.hudVisible}, Modes: [${feedbackTest.modeBtns?.join(",")}], Component: ${feedbackTest.hasComponent}, Prompt: ${feedbackTest.hasComment}, Persistent: ${feedbackTest.stillActive}`
+      );
 
       await sidepanelPage.close();
     }
