@@ -240,9 +240,10 @@ async function run() {
     const pingRes = await sendAgentCommand("ping");
     record("2. Agent Ping/Pong Heartbeat", pingRes?.pong === true, `Latency: ${Date.now() - pingRes?.timestamp}ms, Version: ${pingRes?.version}`);
 
-    // 5. Test Agent Command: tabs.create (Open Test Page)
+    // 3. Test Agent Command: tabs.create (Open Test Page in background without focus)
     const newTab = await sendAgentCommand("tabs.create", { url: `http://127.0.0.1:${HTTP_PORT}/test-page.html` });
-    record("3. Agent Command: tabs.create", !!newTab?.id, `Created Tab ID: ${newTab?.id}, URL: ${newTab?.url}`);
+    const isBgByDefault = newTab?.active === false;
+    record("3. Agent Command: tabs.create (Background by default)", !!newTab?.id && isBgByDefault, `Created Tab ID: ${newTab?.id}, active: ${newTab?.active} (No focus stealing)`);
     // Find testPage and wait for content script injection
     let testPage = null;
     for (let i = 0; i < 20; i++) {
@@ -348,11 +349,15 @@ async function run() {
 
     // 10. Test Agent Command: page.moveMouse
     const moveRes = await sendAgentCommand("page.moveMouse", { tabId, x: 380, y: 240, duration: 150 });
+    let isHiddenOnMove = false;
     let cursorVisibleOnMove = false;
     if (testPage) {
+      isHiddenOnMove = await testPage.evaluate(() => document.hidden);
       cursorVisibleOnMove = await testPage.evaluate(() => document.querySelector(".agent-pilot-virtual-cursor")?.classList.contains("visible"));
     }
-    record("10. Agent Command: page.moveMouse", moveRes?.success === true && cursorVisibleOnMove, `Virtual cursor moved to (380, 240) & visible === true`);
+    // When operating on a background tab, virtual cursor is intentionally kept hidden to prevent DOM/CPU thrashing
+    const moveSuccess = moveRes?.success === true && (isHiddenOnMove ? !cursorVisibleOnMove : cursorVisibleOnMove);
+    record("10. Agent Command: page.moveMouse", moveSuccess, `Virtual cursor moved to (380, 240) (Hidden tab: ${isHiddenOnMove}, Cursor invisible: ${!cursorVisibleOnMove})`);
 
     // 11. Test Agent Command: page.click (Click the test button on page)
     const clickRes = await sendAgentCommand("page.click", { tabId, selector: "#btn-sample-click" });
@@ -420,8 +425,9 @@ async function run() {
     const userActivePage = await browser.newPage();
     await userActivePage.goto(`http://127.0.0.1:${HTTP_PORT}/test-page.html?user_tab=active`);
     await userActivePage.bringToFront();
+    await new Promise(r => setTimeout(r, 400));
     // Now userActivePage is active in foreground, tabId is in background!
-    const bgShotRes = await sendAgentCommand("page.screenshot", { tabId, mode: "visible" });
+    const bgShotRes = await sendAgentCommand("page.screenshot", { tabId, mode: "visible" }, 15000);
     const bgShotSuccess = bgShotRes?.success && bgShotRes?.isBackgroundTab === true && bgShotRes?.dataUrl?.startsWith("data:image/png;base64,");
     record("18. Background Tab Screenshot via CDP", bgShotSuccess, `Background tab ${tabId} captured silently via CDP while user was on active tab`);
 

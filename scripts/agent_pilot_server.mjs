@@ -270,7 +270,7 @@ export const MCP_TOOLS = [
       type: "object",
       properties: {
         url: { type: "string", description: "The URL to navigate to (e.g. https://github.com)" },
-        active: { type: "boolean", description: "Whether to make the newly opened tab active/focused (default true). Set to false to open quietly in the background without stealing user focus.", default: true }
+        active: { type: "boolean", description: "Whether to make the newly opened tab active/focused (default false to keep user focus undisturbed). Set to true only if explicitly requested to switch focus.", default: false }
       },
       required: ["url"]
     }
@@ -413,7 +413,7 @@ export const MCP_TOOLS = [
 async function handleMcpToolCall(name, args) {
   switch (name) {
     case "browser_open_tab":
-      return await sendCommandToExtension("tabs.create", { url: args.url, active: args.active });
+      return await sendCommandToExtension("tabs.create", { url: args.url, active: args.active === true });
 
     case "browser_list_tabs":
       return await sendCommandToExtension("tabs.listAll");

@@ -1185,7 +1185,10 @@ class AgentBridgeClient {
 
         case "tabs.create": {
           const url = normalizeUrl(params.url || "https://google.com");
-          const makeActive = params.active !== false;
+          // Never steal focus from user unless explicitly specified active === true
+          const makeActive = params.active === true;
+          const activeTabBefore = !makeActive ? await this.getActiveTabId() : null;
+
           chrome.tabs.create({ url, active: makeActive }, async (tab) => {
             if (chrome.runtime.lastError) {
               respond(null, chrome.runtime.lastError);
@@ -1196,6 +1199,14 @@ class AgentBridgeClient {
                 await this.assignTabToAgentGroup(tab).catch(() => {});
                 // Auto-attach CDP for background capture & DevTools inspection
                 await attachDebugger(tab.id).catch(() => {});
+
+                // Guarantee user focus is preserved if makeActive was false
+                if (!makeActive && activeTabBefore) {
+                  const currentActive = await this.getActiveTabId();
+                  if (currentActive !== activeTabBefore) {
+                    await chrome.tabs.update(activeTabBefore, { active: true }).catch(() => {});
+                  }
+                }
               }
               respond(tab);
             }

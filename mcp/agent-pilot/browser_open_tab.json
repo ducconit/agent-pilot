@@ -10,8 +10,8 @@
       },
       "active": {
         "type": "boolean",
-        "description": "Whether to make the newly opened tab active/focused (default true). Set to false to open quietly in the background without stealing user focus.",
-        "default": true
+        "description": "Whether to make the newly opened tab active/focused (default false to keep user focus undisturbed). Set to true only if explicitly requested to switch focus.",
+        "default": false
       }
     },
     "required": [
