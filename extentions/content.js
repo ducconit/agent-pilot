@@ -35,7 +35,6 @@
   let isAgentTab = false;
   let isAgentBusy = false;
   let isAgentDispatching = false;
-  let tabBadgeEl = null;
   let lockOverlayEl = null;
 
   // =========================================================================
@@ -611,43 +610,8 @@
   }
 
   // =========================================================================
-  // 6. Agent Tab Badge & Human Input Lock Subsystem (ChatGPT Operator Style)
+  // 6. Agent Human Input Lock Subsystem (ChatGPT Operator-Style Input Barrier)
   // =========================================================================
-
-  function renderAgentTabBadge() {
-    if (tabBadgeEl) return tabBadgeEl;
-    tabBadgeEl = document.createElement("div");
-    tabBadgeEl.id = "agent-pilot-tab-badge";
-    tabBadgeEl.innerHTML = `
-      <span class="agent-pilot-badge-icon">🤖</span>
-      <span class="agent-pilot-badge-title">Agent Pilot</span>
-      <span class="agent-pilot-badge-divider">|</span>
-      <span>Tab tự động</span>
-      <span class="agent-pilot-badge-status">
-        <span class="agent-pilot-badge-dot" id="agent-pilot-badge-dot"></span>
-        <span id="agent-pilot-badge-status-text">Sẵn sàng</span>
-      </span>
-    `;
-    (document.body || document.documentElement).appendChild(tabBadgeEl);
-    return tabBadgeEl;
-  }
-
-  function updateAgentTabBadge(busy, actionText = "") {
-    if (!tabBadgeEl) return;
-    const dot = document.getElementById("agent-pilot-badge-dot");
-    const statusText = document.getElementById("agent-pilot-badge-status-text");
-    if (dot && statusText) {
-      if (busy) {
-        dot.className = "agent-pilot-badge-dot busy";
-        statusText.textContent = actionText || "Đang thao tác...";
-        statusText.style.color = "#f59e0b";
-      } else {
-        dot.className = "agent-pilot-badge-dot";
-        statusText.textContent = "Sẵn sàng";
-        statusText.style.color = "#94a3b8";
-      }
-    }
-  }
 
   function getActionDescription(action) {
     switch (action) {
@@ -776,11 +740,9 @@
     if (isAgentBusy) {
       attachInputBlockers();
       showLockOverlay(action);
-      updateAgentTabBadge(true, action ? "Đang xử lý..." : "Đang thao tác...");
     } else {
       detachInputBlockers();
       hideLockOverlay();
-      updateAgentTabBadge(false);
     }
   }
 
@@ -808,7 +770,6 @@
     isAgentTab: () => isAgentTab,
     setAgentTab: (enabled) => {
       isAgentTab = Boolean(enabled);
-      if (isAgentTab) renderAgentTabBadge();
       return isAgentTab;
     }
   };
@@ -936,9 +897,6 @@
 
     if (req.action === "set_agent_tab_status") {
       isAgentTab = Boolean(req.isAgentTab);
-      if (isAgentTab) {
-        renderAgentTabBadge();
-      }
       sendResponse({ success: true, isAgentTab });
       return true;
     }

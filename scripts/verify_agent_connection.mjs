@@ -261,16 +261,12 @@ async function run() {
     }
     record("4. Cursor Initial Hidden State", initialCursorHidden, `Initial cursor opacity: ${initialOpacity} (Expected 0)`);
 
-    // Verify Agent Tab Badge on tab created by agent
-    let hasAgentTabBadge = false;
+    // Verify Clean DOM (In-page badge removed, replaced by Chrome Native Tab Groups)
+    let domBadgeRemoved = false;
     if (testPage) {
-      for (let i = 0; i < 15; i++) {
-        hasAgentTabBadge = await testPage.evaluate(() => !!document.getElementById("agent-pilot-tab-badge"));
-        if (hasAgentTabBadge) break;
-        await new Promise(r => setTimeout(r, 100));
-      }
+      domBadgeRemoved = await testPage.evaluate(() => !document.getElementById("agent-pilot-tab-badge"));
     }
-    record("5. Agent Tab Badge", hasAgentTabBadge, `Badge element #agent-pilot-tab-badge exists: ${hasAgentTabBadge}`);
+    record("5. Native Tab Group & Clean DOM", domBadgeRemoved, `In-page badge removed for clean DOM: ${domBadgeRemoved}`);
 
     // Test Human Input Lock (page.setBusy)
     const lockRes = await sendAgentCommand("page.setBusy", { tabId, busy: true, action: "Kiểm thử tự động" });

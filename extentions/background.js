@@ -217,11 +217,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     agentBridge.connect();
   }
   if (changeInfo.status === "complete") {
-    if (agentControlledTabs.has(tabId)) {
-      if (typeof agentBridge !== "undefined" && agentBridge && typeof agentBridge.sendTabMessageWithRetry === "function") {
-        agentBridge.sendTabMessageWithRetry(tabId, { action: "set_agent_tab_status", isAgentTab: true }).catch(() => {});
-      }
-    }
     // Restore lock state if tab was locked during navigation (Finding 2)
     const lockState = tabLockStates.get(tabId);
     if (lockState && (lockState.manualLock || lockState.autoCount > 0)) {
@@ -953,6 +948,36 @@ class AgentBridgeClient {
     });
   }
 
+  async assignTabToAgentGroup(tab) {
+    if (!chrome.tabs || !chrome.tabs.group || !tab || !tab.id) return;
+    try {
+      const windowId = tab.windowId;
+      let targetGroupId = null;
+
+      if (chrome.tabGroups && chrome.tabGroups.query) {
+        try {
+          const groups = await chrome.tabGroups.query({ windowId });
+          const existing = groups.find((g) => g.title === "🤖 Agent Pilot" || g.title === "Agent Pilot");
+          if (existing) targetGroupId = existing.id;
+        } catch (_) {}
+      }
+
+      const groupId = await chrome.tabs.group({
+        tabIds: [tab.id],
+        groupId: targetGroupId || undefined
+      });
+
+      if (chrome.tabGroups && chrome.tabGroups.update && (!targetGroupId || groupId !== targetGroupId)) {
+        await chrome.tabGroups.update(groupId, {
+          title: "🤖 Agent Pilot",
+          color: "cyan"
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.warn("[AgentPilot] Tab grouping note:", err?.message || err);
+    }
+  }
+
   async setTabLock(tabId, busy, action = "") {
     if (!tabId) return false;
     const state = getTabLockState(tabId);
@@ -1065,13 +1090,13 @@ class AgentBridgeClient {
           if (url && !url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("chrome://")) {
             url = "https://" + url;
           }
-          chrome.tabs.create({ url, active: params.active !== false }, (tab) => {
+          chrome.tabs.create({ url, active: params.active !== false }, async (tab) => {
             if (chrome.runtime.lastError) {
               respond(null, chrome.runtime.lastError);
             } else {
               if (tab && tab.id) {
                 agentControlledTabs.add(tab.id);
-                this.sendTabMessageWithRetry(tab.id, { action: "set_agent_tab_status", isAgentTab: true }).catch(() => {});
+                await this.assignTabToAgentGroup(tab).catch(() => {});
               }
               respond(tab);
             }
@@ -1086,9 +1111,21 @@ class AgentBridgeClient {
           if (url && !url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("chrome://")) {
             url = "https://" + url;
           }
-          chrome.tabs.update(tabId, { url }, (tab) => {
-            if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
-            else respond(tab);
+          const updateProps = {};
+          if (url) updateProps.url = url;
+          if (params.active !== undefined) updateProps.active = Boolean(params.active);
+          else updateProps.active = true;
+
+          chrome.tabs.update(tabId, updateProps, async (tab) => {
+            if (chrome.runtime.lastError) {
+              respond(null, chrome.runtime.lastError);
+            } else {
+              if (tab && tab.id) {
+                agentControlledTabs.add(tab.id);
+                await this.assignTabToAgentGroup(tab).catch(() => {});
+              }
+              respond(tab);
+            }
           });
           break;
         }

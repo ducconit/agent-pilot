@@ -254,79 +254,8 @@
 }
 
 /* ==========================================================================
-   5. Agent Tab Badge & Lock Overlay (ChatGPT Operator-Style Control)
+   5. Agent Lock Overlay (Human Input Barrier while Agent Busy)
    ========================================================================== */
-#agent-pilot-tab-badge {
-  position: fixed;
-  top: 12px;
-  right: 16px;
-  z-index: 2147483645;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(15, 23, 42, 0.9);
-  color: #f8fafc;
-  border: 1px solid rgba(6, 182, 212, 0.6);
-  border-radius: 9999px;
-  padding: 6px 14px 6px 10px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 12px;
-  font-weight: 500;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 10px rgba(6, 182, 212, 0.25);
-  backdrop-filter: blur(8px);
-  user-select: none;
-  transition: all 0.3s ease;
-  pointer-events: auto;
-}
-
-#agent-pilot-tab-badge.hidden {
-  display: none !important;
-}
-
-.agent-pilot-badge-icon {
-  font-size: 14px;
-  line-height: 1;
-}
-
-.agent-pilot-badge-title {
-  font-weight: 600;
-  color: #38bdf8;
-  letter-spacing: 0.2px;
-}
-
-.agent-pilot-badge-divider {
-  color: #475569;
-  font-size: 11px;
-}
-
-.agent-pilot-badge-status {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: #94a3b8;
-}
-
-.agent-pilot-badge-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
-  transition: background 0.2s, box-shadow 0.2s;
-}
-
-.agent-pilot-badge-dot.busy {
-  background: #f59e0b;
-  box-shadow: 0 0 8px #f59e0b;
-  animation: agentPilotDotPulse 1.2s infinite ease-in-out;
-}
-
-@keyframes agentPilotDotPulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.3); opacity: 0.6; }
-}
-
 /* Glassmorphism Lock Overlay */
 #agent-pilot-lock-overlay {
   position: fixed;
