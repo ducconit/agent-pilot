@@ -1823,6 +1823,15 @@ class AgentBridgeClient {
           break;
         }
 
+        case "extension.reload":
+        case "runtime.reload": {
+          respond({ success: true, message: "Reloading extension..." });
+          setTimeout(() => {
+            chrome.runtime.reload();
+          }, 150);
+          break;
+        }
+
         default:
           respond(null, new Error(`Unknown method: ${method}`));
       }
