@@ -94,41 +94,57 @@ export class ScreenshotPanel {
     }
   }
 
-  async copyCurrentScreenshotToClipboard(showExplicitToast = true) {
-    if (!this.latestScreenshotDataUrl) {
+  async copyCurrentScreenshotToClipboard(showExplicitToast = true, targetDataUrl = null) {
+    const dataUrl = targetDataUrl || this.latestScreenshotDataUrl;
+    if (!dataUrl) {
       if (showExplicitToast) showToast("Chưa có ảnh chụp để sao chép!");
       return false;
     }
+
+    let copied = false;
+
+    // Step 1: Try copying in Side Panel context (works when Side Panel is focused)
     try {
-      if (typeof window !== "undefined" && window.focus) window.focus();
-      const blob = await this.getPngBlobFromDataUrl(this.latestScreenshotDataUrl);
+      const blob = await this.getPngBlobFromDataUrl(dataUrl);
       await navigator.clipboard.write([
         new ClipboardItem({ "image/png": blob })
       ]);
+      copied = true;
+    } catch (sidepanelErr) {
+      console.warn("[AgentPilot] Sidepanel clipboard write note (document may not have focus):", sidepanelErr?.message || sidepanelErr);
+    }
+
+    // Step 2: If Side Panel failed (e.g. document not focused because user clicked on web tab), delegate to active tab content script
+    if (!copied) {
+      const activeTabId = this.getActiveTabId();
+      if (activeTabId) {
+        try {
+          copied = await new Promise((resolve) => {
+            chrome.tabs.sendMessage(activeTabId, { action: "copy_image_to_clipboard", dataUrl, showInPageToast: !showExplicitToast }, (res) => {
+              if (chrome.runtime.lastError || !res || !res.success) {
+                console.warn("[AgentPilot] Active tab clipboard delegation note:", chrome.runtime.lastError?.message || res?.error);
+                resolve(false);
+              } else {
+                resolve(true);
+              }
+            });
+          });
+        } catch (tabErr) {
+          console.warn("[AgentPilot] Active tab clipboard delegation error:", tabErr);
+        }
+      }
+    }
+
+    if (copied) {
       if (showExplicitToast) {
         showToast("📋 Đã sao chép ảnh vào clipboard!");
       }
       return true;
-    } catch (e) {
-      console.warn("[AgentPilot] Clipboard copy attempt 1 notice:", e);
-      // Secondary attempt with forced focus
-      try {
-        if (typeof window !== "undefined" && window.focus) window.focus();
-        const blob = await this.getPngBlobFromDataUrl(this.latestScreenshotDataUrl);
-        await navigator.clipboard.write([
-          new ClipboardItem({ "image/png": blob })
-        ]);
-        if (showExplicitToast) {
-          showToast("📋 Đã sao chép ảnh vào clipboard!");
-        }
-        return true;
-      } catch (err2) {
-        console.error("[AgentPilot] Clipboard copy failed:", err2);
-        if (showExplicitToast) {
-          showToast("Không thể sao chép ảnh: " + (err2.message || "Lỗi clipboard"));
-        }
-        return false;
+    } else {
+      if (showExplicitToast) {
+        showToast("Không thể sao chép ảnh vào clipboard.");
       }
+      return false;
     }
   }
 
@@ -200,15 +216,7 @@ export class ScreenshotPanel {
         if (res.requiresCrop && res.clip) {
           this.cropImageViaCanvas(res.dataUrl, res.clip);
         } else {
-          const img = new Image();
-          img.onload = () => {
-            if (res.clip && (img.naturalWidth > res.clip.width * 1.5 || img.naturalHeight > res.clip.height * 1.5)) {
-              this.cropImageViaCanvas(res.dataUrl, res.clip);
-            } else {
-              this.displayScreenshot(res.dataUrl, "Đã chụp phần tử thành công!");
-            }
-          };
-          img.src = res.dataUrl;
+          this.displayScreenshot(res.dataUrl, "Đã chụp phần tử thành công!");
         }
       } else {
         showToast("Lỗi chụp phần tử: " + (res ? res.error : ""));
@@ -219,21 +227,40 @@ export class ScreenshotPanel {
   cropImageViaCanvas(fullDataUrl, clip) {
     const img = new Image();
     img.onload = () => {
-      const scaleX = img.naturalWidth / window.innerWidth;
-      const scaleY = img.naturalHeight / window.innerHeight;
-      const sx = clip.x * scaleX;
-      const sy = clip.y * scaleY;
-      const sw = clip.width * scaleX;
-      const sh = clip.height * scaleY;
+      // Determine the exact scaling ratio between screenshot bitmap pixels and CSS pixels of the web page
+      const baseWidth = (clip && clip.pageWidth) ? clip.pageWidth : (img.naturalWidth / (clip?.devicePixelRatio || 1));
+      const baseHeight = (clip && clip.pageHeight) ? clip.pageHeight : (img.naturalHeight / (clip?.devicePixelRatio || 1));
+
+      const scaleX = baseWidth > 0 ? (img.naturalWidth / baseWidth) : (clip?.devicePixelRatio || 1);
+      const scaleY = baseHeight > 0 ? (img.naturalHeight / baseHeight) : (clip?.devicePixelRatio || 1);
+
+      let sx = Math.round(clip.x * scaleX);
+      let sy = Math.round(clip.y * scaleY);
+      let sw = Math.round(clip.width * scaleX);
+      let sh = Math.round(clip.height * scaleY);
+
+      // Clamp safely within source image bounds
+      if (sx < 0) { sw += sx; sx = 0; }
+      if (sy < 0) { sh += sy; sy = 0; }
+      if (sx + sw > img.naturalWidth) sw = Math.max(1, img.naturalWidth - sx);
+      if (sy + sh > img.naturalHeight) sh = Math.max(1, img.naturalHeight - sy);
+
+      if (sw <= 0 || sh <= 0) {
+        showToast("Lỗi cắt ảnh: Vùng chọn không hợp lệ!");
+        return;
+      }
 
       const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(sw));
-      canvas.height = Math.max(1, Math.round(sh));
+      canvas.width = sw;
+      canvas.height = sh;
       const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
 
       const croppedDataUrl = canvas.toDataURL("image/png");
       this.displayScreenshot(croppedDataUrl, "Đã chụp và cắt vùng thành công!");
+    };
+    img.onerror = () => {
+      showToast("Lỗi nạp ảnh để cắt vùng!");
     };
     img.src = fullDataUrl;
   }
@@ -257,7 +284,7 @@ export class ScreenshotPanel {
 
     // Auto-copy to clipboard if enabled
     if (this.autoCopyEnabled) {
-      this.copyCurrentScreenshotToClipboard(false).then((copied) => {
+      this.copyCurrentScreenshotToClipboard(false, dataUrl).then((copied) => {
         if (copied) {
           showToast("📋 Đã chụp & tự động sao chép vào clipboard!");
         } else if (customSuccessToast) {

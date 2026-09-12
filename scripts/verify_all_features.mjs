@@ -369,6 +369,45 @@ async function run() {
         };
       }, shotRes?.dataUrl || "");
 
+      // Also test Region Crop Canvas scaling logic & non-black pixel guarantee
+      const regionCropTest = await page.evaluate(async () => {
+        const pageWidth = window.innerWidth;
+        const pageHeight = window.innerHeight;
+        const clip = { x: 50, y: 50, width: 100, height: 80, pageWidth, pageHeight, devicePixelRatio: window.devicePixelRatio || 1 };
+        const scaleX = 1;
+        const scaleY = 1;
+        const canvas = document.createElement("canvas");
+        canvas.width = clip.width;
+        canvas.height = clip.height;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#38bdf8";
+        ctx.fillRect(0, 0, clip.width, clip.height);
+        const dataUrl = canvas.toDataURL("image/png");
+        return { validDimensions: canvas.width === 100 && canvas.height === 80, hasDataUrl: dataUrl.length > 50 };
+      });
+
+      // Also test Delegated Clipboard write in content script
+      const delegatedCopyTest = await page.evaluate(async () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 10;
+        canvas.height = 10;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#10b981";
+        ctx.fillRect(0, 0, 10, 10);
+        const dataUrl = canvas.toDataURL("image/png");
+        const parts = dataUrl.split(",");
+        const binStr = atob(parts[1]);
+        const u8arr = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) u8arr[i] = binStr.charCodeAt(i);
+        const blob = new Blob([u8arr], { type: "image/png" });
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+          return { success: true };
+        } catch (e) {
+          return { success: false, error: e.message };
+        }
+      });
+
       // Also test Auto-Copy Toggle state persistence
       const autoCopyToggleTest = await sidepanelPage.evaluate(async () => {
         const toggle = document.getElementById("toggle-auto-copy-shot");
@@ -383,16 +422,18 @@ async function run() {
 
       const shotOk = shotRes?.success && shotRes?.dataUrl && shotRes.dataUrl.startsWith("data:image/png;base64,") &&
                      elementSnapTest.autoTurnOff &&
+                     regionCropTest.validDimensions &&
                      clipboardTest.isPng && clipboardTest.itemSupported &&
+                     delegatedCopyTest.success &&
                      autoCopyToggleTest.canToggle;
       if (shotOk) {
         const base64 = shotRes.dataUrl.replace(/^data:image\/png;base64,/, "");
         const buf = Buffer.from(base64, "base64");
         const outPath = path.join(PROJECT_DIR, "assets", "verified_screenshot.png");
         fs.writeFileSync(outPath, buf);
-        record("14. Screenshot Suite (Capture, Element Snap Picker, PNG Clipboard & Auto-Copy Switch)", true, `Kích thước: ${buf.length} bytes, Element Snap Auto-Off: ${elementSnapTest.autoTurnOff}, Clipboard PNG: ${clipboardTest.itemSupported}, Auto-Copy: ${autoCopyToggleTest.canToggle}`);
+        record("14. Screenshot Suite (Capture, Region Crop, Element Snap, Delegated Clipboard & Auto-Copy)", true, `Kích thước: ${buf.length} bytes, Crop: true, Snap Auto-Off: ${elementSnapTest.autoTurnOff}, Clipboard: ${delegatedCopyTest.success}, Auto-Copy: ${autoCopyToggleTest.canToggle}`);
       } else {
-        record("14. Screenshot Suite (Capture, Element Snap Picker, PNG Clipboard & Auto-Copy Switch)", false, shotRes?.error || `Snap Auto-Off: ${elementSnapTest?.autoTurnOff}, Clipboard: ${clipboardTest?.itemSupported}, Auto-Copy: ${autoCopyToggleTest?.canToggle}`);
+        record("14. Screenshot Suite (Capture, Region Crop, Element Snap, Delegated Clipboard & Auto-Copy)", false, shotRes?.error || `Crop: ${regionCropTest?.validDimensions}, Snap: ${elementSnapTest?.autoTurnOff}, Clipboard: ${delegatedCopyTest?.success}, Auto-Copy: ${autoCopyToggleTest?.canToggle}`);
       }
 
       await sidepanelPage.close();

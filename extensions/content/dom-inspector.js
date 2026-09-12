@@ -372,7 +372,10 @@
       x: Math.round(r.left),
       y: Math.round(r.top),
       width: Math.round(r.width),
-      height: Math.round(r.height)
+      height: Math.round(r.height),
+      pageWidth: window.innerWidth,
+      pageHeight: window.innerHeight,
+      devicePixelRatio: window.devicePixelRatio || 1
     };
     const tagName = target.tagName.toLowerCase();
 
@@ -524,7 +527,15 @@
         showToast("Vui lòng kéo chọn vùng lớn hơn!");
         return;
       }
-      const clip = { ...cropState.currentRect };
+      const clip = {
+        x: Math.round(cropState.currentRect.x),
+        y: Math.round(cropState.currentRect.y),
+        width: Math.round(cropState.currentRect.width),
+        height: Math.round(cropState.currentRect.height),
+        pageWidth: window.innerWidth,
+        pageHeight: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio || 1
+      };
       cleanup();
 
       // Send to side panel / background

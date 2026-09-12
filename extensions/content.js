@@ -258,6 +258,29 @@
       return true;
     }
 
+    if (req.action === "copy_image_to_clipboard" && req.dataUrl) {
+      (async () => {
+        try {
+          const parts = req.dataUrl.split(",");
+          const binStr = atob(parts[1]);
+          const u8arr = new Uint8Array(binStr.length);
+          for (let i = 0; i < binStr.length; i++) u8arr[i] = binStr.charCodeAt(i);
+          const blob = new Blob([u8arr], { type: "image/png" });
+          await navigator.clipboard.write([
+            new ClipboardItem({ "image/png": blob })
+          ]);
+          if (req.showInPageToast) {
+            toast.showToast("📋 Đã sao chép ảnh vào clipboard!");
+          }
+          sendResponse({ success: true });
+        } catch (e) {
+          console.warn("[AgentPilot] Content script clipboard copy error:", e);
+          sendResponse({ success: false, error: e.message });
+        }
+      })();
+      return true;
+    }
+
     if (req.action === "pick_color") {
       eyedropper.pickColor(req.x, req.y).then((color) => sendResponse({ success: !!color, color }));
       return true;

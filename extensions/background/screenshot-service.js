@@ -43,18 +43,21 @@ export async function captureTabScreenshot(tabId, params = {}) {
       }
       try {
         let res;
+        let requiresCrop = false;
         try {
           res = await sendCdpCommand(tabId, "Page.captureScreenshot", cdpParams, CDP_SCREENSHOT_TIMEOUT_MS);
         } catch (firstErr) {
           console.warn("[AgentPilot] CDP screenshot initial attempt note:", firstErr?.message || firstErr);
           res = await sendCdpCommand(tabId, "Page.captureScreenshot", { format: "png" }, CDP_SCREENSHOT_TIMEOUT_MS);
+          requiresCrop = Boolean((mode === "element" || mode === "region") && params.clip);
         }
         return {
           success: true,
           tabId,
           isBackgroundTab: !isTabActive,
           dataUrl: "data:image/png;base64," + res.data,
-          clip: params.clip
+          clip: params.clip,
+          requiresCrop
         };
       } catch (cdpErr) {
         console.warn("[AgentPilot] CDP screenshot failed on tab " + tabId + ":", cdpErr?.message || cdpErr);

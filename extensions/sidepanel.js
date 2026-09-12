@@ -191,11 +191,29 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
     }
 
     if (msg.type === "REGION_CROP_REQUESTED" && msg.clip) {
-      chrome.runtime.sendMessage({ action: "capture_screenshot", mode: "visible" }, (res) => {
+      const activeTabId = getActiveTabId ? getActiveTabId() : null;
+      chrome.runtime.sendMessage({
+        action: "capture_screenshot",
+        mode: "region",
+        tabId: activeTabId,
+        clip: msg.clip
+      }, (res) => {
+        if (chrome.runtime.lastError) {
+          showToast("Lỗi chụp vùng: " + chrome.runtime.lastError.message);
+          return;
+        }
         if (res && res.success && res.dataUrl) {
-          screenshotPanel.cropImageViaCanvas(res.dataUrl, msg.clip);
+          if (res.requiresCrop && res.clip) {
+            screenshotPanel.cropImageViaCanvas(res.dataUrl, res.clip);
+          } else {
+            screenshotPanel.displayScreenshot(res.dataUrl, "Đã chụp và cắt vùng thành công!");
+          }
+        } else {
+          showToast("Lỗi chụp vùng: " + (res ? res.error : ""));
         }
       });
+      const tabScreenshotBtn = document.querySelector('[data-tab="tab-screenshot"]');
+      if (tabScreenshotBtn) tabScreenshotBtn.click();
     }
 
     if (msg.type === "ELEMENT_SNAP_REQUESTED" && msg.rect) {
