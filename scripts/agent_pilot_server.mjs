@@ -457,9 +457,12 @@ async function handleMcpToolCall(name, args) {
 }
 
 // Start stdio interface and HTTP server when executed directly as main script
+const isWin = process.platform === "win32";
 const isMainScript = Boolean(
   process.argv[1] &&
-  path.resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase()
+  (isWin
+    ? path.resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase()
+    : path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
 );
 
 if (isMainScript) {

@@ -34,12 +34,15 @@ function normalizeUrl(url) {
 }
 
 // Cached host platform: "win", "mac", "linux", "cros"
-let currentPlatform = "linux";
-if (typeof chrome !== "undefined" && chrome.runtime?.getPlatformInfo) {
-  chrome.runtime.getPlatformInfo((info) => {
-    if (info && info.os) currentPlatform = info.os;
-  });
-}
+let currentPlatform = "unknown";
+const platformPromise = (typeof chrome !== "undefined" && chrome.runtime?.getPlatformInfo)
+  ? new Promise((resolve) => {
+      chrome.runtime.getPlatformInfo((info) => {
+        currentPlatform = info?.os || "unknown";
+        resolve(currentPlatform);
+      });
+    })
+  : Promise.resolve("unknown");
 
 // Enable Side Panel behavior on icon click natively
 function enableSidePanelBehavior() {
@@ -800,10 +803,11 @@ class AgentBridgeClient {
       const ws = new WebSocket(url);
       this.ws = ws;
 
-      ws.onopen = () => {
+      ws.onopen = async () => {
         if (this.ws !== ws) return;
         this.connected = true;
         this.reconnectDelay = 2000;
+        await platformPromise;
         // Send enriched handshake info immediately
         const ua = navigator.userAgent || "";
         const browserName = ua.includes("Edg/") ? "Microsoft Edge"
