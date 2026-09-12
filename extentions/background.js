@@ -579,6 +579,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+
+  if (action === "ensure_content_script") {
+    (async () => {
+      const targetId = request.tabId || (agentBridge ? await agentBridge.getActiveTabId() : null);
+      if (!targetId) {
+        return sendResponse({ success: false, error: "Không tìm thấy tab mục tiêu" });
+      }
+      const ok = agentBridge ? await agentBridge.ensureContentScript(targetId) : false;
+      sendResponse({ success: ok });
+    })();
+    return true;
+  }
 });
 
 /**
@@ -802,23 +814,52 @@ class AgentBridgeClient {
     });
   }
 
-  sendTabMessageWithRetry(tabId, message, maxRetries = 4, delayMs = 300) {
+  async ensureContentScript(tabId) {
+    if (!tabId) return false;
+    try {
+      const tab = await chrome.tabs.get(tabId).catch(() => null);
+      if (!tab || !tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://") || tab.url.startsWith("about:") || tab.url.startsWith("edge://")) {
+        return false;
+      }
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => Boolean(window.__AGENT_PILOT__)
+      }).catch(() => null);
+
+      if (!results || !results[0] || !results[0].result) {
+        await chrome.scripting.insertCSS({ target: { tabId }, files: ["content.css"] }).catch(() => {});
+        await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] }).catch(() => {});
+        await new Promise(r => setTimeout(r, 80));
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async sendTabMessageWithRetry(tabId, message, maxRetries = 3, delayMs = 250) {
+    await this.ensureContentScript(tabId);
+
     return new Promise((resolve, reject) => {
       let attempts = 0;
-      function attempt() {
+      const attempt = () => {
         attempts++;
-        chrome.tabs.sendMessage(tabId, message, (res) => {
+        chrome.tabs.sendMessage(tabId, message, async (res) => {
           if (chrome.runtime.lastError) {
+            const errMsg = chrome.runtime.lastError.message;
             if (attempts < maxRetries) {
+              if (errMsg && errMsg.includes("Receiving end does not exist")) {
+                await this.ensureContentScript(tabId);
+              }
               setTimeout(attempt, delayMs);
             } else {
-              reject(new Error(chrome.runtime.lastError.message));
+              reject(new Error(errMsg));
             }
           } else {
             resolve(res);
           }
         });
-      }
+      };
       attempt();
     });
   }
@@ -832,6 +873,19 @@ class AgentBridgeClient {
         id,
         result: error ? undefined : result,
         error: error ? (error.message || String(error)) : null
+      });
+
+      // Broadcast real-time action log to extension sidepanel
+      broadcastToExtension({
+        type: "AGENT_ACTION_LOG",
+        log: {
+          id,
+          method,
+          params,
+          timestamp: Date.now(),
+          status: error ? "error" : "success",
+          error: error ? (error.message || String(error)) : null
+        }
       });
     };
 

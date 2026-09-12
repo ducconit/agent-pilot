@@ -42,21 +42,15 @@ Bạn có thể dễ dàng mở trung tâm điều khiển Side Panel bằng 2 c
 
 ---
 
-### 3.2 Thao Tác Chuột Ảo & Tự Động Gõ Chữ
-Chuyển sang tab **🖱️ Chuột & Agent** trên Side Panel:
-- **Di chuyển chuột đến tọa độ**: Nhập tọa độ `X` và `Y` (ví dụ: `350`, `200`) -> Nhấp **Di chuyển chuột**. Bạn sẽ thấy con trỏ chuột neon lướt mượt mà trên trang web kèm bảng tọa độ trực quan.
-- **Click chuột ảo**: Nhấp **Click tại (X, Y)**. Tại vị trí con trỏ sẽ phát ra vòng sóng ripple màu xanh ngọc và kích hoạt sự kiện click lên phần tử thực tế bên dưới.
-- **Cuộn trang**: Nhấp **Cuộn lên ⬆** hoặc **Cuộn xuống ⬇**.
-- **Tự động điền văn bản**:
-  - Nhập CSS Selector của ô input (ví dụ: `#search-input` hoặc `input[name='q']`).
-  - Nhập nội dung cần gõ.
-  - Nhấp **Gõ chữ tự động**: Chuột ảo sẽ tự động bay đến ô nhập liệu, click focus và gõ từng ký tự với hoạt ảnh chân thực.
-
----
-
-### 3.3 Chạy Kịch Bản Tự Động Hóa Của Agent (JSON Action Script)
-- Nhấp nút **Tải mẫu** trong mục *Kịch bản Agent* để tải đoạn mã JSON mẫu gồm chuỗi các bước: `navigate` -> `mouse_move` -> `mouse_click` -> `type` -> `scroll` -> `screenshot`.
-- Nhấp **▶ Chạy Kịch bản Agent**: Hệ thống sẽ tuần tự thực thi từng hành động và hiển thị tiến trình hoàn thành chi tiết trong nhật ký.
+### 3.2 Giám Sát Hoạt Động AI Agent Thời Gian Thực
+Chuyển sang tab **🤖 AI Agent** trên Side Panel:
+- **Tự động hóa hoàn toàn bởi AI Agent**: Toàn bộ các thao tác di chuyển chuột ảo, click tạo sóng ripple, tự động điền văn bản và cuộn trang đều do AI Agent (Antigravity) điều khiển tự động thông qua giao thức MCP (cổng `58765`).
+- **Nhật ký Lệnh Thời gian thực (Live Action Stream)**: Khi AI Agent gửi lệnh thao tác trên trình duyệt, Side Panel sẽ hiển thị ngay lập tức tên lệnh, tham số tọa độ/phần tử và trạng thái thực thi (`✓ Xong` hoặc `✕ Lỗi`).
+- **Tự kiểm tra hệ thống (Self-Test)**: Nhấp nút **🧪 Tự kiểm tra hệ thống** để kiểm tra tự động 3 bước:
+  1. Quyền truy cập tab web hiện tại.
+  2. Khả năng nạp Content Script và kích hoạt API Chuột ảo.
+  3. Trạng thái kết nối Máy chủ Bridge (Port 58765).
+  *(Nếu có lỗi, hệ thống sẽ chỉ rõ nguyên nhân và dừng lại ngay lập tức).*
 
 ---
 

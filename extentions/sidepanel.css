@@ -766,3 +766,94 @@ body {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* ==========================================================================
+   10. Agent Monitor & Live Activity Stream
+   ========================================================================== */
+.agent-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-primary);
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.info-label {
+  color: var(--text-muted);
+}
+
+.info-val {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.log-counter {
+  font-size: 10px;
+  background: var(--bg-tertiary);
+  color: var(--accent-cyan);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+.agent-activity-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.agent-activity-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-activity-time {
+  color: var(--text-muted);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.agent-activity-method {
+  color: var(--accent-cyan);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.agent-activity-status {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.agent-activity-status.success {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--accent-green);
+}
+
+.agent-activity-status.error {
+  background: rgba(244, 63, 94, 0.15);
+  color: var(--accent-red);
+}
+
+.agent-activity-detail {
+  color: var(--text-secondary);
+  font-size: 10px;
+  word-break: break-all;
+  padding-left: 2px;
+}
+

@@ -34,20 +34,17 @@
   const subtabBtns = document.querySelectorAll(".subtab-btn");
   const subpanels = document.querySelectorAll(".subpanel");
 
-  // Virtual Mouse Controls
-  const mouseXInput = document.getElementById("mouse-x");
-  const mouseYInput = document.getElementById("mouse-y");
-  const btnMouseMove = document.getElementById("btn-mouse-move");
-  const btnMouseClick = document.getElementById("btn-mouse-click");
-  const btnScrollUp = document.getElementById("btn-scroll-up");
-  const btnScrollDown = document.getElementById("btn-scroll-down");
-  const typeSelector = document.getElementById("type-selector");
-  const typeText = document.getElementById("type-text");
-  const btnTypeSubmit = document.getElementById("btn-type-submit");
-  const agentScriptEditor = document.getElementById("agent-script-editor");
-  const btnLoadSampleScript = document.getElementById("btn-load-sample-script");
-  const btnRunAgentScript = document.getElementById("btn-run-agent-script");
-  const scriptOutputLog = document.getElementById("script-output-log");
+  // AI Agent Monitor Elements
+  const agentStatusBadge = document.getElementById("agent-status-badge");
+  const agentInfoPort = document.getElementById("agent-info-port");
+  const agentInfoTarget = document.getElementById("agent-info-target");
+  const btnPingAgent = document.getElementById("btn-ping-agent");
+  const btnSelfTestAgent = document.getElementById("btn-self-test-agent");
+  const agentTestLog = document.getElementById("agent-test-log");
+  const agentActivityLog = document.getElementById("agent-activity-log");
+  const agentActivityCount = document.getElementById("agent-activity-count");
+  const btnClearAgentLog = document.getElementById("btn-clear-agent-log");
+  const agentEmptyHint = document.getElementById("agent-empty-hint");
 
   // DevTools Controls
   const consoleStream = document.getElementById("console-stream");
@@ -128,6 +125,9 @@
         activeTabId = res.tab.id;
         activeTabTitle.textContent = res.tab.title || "Tab không tên";
         inputUrl.value = res.tab.url || "";
+        if (agentInfoTarget) {
+          agentInfoTarget.textContent = `Tab ${res.tab.id}: ${res.tab.title || res.tab.url || "Untitled"}`;
+        }
         checkCdpStatus();
       }
     });
@@ -210,152 +210,175 @@
   };
 
   // =========================================================================
-  // 3. Virtual Mouse & Text Typing Controls
+  // 3. AI Agent Monitor & Live Activity Stream
   // =========================================================================
 
-  btnMouseMove.onclick = () => {
-    if (!activeTabId) return;
-    const x = parseInt(mouseXInput.value) || 0;
-    const y = parseInt(mouseYInput.value) || 0;
-    chrome.tabs.sendMessage(activeTabId, { action: "virtual_mouse_move", x, y, duration: 350 }, (res) => {
-      showToast(`Chuột ảo đã di chuyển tới (${x}, ${y})`);
-    });
-  };
+  let agentActivityTotal = 0;
 
-  btnMouseClick.onclick = () => {
-    if (!activeTabId) return;
-    const x = parseInt(mouseXInput.value) || 0;
-    const y = parseInt(mouseYInput.value) || 0;
-    chrome.tabs.sendMessage(activeTabId, { action: "virtual_mouse_click", x, y }, (res) => {
-      showToast(`Đã click chuột ảo tại (${x}, ${y})`);
-    });
-  };
+  function addAgentActivityLog(item) {
+    if (!agentActivityLog) return;
+    if (agentEmptyHint) agentEmptyHint.style.display = "none";
+    agentActivityTotal++;
+    if (agentActivityCount) agentActivityCount.textContent = agentActivityTotal;
 
-  btnScrollUp.onclick = () => {
-    if (!activeTabId) return;
-    chrome.tabs.sendMessage(activeTabId, { action: "virtual_scroll", deltaX: 0, deltaY: -350 });
-  };
+    const row = document.createElement("div");
+    row.className = "agent-activity-item";
 
-  btnScrollDown.onclick = () => {
-    if (!activeTabId) return;
-    chrome.tabs.sendMessage(activeTabId, { action: "virtual_scroll", deltaX: 0, deltaY: 350 });
-  };
+    const timeStr = new Date(item.timestamp || Date.now()).toLocaleTimeString("vi-VN", { hour12: false });
+    const isError = item.status === "error";
 
-  btnTypeSubmit.onclick = () => {
-    if (!activeTabId) return;
-    const text = typeText.value;
-    const selector = typeSelector.value.trim();
-    if (!text) {
-      showToast("Vui lòng nhập nội dung cần gõ!");
-      return;
+    const header = document.createElement("div");
+    header.className = "agent-activity-header";
+
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "agent-activity-time";
+    timeSpan.textContent = timeStr;
+
+    const methodSpan = document.createElement("span");
+    methodSpan.className = "agent-activity-method";
+    methodSpan.textContent = item.method || "unknown";
+
+    const statusBadge = document.createElement("span");
+    statusBadge.className = `agent-activity-status ${isError ? 'error' : 'success'}`;
+    statusBadge.textContent = isError ? "✕ Lỗi" : "✓ Xong";
+
+    header.appendChild(timeSpan);
+    header.appendChild(methodSpan);
+    header.appendChild(statusBadge);
+    row.appendChild(header);
+
+    const detail = document.createElement("div");
+    detail.className = "agent-activity-detail";
+    detail.textContent = formatParams(item.params);
+    row.appendChild(detail);
+
+    if (isError && item.error) {
+      const errDetail = document.createElement("div");
+      errDetail.style.color = "var(--accent-red)";
+      errDetail.style.fontSize = "10px";
+      errDetail.style.marginTop = "2px";
+      errDetail.textContent = `Chi tiết lỗi: ${item.error}`;
+      row.appendChild(errDetail);
     }
-    chrome.tabs.sendMessage(activeTabId, { action: "virtual_type", selector, text }, (res) => {
-      if (res && res.success) {
-        showToast("Đã tự động gõ chữ thành công!");
-      } else {
-        showToast("Lỗi gõ chữ: " + (res ? res.error : "Không tìm thấy ô nhập"));
+
+    agentActivityLog.prepend(row);
+  }
+
+  function formatParams(params) {
+    if (!params) return "";
+    if (typeof params !== "object") return String(params);
+    const keys = Object.keys(params);
+    if (keys.length === 0) return "";
+    return keys.map((k) => `${k}: ${JSON.stringify(params[k])}`).join(", ");
+  }
+
+  if (btnClearAgentLog) {
+    btnClearAgentLog.onclick = () => {
+      if (agentActivityLog) {
+        agentActivityLog.innerHTML = `<div class="empty-hint" id="agent-empty-hint">Chưa có lệnh nào. Khi AI Agent gửi lệnh qua cổng 58765, hoạt động sẽ hiển thị tại đây.</div>`;
       }
-    });
-  };
+      agentActivityTotal = 0;
+      if (agentActivityCount) agentActivityCount.textContent = "0";
+      showToast("Đã xóa nhật ký lệnh Agent");
+    };
+  }
 
-  // =========================================================================
-  // 4. Agent JSON Action Runner (Antigravity Automation)
-  // =========================================================================
-
-  const sampleScript = [
-    { action: "mouse_move", x: 250, y: 180, duration: 400 },
-    { action: "wait", ms: 300 },
-    { action: "mouse_click", x: 250, y: 180 },
-    { action: "wait", ms: 400 },
-    { action: "type", selector: "input[type='text'], input", text: "Agent Pilot Antigravity Demo" },
-    { action: "scroll", deltaY: 200 },
-    { action: "screenshot", mode: "visible" }
-  ];
-
-  btnLoadSampleScript.onclick = () => {
-    agentScriptEditor.value = JSON.stringify(sampleScript, null, 2);
-    showToast("Đã tải kịch bản mẫu.");
-  };
-
-  btnRunAgentScript.onclick = async () => {
-    if (!activeTabId) return;
-    let actions = [];
-    try {
-      actions = JSON.parse(agentScriptEditor.value);
-      if (!Array.isArray(actions)) throw new Error("Kịch bản phải là một mảng JSON các actions!");
-    } catch (e) {
-      showToast("Lỗi cú pháp JSON: " + e.message);
-      return;
-    }
-
-    scriptOutputLog.style.display = "block";
-    scriptOutputLog.innerHTML = `<div style="color:#38bdf8;">🚀 Bắt đầu thực thi ${actions.length} bước của Agent...</div>`;
-
-    for (let i = 0; i < actions.length; i++) {
-      const act = actions[i];
-      const stepNum = i + 1;
-      const logLine = document.createElement("div");
-      logLine.style.fontSize = "11px";
-      logLine.style.padding = "2px 0";
-      logLine.textContent = `[Bước ${stepNum}/${actions.length}] Hành động: ${act.action}...`;
-      scriptOutputLog.appendChild(logLine);
-
-      try {
-        if (act.action === "wait") {
-          await new Promise((r) => setTimeout(r, act.ms || 500));
-        } else if (act.action === "mouse_move") {
-          await sendTabMessageAsync(activeTabId, { action: "virtual_mouse_move", x: act.x, y: act.y, duration: act.duration || 300 });
-        } else if (act.action === "mouse_click") {
-          await sendTabMessageAsync(activeTabId, { action: "virtual_mouse_click", x: act.x, y: act.y });
-        } else if (act.action === "type") {
-          await sendTabMessageAsync(activeTabId, { action: "virtual_type", selector: act.selector, text: act.text });
-        } else if (act.action === "scroll") {
-          await sendTabMessageAsync(activeTabId, { action: "virtual_scroll", deltaX: act.deltaX || 0, deltaY: act.deltaY || 300 });
-        } else if (act.action === "navigate") {
-          await new Promise((resolve) => {
-            chrome.runtime.sendMessage({ action: "navigate", tabId: activeTabId, url: act.url });
-            function onTabComplete(tabId, info) {
-              if (tabId === activeTabId && info.status === "complete") {
-                chrome.tabs.onUpdated.removeListener(onTabComplete);
-                resolve();
-              }
-            }
-            chrome.tabs.onUpdated.addListener(onTabComplete);
-            setTimeout(() => {
-              chrome.tabs.onUpdated.removeListener(onTabComplete);
-              resolve();
-            }, 4000);
-          });
-        } else if (act.action === "screenshot") {
-          await captureVisibleScreenshot();
-        }
-        logLine.textContent += " ✓ Thành công";
-        logLine.style.color = "#34d399";
-      } catch (err) {
-        logLine.textContent += " ✕ Lỗi: " + err.message;
-        logLine.style.color = "#f43f5e";
-        break;
-      }
-    }
-
-    const doneLine = document.createElement("div");
-    doneLine.style.color = "#38bdf8";
-    doneLine.style.marginTop = "4px";
-    doneLine.textContent = "🎉 Hoàn tất kịch bản tự động hóa!";
-    scriptOutputLog.appendChild(doneLine);
-    scriptOutputLog.scrollTop = scriptOutputLog.scrollHeight;
-  };
-
-  function sendTabMessageAsync(tabId, message) {
-    return new Promise((resolve, reject) => {
-      chrome.tabs.sendMessage(tabId, message, (res) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+  if (btnPingAgent) {
+    btnPingAgent.onclick = () => {
+      chrome.runtime.sendMessage({ action: "get_agent_bridge_status" }, (status) => {
+        if (status && status.connected) {
+          showToast(`✓ Đã kết nối ổn định tới AI Agent (Cổng ${status.port})`);
         } else {
-          resolve(res);
+          showToast(`⚪ Chưa có AI Agent kết nối tại cổng ${status?.port || 58765}`);
         }
       });
-    });
+    };
+  }
+
+  if (btnSelfTestAgent) {
+    btnSelfTestAgent.onclick = async () => {
+      if (!agentTestLog) return;
+      agentTestLog.style.display = "block";
+      agentTestLog.innerHTML = `<div style="color:var(--accent-cyan);font-weight:600;margin-bottom:4px;">🚀 Bắt đầu tự kiểm tra khả năng hoạt động của AI Agent...</div>`;
+
+      const steps = [
+        {
+          name: "1. Kiểm tra quyền truy cập tab đang mở",
+          run: async () => {
+            if (!activeTabId) throw new Error("Chưa xác định được tab. Vui lòng mở một trang web bình thường.");
+            const tab = await chrome.tabs.get(activeTabId).catch(() => null);
+            if (!tab) throw new Error("Không thể truy vấn thông tin tab.");
+            if (tab.url && (tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://") || tab.url.startsWith("about:"))) {
+              throw new Error("Không thể thao tác trên trang hệ thống nội bộ của trình duyệt. Hãy mở trang web bình thường.");
+            }
+            return `Tab ID: ${tab.id} - ${tab.title || tab.url}`;
+          }
+        },
+        {
+          name: "2. Kiểm tra nạp Content Script & API Chuột/Phím",
+          run: async () => {
+            const res = await new Promise((resolve) => {
+              chrome.runtime.sendMessage({ action: "ensure_content_script", tabId: activeTabId }, resolve);
+            });
+            if (!res || !res.success) {
+              throw new Error(res?.error || "Không thể nạp Content Script vào trang web.");
+            }
+            return "Content Script & Bridge API sẵn sàng";
+          }
+        },
+        {
+          name: "3. Kiểm tra kết nối Máy chủ Bridge (Port 58765)",
+          run: async () => {
+            const status = await new Promise((resolve) => {
+              chrome.runtime.sendMessage({ action: "get_agent_bridge_status" }, resolve);
+            });
+            if (!status || !status.connected) {
+              throw new Error(`Máy chủ chưa kết nối. Hãy đảm bảo đã khởi chạy agent-pilot server trên cổng ${status?.port || 58765}.`);
+            }
+            return `Kết nối WebSocket mở tại ws://127.0.0.1:${status.port}`;
+          }
+        }
+      ];
+
+      let hasError = false;
+      let failedReason = "";
+
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        const logLine = document.createElement("div");
+        logLine.style.fontSize = "11px";
+        logLine.style.padding = "2px 0";
+        logLine.textContent = `${step.name}...`;
+        agentTestLog.appendChild(logLine);
+
+        try {
+          const detail = await step.run();
+          logLine.textContent += ` ✓ Thành công (${detail})`;
+          logLine.style.color = "var(--accent-green)";
+        } catch (err) {
+          hasError = true;
+          failedReason = err.message;
+          logLine.textContent += ` ✕ Lỗi: ${err.message}`;
+          logLine.style.color = "var(--accent-red)";
+          break; // Stop immediately upon error
+        }
+      }
+
+      const summaryLine = document.createElement("div");
+      summaryLine.style.marginTop = "6px";
+      summaryLine.style.fontWeight = "bold";
+
+      if (hasError) {
+        summaryLine.style.color = "var(--accent-red)";
+        summaryLine.textContent = `❌ Kiểm tra thất bại: ${failedReason}`;
+      } else {
+        summaryLine.style.color = "var(--accent-green)";
+        summaryLine.textContent = "🎉 Toàn bộ hệ thống sẵn sàng 100% cho AI Agent thao tác!";
+      }
+
+      agentTestLog.appendChild(summaryLine);
+      agentTestLog.scrollTop = agentTestLog.scrollHeight;
+    };
   }
 
   // =========================================================================
@@ -773,19 +796,32 @@
     if (msg.type === "AGENT_BRIDGE_STATUS_CHANGED" && msg.status) {
       updateBridgeUI(msg.status);
     }
+
+    if (msg.type === "AGENT_ACTION_LOG" && msg.log) {
+      addAgentActivityLog(msg.log);
+    }
   });
 
   // AI Agent Bridge UI Handlers
   function updateBridgeUI(status) {
-    if (!status || !agentBridgeText || !agentBridgeDot) return;
-    if (status.connected) {
-      agentBridgeDot.className = "status-dot connected";
-      agentBridgeText.textContent = `AI Agent: Đã kết nối (ws://127.0.0.1:${status.port})`;
-      agentBridgeText.style.color = "var(--accent-green)";
-    } else {
-      agentBridgeDot.className = "status-dot disconnected";
-      agentBridgeText.textContent = `AI Agent: Chờ kết nối (Port ${status.port})`;
-      agentBridgeText.style.color = "var(--text-secondary)";
+    if (!status) return;
+    if (agentBridgeDot && agentBridgeText) {
+      if (status.connected) {
+        agentBridgeDot.className = "status-dot connected";
+        agentBridgeText.textContent = `AI Agent: Đã kết nối (ws://127.0.0.1:${status.port})`;
+        agentBridgeText.style.color = "var(--accent-green)";
+      } else {
+        agentBridgeDot.className = "status-dot disconnected";
+        agentBridgeText.textContent = `AI Agent: Chờ kết nối (Port ${status.port})`;
+        agentBridgeText.style.color = "var(--text-secondary)";
+      }
+    }
+    if (agentStatusBadge) {
+      agentStatusBadge.textContent = status.connected ? "Đã kết nối" : "Chờ kết nối";
+      agentStatusBadge.style.color = status.connected ? "var(--accent-green)" : "var(--text-muted)";
+    }
+    if (agentInfoPort && status.port) {
+      agentInfoPort.textContent = `ws://127.0.0.1:${status.port}`;
     }
     if (inputBridgePort && status.port) {
       inputBridgePort.value = status.port;
