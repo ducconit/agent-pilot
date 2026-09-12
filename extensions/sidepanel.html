@@ -85,7 +85,7 @@
       <!-- Secret & API Key Redaction Filter Card -->
       <div class="card mt-3">
         <div class="card-header">
-          <div style="display:flex;align-items:center;gap:6px;">
+          <div class="card-header-title-group">
             <span class="card-title">🛡️ Lọc Secret & API Key</span>
             <span class="tooltip-icon" tabindex="0" title="Tự động che giấu API keys (OpenAI, Anthropic, Gemini, AWS, Stripe), Private Keys, JWT, Bearer token bằng dấu sao (*) trước khi trả lời Agent. Kèm thông báo bảo mật để Agent hiểu giá trị đã được che.">?</span>
             <span class="card-badge badge-success" id="secret-filter-badge">Đang bảo vệ</span>
@@ -245,8 +245,8 @@
       <!-- Session Master Controller -->
       <div class="card">
         <div class="card-header">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span class="card-title">✏️ Chú Thích & Chỉ Điểm Cho Agent</span>
+          <div class="card-header-title-group">
+            <span class="card-title">✏️ Chú Thích Cho Agent</span>
             <span class="tooltip-icon" tabindex="0" title="Chế độ chú thích trực quan: Khoanh vùng, chọn phần tử hoặc chụp màn hình và ghi chú để giao cho AI Agent tìm đúng file và sửa code.">?</span>
           </div>
           <span class="card-badge" id="feedback-status-badge">Đang tắt</span>
@@ -269,7 +269,9 @@
       <!-- Mode Selector Card (Active when session is ON) -->
       <div class="card mt-3" id="card-feedback-tools" style="display:none;">
         <div class="card-header">
-          <span class="card-title">Công Cụ Đánh Dấu & Chú Thích</span>
+          <div class="card-header-title-group">
+            <span class="card-title">Công Cụ Đánh Dấu</span>
+          </div>
           <span class="card-badge badge-info" id="feedback-current-mode-badge">Phần tử</span>
         </div>
         <div class="card-body">
@@ -287,7 +289,7 @@
       <!-- Collected Items List Card -->
       <div class="card mt-3">
         <div class="card-header">
-          <div style="display:flex;align-items:center;gap:6px;">
+          <div class="card-header-title-group">
             <span class="card-title">Vị Trí Cần Sửa Đã Ghi Nhận</span>
             <span class="log-counter" id="feedback-items-counter">0</span>
           </div>
