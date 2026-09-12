@@ -71,6 +71,28 @@ const server = http.createServer(async (req, res) => {
 
   // HTTP API Endpoint for non-WebSocket scripts / curl
   if (req.url === "/api" && req.method === "POST") {
+    // CSRF Protection: Require application/json Content-Type.
+    // In browsers, non-preflighted requests cannot use application/json.
+    const contentType = req.headers["content-type"] || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      res.writeHead(415, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Unsupported Media Type: application/json required" }));
+      return;
+    }
+
+    // CSRF Protection: If Origin is sent (by a browser web page), reject non-loopback/extension origins
+    const origin = req.headers["origin"];
+    if (origin) {
+      const allowed = origin.startsWith("chrome-extension://") ||
+                      origin.startsWith("http://127.0.0.1:") ||
+                      origin.startsWith("http://localhost:");
+      if (!allowed) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Forbidden: Cross-origin request rejected" }));
+        return;
+      }
+    }
+
     let body = "";
     req.on("data", chunk => {
       body += chunk;
