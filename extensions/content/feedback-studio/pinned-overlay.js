@@ -1,0 +1,132 @@
+/**
+ * Agent Pilot - Feedback Studio Pinned Regions & Draft Highlight Layer
+ * Renders persistent numbered pinned boxes on screen for annotated areas.
+ */
+(function () {
+  window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
+  window.__AP_INTERNAL__.feedbackStudio = window.__AP_INTERNAL__.feedbackStudio || {};
+
+  // Setup DOM Elements
+  const pinnedLayer = document.createElement("div");
+  pinnedLayer.id = "agent-pilot-feedback-pinned-layer";
+  pinnedLayer.className = "agent-pilot-feedback-pinned-layer hidden";
+  document.documentElement.appendChild(pinnedLayer);
+
+  const draftBox = document.createElement("div");
+  draftBox.id = "agent-pilot-feedback-draft-box";
+  draftBox.className = "ap-pinned-box draft hidden";
+  draftBox.innerHTML = `<span class="ap-pinned-badge" id="ap-draft-badge">Đang soạn...</span>`;
+  pinnedLayer.appendChild(draftBox);
+
+  /**
+   * Show animated draft box while user is writing comment for a selected region
+   */
+  function showDraftBox(clip, itemNumber) {
+    if (!clip) return;
+    const pageX = (clip.pageX !== undefined) ? clip.pageX : (clip.x + (clip.scrollX !== undefined ? clip.scrollX : window.scrollX));
+    const pageY = (clip.pageY !== undefined) ? clip.pageY : (clip.y + (clip.scrollY !== undefined ? clip.scrollY : window.scrollY));
+
+    draftBox.style.left = `${pageX}px`;
+    draftBox.style.top = `${pageY}px`;
+    draftBox.style.width = `${clip.width}px`;
+    draftBox.style.height = `${clip.height}px`;
+
+    const viewportY = (clip.y !== undefined) ? clip.y : (pageY - window.scrollY);
+    draftBox.classList.toggle("flip-badge-inside", viewportY < 28);
+    const badgeEl = draftBox.querySelector("#ap-draft-badge");
+    if (badgeEl) {
+      badgeEl.textContent = `#${itemNumber} (Đang soạn...)`;
+    }
+
+    draftBox.classList.remove("hidden");
+    pinnedLayer.classList.remove("hidden");
+  }
+
+  /**
+   * Hide the active draft highlight
+   */
+  function hideDraftBox() {
+    draftBox.classList.add("hidden");
+    const items = window.__AP_INTERNAL__.feedbackStudio.state?.getItems() || [];
+    const hasItemsWithClip = items.some((it) => it.clip && it.clip.width > 0);
+    if (!hasItemsWithClip) {
+      pinnedLayer.classList.add("hidden");
+    }
+  }
+
+  /**
+   * Render all persistent pinned boxes on the page
+   */
+  function renderPinnedBoxes() {
+    // Remove all existing pinned boxes except draftBox
+    pinnedLayer.querySelectorAll(".ap-pinned-box:not(#agent-pilot-feedback-draft-box)").forEach((el) => el.remove());
+
+    const isFeedbackActive = window.__AP_INTERNAL__.feedbackStudio.state?.isActive() || false;
+    if (!isFeedbackActive) {
+      pinnedLayer.classList.add("hidden");
+      draftBox.classList.add("hidden");
+      return;
+    }
+
+    const items = window.__AP_INTERNAL__.feedbackStudio.state?.getItems() || [];
+    const itemsWithClip = items.filter((it) => it.clip && it.clip.width > 0 && it.clip.height > 0);
+    if (!itemsWithClip.length && draftBox.classList.contains("hidden")) {
+      pinnedLayer.classList.add("hidden");
+      return;
+    }
+
+    pinnedLayer.classList.remove("hidden");
+    const constants = window.__AP_INTERNAL__.feedbackStudio.constants || {};
+    const PIN_COLORS = constants.PIN_COLORS || [];
+    const escapeHtml = constants.escapeHtml || ((s) => s);
+
+    items.forEach((item, idx) => {
+      if (!item.clip || !item.clip.width) return;
+      const palette = PIN_COLORS[idx % PIN_COLORS.length] || { color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", glow: "rgba(56, 189, 248, 0.3)" };
+      const pageX = (item.clip.pageX !== undefined) ? item.clip.pageX : (item.clip.x + (item.clip.scrollX !== undefined ? item.clip.scrollX : 0));
+      const pageY = (item.clip.pageY !== undefined) ? item.clip.pageY : (item.clip.y + (item.clip.scrollY !== undefined ? item.clip.scrollY : 0));
+
+      const box = document.createElement("div");
+      box.className = "ap-pinned-box";
+      box.dataset.id = item.id;
+      box.style.setProperty("--box-color", palette.color);
+      box.style.setProperty("--box-bg", palette.bg);
+      box.style.setProperty("--box-glow", palette.glow);
+      box.style.left = `${pageX}px`;
+      box.style.top = `${pageY}px`;
+      box.style.width = `${item.clip.width}px`;
+      box.style.height = `${item.clip.height}px`;
+
+      const viewportY = (item.clip.y !== undefined) ? item.clip.y : (pageY - window.scrollY);
+      if (viewportY < 28) {
+        box.classList.add("flip-badge-inside");
+      }
+
+      const badge = document.createElement("span");
+      badge.className = "ap-pinned-badge";
+      badge.innerHTML = `
+        <span>#${idx + 1}</span>
+        <button class="ap-pinned-del-btn" title="Xóa vị trí #${idx + 1}">✕</button>
+        ${item.comment ? `<div class="ap-pinned-tooltip"><strong>#${idx + 1}:</strong> ${escapeHtml(item.comment)}</div>` : ""}
+      `;
+
+      badge.querySelector(".ap-pinned-del-btn").onclick = (e) => {
+        e.stopPropagation();
+        if (window.__AP_INTERNAL__.feedbackStudio.actions?.deleteItem) {
+          window.__AP_INTERNAL__.feedbackStudio.actions.deleteItem(item.id);
+        }
+      };
+
+      box.appendChild(badge);
+      pinnedLayer.appendChild(box);
+    });
+  }
+
+  window.__AP_INTERNAL__.feedbackStudio.pinned = {
+    pinnedLayer,
+    draftBox,
+    showDraftBox,
+    hideDraftBox,
+    renderPinnedBoxes
+  };
+})();

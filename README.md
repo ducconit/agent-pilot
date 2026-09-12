@@ -78,7 +78,16 @@ agent-pilot-extension/
 │   │   ├── cursor-simulator.js         # Con trỏ chuột ảo Neon & sóng ripple
 │   │   ├── dom-inspector.js            # Trích xuất thông số DOM & Element Snap
 │   │   ├── eyedropper.js               # Kính lúp phóng đại 11x11 lấy mã màu
-│   │   └── feedback-studio.js          # Chú thích & Chỉ điểm UI in-page, multi-mode HUD & component inspector
+│   │   └── feedback-studio/            # Chú thích & Chỉ điểm UI in-page (Modular Architecture)
+│   │       ├── constants.js            # Bảng màu xoay vòng, tiện ích escape & kéo thả
+│   │       ├── state.js                # Quản lý trạng thái phiên chú thích & danh sách vị trí
+│   │       ├── capture-service.js      # Dịch vụ chụp ảnh, cắt Canvas & nhận diện component nguồn
+│   │       ├── pinned-overlay.js       # Quản lý layer ghim cố định khung chọn trên màn hình
+│   │       ├── hud-toolbar.js          # Thanh công cụ HUD nổi trên trang & chuyển chế độ
+│   │       ├── modals.js               # Popover ghi chú, Annotator màn hình & modal danh sách
+│   │       ├── selection-modes.js      # Logic chọn phần tử, kéo chọn vùng, chụp viewport/fullpage
+│   │       ├── export-channels.js      # 3 kênh xuất feedback (Prompt C, Inbox B, Live A)
+│   │       └── index.js                # Điều phối vòng đời & xuất API window.__AP_INTERNAL__.feedback
 │   ├── content.css                     # Stylesheet cho con trỏ, kính lúp, overlay & feedback HUD
 │   ├── sidepanel.html                  # Giao diện trung tâm điều khiển Side Panel
 │   ├── sidepanel.css                   # Giao diện Modern Dark Cyberpunk Responsive
