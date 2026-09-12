@@ -17,7 +17,7 @@ Chào mừng bạn đến với **Agent Pilot** – Tiện ích mở rộng đi�
 
 ## 2. Cách Khởi Động Bảng Điều Khiển (Side Panel)
 
-- **Phím tắt nhanh**: Nhấn <kbd>Alt + Shift + P</kbd> (trên macOS: <kbd>Option + Shift + P</kbd>).
+- **Phím tắt nhanh**: Nhấn <kbd>Alt + Shift + A</kbd> (trên macOS: <kbd>Option + Shift + A</kbd>).
 - **Hoặc**: Nhấp vào biểu tượng Agent Pilot trên thanh công cụ -> Chọn **Mở Bảng Điều Khiển**.
 - **Hoặc**: Nhấp chuột phải vào trang web bất kỳ -> Chọn **Mở Agent Pilot (Side Panel)**.
 
