@@ -22,6 +22,7 @@
   }
 
   let isInspectorActive = false;
+  let isElementSnapActive = false;
   let lockedElement = null;
   let cropState = { active: false, startX: 0, startY: 0, currentRect: null };
 
@@ -274,6 +275,9 @@
   }
 
   function toggleInspector(enabled, showToastNotice = true) {
+    if (enabled && isElementSnapActive) {
+      stopElementSnap(false);
+    }
     isInspectorActive = Boolean(enabled);
     if (enabled) {
       if (highlightTimer) {
@@ -299,6 +303,146 @@
   }
 
   // =========================================================================
+  // Interactive Element Snap (Chụp Phần tử Trực tiếp trên DOM)
+  // =========================================================================
+
+  function handleElementSnapMouseMove(e) {
+    if (!isElementSnapActive) return;
+
+    if (e.target.closest("#agent-pilot-cursor-layer") || 
+        e.target.closest("#agent-pilot-inspector-box") || 
+        e.target.closest("#agent-pilot-inspector-tooltip") ||
+        e.target.closest("#agent-pilot-crop-overlay") ||
+        e.target.closest("#agent-pilot-toast-container") ||
+        e.target.closest("#agent-pilot-loupe")) {
+      return;
+    }
+
+    const target = e.target;
+    if (!target || target === document.documentElement || target === document.body) return;
+
+    const rect = target.getBoundingClientRect();
+    inspectorBox.style.top = `${rect.top}px`;
+    inspectorBox.style.left = `${rect.left}px`;
+    inspectorBox.style.width = `${rect.width}px`;
+    inspectorBox.style.height = `${rect.height}px`;
+    inspectorBox.style.borderColor = "#a855f7";
+    inspectorBox.style.boxShadow = "0 0 16px rgba(168, 85, 247, 0.7)";
+    inspectorBox.style.display = "block";
+
+    const safeTag = escapeHtml(target.tagName.toLowerCase());
+    inspectorTooltip.innerHTML = `
+      <div class="agent-pilot-tooltip-header" style="color: #a855f7;">
+        <span class="agent-pilot-tag" style="background: rgba(168, 85, 247, 0.2); color: #d8b4fe;">📸 &lt;${safeTag}&gt;</span>
+        <span class="agent-pilot-dimensions">${Math.round(rect.width)} × ${Math.round(rect.height)}</span>
+      </div>
+      <div style="font-size: 11px; color: #cbd5e1; margin-top: 3px;">🎯 Click để chụp phần tử này • Esc để hủy</div>
+    `;
+
+    let tooltipTop = rect.top - 52;
+    if (tooltipTop < 10) tooltipTop = rect.bottom + 10;
+    let tooltipLeft = Math.max(10, Math.min(rect.left, window.innerWidth - 320));
+
+    inspectorTooltip.style.top = `${tooltipTop}px`;
+    inspectorTooltip.style.left = `${tooltipLeft}px`;
+    inspectorTooltip.style.display = "block";
+  }
+
+  function handleElementSnapClick(e) {
+    if (!isElementSnapActive) return;
+
+    if (e.target.closest("#agent-pilot-cursor-layer") || 
+        e.target.closest("#agent-pilot-inspector-box") || 
+        e.target.closest("#agent-pilot-inspector-tooltip") ||
+        e.target.closest("#agent-pilot-crop-overlay") ||
+        e.target.closest("#agent-pilot-toast-container") ||
+        e.target.closest("#agent-pilot-loupe")) {
+      return;
+    }
+
+    const target = e.target;
+    if (!target || target === document.documentElement || target === document.body) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+
+    const r = target.getBoundingClientRect();
+    const rect = {
+      x: Math.round(r.left),
+      y: Math.round(r.top),
+      width: Math.round(r.width),
+      height: Math.round(r.height)
+    };
+    const tagName = target.tagName.toLowerCase();
+
+    // Tự động tắt ngay chế độ chọn phần tử chụp
+    stopElementSnap(false);
+
+    // Hiệu ứng chớp xanh xác nhận chụp thành công
+    inspectorTooltip.style.display = "none";
+    inspectorBox.style.display = "block";
+    inspectorBox.style.borderColor = "#10b981";
+    inspectorBox.style.boxShadow = "0 0 20px rgba(16, 185, 129, 0.8)";
+    if (highlightTimer) clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => {
+      inspectorBox.style.display = "none";
+      highlightTimer = null;
+    }, 1000);
+
+    // Gửi yêu cầu chụp phần tử đến Side Panel / Background
+    chrome.runtime.sendMessage({
+      type: "ELEMENT_SNAP_REQUESTED",
+      rect,
+      tagName
+    }).catch(() => {});
+
+    showToast(`📸 Đã chọn phần tử &lt;${escapeHtml(tagName)}&gt; - Đang chụp ảnh...`);
+  }
+
+  function handleElementSnapKeyDown(e) {
+    if (!isElementSnapActive) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      stopElementSnap(true);
+      chrome.runtime.sendMessage({
+        type: "ELEMENT_SNAP_CANCELLED"
+      }).catch(() => {});
+    }
+  }
+
+  function startElementSnap() {
+    if (isInspectorActive) {
+      toggleInspector(false, false);
+    }
+    if (isElementSnapActive) return;
+    isElementSnapActive = true;
+    if (highlightTimer) {
+      clearTimeout(highlightTimer);
+      highlightTimer = null;
+    }
+    inspectorBox.style.borderColor = "#a855f7";
+    inspectorBox.style.boxShadow = "0 0 16px rgba(168, 85, 247, 0.7)";
+    document.addEventListener("mousemove", handleElementSnapMouseMove, true);
+    document.addEventListener("click", handleElementSnapClick, true);
+    document.addEventListener("keydown", handleElementSnapKeyDown, true);
+    showToast("📸 Chế độ chụp phần tử: Di chuột và click chọn phần tử trên trang • Esc để hủy");
+  }
+
+  function stopElementSnap(showToastNotice = false) {
+    if (!isElementSnapActive) return;
+    isElementSnapActive = false;
+    document.removeEventListener("mousemove", handleElementSnapMouseMove, true);
+    document.removeEventListener("click", handleElementSnapClick, true);
+    document.removeEventListener("keydown", handleElementSnapKeyDown, true);
+    inspectorTooltip.style.display = "none";
+    if (!highlightTimer) {
+      inspectorBox.style.display = "none";
+    }
+    if (showToastNotice) showToast("Đã hủy chụp phần tử.");
+  }
+
+  // =========================================================================
   // Region Screenshot Crop Overlay
   // =========================================================================
 
@@ -321,6 +465,8 @@
   const cropCancelBtn = document.getElementById("agent-pilot-crop-cancel");
 
   function startRegionCrop() {
+    if (isElementSnapActive) stopElementSnap(false);
+    if (isInspectorActive) toggleInspector(false, false);
     cropOverlay.style.display = "block";
     cropBox.style.display = "none";
     cropState.active = false;
@@ -396,6 +542,9 @@
     getElementSelector,
     getXPath,
     getLockedElement: () => (lockedElement ? getDetailedElementInfo(lockedElement) : null),
-    startRegionCrop
+    startRegionCrop,
+    startElementSnap,
+    stopElementSnap,
+    isElementSnapActive: () => isElementSnapActive
   };
 })();

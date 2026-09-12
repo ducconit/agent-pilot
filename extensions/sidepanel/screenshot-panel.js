@@ -43,12 +43,18 @@ export class ScreenshotPanel {
 
     if (this.btnCaptureElement) {
       this.btnCaptureElement.onclick = () => {
-        const selected = this.getSelectedElementDetails();
-        if (!selected) {
-          showToast("Vui lòng soi và chọn một phần tử trước!");
+        const activeTabId = this.getActiveTabId();
+        if (!activeTabId) {
+          showToast("Không tìm thấy tab hoạt động.");
           return;
         }
-        this.captureElementScreenshot(selected.rect);
+        chrome.tabs.sendMessage(activeTabId, { action: "start_element_snap" }, () => {
+          if (chrome.runtime.lastError) {
+            showToast("Vui lòng làm mới trang web trước khi chụp!");
+          } else {
+            showToast("📸 Di chuột và click chọn phần tử trên trang web để chụp • Esc để hủy");
+          }
+        });
       };
     }
 
@@ -65,18 +71,51 @@ export class ScreenshotPanel {
 
     if (this.btnCopyShot) {
       this.btnCopyShot.onclick = async () => {
-        if (!this.latestScreenshotDataUrl) return;
+        if (!this.latestScreenshotDataUrl) {
+          showToast("Chưa có ảnh chụp để sao chép!");
+          return;
+        }
         try {
-          const blob = await (await fetch(this.latestScreenshotDataUrl)).blob();
+          const blob = await this.getPngBlobFromDataUrl(this.latestScreenshotDataUrl);
           await navigator.clipboard.write([
-            new ClipboardItem({ [blob.type]: blob })
+            new ClipboardItem({ "image/png": blob })
           ]);
-          showToast("Đã sao chép ảnh vào clipboard!");
+          showToast("📋 Đã sao chép ảnh vào clipboard!");
         } catch (e) {
-          showToast("Không thể sao chép ảnh: " + e.message);
+          console.error("[AgentPilot] Clipboard copy failed:", e);
+          showToast("Không thể sao chép ảnh: " + (e.message || "Lỗi clipboard"));
         }
       };
     }
+  }
+
+  async getPngBlobFromDataUrl(dataUrl) {
+    if (dataUrl.startsWith("data:image/png;base64,")) {
+      const base64 = dataUrl.slice("data:image/png;base64,".length);
+      const binStr = atob(base64);
+      const len = binStr.length;
+      const u8arr = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        u8arr[i] = binStr.charCodeAt(i);
+      }
+      return new Blob([u8arr], { type: "image/png" });
+    }
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob((b) => {
+          if (b) resolve(b);
+          else reject(new Error("Canvas toBlob failed"));
+        }, "image/png");
+      };
+      img.onerror = () => reject(new Error("Không thể nạp ảnh"));
+      img.src = dataUrl;
+    });
   }
 
   captureVisibleScreenshot() {
@@ -103,13 +142,27 @@ export class ScreenshotPanel {
       tabId: activeTabId,
       clip: rect
     }, (res) => {
-      if (res && res.success) {
-        if (res.requiresCrop && res.dataUrl) {
+      if (chrome.runtime.lastError) {
+        showToast("Lỗi chụp phần tử: " + chrome.runtime.lastError.message);
+        return;
+      }
+      if (res && res.success && res.dataUrl) {
+        if (res.requiresCrop && res.clip) {
           this.cropImageViaCanvas(res.dataUrl, res.clip);
-        } else if (res.dataUrl) {
-          this.displayScreenshot(res.dataUrl);
-          showToast("Đã chụp phần tử thành công!");
+        } else {
+          const img = new Image();
+          img.onload = () => {
+            if (res.clip && (img.naturalWidth > res.clip.width * 1.5 || img.naturalHeight > res.clip.height * 1.5)) {
+              this.cropImageViaCanvas(res.dataUrl, res.clip);
+            } else {
+              this.displayScreenshot(res.dataUrl);
+              showToast("Đã chụp phần tử thành công!");
+            }
+          };
+          img.src = res.dataUrl;
         }
+      } else {
+        showToast("Lỗi chụp phần tử: " + (res ? res.error : ""));
       }
     });
   }

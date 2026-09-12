@@ -81,7 +81,8 @@ export async function captureTabScreenshot(tabId, params = {}) {
         tabId,
         isBackgroundTab: false,
         dataUrl,
-        clip: params.clip
+        clip: params.clip,
+        requiresCrop: Boolean((mode === "element" || mode === "region") && params.clip)
       });
     });
   });

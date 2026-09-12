@@ -29,7 +29,10 @@
     isInspectorActive: () => false,
     getDetailedElementInfo: () => null,
     getLockedElement: () => null,
-    startRegionCrop: () => {}
+    startRegionCrop: () => {},
+    startElementSnap: () => {},
+    stopElementSnap: () => {},
+    isElementSnapActive: () => false
   };
   const eyedropper = modules.eyedropper || {
     pickColor: () => Promise.resolve(null),
@@ -55,6 +58,9 @@
       return inspector.getDetailedElementInfo(el);
     },
     startRegionCrop: () => inspector.startRegionCrop(),
+    startElementSnap: () => inspector.startElementSnap(),
+    stopElementSnap: () => inspector.stopElementSnap(),
+    isElementSnapActive: () => inspector.isElementSnapActive(),
     pickColor: (x, y) => eyedropper.pickColor(x, y),
     stopEyedropper: () => eyedropper.stopEyedropper(),
     isEyedropperActive: () => eyedropper.isEyedropperActive(),
@@ -99,6 +105,9 @@
           scroll: (deltaX, deltaY) => sendBridgeRequest("virtual_scroll", { deltaX, deltaY }),
           toggleInspector: (enabled) => sendBridgeRequest("toggle_inspector", { enabled }),
           getElement: (selector) => sendBridgeRequest("get_element_info", { selector }),
+          startElementSnap: () => sendBridgeRequest("start_element_snap", {}),
+          stopElementSnap: () => sendBridgeRequest("stop_element_snap", {}),
+          isElementSnapActive: () => sendBridgeRequest("is_element_snap_active", {}),
           pickColor: (x, y) => sendBridgeRequest("pick_color", { x, y }),
           stopEyedropper: () => sendBridgeRequest("stop_eyedropper", {}),
           isEyedropperActive: () => sendBridgeRequest("is_eyedropper_active", {}),
@@ -128,6 +137,9 @@
       const el = document.querySelector(data.selector);
       result = inspector.getDetailedElementInfo(el);
     }
+    else if (action === "start_element_snap") { inspector.startElementSnap(); result = { success: true }; }
+    else if (action === "stop_element_snap") { inspector.stopElementSnap(); result = { success: true }; }
+    else if (action === "is_element_snap_active") result = inspector.isElementSnapActive();
     else if (action === "pick_color") result = await eyedropper.pickColor(data.x, data.y);
     else if (action === "stop_eyedropper") { eyedropper.stopEyedropper(); result = { success: true }; }
     else if (action === "is_eyedropper_active") result = eyedropper.isEyedropperActive();
@@ -230,6 +242,18 @@
 
     if (req.action === "start_region_crop") {
       inspector.startRegionCrop();
+      sendResponse({ success: true });
+      return true;
+    }
+
+    if (req.action === "start_element_snap") {
+      inspector.startElementSnap();
+      sendResponse({ success: true });
+      return true;
+    }
+
+    if (req.action === "stop_element_snap") {
+      inspector.stopElementSnap();
       sendResponse({ success: true });
       return true;
     }

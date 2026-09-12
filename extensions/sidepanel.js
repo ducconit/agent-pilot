@@ -179,6 +179,12 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
       });
     }
 
+    if (msg.type === "ELEMENT_SNAP_REQUESTED" && msg.rect) {
+      screenshotPanel.captureElementScreenshot(msg.rect);
+      const tabScreenshotBtn = document.querySelector('[data-tab="tab-screenshot"]');
+      if (tabScreenshotBtn) tabScreenshotBtn.click();
+    }
+
     if (msg.type === "AGENT_BRIDGE_STATUS_CHANGED" && msg.status) {
       agentMonitor.updateBridgeUI(msg.status);
     }

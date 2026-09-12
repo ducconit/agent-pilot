@@ -210,7 +210,8 @@ async function run() {
         subtabBtns,
         isCssTabActive,
         hasCssSearch: !!document.getElementById("inspector-css-search"),
-        hasCopyAllCss: !!document.getElementById("btn-copy-all-css")
+        hasCopyAllCss: !!document.getElementById("btn-copy-all-css"),
+        captureElementText: document.getElementById("btn-capture-element")?.textContent.replace(/\s+/g, " ").trim()
       };
     });
     const sidepanelOk = sidepanelCheck.brand === "AGENT PILOT" &&
@@ -218,8 +219,9 @@ async function run() {
                         sidepanelCheck.hasAgentMonitor &&
                         sidepanelCheck.subtabBtns.length === 2 &&
                         sidepanelCheck.isCssTabActive &&
-                        sidepanelCheck.hasCssSearch;
-    record("8. Side Panel Control Center UI (3 Main Tabs + Inspector Overview/CSS Subtabs)", sidepanelOk, `Brand: ${sidepanelCheck.brand}, Tabs: [${sidepanelCheck.tabBtns.join(" | ")}], Inspector Subtabs: [${sidepanelCheck.subtabBtns.join(" | ")}]`);
+                        sidepanelCheck.hasCssSearch &&
+                        sidepanelCheck.captureElementText === "🎯 Chụp phần tử";
+    record("8. Side Panel Control Center UI (3 Main Tabs + Inspector Subtabs + '🎯 Chụp phần tử')", sidepanelOk, `Brand: ${sidepanelCheck.brand}, Button: "${sidepanelCheck.captureElementText}", Inspector Subtabs: [${sidepanelCheck.subtabBtns.join(" | ")}]`);
     // Keep sidepanelPage open to test Extension IPC messaging
     // 10. Test Chrome DevTools Protocol (CDP) via Background Service Worker
     console.log("\n--- KIỂM THỬ CHROME DEVTOOLS PROTOCOL (CDP ENGINE) ---");
@@ -299,15 +301,49 @@ async function run() {
         });
       }, tabInfo.id);
 
-      const shotOk = shotRes?.success && shotRes?.dataUrl && shotRes.dataUrl.startsWith("data:image/png;base64,");
+      // Also test interactive element snap mode (auto turn-off on element click)
+      const elementSnapTest = await page.evaluate(async () => {
+        await window.__AGENT_PILOT__.startElementSnap();
+        const wasActive = await window.__AGENT_PILOT__.isElementSnapActive();
+        const testTarget = document.getElementById("inspector-special-box");
+        const r = testTarget.getBoundingClientRect();
+        testTarget.dispatchEvent(new MouseEvent("click", {
+          clientX: r.left + r.width / 2,
+          clientY: r.top + r.height / 2,
+          bubbles: true,
+          cancelable: true
+        }));
+        await new Promise(res => setTimeout(res, 60));
+        const isNowActive = await window.__AGENT_PILOT__.isElementSnapActive();
+        return { wasActive, autoTurnOff: wasActive === true && isNowActive === false };
+      });
+
+      // Also test PNG blob creation & ClipboardItem image/png compatibility
+      const clipboardTest = await sidepanelPage.evaluate(async (dataUrl) => {
+        const parts = dataUrl.split(",");
+        const binStr = atob(parts[1]);
+        const u8arr = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) u8arr[i] = binStr.charCodeAt(i);
+        const blob = new Blob([u8arr], { type: "image/png" });
+        const item = new ClipboardItem({ "image/png": blob });
+        return {
+          isPng: blob.type === "image/png",
+          blobSize: blob.size,
+          itemSupported: Boolean(item && item.types && item.types.includes("image/png"))
+        };
+      }, shotRes?.dataUrl || "");
+
+      const shotOk = shotRes?.success && shotRes?.dataUrl && shotRes.dataUrl.startsWith("data:image/png;base64,") &&
+                     elementSnapTest.autoTurnOff &&
+                     clipboardTest.isPng && clipboardTest.itemSupported;
       if (shotOk) {
         const base64 = shotRes.dataUrl.replace(/^data:image\/png;base64,/, "");
         const buf = Buffer.from(base64, "base64");
         const outPath = path.join(PROJECT_DIR, "assets", "verified_screenshot.png");
         fs.writeFileSync(outPath, buf);
-        record("14. Screenshot Suite (Capture & PNG Encoding)", true, `Kích thước file: ${buf.length} bytes -> assets/verified_screenshot.png`);
+        record("14. Screenshot Suite (Capture, Element Snap Picker & PNG Clipboard Item)", true, `Kích thước: ${buf.length} bytes, Element Snap Auto-Off: ${elementSnapTest.autoTurnOff}, Clipboard PNG: ${clipboardTest.itemSupported}`);
       } else {
-        record("14. Screenshot Suite (Capture & PNG Encoding)", false, shotRes?.error || "Lỗi chụp ảnh");
+        record("14. Screenshot Suite (Capture, Element Snap Picker & PNG Clipboard Item)", false, shotRes?.error || `Snap Auto-Off: ${elementSnapTest?.autoTurnOff}, Clipboard: ${clipboardTest?.itemSupported}`);
       }
 
       await sidepanelPage.close();

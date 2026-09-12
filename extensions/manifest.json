@@ -59,7 +59,8 @@
     "storage",
     "sidePanel",
     "contextMenus",
-    "alarms"
+    "alarms",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "<all_urls>"
