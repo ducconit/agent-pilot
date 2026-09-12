@@ -14,7 +14,7 @@ Do Agent Pilot được phát triển dưới dạng mã nguồn mở chuẩn Ma
 4. Nhấp vào nút **Load unpacked** (Tải tiện ích đã giải nén) ở góc trên bên trái.
 5. Duyệt đến thư mục của dự án và chọn thư mục con:
    ```
-   /home/ubuntu/workspace/projects/browser-control/extentions
+   /home/ubuntu/workspace/projects/browser-control/extensions
    ```
 6. Tiện ích **Agent Pilot - AI Browser Controller** sẽ ngay lập tức xuất hiện trong danh sách extensions.
 7. Nhấp vào biểu tượng mảnh ghép (Extensions icon) trên thanh công cụ của Chrome và chọn **Ghim (Pin)** biểu tượng Agent Pilot ra ngoài để tiện sử dụng.

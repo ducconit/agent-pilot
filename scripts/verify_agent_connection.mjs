@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 const BRIDGE_PORT = 58765;
 const HTTP_PORT = 8765;
 const PROJECT_DIR = path.resolve(__dirname, "..");
-const EXT_DIR = path.join(PROJECT_DIR, "extentions");
+const EXT_DIR = path.join(PROJECT_DIR, "extensions");
 
 import { resolveChromiumBin, getChromiumLaunchArgs } from "./browser_resolver.mjs";
 const CHROMIUM_BIN = resolveChromiumBin();

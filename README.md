@@ -5,7 +5,7 @@
 # 🚀 AGENT PILOT
 ### Universal AI Agent Browser Controller • Antigravity-First
 
-[![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-blue?style=for-the-badge&logo=googlechrome)](extentions/manifest.json)
+[![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-blue?style=for-the-badge&logo=googlechrome)](extensions/manifest.json)
 [![Antigravity First](https://img.shields.io/badge/AI%20Agent-Antigravity--First-8b5cf6?style=for-the-badge)](docs/ANTIGRAVITY_INTEGRATION.md)
 [![CDP Protocol](https://img.shields.io/badge/Engine-Chrome%20DevTools%20Protocol-06b6d4?style=for-the-badge)](docs/CDP_GUIDE.md)
 [![Cross-Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blueviolet?style=for-the-badge)](#)
@@ -51,7 +51,7 @@ browser-control/
 │   ├── CDP_GUIDE.md                    # Hướng dẫn Chrome DevTools Protocol (CDP)
 │   ├── API_REFERENCE.md                # Danh mục tin nhắn & đặc tả JSON Action
 │   └── USAGE_GUIDE.md                  # Sổ tay hướng dẫn sử dụng từng tính năng
-├── extentions/                         # Toàn bộ mã nguồn Chrome Extension (Manifest V3)
+├── extensions/                         # Toàn bộ mã nguồn Chrome Extension (Manifest V3)
 │   ├── manifest.json                   # Cấu hình chuẩn Chrome Extension MV3
 │   ├── background.js                   # Service Worker: CDP, Tab Manager, Screenshot Engine
 │   ├── content.js                      # Content Script: Chuột ảo, Inspector, Crop, Bridge
@@ -85,10 +85,10 @@ chrome://extensions
 ### Bước 2: Bật Chế độ Nhà phát triển & Tải Extension
 1. Gạt bật công tắc **Developer mode** ở góc trên cùng bên phải.
 2. Nhấp nút **Load unpacked** (Tải tiện ích đã giải nén) ở góc trên bên trái.
-3. Chọn đường dẫn thư mục `extentions` của dự án tương ứng với hệ điều hành của bạn:
-   * **Windows**: `C:\path\to\browser-control\extentions`
-   * **macOS**: `/Users/<username>/path/to/browser-control/extentions`
-   * **Linux**: `/home/<username>/path/to/browser-control/extentions`
+3. Chọn đường dẫn thư mục `extensions` của dự án tương ứng với hệ điều hành của bạn:
+   * **Windows**: `C:\path\to\browser-control\extensions`
+   * **macOS**: `/Users/<username>/path/to/browser-control/extensions`
+   * **Linux**: `/home/<username>/path/to/browser-control/extensions`
    *(Hoặc giải nén tệp sẵn sàng cài đặt tại `dist/agent-pilot-v1.0.0.zip`)*.
 
 ### Bước 3: Khởi động Bảng điều khiển (Side Panel)

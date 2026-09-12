@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Agent Pilot - Extension Packaging Utility
- * Packages extentions/ into a distribution-ready ZIP for GitHub Releases & Chrome Web Store
+ * Packages extensions/ into a distribution-ready ZIP for GitHub Releases & Chrome Web Store
  */
 
 import fs from "node:fs";
@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
-const EXT_DIR = path.join(ROOT_DIR, "extentions");
+const EXT_DIR = path.join(ROOT_DIR, "extensions");
 const DIST_DIR = path.join(ROOT_DIR, "dist");
 
 // 1. Read and validate versions
@@ -21,7 +21,7 @@ const pkgPath = path.join(ROOT_DIR, "package.json");
 const manifestPath = path.join(EXT_DIR, "manifest.json");
 
 if (!fs.existsSync(pkgPath) || !fs.existsSync(manifestPath)) {
-  console.error("❌ Error: Missing package.json or extentions/manifest.json");
+  console.error("❌ Error: Missing package.json or extensions/manifest.json");
   process.exit(1);
 }
 
@@ -50,7 +50,7 @@ if (fs.existsSync(zipFilePath)) {
   fs.unlinkSync(zipFilePath);
 }
 
-// 3. Zip extentions/ contents
+// 3. Zip extensions/ contents
 console.log(`→ Creating zip archive: dist/${zipFileName}...`);
 
 function packZip(extDir, outputZip) {

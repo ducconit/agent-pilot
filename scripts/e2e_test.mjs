@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 const PORT = 8765;
 const CDP_PORT = 9222;
 const PROJECT_DIR = path.resolve(__dirname, "..");
-const EXT_DIR = path.join(PROJECT_DIR, "extentions");
+const EXT_DIR = path.join(PROJECT_DIR, "extensions");
 const USER_DATA_DIR = "/tmp/agent-pilot-e2e-" + Date.now();
 
 // Simple HTTP server to serve test-page.html

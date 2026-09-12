@@ -25,7 +25,7 @@
 │                      ▼                                  ▼                   │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │                 BACKGROUND TỔNG THỂ (SERVICE WORKER)                  │  │
-│  │                       (extentions/background.js)                      │  │
+│  │                       (extensions/background.js)                      │  │
 │  │                                                                       │  │
 │  │   ┌────────────────────────┐  ┌────────────────────────────────────┐  │  │
 │  │   │  Quản lý Tab Trình Duyệt│  │  Điều Phối Chrome DevTools (CDP)   │  │  │
@@ -43,7 +43,7 @@
 │                                      ▼                                      │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │                  NGỮ CẢNH TRANG WEB (CONTENT SCRIPT)                  │  │
-│  │                  (extentions/content.js & content.css)                │  │
+│  │                  (extensions/content.js & content.css)                │  │
 │  │                                                                       │  │
 │  │   ┌────────────────────────┐  ┌────────────────────────────────────┐  │  │
 │  │   │  Lớp Chuột Ảo SVG      │  │  Bộ Soi Phần Tử DOM                │  │  │
