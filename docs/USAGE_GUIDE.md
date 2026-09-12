@@ -100,4 +100,5 @@ Chuyển sang tab **📸 Chụp ảnh**:
 - **🖥️ Chụp Toàn màn hình**: Chụp lại toàn bộ khung nhìn hiển thị hiện tại của tab.
 - **✂️ Kéo chọn vùng (Crop)**: Trang web sẽ mờ đi kèm con trỏ dấu cộng; bạn chỉ cần giữ chuột trái và kéo một khung chữ nhật quanh khu vực cần chụp -> Nhấp **✓ Chụp vùng này**.
 - **🎯 Chụp phần tử**: Di chuột trực tiếp trên trang web để chọn phần tử muốn chụp (viền tím và tooltip hướng dẫn). Khi click chọn phần tử, hệ thống sẽ tự động chụp khung viền của phần tử đó và tự động tắt ngay chế độ chọn (có thể nhấn Esc để hủy).
+- **📋 Tự động sao chép vào Clipboard (Switch)**: Khi bật tùy chọn này, bất kỳ thao tác chụp nào (toàn màn hình, kéo vùng crop hay chụp phần tử) sẽ tự động sao chép ngay ảnh kết quả vào bộ nhớ tạm (clipboard) của hệ thống mà không cần nhấp thêm nút Sao chép.
 - Sau khi chụp, ảnh xem trước sẽ hiển thị ngay trong Side Panel kèm kích thước pixel thực tế, nút **💾 Tải về PNG** và nút **📋 Sao chép** vào clipboard.

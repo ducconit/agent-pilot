@@ -20,13 +20,31 @@ export class ScreenshotPanel {
     this.shotDimensions = document.getElementById("shot-dimensions");
     this.btnDownloadShot = document.getElementById("btn-download-shot");
     this.btnCopyShot = document.getElementById("btn-copy-shot");
+    this.toggleAutoCopy = document.getElementById("toggle-auto-copy-shot");
 
     this.latestScreenshotDataUrl = null;
+    this.autoCopyEnabled = false;
+    try {
+      this.autoCopyEnabled = localStorage.getItem("agent_pilot_auto_copy_shot") === "true";
+      if (this.toggleAutoCopy) {
+        this.toggleAutoCopy.checked = this.autoCopyEnabled;
+      }
+    } catch (e) {}
 
     this.bindEvents();
   }
 
   bindEvents() {
+    if (this.toggleAutoCopy) {
+      this.toggleAutoCopy.onchange = () => {
+        this.autoCopyEnabled = this.toggleAutoCopy.checked;
+        try {
+          localStorage.setItem("agent_pilot_auto_copy_shot", String(this.autoCopyEnabled));
+        } catch (e) {}
+        showToast(this.autoCopyEnabled ? "Đã bật tự động sao chép ảnh vào clipboard." : "Đã tắt tự động sao chép ảnh.");
+      };
+    }
+
     if (this.btnCaptureVisible) {
       this.btnCaptureVisible.onclick = () => this.captureVisibleScreenshot();
     }
@@ -70,35 +88,68 @@ export class ScreenshotPanel {
     }
 
     if (this.btnCopyShot) {
-      this.btnCopyShot.onclick = async () => {
-        if (!this.latestScreenshotDataUrl) {
-          showToast("Chưa có ảnh chụp để sao chép!");
-          return;
-        }
-        try {
-          const blob = await this.getPngBlobFromDataUrl(this.latestScreenshotDataUrl);
-          await navigator.clipboard.write([
-            new ClipboardItem({ "image/png": blob })
-          ]);
-          showToast("📋 Đã sao chép ảnh vào clipboard!");
-        } catch (e) {
-          console.error("[AgentPilot] Clipboard copy failed:", e);
-          showToast("Không thể sao chép ảnh: " + (e.message || "Lỗi clipboard"));
-        }
+      this.btnCopyShot.onclick = () => {
+        this.copyCurrentScreenshotToClipboard(true);
       };
+    }
+  }
+
+  async copyCurrentScreenshotToClipboard(showExplicitToast = true) {
+    if (!this.latestScreenshotDataUrl) {
+      if (showExplicitToast) showToast("Chưa có ảnh chụp để sao chép!");
+      return false;
+    }
+    try {
+      if (typeof window !== "undefined" && window.focus) window.focus();
+      const blob = await this.getPngBlobFromDataUrl(this.latestScreenshotDataUrl);
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/png": blob })
+      ]);
+      if (showExplicitToast) {
+        showToast("📋 Đã sao chép ảnh vào clipboard!");
+      }
+      return true;
+    } catch (e) {
+      console.warn("[AgentPilot] Clipboard copy attempt 1 notice:", e);
+      // Secondary attempt with forced focus
+      try {
+        if (typeof window !== "undefined" && window.focus) window.focus();
+        const blob = await this.getPngBlobFromDataUrl(this.latestScreenshotDataUrl);
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob })
+        ]);
+        if (showExplicitToast) {
+          showToast("📋 Đã sao chép ảnh vào clipboard!");
+        }
+        return true;
+      } catch (err2) {
+        console.error("[AgentPilot] Clipboard copy failed:", err2);
+        if (showExplicitToast) {
+          showToast("Không thể sao chép ảnh: " + (err2.message || "Lỗi clipboard"));
+        }
+        return false;
+      }
     }
   }
 
   async getPngBlobFromDataUrl(dataUrl) {
     if (dataUrl.startsWith("data:image/png;base64,")) {
-      const base64 = dataUrl.slice("data:image/png;base64,".length);
-      const binStr = atob(base64);
-      const len = binStr.length;
-      const u8arr = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        u8arr[i] = binStr.charCodeAt(i);
+      try {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        if (blob.type === "image/png") return blob;
+        return new Blob([await blob.arrayBuffer()], { type: "image/png" });
+      } catch (e) {
+        // Fallback for extreme environments
+        const base64 = dataUrl.slice("data:image/png;base64,".length);
+        const binStr = atob(base64);
+        const len = binStr.length;
+        const u8arr = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          u8arr[i] = binStr.charCodeAt(i);
+        }
+        return new Blob([u8arr], { type: "image/png" });
       }
-      return new Blob([u8arr], { type: "image/png" });
     }
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -122,8 +173,7 @@ export class ScreenshotPanel {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({ action: "capture_screenshot", mode: "visible" }, (res) => {
         if (res && res.success && res.dataUrl) {
-          this.displayScreenshot(res.dataUrl);
-          showToast("Đã chụp toàn bộ khung nhìn!");
+          this.displayScreenshot(res.dataUrl, "Đã chụp toàn bộ khung nhìn!");
           resolve(res.dataUrl);
         } else {
           showToast("Lỗi chụp ảnh: " + (res ? res.error : ""));
@@ -155,8 +205,7 @@ export class ScreenshotPanel {
             if (res.clip && (img.naturalWidth > res.clip.width * 1.5 || img.naturalHeight > res.clip.height * 1.5)) {
               this.cropImageViaCanvas(res.dataUrl, res.clip);
             } else {
-              this.displayScreenshot(res.dataUrl);
-              showToast("Đã chụp phần tử thành công!");
+              this.displayScreenshot(res.dataUrl, "Đã chụp phần tử thành công!");
             }
           };
           img.src = res.dataUrl;
@@ -184,13 +233,12 @@ export class ScreenshotPanel {
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
 
       const croppedDataUrl = canvas.toDataURL("image/png");
-      this.displayScreenshot(croppedDataUrl);
-      showToast("Đã chụp và cắt vùng thành công!");
+      this.displayScreenshot(croppedDataUrl, "Đã chụp và cắt vùng thành công!");
     };
     img.src = fullDataUrl;
   }
 
-  displayScreenshot(dataUrl) {
+  displayScreenshot(dataUrl, customSuccessToast = null) {
     this.latestScreenshotDataUrl = dataUrl;
     if (this.screenshotPreviewCard) this.screenshotPreviewCard.style.display = "block";
     if (this.screenshotImg) this.screenshotImg.src = dataUrl;
@@ -206,5 +254,18 @@ export class ScreenshotPanel {
     // Switch to screenshot tab
     const tabScreenshotBtn = document.querySelector('[data-tab="tab-screenshot"]');
     if (tabScreenshotBtn) tabScreenshotBtn.click();
+
+    // Auto-copy to clipboard if enabled
+    if (this.autoCopyEnabled) {
+      this.copyCurrentScreenshotToClipboard(false).then((copied) => {
+        if (copied) {
+          showToast("📋 Đã chụp & tự động sao chép vào clipboard!");
+        } else if (customSuccessToast) {
+          showToast(customSuccessToast);
+        }
+      });
+    } else if (customSuccessToast) {
+      showToast(customSuccessToast);
+    }
   }
 }

@@ -211,7 +211,8 @@ async function run() {
         isCssTabActive,
         hasCssSearch: !!document.getElementById("inspector-css-search"),
         hasCopyAllCss: !!document.getElementById("btn-copy-all-css"),
-        captureElementText: document.getElementById("btn-capture-element")?.textContent.replace(/\s+/g, " ").trim()
+        captureElementText: document.getElementById("btn-capture-element")?.textContent.replace(/\s+/g, " ").trim(),
+        hasAutoCopySwitch: !!document.getElementById("toggle-auto-copy-shot")
       };
     });
     const sidepanelOk = sidepanelCheck.brand === "AGENT PILOT" &&
@@ -220,8 +221,9 @@ async function run() {
                         sidepanelCheck.subtabBtns.length === 2 &&
                         sidepanelCheck.isCssTabActive &&
                         sidepanelCheck.hasCssSearch &&
-                        sidepanelCheck.captureElementText === "🎯 Chụp phần tử";
-    record("8. Side Panel Control Center UI (3 Main Tabs + Inspector Subtabs + '🎯 Chụp phần tử')", sidepanelOk, `Brand: ${sidepanelCheck.brand}, Button: "${sidepanelCheck.captureElementText}", Inspector Subtabs: [${sidepanelCheck.subtabBtns.join(" | ")}]`);
+                        sidepanelCheck.captureElementText === "🎯 Chụp phần tử" &&
+                        sidepanelCheck.hasAutoCopySwitch === true;
+    record("8. Side Panel Control Center UI (3 Main Tabs + Inspector Subtabs + '🎯 Chụp phần tử' + Auto-Copy Switch)", sidepanelOk, `Brand: ${sidepanelCheck.brand}, Button: "${sidepanelCheck.captureElementText}", Auto-Copy Switch: ${sidepanelCheck.hasAutoCopySwitch}`);
     // Keep sidepanelPage open to test Extension IPC messaging
     // 10. Test Chrome DevTools Protocol (CDP) via Background Service Worker
     console.log("\n--- KIỂM THỬ CHROME DEVTOOLS PROTOCOL (CDP ENGINE) ---");
@@ -333,17 +335,30 @@ async function run() {
         };
       }, shotRes?.dataUrl || "");
 
+      // Also test Auto-Copy Toggle state persistence
+      const autoCopyToggleTest = await sidepanelPage.evaluate(async () => {
+        const toggle = document.getElementById("toggle-auto-copy-shot");
+        if (!toggle) return { found: false, canToggle: false };
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event("change"));
+        const stored = localStorage.getItem("agent_pilot_auto_copy_shot") === "true";
+        toggle.checked = false;
+        toggle.dispatchEvent(new Event("change"));
+        return { found: true, canToggle: stored };
+      });
+
       const shotOk = shotRes?.success && shotRes?.dataUrl && shotRes.dataUrl.startsWith("data:image/png;base64,") &&
                      elementSnapTest.autoTurnOff &&
-                     clipboardTest.isPng && clipboardTest.itemSupported;
+                     clipboardTest.isPng && clipboardTest.itemSupported &&
+                     autoCopyToggleTest.canToggle;
       if (shotOk) {
         const base64 = shotRes.dataUrl.replace(/^data:image\/png;base64,/, "");
         const buf = Buffer.from(base64, "base64");
         const outPath = path.join(PROJECT_DIR, "assets", "verified_screenshot.png");
         fs.writeFileSync(outPath, buf);
-        record("14. Screenshot Suite (Capture, Element Snap Picker & PNG Clipboard Item)", true, `Kích thước: ${buf.length} bytes, Element Snap Auto-Off: ${elementSnapTest.autoTurnOff}, Clipboard PNG: ${clipboardTest.itemSupported}`);
+        record("14. Screenshot Suite (Capture, Element Snap Picker, PNG Clipboard & Auto-Copy Switch)", true, `Kích thước: ${buf.length} bytes, Element Snap Auto-Off: ${elementSnapTest.autoTurnOff}, Clipboard PNG: ${clipboardTest.itemSupported}, Auto-Copy: ${autoCopyToggleTest.canToggle}`);
       } else {
-        record("14. Screenshot Suite (Capture, Element Snap Picker & PNG Clipboard Item)", false, shotRes?.error || `Snap Auto-Off: ${elementSnapTest?.autoTurnOff}, Clipboard: ${clipboardTest?.itemSupported}`);
+        record("14. Screenshot Suite (Capture, Element Snap Picker, PNG Clipboard & Auto-Copy Switch)", false, shotRes?.error || `Snap Auto-Off: ${elementSnapTest?.autoTurnOff}, Clipboard: ${clipboardTest?.itemSupported}, Auto-Copy: ${autoCopyToggleTest?.canToggle}`);
       }
 
       await sidepanelPage.close();
