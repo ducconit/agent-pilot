@@ -1,0 +1,70 @@
+name: Release Agent Pilot Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name (e.g. v1.0.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Syntax & Lint Checks
+        run: npm run lint
+
+      - name: Validate Version Alignment
+        run: |
+          REF_TAG="${{ github.ref_name }}"
+          PKG_VER="v$(node -p "require('./package.json').version")"
+          MAN_VER="v$(node -p "require('./extentions/manifest.json').version")"
+          echo "GitHub Tag       : $REF_TAG"
+          echo "package.json     : $PKG_VER"
+          echo "manifest.json    : $MAN_VER"
+          if [[ "$REF_TAG" != "$PKG_VER" ]]; then
+            echo "::warning::Git tag ($REF_TAG) does not match package.json version ($PKG_VER)"
+          fi
+
+      - name: Package Extension Archive
+        run: npm run pack
+
+      - name: Extract Release Notes
+        id: release_notes
+        run: |
+          VERSION="${{ github.ref_name }}"
+          echo "TAG=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release & Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/agent-pilot-*.zip
+            dist/checksums.txt
+          name: "Agent Pilot ${{ steps.release_notes.outputs.TAG }}"
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -7,7 +7,8 @@
     "test": "xvfb-run -a node scripts/verify_all_features.mjs",
     "test:agent": "xvfb-run -a node scripts/verify_agent_connection.mjs",
     "server": "node scripts/agent_pilot_server.mjs",
-    "lint": "node -c extentions/background.js && node -c extentions/content.js && node -c extentions/sidepanel.js && node -c scripts/agent_pilot_server.mjs",
+    "lint": "node -c extentions/background.js && node -c extentions/content.js && node -c extentions/sidepanel.js && node -c scripts/agent_pilot_server.mjs && node -c scripts/pack_extension.mjs",
+    "pack": "node scripts/pack_extension.mjs",
     "sync:agk": "cp scripts/agent_pilot_server.mjs ~/.agk/scripts/agent-pilot/server.mjs && chmod +x ~/.agk/scripts/agent-pilot/server.mjs && bash ~/.agk/build/build.sh && bash ~/.agk/scripts/install.sh --app"
   },
   "keywords": ["browser-control", "ai-agent", "chrome-extension", "antigravity", "cdp", "mcp"],

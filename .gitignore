@@ -30,5 +30,6 @@ Thumbs.db
 
 # Test & Runtime Output Artifacts
 assets/verified_*.png
+dist/
 /tmp/
 *.log
