@@ -451,10 +451,33 @@ body {
 .btn-icon {
   background: var(--bg-tertiary);
   color: var(--text-primary);
-  padding: 6px 8px;
+  padding: 4px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 12px;
+  line-height: 1;
 }
 .btn-icon:hover {
   background: var(--bg-hover);
+  border-color: var(--accent-cyan);
+}
+
+.btn-xs {
+  padding: 2px 6px;
+  font-size: 11px;
+  min-height: 22px;
+}
+
+.card-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
 }
 
 .btn-text {

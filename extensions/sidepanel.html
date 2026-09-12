@@ -43,8 +43,6 @@
     <div class="url-control">
       <input type="text" id="input-url" class="form-input url-input" placeholder="Nhập URL (https://...)" spellcheck="false">
       <button class="btn btn-primary" id="btn-navigate" title="Đi tới">Đi tới</button>
-      <button class="btn btn-icon" id="btn-reload" title="Tải lại tab">🔄</button>
-      <button class="btn btn-icon" id="btn-new-tab" title="Mở tab mới">➕</button>
     </div>
   </section>
 
@@ -116,7 +114,10 @@
             <span class="card-title">Nhật ký Lệnh Thời gian thực</span>
             <span class="log-counter" id="agent-activity-count">0</span>
           </div>
-          <button class="btn-text" id="btn-clear-agent-log">Xóa nhật ký</button>
+          <div class="card-header-actions" style="display:flex;align-items:center;gap:4px;">
+            <button class="btn btn-icon btn-xs" id="btn-copy-agent-log" title="Sao chép toàn bộ nhật ký">📋</button>
+            <button class="btn btn-icon btn-xs" id="btn-clear-agent-log" title="Xóa toàn bộ nhật ký">🗑️</button>
+          </div>
         </div>
         <div class="card-body">
           <p class="text-muted" style="font-size:11px;margin-bottom:8px;">

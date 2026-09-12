@@ -19,8 +19,6 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
   const activeTabTitle = document.getElementById("active-tab-title");
   const inputUrl = document.getElementById("input-url");
   const btnNavigate = document.getElementById("btn-navigate");
-  const btnReload = document.getElementById("btn-reload");
-  const btnNewTab = document.getElementById("btn-new-tab");
 
   // Main Tabs Nav
   const tabBtns = document.querySelectorAll(".tab-btn");
@@ -113,21 +111,6 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
     inputUrl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && btnNavigate) btnNavigate.click();
     });
-  }
-
-  if (btnReload) {
-    btnReload.onclick = () => {
-      if (!activeTabId) return;
-      chrome.runtime.sendMessage({ action: "reload_tab", tabId: activeTabId }, () => {
-        showToast("Đang tải lại trang...");
-      });
-    };
-  }
-
-  if (btnNewTab) {
-    btnNewTab.onclick = () => {
-      chrome.runtime.sendMessage({ action: "new_tab", url: "https://google.com" });
-    };
   }
 
   // =========================================================================

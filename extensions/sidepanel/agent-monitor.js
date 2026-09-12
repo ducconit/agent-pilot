@@ -25,6 +25,7 @@ export class AgentMonitor {
     this.agentActivityLog = document.getElementById("agent-activity-log");
     this.agentActivityCount = document.getElementById("agent-activity-count");
     this.btnClearAgentLog = document.getElementById("btn-clear-agent-log");
+    this.btnCopyAgentLog = document.getElementById("btn-copy-agent-log");
     this.agentEmptyHint = document.getElementById("agent-empty-hint");
 
     // Secret Redaction Filter Elements
@@ -35,6 +36,7 @@ export class AgentMonitor {
     this.btnConfirmSecretDisable = document.getElementById("btn-confirm-secret-disable");
 
     this.agentActivityTotal = 0;
+    this.rawLogs = [];
 
     this.bindEvents();
 
@@ -52,9 +54,33 @@ export class AgentMonitor {
         if (this.agentActivityLog) {
           this.agentActivityLog.innerHTML = `<div class="empty-hint" id="agent-empty-hint">Chưa có lệnh nào. Khi AI Agent gửi lệnh qua cổng 58765, hoạt động sẽ hiển thị tại đây.</div>`;
         }
+        this.rawLogs = [];
         this.agentActivityTotal = 0;
         if (this.agentActivityCount) this.agentActivityCount.textContent = "0";
         showToast("Đã xóa nhật ký lệnh Agent");
+      };
+    }
+
+    if (this.btnCopyAgentLog) {
+      this.btnCopyAgentLog.onclick = async () => {
+        if (!this.rawLogs || this.rawLogs.length === 0) {
+          showToast("Nhật ký trống, không có gì để sao chép");
+          return;
+        }
+        const text = this.rawLogs.map((log) => {
+          const time = new Date(log.timestamp || Date.now()).toLocaleTimeString("vi-VN", { hour12: false });
+          const status = log.status === "error" ? "✕ LỖI" : "✓ XONG";
+          const paramsStr = typeof log.params === "object" ? JSON.stringify(log.params) : String(log.params || "");
+          const err = log.error ? ` | Lỗi: ${log.error}` : "";
+          return `[${time}] ${status} ${log.method || "unknown"}: ${paramsStr}${err}`;
+        }).join("\n");
+
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast(`📋 Đã sao chép ${this.rawLogs.length} mục nhật ký`);
+        } catch {
+          showToast("Không thể sao chép vào clipboard");
+        }
       };
     }
 
@@ -194,6 +220,9 @@ export class AgentMonitor {
     if (!this.agentActivityLog) return;
     const emptyHint = document.getElementById("agent-empty-hint");
     if (emptyHint) emptyHint.style.display = "none";
+
+    this.rawLogs.unshift(item);
+    if (this.rawLogs.length > 500) this.rawLogs.pop();
 
     this.agentActivityTotal++;
     if (this.agentActivityCount) this.agentActivityCount.textContent = this.agentActivityTotal;
