@@ -13,6 +13,7 @@ import { WebSocketServer, WebSocket } from "ws";
 
 const PORT = Number(process.env.AGENT_PILOT_PORT || process.env.PORT || 58765);
 const HOST = process.env.AGENT_PILOT_HOST || "127.0.0.1";
+const CLIENT_HOST = HOST === "0.0.0.0" || HOST === "::" ? "127.0.0.1" : HOST;
 
 const connectedClients = new Map(); // id -> { id, ws, ip, connectedAt, lastActive, agent, version, details }
 let activeClientId = null;
@@ -36,18 +37,8 @@ function getActiveClient(targetId = null) {
   return openClients[0];
 }
 
-// 1. Create HTTP & WebSocket Server
+// 1. Create HTTP & WebSocket Server (Local loopback only, no external CORS)
 const server = http.createServer(async (req, res) => {
-  // CORS Headers
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (req.method === "OPTIONS") {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
 
   // Health check
   if (req.url === "/" || req.url === "/health") {
@@ -412,28 +403,28 @@ export const MCP_TOOLS = [
 
 let isForwarderMode = false;
 
+const FORWARDER_METHOD_MAP = Object.freeze({
+  browser_open_tab: { method: "tabs.create", getParams: (a) => ({ url: a.url, active: a.active === true }) },
+  browser_list_tabs: { method: "tabs.listAll", getParams: () => ({}) },
+  browser_navigate: { method: "tabs.update", getParams: (a) => ({ url: a.url, tabId: a.tabId }) },
+  browser_click: { method: "page.click", getParams: (a) => a },
+  browser_type: { method: "page.type", getParams: (a) => a },
+  browser_scroll: { method: "page.scroll", getParams: (a) => a },
+  browser_get_element: { method: "page.getElement", getParams: (a) => a },
+  browser_screenshot: { method: "page.screenshot", getParams: (a) => a },
+  browser_get_devtools_data: { method: "devtools.getData", getParams: (a) => a },
+  browser_pick_color: { method: "page.pickColor", getParams: (a) => a },
+  browser_list_instances: { method: "instances.list", getParams: () => ({}) },
+  browser_select_instance: { method: "instances.select", getParams: (a) => a },
+  browser_set_busy: { method: "page.setBusy", getParams: (a) => a }
+});
+
 async function handleMcpToolCall(name, args) {
   if (isForwarderMode) {
-    const methodMap = {
-      browser_open_tab: { method: "tabs.create", getParams: (a) => ({ url: a.url, active: a.active === true }) },
-      browser_list_tabs: { method: "tabs.listAll", getParams: () => ({}) },
-      browser_navigate: { method: "tabs.update", getParams: (a) => ({ url: a.url, tabId: a.tabId }) },
-      browser_click: { method: "page.click", getParams: (a) => a },
-      browser_type: { method: "page.type", getParams: (a) => a },
-      browser_scroll: { method: "page.scroll", getParams: (a) => a },
-      browser_get_element: { method: "page.getElement", getParams: (a) => a },
-      browser_screenshot: { method: "page.screenshot", getParams: (a) => a },
-      browser_get_devtools_data: { method: "devtools.getData", getParams: (a) => a },
-      browser_pick_color: { method: "page.pickColor", getParams: (a) => a },
-      browser_list_instances: { method: "instances.list", getParams: () => ({}) },
-      browser_select_instance: { method: "instances.select", getParams: (a) => a },
-      browser_set_busy: { method: "page.setBusy", getParams: (a) => a }
-    };
-
-    const target = methodMap[name];
+    const target = FORWARDER_METHOD_MAP[name];
     if (!target) throw new Error(`Unsupported tool: ${name}`);
 
-    const resp = await fetch(`http://${HOST}:${PORT}/api`, {
+    const resp = await fetch(`http://${CLIENT_HOST}:${PORT}/api`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -618,6 +609,9 @@ if (isMainScript) {
   rl.on("close", () => {
     console.error("[BridgeServer] Stdin pipe closed (MCP client disconnected). Exiting cleanly...");
     if (!isForwarderMode) {
+      if (typeof server.closeAllConnections === "function") {
+        server.closeAllConnections();
+      }
       wss.close();
       server.close(() => process.exit(0));
     } else {
@@ -628,7 +622,7 @@ if (isMainScript) {
   // 1. Check if an existing Bridge Server is already active on PORT
   let serverAlreadyRunning = false;
   try {
-    const checkRes = await fetch(`http://${HOST}:${PORT}/health`, { signal: AbortSignal.timeout(600) });
+    const checkRes = await fetch(`http://${CLIENT_HOST}:${PORT}/health`, { signal: AbortSignal.timeout(600) });
     const checkJson = await checkRes.json();
     if (checkJson && checkJson.status === "ok") {
       serverAlreadyRunning = true;
@@ -667,6 +661,9 @@ if (isMainScript) {
   const shutdown = (signal) => {
     console.error(`\n[BridgeServer] ${signal} received. Shutting down...`);
     if (!isForwarderMode) {
+      if (typeof server.closeAllConnections === "function") {
+        server.closeAllConnections();
+      }
       wss.close();
       server.close(() => process.exit(0));
     } else {
