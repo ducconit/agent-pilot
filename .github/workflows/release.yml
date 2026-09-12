@@ -39,7 +39,7 @@ jobs:
         run: |
           REF_TAG="${{ github.ref_name }}"
           PKG_VER="v$(node -p "require('./package.json').version")"
-          MAN_VER="v$(node -p "require('./extentions/manifest.json').version")"
+          MAN_VER="v$(node -p "require('./extensions/manifest.json').version")"
           echo "GitHub Tag       : $REF_TAG"
           echo "package.json     : $PKG_VER"
           echo "manifest.json    : $MAN_VER"

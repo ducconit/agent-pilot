@@ -38,7 +38,7 @@
 
 ## 🏗️ Cấu Trúc Thư Mục Dự Án
 
-Dự án được tổ chức khoa học và tuân thủ tuyệt đối các yêu cầu về đường dẫn:
+Dự án được tổ chức khoa học, module hóa chuyên sâu và tuân thủ các chuẩn kỹ thuật cao nhất:
 
 ```
 browser-control/
@@ -53,21 +53,47 @@ browser-control/
 │   └── USAGE_GUIDE.md                  # Sổ tay hướng dẫn sử dụng từng tính năng
 ├── extensions/                         # Toàn bộ mã nguồn Chrome Extension (Manifest V3)
 │   ├── manifest.json                   # Cấu hình chuẩn Chrome Extension MV3
-│   ├── background.js                   # Service Worker: CDP, Tab Manager, Screenshot Engine
-│   ├── content.js                      # Content Script: Chuột ảo, Inspector, Crop, Bridge
-│   ├── content.css                     # Stylesheet cho con trỏ, sóng ripple, highlight box
+│   ├── guide.html                      # Trang Thông tin & Hướng dẫn sử dụng responsive
+│   ├── background.js                   # Service Worker chính (ES Module entry)
+│   ├── background/                     # Các module dịch vụ nền
+│   │   ├── constants.js                # Hằng số hệ thống & cấu hình
+│   │   ├── secret-sanitizer.js         # Lớp lọc che giấu Secret & API Key
+│   │   ├── cdp-manager.js              # Quản lý Chrome DevTools Protocol
+│   │   ├── tab-manager.js              # Quản lý Tabs & Native Tab Groups
+│   │   ├── screenshot-service.js       # Dịch vụ chụp ảnh màn hình
+│   │   ├── batch-executor.js           # Bộ chạy kịch bản gom cụm Batch Actions
+│   │   └── bridge-client.js            # WebSocket client kết nối AI Agent bridge
+│   ├── content.js                      # Content Script điều phối in-page
+│   ├── content/                        # Các module tương tác DOM & Visuals
+│   │   ├── toast.js                    # Thông báo Toast HUD trên trang web
+│   │   ├── lock-shield.js              # Lớp bảo vệ Human Input Lock khi Agent thao tác
+│   │   ├── cursor-simulator.js         # Con trỏ chuột ảo Neon & sóng ripple
+│   │   ├── dom-inspector.js            # Trích xuất thông số DOM & Element Snap
+│   │   └── eyedropper.js               # Kính lúp phóng đại 11x11 lấy mã màu
+│   ├── content.css                     # Stylesheet cho con trỏ, kính lúp, overlay
 │   ├── sidepanel.html                  # Giao diện trung tâm điều khiển Side Panel
-│   ├── sidepanel.js                    # Bộ xử lý sự kiện realtime, DevTools charts, Actions
-│   ├── sidepanel.css                   # Giao diện Modern Dark Tech Cyberpunk
+│   ├── sidepanel.css                   # Giao diện Modern Dark Cyberpunk Responsive
+│   ├── sidepanel.js                    # Bộ điều phối UI Side Panel (ES Module)
+│   ├── sidepanel/                      # Các module quản lý thẻ Side Panel
+│   │   ├── ui-helpers.js               # Tiện ích giao diện, toast, badge
+│   │   ├── agent-monitor.js            # Giám sát kết nối Agent & Secret Redaction toggle
+│   │   ├── inspector-panel.js          # Thẻ Tổng quan DOM & Kiểu dáng CSS
+│   │   └── screenshot-panel.js         # Studio chụp ảnh & Auto-copy Clipboard
 │   ├── popup.html                      # Popup tiện ích khởi động nhanh
 │   ├── popup.js                        # Xử lý sự kiện popup
 │   ├── popup.css
 │   └── icons/                          # Bộ icon nhận diện chuẩn các kích thước
-│       ├── icon.svg
-│       ├── icon16.png
-│       ├── icon32.png
-│       ├── icon48.png
-│       └── icon128.png
+├── mcp/agent-pilot/                    # 14 tệp lược đồ chuẩn Single Source of Truth (SSOT)
+├── scripts/                            # Bộ công cụ build, test, pack & sync cross-platform
+│   ├── agent_pilot_server.mjs          # Máy chủ cầu nối WebSocket & MCP Bridge Server
+│   ├── browser_resolver.mjs            # Tự động tìm kiếm Chrome/Chromium/Edge/Brave đa nền tảng
+│   ├── export_mcp_schemas.mjs          # Trích xuất schema MCP tự động
+│   ├── pack_extension.mjs              # Đóng gói tiện ích ra file ZIP release
+│   ├── run_test.mjs                    # Bộ chạy test tự động Windows/macOS/Linux
+│   ├── sync_agk.mjs                    # Đồng bộ sang plugin AGK Antigravity
+│   ├── verify_all_features.mjs         # Bộ kiểm thử 14 tính năng cốt lõi trên trình duyệt thật
+│   ├── verify_agent_connection.mjs     # Bộ kiểm thử 27 tính năng kết nối & điều khiển Agent
+│   └── verify_secret_sanitizer.mjs     # Bộ kiểm thử 19 kịch bản lọc che giấu Secret/API Key
 ├── test-page.html                      # Trang web tương tác phục vụ kiểm thử tức thì
 └── README.md                           # Tài liệu giới thiệu dự án
 ```
@@ -124,7 +150,7 @@ Agent Pilot trang bị sẵn máy chủ WebSocket & MCP Server tại cổng chuy
    ```bash
    npm run test:agent
    ```
-   *(Bộ test tự động hóa E2E kiểm chứng 12/12 tính năng Agent điều khiển Chrome qua cổng 58765 đạt 100% PASS).*
+   *(Bộ test tự động hóa E2E kiểm chứng 27/27 tính năng Agent điều khiển Chrome qua cổng 58765 và 14/14 tính năng Extension đạt 100% PASS).*
 3. **Cấu hình Antigravity MCP**: Xem hướng dẫn 1-click tại [docs/ANTIGRAVITY_INTEGRATION.md](docs/ANTIGRAVITY_INTEGRATION.md).
 
 ---

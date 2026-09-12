@@ -35,63 +35,54 @@ Bạn có thể dễ dàng mở trung tâm điều khiển Side Panel bằng 2 c
 
 ## 3. Hướng Dẫn Chi Tiết Các Tính Năng
 
-### 3.1 Điều Khiển Tab & Trình Duyệt
+### 3.1 Điều Khiển Thanh Điều Hướng & Trang Hướng Dẫn
 - **Đi tới địa chỉ mới**: Nhập URL vào ô địa chỉ trên thanh công cụ của Side Panel (ví dụ: `google.com` hoặc `localhost:3000`) và nhấn **Enter** hoặc nhấp **Đi tới**.
-- **Tải lại tab**: Nhấp vào biểu tượng 🔄 **Reload**.
-- **Tạo tab mới**: Nhấp vào biểu tượng ➕ **New Tab**.
+- **Mở trang Thông tin & Hướng dẫn sử dụng**: Nhấp vào biểu tượng 📖 trên thanh Header:
+  - Nếu trang hướng dẫn chưa mở: Extension tự động mở một tab mới và focus vào tab đó.
+  - Nếu tab hướng dẫn đang mở: Tự động chuyển focus về tab đó và đưa cửa sổ trình duyệt lên trên cùng (chống mở trùng lặp).
+- **Gắn kết nối CDP**: Nhấp nút **Gắn CDP** ở góc trên bên phải để chủ động kết nối Chrome DevTools Protocol khi cần.
 
 ---
 
 ### 3.2 Giám Sát Hoạt Động AI Agent Thời Gian Thực
 Chuyển sang tab **🤖 AI Agent** trên Side Panel:
 - **Tự động hóa hoàn toàn bởi AI Agent**: Toàn bộ các thao tác di chuyển chuột ảo, click tạo sóng ripple, tự động điền văn bản và cuộn trang đều do AI Agent (Antigravity) điều khiển tự động thông qua giao thức MCP (cổng `58765`).
-- **Nhật ký Lệnh Thời gian thực (Live Action Stream)**: Khi AI Agent gửi lệnh thao tác trên trình duyệt, Side Panel sẽ hiển thị ngay lập tức tên lệnh, tham số tọa độ/phần tử và trạng thái thực thi (`✓ Xong` hoặc `✕ Lỗi`).
+- **Lớp lọc bảo vệ Secret & Private Key**:
+  - Mặc định **Bật**: Tự động nhận diện và che giấu bằng các dấu sao `*` đối với Private Key (RSA, EC, OpenSSH), API Keys (OpenAI, Gemini, Claude, AWS, GitHub, Stripe, Slack...), JWT và query secrets trước khi gửi cho AI Agent. Kèm thông báo bảo mật rõ ràng để Agent không nhầm lẫn giá trị che giấu.
+  - Hover vào icon **`?`** để xem nhanh mô tả bảo vệ.
+  - Khi người dùng gạt tắt công tắc, hộp thoại cảnh báo bảo mật sẽ xuất hiện yêu cầu xác nhận rủi ro nhà cung cấp mô hình LLM có thể thu thập thông tin.
+- **Nhật ký Lệnh Thời gian thực (Live Action Stream)**: Hiển thị thời gian thực luồng lệnh Agent gửi đến (`moveMouse`, `click`, `type`, `run_actions`...) kèm nút sao chép toàn bộ nhật ký (📋) và nút xóa nhật ký (🗑️).
 - **Tự kiểm tra hệ thống (Self-Test)**: Nhấp nút **🧪 Tự kiểm tra hệ thống** để kiểm tra tự động 3 bước:
   1. Quyền truy cập tab web hiện tại.
   2. Khả năng nạp Content Script và kích hoạt API Chuột ảo.
   3. Trạng thái kết nối Máy chủ Bridge (Port 58765).
-  *(Nếu có lỗi, hệ thống sẽ chỉ rõ nguyên nhân và dừng lại ngay lập tức).*
 
 ---
 
-### 3.4 Giám Sát DevTools Thời Gian Thực (CDP)
-Chuyển sang tab **⚡ DevTools**:
-1. Nhấp nút **Gắn CDP** ở góc trên cùng bên phải thanh Header. (Trình duyệt sẽ hiển thị thanh vàng thông báo debug).
-2. **Subtab Console**:
-   - Theo dõi toàn bộ `console.log`, `warn`, `error` và `uncaught exception` phát sinh trên trang web.
-   - Sử dụng bộ lọc Cấp độ (Level) hoặc ô tìm kiếm để lọc nhanh thông điệp lỗi.
-   - Nhấp **Xóa** để làm sạch màn hình.
-3. **Subtab Network**:
-   - Theo dõi danh sách các API requests (Fetch / XHR / Document) kèm phương thức (GET, POST), mã phản hồi HTTP (200, 404, 500) và đường dẫn URL.
-4. **Subtab Performance**:
-   - Nhấp **Làm mới** để đọc ngay tức thời:
-     - Dung lượng RAM bộ nhớ V8 JS Heap (Used & Total).
-     - Số lượng DOM Nodes đang tồn tại.
-     - Số lần tính toán lại Layout và CSS Style.
+### 3.3 Trợ Thủ DevTools Toàn Diện Cho AI Agent (CDP Engine)
+Thay vì làm rối giao diện Side Panel, khả năng DevTools được chuyển giao toàn diện thành siêu năng lực cho AI Agent:
+- AI Agent có thể truy xuất logs `console.log/warn/error`, các truy vấn mạng `Network traffic`, hoặc đọc dung lượng RAM `Performance metrics` (JS Heap used/total, số lượng DOM nodes, recalculate styles) thông qua công cụ MCP `browser_get_devtools_data` hoặc gom cụm trong `browser_run_actions`.
+- Khi Agent yêu cầu dữ liệu DevTools, Extension tự động kích hoạt CDP và trả về cấu trúc dữ liệu đã được làm sạch và lọc bảo mật.
 
 ---
 
-### 3.5 Soi Phần Tử & Lấy Vị Trí (Element Inspector)
+### 3.4 Soi Phần Tử & Kiểu Dáng CSS (DOM Inspector Studio)
 Chuyển sang tab **🎯 Inspector & Màu**:
-1. Nhấp nút **Bật Soi Phần tử**: Khi bạn di chuyển con trỏ chuột thật qua trang web, khung bao sáng màu cyan sẽ tự động bắt dính vào từng phần tử kèm thẻ thông số hiển thị Tag name, kích thước `W x H` và CSS selector.
-2. **Click để khóa phần tử**: Click chuột vào phần tử bạn muốn chọn.
-3. Bảng điều khiển Side Panel sẽ tự động hiển thị:
-   - Tag Name, Tọa độ `X, Y`, Kích thước chính xác `W × H`.
-   - Chuỗi **CSS Selector** (nhấp để copy).
-   - Biểu thức **XPath** (nhấp để copy).
-   - Nội dung chữ bên trong.
-4. **Hành động nhanh với phần tử**:
-   - **Di chuột tới phần tử**: Ra lệnh cho chuột ảo bay ngay vào tâm của phần tử vừa chọn.
-   - **Click vào phần tử**: Chuột ảo click trực tiếp vào phần tử.
-   - **Chụp riêng phần tử này**: Cắt và chụp đúng kích thước của phần tử thành ảnh PNG.
+1. Nhấp nút **Bật Soi Phần tử**: Di chuyển con trỏ chuột thật qua trang web, khung bao sáng màu cyan tự động bắt dính vào từng phần tử kèm thẻ thông số hiển thị Tag name, kích thước `W x H`.
+2. **Click để chọn phần tử**: Ngay khi bạn click chọn phần tử, chế độ soi sẽ **tự động tắt ngay lập tức** để trả lại trạng thái tương tác tự nhiên cho trang web.
+3. Bảng điều khiển Side Panel chia làm 2 thẻ phụ (Subtabs) trực quan:
+   - **📌 Tổng quan**: Hiển thị Tag Name, Tọa độ `X, Y`, Kích thước `W × H`, chuỗi **CSS Selector** và biểu thức **XPath** (nhấp để sao chép nhanh).
+   - **🎨 Kiểu dáng CSS**: Hiển thị toàn bộ thông số CSS tính toán (Computed CSS) mà phần tử đang chịu (Typography, Layout, Dimensions, Spacing, Visuals, Flexbox, Grid...), tích hợp thanh tìm kiếm CSS thời gian thực và nút **Sao chép tất cả CSS**.
 
 ---
 
-### 3.6 Trích Xuất Màu Sắc (Color Eyedropper)
+### 3.5 Kính Lúp Phóng Đại Lấy Mã Màu (Eyedropper)
 1. Nhấp nút **🎨 Lấy mã màu** trên Side Panel hoặc Popup.
-2. Kính lúp phóng to pixel sẽ xuất hiện trên màn hình.
-3. Di chuột và click vào điểm màu bất kỳ trên trang web.
-4. Mã màu **HEX** sẽ được tự động copy vào bộ nhớ đệm (clipboard), đồng thời hiển thị đầy đủ thông số `HEX`, `RGB`, `HSL` và lưu lại vào khay lịch sử màu sắc trên Side Panel.
+2. Một **vùng kính lúp phóng đại 11x11 pixel** cực nét sẽ xuất hiện và bám theo đầu con trỏ chuột, hiển thị rõ ràng từng điểm ảnh cùng tâm ngắm kép và bảng mã màu trực tiếp quanh chuột.
+3. Nhấp chuột trái vào điểm màu bạn chọn:
+   - Mã màu **HEX** tự động copy vào bộ nhớ đệm (clipboard).
+   - Bảng mã màu được **cố định ngay trên Side Panel** (hiển thị HEX, RGB, HSL và khay lịch sử màu).
+   - Chế độ lấy mã màu **tự động tắt ngay lập tức** (hoặc nhấn phím `Esc` để hủy bất kỳ lúc nào).
 
 ---
 

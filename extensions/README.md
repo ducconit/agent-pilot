@@ -49,9 +49,10 @@ Chào mừng bạn đến với **Agent Pilot** – Tiện ích mở rộng đi�
 
 ## 4. Các Tính Năng Chính
 
-- **🖱️ Chuột ảo & Click**: Di chuyển chuột mượt mà, hiển thị huy hiệu tọa độ, phát sóng ripple click.
-- **⌨️ Gõ phím tự động**: Human-like typing vào ô input/textarea.
-- **🎯 Soi phần tử (Inspector)**: Đo kích thước, bắt tọa độ, trích xuất CSS Selector & XPath an toàn.
-- **🎨 Lấy mã màu (Eyedropper)**: Phóng to pixel đọc mã màu HEX, RGB, HSL.
-- **📸 Chụp ảnh màn hình**: Chụp toàn màn hình, kéo vùng crop hoặc chụp riêng phần tử DOM.
-- **⚡ DevTools thời gian thực**: Xem log Console, Network requests và JS Heap/DOM nodes qua CDP.
+- **🤖 AI Agent Monitor & Batch Engine**: Kết nối qua cổng 58765, hiển thị luồng lệnh thời gian thực, tự kiểm tra 3 bước và hỗ trợ gom cụm tác vụ (Batch Execution).
+- **🛡️ Lớp Lọc Che Giấu Secret/API Key**: Tự động che Private Key, OpenAI, Gemini, Claude, AWS, GitHub... trước khi gửi về AI Agent, kèm hộp thoại cảnh báo bảo mật.
+- **🖱️ Chuột ảo & Gõ phím tự động**: Di chuyển chuột mượt mà, hiển thị huy hiệu tọa độ, phát sóng ripple click và human-like typing.
+- **🎯 Soi phần tử & Kiểu dáng CSS**: Bắt tọa độ, selector, xpath, xem thông số Computed CSS kèm bộ lọc tìm kiếm và tự động tắt sau khi chọn.
+- **🎨 Kính lúp phóng đại 11x11 pixel**: Kính lúp theo dõi con trỏ chuột, hiển thị lưới điểm ảnh cực nét để lấy màu HEX, RGB, HSL chính xác.
+- **📸 Chụp ảnh màn hình & Auto-Copy**: Chụp toàn màn hình, kéo vùng crop, chụp chọn phần tử (Element Snap) và công tắc tự động sao chép ảnh vào Clipboard.
+- **📖 Trang Hướng Dẫn Responsive**: Tích hợp trang tài liệu offline `guide.html` ngay trong tiện ích, hỗ trợ chuyển focus tab thông minh.

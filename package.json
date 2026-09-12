@@ -14,8 +14,16 @@
     "sync:agk": "node scripts/sync_agk.mjs"
   },
   "keywords": ["browser-control", "ai-agent", "chrome-extension", "antigravity", "cdp", "mcp"],
-  "author": "Antigravity Pair Programmer",
+  "author": "Antigravity & Agent Pilot Contributors",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/ducconit/agent-pilot-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ducconit/agent-pilot-extension/issues"
+  },
+  "homepage": "https://github.com/ducconit/agent-pilot-extension#readme",
   "dependencies": {
     "ws": "^8.18.0"
   },

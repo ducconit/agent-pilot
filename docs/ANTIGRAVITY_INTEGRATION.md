@@ -122,16 +122,21 @@ Thêm cấu hình sau vào Antigravity để AI Agent tự động sở hữu to
 }
 ```
 
-### 3.3. Danh mục 9 Công cụ MCP cung cấp cho Antigravity:
-1. `browser_open_tab(url)`: Mở tab trình duyệt mới với địa chỉ URL chỉ định.
-2. `browser_navigate(url, tabId)`: Điều hướng tab đang hoạt động hoặc tab chỉ định.
-3. `browser_click(x, y, selector)`: Di chuyển chuột ảo mượt mà và click vào tọa độ (X, Y) hoặc selector CSS.
-4. `browser_type(selector, text, delay)`: Tự động gõ phím human-like vào ô nhập liệu.
-5. `browser_scroll(deltaX, deltaY)`: Cuộn trang web mượt mà theo trục X hoặc Y.
-6. `browser_get_element(selector)`: Trích xuất Bounding Box, kích thước, CSS selector và XPath của phần tử DOM.
-7. `browser_screenshot(mode)`: Chụp ảnh màn hình (trả về dữ liệu Base64 PNG trực tiếp cho Antigravity xem).
-8. `browser_get_devtools_data(tabId)`: Lấy toàn bộ Console logs và Network requests thời gian thực qua CDP.
-9. `browser_pick_color()`: Kích hoạt kính lúp lấy mã màu pixel tại vị trí chỉ định.
+### 3.3. Danh mục 14 Công cụ MCP Cung Cấp Cho AI Agent:
+1. `browser_open_tab(url, active)`: Mở tab trình duyệt mới (mặc định mở nền không cướp focus của người dùng, tự động phân nhóm Chrome Tab Group).
+2. `browser_list_tabs()`: Liệt kê toàn bộ các tab trình duyệt kèm trạng thái tab do Agent quản lý.
+3. `browser_navigate(url, tabId)`: Điều hướng tab đang hoạt động hoặc tab chỉ định.
+4. `browser_click(x, y, selector)`: Di chuyển chuột ảo mượt mà và click vào tọa độ (X, Y) hoặc selector CSS (tự động cuộn phần tử vào khung nhìn).
+5. `browser_type(selector, text, delay, clear, pressEnter)`: Tự động gõ phím human-like vào ô nhập liệu.
+6. `browser_scroll(deltaX, deltaY)`: Cuộn trang web mượt mà theo trục X hoặc Y.
+7. `browser_get_element(selector)`: Trích xuất Bounding Box, kích thước, CSS selector và XPath của phần tử DOM.
+8. `browser_screenshot(mode, tabId)`: Chụp ảnh màn hình (hỗ trợ chụp cả tab ngầm trong background mà không cần focus màn hình).
+9. `browser_get_devtools_data(tabId, type, limit, clear)`: Lấy toàn bộ Console logs, Network requests và Performance metrics (JS Heap, DOM Nodes) thời gian thực qua CDP.
+10. `browser_pick_color(x, y)`: Trích xuất mã màu pixel tại vị trí chỉ định.
+11. `browser_list_instances()`: Liệt kê các phiên bản trình duyệt Chrome đang kết nối đến hệ thống.
+12. `browser_select_instance(instanceId)`: Lựa chọn điều khiển một trình duyệt cụ thể trong môi trường đa trình duyệt.
+13. `browser_set_busy(isBusy, message)`: Khóa hoặc mở khóa màn hình Human Input Shield khi Agent thực thi thao tác phức tạp.
+14. `browser_run_actions(actions, tabId, stopOnError)`: Bộ máy gom cụm thực thi hàng loạt hành động trong 1 lệnh duy nhất (Batch Execution Engine), giảm 80%+ độ trễ và số token tiêu thụ.
 
 ---
 
