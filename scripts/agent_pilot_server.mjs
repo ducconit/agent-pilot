@@ -420,6 +420,76 @@ export const MCP_TOOLS = [
         action: { type: "string", description: "Optional description of the active action to display on the banner" }
       }
     }
+  },
+  {
+    name: "browser_run_actions",
+    description: "Execute a batch sequence of browser actions in a single tool call to minimize LLM token usage and latency. Supports open_tab, navigate, wait_for_selector, scroll_into_view, click, type, press_key, scroll, sleep, screenshot, get_element, evaluate, cdp, and close_tab. Automatically scrolls off-screen elements into view before clicking or typing.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tabId: {
+          type: "integer",
+          description: "Optional initial target Tab ID. Defaults to the tab opened in the batch or the current agent tab."
+        },
+        stopOnError: {
+          type: "boolean",
+          description: "Whether to halt the batch sequence immediately if any step fails (default: true).",
+          default: true
+        },
+        actions: {
+          type: "array",
+          description: "Ordered array of actions to execute sequentially.",
+          items: {
+            type: "object",
+            properties: {
+              type: {
+                type: "string",
+                enum: [
+                  "open",
+                  "open_tab",
+                  "navigate",
+                  "close",
+                  "close_tab",
+                  "wait_for_selector",
+                  "scroll_into_view",
+                  "click",
+                  "type",
+                  "press_key",
+                  "scroll",
+                  "sleep",
+                  "wait",
+                  "screenshot",
+                  "get_element",
+                  "evaluate",
+                  "cdp"
+                ],
+                description: "Type of action to execute"
+              },
+              url: { type: "string", description: "Target URL for open or navigate" },
+              active: { type: "boolean", description: "Whether to make opened tab active (default false to avoid stealing user focus)", default: false },
+              waitUntil: { type: "boolean", description: "Wait for page load complete on open/navigate (default true)", default: true },
+              selector: { type: "string", description: "CSS selector for click, type, scroll_into_view, wait_for_selector, or get_element" },
+              text: { type: "string", description: "Text to type into input field" },
+              clear: { type: "boolean", description: "Clear existing text before typing (default false)", default: false },
+              pressEnter: { type: "boolean", description: "Press Enter key after typing (default false)", default: false },
+              key: { type: "string", description: "Key name to press for press_key (e.g. Enter, Escape, Tab)", default: "Enter" },
+              x: { type: "number", description: "Target X pixel coordinate for click" },
+              y: { type: "number", description: "Target Y pixel coordinate for click" },
+              deltaX: { type: "number", description: "Horizontal scroll amount" },
+              deltaY: { type: "number", description: "Vertical scroll amount (positive down, negative up)" },
+              ms: { type: "number", description: "Duration in milliseconds for sleep/wait" },
+              timeoutMs: { type: "number", description: "Timeout in milliseconds for wait_for_selector (default 5000)" },
+              expression: { type: "string", description: "JavaScript expression to evaluate via CDP" },
+              cdpMethod: { type: "string", description: "Chrome DevTools Protocol method name" },
+              cdpParams: { type: "object", description: "Chrome DevTools Protocol parameters" },
+              label: { type: "string", description: "Optional label for screenshot or step result" }
+            },
+            required: ["type"]
+          }
+        }
+      },
+      required: ["actions"]
+    }
   }
 ];
 
@@ -438,7 +508,8 @@ const FORWARDER_METHOD_MAP = Object.freeze({
   browser_pick_color: { method: "page.pickColor", getParams: (a) => a },
   browser_list_instances: { method: "instances.list", getParams: () => ({}) },
   browser_select_instance: { method: "instances.select", getParams: (a) => a },
-  browser_set_busy: { method: "page.setBusy", getParams: (a) => a }
+  browser_set_busy: { method: "page.setBusy", getParams: (a) => a },
+  browser_run_actions: { method: "batch.run", getParams: (a) => a }
 });
 
 async function handleMcpToolCall(name, args) {
@@ -498,6 +569,9 @@ async function handleMcpToolCall(name, args) {
 
     case "browser_set_busy":
       return await sendCommandToExtension("page.setBusy", args);
+
+    case "browser_run_actions":
+      return await sendCommandToExtension("batch.run", args);
 
     default:
       throw new Error(`Unsupported tool: ${name}`);
@@ -570,15 +644,31 @@ if (isMainScript) {
         const { name, arguments: toolArgs = {} } = params;
         try {
           const res = await handleMcpToolCall(name, toolArgs);
-          const isScreenshot = name === "browser_screenshot" && res?.dataUrl;
-
           let content = [];
-          if (isScreenshot) {
+
+          if (name === "browser_screenshot" && res?.dataUrl) {
             const base64Data = res.dataUrl.replace(/^data:image\/png;base64,/, "");
             content = [
               { type: "image", data: base64Data, mimeType: "image/png" },
               { type: "text", text: "Screenshot captured successfully" }
             ];
+          } else if (name === "browser_run_actions" && res?.results) {
+            const cleanRes = JSON.parse(JSON.stringify(res));
+            for (const step of cleanRes.results) {
+              if (step.dataUrl) {
+                const base64Data = step.dataUrl.replace(/^data:image\/png;base64,/, "");
+                content.push({
+                  type: "image",
+                  data: base64Data,
+                  mimeType: "image/png"
+                });
+                step.dataUrl = `[base64 image captured: ${base64Data.length} chars]`;
+              }
+            }
+            content.push({
+              type: "text",
+              text: JSON.stringify(cleanRes, null, 2)
+            });
           } else {
             content = [
               { type: "text", text: typeof res === "object" ? JSON.stringify(res, null, 2) : String(res) }
@@ -588,7 +678,7 @@ if (isMainScript) {
           process.stdout.write(JSON.stringify({
             jsonrpc: "2.0",
             id,
-            result: { content, isError: false }
+            result: { content, isError: Boolean(res && res.success === false) }
           }) + "\n");
         } catch (callErr) {
           process.stdout.write(JSON.stringify({

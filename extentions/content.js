@@ -207,11 +207,18 @@
   /**
    * Virtual Type text into an element with human-like typing
    */
-  async function virtualType(selector, text) {
+  async function virtualType(selector, text, clear = false, pressEnter = false) {
     activateCursor();
     let el = null;
     if (selector) {
       el = document.querySelector(selector);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+        if (!inView) {
+          el.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+        }
+      }
     } else {
       const prevCursorDisplay = cursorLayer.style.display;
       const prevOverlayDisplay = lockOverlayEl ? lockOverlayEl.style.display : null;
@@ -231,6 +238,13 @@
     await virtualClick(rect.left + rect.width / 2, rect.top + rect.height / 2);
 
     el.focus();
+    if (clear) {
+      if (el.isContentEditable) {
+        el.textContent = "";
+      } else if (el.value !== undefined) {
+        el.value = "";
+      }
+    }
     const cleanText = String(text ?? "").replace(/\r\n/g, "\n");
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) {
       for (const char of cleanText) {
@@ -251,6 +265,16 @@
       try {
         isAgentDispatching = true;
         el.dispatchEvent(new Event("change", { bubbles: true }));
+        if (pressEnter) {
+          const keyCode = 13;
+          const enterEvent = { key: "Enter", code: "Enter", keyCode, which: keyCode, bubbles: true, cancelable: true };
+          el.dispatchEvent(new KeyboardEvent("keydown", enterEvent));
+          el.dispatchEvent(new KeyboardEvent("keypress", enterEvent));
+          el.dispatchEvent(new KeyboardEvent("keyup", enterEvent));
+          if (el.form && typeof el.form.requestSubmit === "function") {
+            try { el.form.requestSubmit(); } catch (_) {}
+          }
+        }
       } finally {
         isAgentDispatching = false;
       }
@@ -868,6 +892,11 @@
       if (req.selector && (!req.x || !req.y)) {
         const el = document.querySelector(req.selector);
         if (el) {
+          const r = el.getBoundingClientRect();
+          const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+          if (!inView) {
+            el.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+          }
           const rect = el.getBoundingClientRect();
           req.x = rect.left + rect.width / 2;
           req.y = rect.top + rect.height / 2;
@@ -878,12 +907,71 @@
     }
 
     if (req.action === "virtual_type" || req.action === "type_text") {
-      virtualType(req.selector, req.text).then(sendResponse);
+      virtualType(req.selector, req.text, req.clear, req.pressEnter).then(sendResponse);
+      return true;
+    }
+
+    if (req.action === "press_key" || req.action === "dispatch_key") {
+      const key = req.key || "Enter";
+      let target = req.selector ? document.querySelector(req.selector) : null;
+      if (!target) {
+        target = document.activeElement && document.activeElement !== document.body ? document.activeElement : document.body;
+      }
+      try {
+        isAgentDispatching = true;
+        const keyCodeMap = { Enter: 13, Escape: 27, Tab: 9, Backspace: 8, ArrowDown: 40, ArrowUp: 38, ArrowLeft: 37, ArrowRight: 39 };
+        const code = req.code || key;
+        const keyCode = req.keyCode || keyCodeMap[key] || 0;
+        const eventInit = { key, code, keyCode, which: keyCode, bubbles: true, cancelable: true };
+        target.dispatchEvent(new KeyboardEvent("keydown", eventInit));
+        target.dispatchEvent(new KeyboardEvent("keypress", eventInit));
+        target.dispatchEvent(new KeyboardEvent("keyup", eventInit));
+        if (key === "Enter" && target.form && typeof target.form.requestSubmit === "function") {
+          try { target.form.requestSubmit(); } catch (_) {}
+        }
+        sendResponse({ success: true, key });
+      } finally {
+        isAgentDispatching = false;
+      }
       return true;
     }
 
     if (req.action === "virtual_scroll" || req.action === "scroll_page") {
       sendResponse(virtualScroll(req.deltaX, req.deltaY));
+      return true;
+    }
+
+    if (req.action === "scroll_into_view") {
+      const el = document.querySelector(req.selector);
+      if (!el) {
+        sendResponse({ success: false, error: `Selector '${req.selector}' not found` });
+        return true;
+      }
+      el.scrollIntoView({ behavior: req.behavior || "auto", block: req.block || "center", inline: req.inline || "center" });
+      const rect = el.getBoundingClientRect();
+      sendResponse({ success: true, rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) } });
+      return true;
+    }
+
+    if (req.action === "wait_for_selector") {
+      const selector = req.selector;
+      const timeoutMs = Number(req.timeoutMs || req.timeout || 5000);
+      const startTime = Date.now();
+      const checkInterval = 100;
+
+      const check = () => {
+        const el = document.querySelector(selector);
+        if (el) {
+          sendResponse({ success: true, found: true, details: getDetailedElementInfo(el) });
+          return;
+        }
+        if (Date.now() - startTime >= timeoutMs) {
+          sendResponse({ success: false, found: false, error: `Selector '${selector}' not found within ${timeoutMs}ms` });
+          return;
+        }
+        setTimeout(check, checkInterval);
+      };
+      check();
       return true;
     }
 

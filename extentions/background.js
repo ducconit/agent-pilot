@@ -1123,6 +1123,404 @@ class AgentBridgeClient {
     }
   }
 
+  async captureTabScreenshot(tabId, params = {}) {
+    const mode = params.mode || "visible";
+    let targetTab = null;
+    try {
+      targetTab = await chrome.tabs.get(tabId);
+    } catch (e) {
+      throw new Error(`Target tab ${tabId} not found: ${e.message}`);
+    }
+
+    const isTabActive = Boolean(targetTab && targetTab.active);
+
+    if (!isTabActive || attachedTabs.has(tabId)) {
+      if (!attachedTabs.has(tabId)) {
+        await attachDebugger(tabId).catch(() => {});
+      }
+
+      if (attachedTabs.has(tabId)) {
+        const cdpParams = {
+          format: "png",
+          fromSurface: true,
+          captureBeyondViewport: false
+        };
+        if ((mode === "element" || mode === "region") && params.clip) {
+          cdpParams.clip = {
+            x: params.clip.x,
+            y: params.clip.y,
+            width: params.clip.width,
+            height: params.clip.height,
+            scale: 1
+          };
+        }
+        try {
+          let res;
+          try {
+            res = await sendCdpCommand(tabId, "Page.captureScreenshot", cdpParams, 12000);
+          } catch (firstErr) {
+            console.warn("[AgentPilot] CDP screenshot initial attempt note:", firstErr?.message || firstErr);
+            res = await sendCdpCommand(tabId, "Page.captureScreenshot", { format: "png" }, 12000);
+          }
+          return {
+            success: true,
+            tabId,
+            isBackgroundTab: !isTabActive,
+            dataUrl: "data:image/png;base64," + res.data,
+            clip: params.clip
+          };
+        } catch (cdpErr) {
+          console.warn("[AgentPilot] CDP screenshot failed on tab " + tabId + ":", cdpErr?.message || cdpErr);
+          if (!isTabActive) {
+            throw new Error(`CDP screenshot failed on background tab ${tabId}: ${cdpErr?.message || cdpErr}`);
+          }
+        }
+      } else if (!isTabActive) {
+        throw new Error(`Cannot capture background tab ${tabId}: CDP debugger attachment failed`);
+      }
+    }
+
+    if (!isTabActive) {
+      throw new Error(`Cannot capture background tab ${tabId} without active CDP`);
+    }
+
+    const winId = targetTab?.windowId || null;
+    return new Promise((resolve, reject) => {
+      chrome.tabs.captureVisibleTab(winId, { format: "png" }, (dataUrl) => {
+        if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+        resolve({
+          success: true,
+          tabId,
+          isBackgroundTab: false,
+          dataUrl,
+          clip: params.clip
+        });
+      });
+    });
+  }
+
+  async executeBatchActions(params) {
+    const actions = Array.isArray(params.actions) ? params.actions : [];
+    const stopOnError = params.stopOnError !== false;
+    let currentTabId = params.tabId ? await this.getTargetTabId(params.tabId) : (this.lastAgentTabId || (await this.getActiveTabId()));
+    const results = [];
+    const startTime = Date.now();
+
+    for (let i = 0; i < actions.length; i++) {
+      const act = actions[i];
+      const stepNum = i + 1;
+      const type = (act.type || act.action || "").toLowerCase();
+      const stepResult = { step: stepNum, type, success: false };
+
+      try {
+        switch (type) {
+          case "open":
+          case "open_tab":
+          case "tabs.create": {
+            const url = normalizeUrl(act.url || "https://google.com");
+            const makeActive = act.active === true;
+            const activeTabBefore = !makeActive ? await this.getActiveTabId() : null;
+
+            const tab = await new Promise((resolve, reject) => {
+              chrome.tabs.create({ url, active: makeActive }, (t) => {
+                if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+                resolve(t);
+              });
+            });
+
+            currentTabId = tab.id;
+            this.lastAgentTabId = tab.id;
+            agentControlledTabs.add(tab.id);
+            await this.assignTabToAgentGroup(tab).catch(() => {});
+
+            if (!makeActive && activeTabBefore && activeTabBefore !== tab.id) {
+              const curActive = await this.getActiveTabId();
+              if (curActive === tab.id) {
+                await chrome.tabs.update(activeTabBefore, { active: true }).catch(() => {});
+              }
+            }
+
+            await attachDebugger(tab.id).catch(() => {});
+
+            // Wait for tab load completion if requested (default true)
+            if (act.waitUntil !== false) {
+              await new Promise((resolve) => {
+                const timeout = setTimeout(() => {
+                  chrome.tabs.onUpdated.removeListener(onUpdated);
+                  resolve();
+                }, Number(act.loadTimeout || 15000));
+
+                const onUpdated = (tId, changeInfo) => {
+                  if (tId === tab.id && changeInfo.status === "complete") {
+                    clearTimeout(timeout);
+                    chrome.tabs.onUpdated.removeListener(onUpdated);
+                    resolve();
+                  }
+                };
+                chrome.tabs.onUpdated.addListener(onUpdated);
+                chrome.tabs.get(tab.id, (t) => {
+                  if (t && t.status === "complete") {
+                    clearTimeout(timeout);
+                    chrome.tabs.onUpdated.removeListener(onUpdated);
+                    resolve();
+                  }
+                });
+              });
+            }
+
+            stepResult.success = true;
+            stepResult.tabId = tab.id;
+            stepResult.url = tab.url || tab.pendingUrl || url;
+            break;
+          }
+
+          case "navigate":
+          case "tabs.update": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for navigate");
+            const url = normalizeUrl(act.url);
+            await new Promise((resolve, reject) => {
+              chrome.tabs.update(targetTabId, { url }, (t) => {
+                if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+                resolve(t);
+              });
+            });
+
+            if (act.waitUntil !== false) {
+              await new Promise((resolve) => {
+                const timeout = setTimeout(() => {
+                  chrome.tabs.onUpdated.removeListener(onUpdated);
+                  resolve();
+                }, Number(act.loadTimeout || 15000));
+
+                const onUpdated = (tId, changeInfo) => {
+                  if (tId === targetTabId && changeInfo.status === "complete") {
+                    clearTimeout(timeout);
+                    chrome.tabs.onUpdated.removeListener(onUpdated);
+                    resolve();
+                  }
+                };
+                chrome.tabs.onUpdated.addListener(onUpdated);
+              });
+            }
+
+            stepResult.success = true;
+            stepResult.tabId = targetTabId;
+            stepResult.url = url;
+            break;
+          }
+
+          case "close":
+          case "close_tab":
+          case "tabs.remove": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab to close");
+            await new Promise((resolve, reject) => {
+              chrome.tabs.remove(targetTabId, () => {
+                if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+                resolve();
+              });
+            });
+            agentControlledTabs.delete(targetTabId);
+            if (currentTabId === targetTabId) {
+              currentTabId = null;
+            }
+            stepResult.success = true;
+            stepResult.closedTabId = targetTabId;
+            break;
+          }
+
+          case "wait_for_selector": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for wait_for_selector");
+            await this.ensureContentScript(targetTabId);
+            const res = await this.sendTabMessageWithRetry(targetTabId, {
+              action: "wait_for_selector",
+              selector: act.selector,
+              timeoutMs: act.timeoutMs || act.timeout || 5000
+            });
+            if (!res || !res.success) throw new Error(res?.error || `Selector '${act.selector}' not found within timeout`);
+            stepResult.success = true;
+            stepResult.found = true;
+            stepResult.details = res.details;
+            break;
+          }
+
+          case "scroll_into_view": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for scroll_into_view");
+            await this.ensureContentScript(targetTabId);
+            const res = await this.sendTabMessageWithRetry(targetTabId, {
+              action: "scroll_into_view",
+              selector: act.selector,
+              behavior: act.behavior || "auto"
+            });
+            if (!res || !res.success) throw new Error(res?.error || `Failed to scroll into view: ${act.selector}`);
+            stepResult.success = true;
+            stepResult.rect = res.rect;
+            break;
+          }
+
+          case "click":
+          case "page.click": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for click");
+            await this.ensureContentScript(targetTabId);
+            const res = await this.sendTabMessageWithRetry(targetTabId, {
+              action: "click_cursor",
+              selector: act.selector,
+              x: act.x,
+              y: act.y
+            });
+            if (!res || !res.success) throw new Error(res?.error || "Click failed");
+            stepResult.success = true;
+            stepResult.element = res.element;
+            break;
+          }
+
+          case "type":
+          case "page.type": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for type");
+            await this.ensureContentScript(targetTabId);
+            const res = await this.sendTabMessageWithRetry(targetTabId, {
+              action: "type_text",
+              selector: act.selector,
+              text: act.text,
+              clear: Boolean(act.clear),
+              pressEnter: Boolean(act.pressEnter)
+            });
+            if (!res || !res.success) throw new Error(res?.error || "Type failed");
+            stepResult.success = true;
+            stepResult.textEntered = res.textEntered;
+            break;
+          }
+
+          case "press_key":
+          case "key": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for press_key");
+            await this.ensureContentScript(targetTabId);
+            const res = await this.sendTabMessageWithRetry(targetTabId, {
+              action: "press_key",
+              key: act.key || "Enter",
+              selector: act.selector
+            });
+            stepResult.success = true;
+            stepResult.key = act.key || "Enter";
+            break;
+          }
+
+          case "scroll":
+          case "page.scroll": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for scroll");
+            await this.ensureContentScript(targetTabId);
+            const res = await this.sendTabMessageWithRetry(targetTabId, {
+              action: "scroll_page",
+              deltaX: act.deltaX || 0,
+              deltaY: act.deltaY || 0
+            });
+            stepResult.success = true;
+            stepResult.scroll = res;
+            break;
+          }
+
+          case "sleep":
+          case "wait": {
+            const ms = Number(act.ms || act.duration || 1000);
+            await new Promise(r => setTimeout(r, ms));
+            stepResult.success = true;
+            stepResult.ms = ms;
+            break;
+          }
+
+          case "screenshot":
+          case "page.screenshot": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for screenshot");
+            const shotRes = await this.captureTabScreenshot(targetTabId, act);
+            stepResult.success = true;
+            stepResult.dataUrl = shotRes.dataUrl;
+            stepResult.label = act.label || act.name || `step_${stepNum}`;
+            break;
+          }
+
+          case "get_element":
+          case "page.getelement": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for get_element");
+            await this.ensureContentScript(targetTabId);
+            const res = await this.sendTabMessageWithRetry(targetTabId, {
+              action: "get_element_info",
+              selector: act.selector,
+              x: act.x,
+              y: act.y
+            });
+            if (!res || !res.success) throw new Error(res?.error || `Element not found: ${act.selector}`);
+            stepResult.success = true;
+            stepResult.element = res.details || res;
+            break;
+          }
+
+          case "evaluate":
+          case "eval": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for evaluate");
+            await attachDebugger(targetTabId).catch(() => {});
+            const evalRes = await sendCdpCommand(targetTabId, "Runtime.evaluate", {
+              expression: act.expression,
+              returnByValue: true,
+              awaitPromise: true
+            });
+            stepResult.success = true;
+            stepResult.value = evalRes?.result?.value;
+            break;
+          }
+
+          case "cdp": {
+            const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for cdp");
+            await attachDebugger(targetTabId).catch(() => {});
+            const cdpRes = await sendCdpCommand(targetTabId, act.cdpMethod || act.method, act.cdpParams || act.params || {});
+            stepResult.success = true;
+            stepResult.result = cdpRes;
+            break;
+          }
+
+          default:
+            throw new Error(`Unsupported batch action type: ${type}`);
+        }
+
+        results.push(stepResult);
+      } catch (stepErr) {
+        stepResult.success = false;
+        stepResult.error = stepErr.message || String(stepErr);
+        results.push(stepResult);
+
+        if (stopOnError) {
+          return {
+            success: false,
+            error: `Batch execution halted at step ${stepNum} (${type}): ${stepErr.message || stepErr}`,
+            failedStep: stepNum,
+            totalActions: actions.length,
+            executedActions: results.length,
+            durationMs: Date.now() - startTime,
+            results
+          };
+        }
+      }
+    }
+
+    return {
+      success: results.every(r => r.success),
+      totalActions: actions.length,
+      executedActions: results.length,
+      durationMs: Date.now() - startTime,
+      results
+    };
+  }
+
   async handleAgentMessage(msg) {
     const { id, method, params = {} } = msg;
 
@@ -1378,85 +1776,19 @@ class AgentBridgeClient {
         }
 
         case "page.screenshot": {
-          const mode = params.mode || "visible";
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
+          this.captureTabScreenshot(tabId, params)
+            .then(res => respond(res))
+            .catch(err => respond(null, err));
+          break;
+        }
 
-          let targetTab = null;
-          try {
-            targetTab = await chrome.tabs.get(tabId);
-          } catch (e) {
-            return respond(null, new Error(`Target tab ${tabId} not found: ${e.message}`));
-          }
-
-          const isTabActive = Boolean(targetTab && targetTab.active);
-
-          // If target tab is running in background (user is on another tab) OR CDP is already attached,
-          // capture via CDP Page.captureScreenshot so we don't disrupt user or capture wrong tab.
-          if (!isTabActive || attachedTabs.has(tabId)) {
-            if (!attachedTabs.has(tabId)) {
-              await attachDebugger(tabId).catch(() => {});
-            }
-
-            if (attachedTabs.has(tabId)) {
-              const cdpParams = {
-                format: "png",
-                fromSurface: true,
-                captureBeyondViewport: false
-              };
-              if ((mode === "element" || mode === "region") && params.clip) {
-                cdpParams.clip = {
-                  x: params.clip.x,
-                  y: params.clip.y,
-                  width: params.clip.width,
-                  height: params.clip.height,
-                  scale: 1
-                };
-              }
-              try {
-                let res;
-                try {
-                  res = await sendCdpCommand(tabId, "Page.captureScreenshot", cdpParams, 12000);
-                } catch (firstErr) {
-                  console.warn("[AgentPilot] CDP screenshot initial attempt note:", firstErr?.message || firstErr);
-                  res = await sendCdpCommand(tabId, "Page.captureScreenshot", { format: "png" }, 12000);
-                }
-                return respond({
-                  success: true,
-                  tabId,
-                  isBackgroundTab: !isTabActive,
-                  dataUrl: "data:image/png;base64," + res.data
-                });
-              } catch (cdpErr) {
-                console.warn("[AgentPilot] CDP screenshot failed on tab " + tabId + ":", cdpErr?.message || cdpErr);
-                if (!isTabActive) {
-                  return respond(null, new Error(`CDP screenshot failed on background tab ${tabId}: ${cdpErr?.message || cdpErr}`));
-                }
-              }
-            } else if (!isTabActive) {
-              return respond(null, new Error(`Cannot capture background tab ${tabId}: CDP debugger attachment failed`));
-            }
-          }
-
-          if (!isTabActive) {
-            return respond(null, new Error(`Cannot capture background tab ${tabId} without active CDP`));
-          }
-
-          // Fallback: captureVisibleTab on window (only captures the active tab of window)
-          const winId = targetTab?.windowId || null;
-          chrome.tabs.captureVisibleTab(winId, { format: "png" }, (dataUrl) => {
-            if (chrome.runtime.lastError) {
-              respond(null, chrome.runtime.lastError);
-            } else {
-              respond({
-                success: true,
-                tabId,
-                isBackgroundTab: false,
-                dataUrl,
-                clip: params.clip
-              });
-            }
-          });
+        case "batch.run":
+        case "batch.execute": {
+          this.executeBatchActions(params)
+            .then(res => respond(res))
+            .catch(err => respond(null, err));
           break;
         }
 

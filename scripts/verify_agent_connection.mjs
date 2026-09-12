@@ -506,6 +506,66 @@ async function run() {
 
     await sidepanelPage.close();
 
+    // 23. Test Batch Action Execution via WebSocket (batch.run)
+    // Sequence: open -> wait_for_selector -> click -> type (with clear) -> screenshot -> close
+    const batchRes = await sendAgentCommand("batch.run", {
+      actions: [
+        { type: "open", url: `http://127.0.0.1:${HTTP_PORT}/test-page.html` },
+        { type: "wait_for_selector", selector: "#btn-sample-click", timeoutMs: 4000 },
+        { type: "click", selector: "#btn-sample-click" },
+        { type: "type", selector: "#test-search-input", text: "Batch Action Automation Verified", clear: true },
+        { type: "screenshot", label: "batch_test" },
+        { type: "close" }
+      ]
+    });
+
+    const isBatchSuccess = batchRes?.success === true &&
+                           batchRes?.results?.length === 6 &&
+                           batchRes?.results[0]?.type === "open" &&
+                           batchRes?.results[1]?.type === "wait_for_selector" &&
+                           batchRes?.results[2]?.type === "click" &&
+                           batchRes?.results[3]?.type === "type" &&
+                           batchRes?.results[4]?.dataUrl?.startsWith("data:image/png;base64,") &&
+                           batchRes?.results[5]?.type === "close";
+
+    record("23. Batch Actions Engine (Single Tool Call)", isBatchSuccess, `Executed 6-step batch (open -> wait -> click -> type -> screenshot -> close) in ${batchRes?.durationMs}ms`);
+
+    // 24. Test Batch Actions via HTTP REST API (POST /api method: batch.run)
+    const httpBatchParams = {
+      actions: [
+        { type: "open", url: `http://127.0.0.1:${HTTP_PORT}/test-page.html` },
+        { type: "wait_for_selector", selector: "#btn-sample-click" },
+        { type: "close" }
+      ]
+    };
+    if (selectedTestInstanceId) {
+      httpBatchParams.instanceId = selectedTestInstanceId;
+    }
+
+    const httpBatchRes = await new Promise((resolve) => {
+      const req = http.request(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      }, (res) => {
+        let b = "";
+        res.on("data", c => b += c);
+        res.on("end", () => {
+          try { resolve(JSON.parse(b)); } catch { resolve(null); }
+        });
+      });
+      req.on("error", () => resolve(null));
+      req.write(JSON.stringify({
+        method: "batch.run",
+        params: httpBatchParams
+      }));
+      req.end();
+    });
+
+    const isHttpBatchSuccess = httpBatchRes?.success === true &&
+                               httpBatchRes?.result?.success === true &&
+                               httpBatchRes?.result?.executedActions === 3;
+    record("24. Batch Actions HTTP API Endpoint", isHttpBatchSuccess, `Executed 3 actions via HTTP /api in ${httpBatchRes?.result?.durationMs}ms`);
+
     console.log("\n==================================================================");
     console.log("📊 BẢNG TỔNG KẾT KẾT QUẢ KIỂM THỬ KẾT NỐI AI AGENT:");
     const passedCount = testResults.filter(t => t.passed).length;
