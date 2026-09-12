@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Pilot - Control Center</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <!-- Header Bar -->
+  <header class="header">
+    <div class="brand">
+      <img src="icons/icon32.png" alt="Logo" class="brand-icon">
+      <div class="brand-text">
+        <span class="brand-title">AGENT PILOT</span>
+        <span class="brand-sub">Antigravity AI Controller</span>
+      </div>
+    </div>
+    <div class="debugger-toggle">
+      <span class="status-indicator" id="cdp-status-dot"></span>
+      <button class="btn btn-sm btn-outline" id="btn-toggle-cdp">Gắn CDP</button>
+    </div>
+  </header>
+
+  <!-- AI Agent Connection Status Banner -->
+  <section class="agent-bridge-bar" id="agent-bridge-bar">
+    <div class="bridge-status-indicator">
+      <span class="status-dot disconnected" id="agent-bridge-dot"></span>
+      <span class="bridge-status-text" id="agent-bridge-text">AI Agent: Chờ kết nối (Port 58765)</span>
+    </div>
+    <div class="bridge-controls">
+      <input type="number" id="input-bridge-port" class="port-input" value="58765" title="Cổng WebSocket kết nối AI Agent">
+      <button class="btn btn-xs btn-outline" id="btn-reconnect-bridge" title="Kết nối lại WebSocket">⚡ Nối</button>
+    </div>
+  </section>
+
+  <!-- Active Tab Info & Browser Navigation Bar -->
+  <section class="nav-bar">
+    <div class="active-tab-banner">
+      <span class="tab-fav-icon">🌐</span>
+      <span class="tab-title" id="active-tab-title">Đang tải tab...</span>
+    </div>
+    <div class="url-control">
+      <input type="text" id="input-url" class="form-input url-input" placeholder="Nhập URL (https://...)" spellcheck="false">
+      <button class="btn btn-primary" id="btn-navigate" title="Đi tới">Đi tới</button>
+      <button class="btn btn-icon" id="btn-reload" title="Tải lại tab">🔄</button>
+      <button class="btn btn-icon" id="btn-new-tab" title="Mở tab mới">➕</button>
+    </div>
+  </section>
+
+  <!-- Main Navigation Tabs -->
+  <nav class="tabs-nav">
+    <button class="tab-btn active" data-tab="tab-mouse">🖱️ Chuột & Agent</button>
+    <button class="tab-btn" data-tab="tab-devtools">⚡ DevTools</button>
+    <button class="tab-btn" data-tab="tab-inspector">🎯 Inspector & Màu</button>
+    <button class="tab-btn" data-tab="tab-screenshot">📸 Chụp ảnh</button>
+  </nav>
+
+  <!-- Main Content Panels -->
+  <main class="panels-container">
+
+    <!-- ==================== PANEL 1: VIRTUAL MOUSE & AGENT ACTIONS ==================== -->
+    <section class="panel active" id="tab-mouse">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Mô phỏng Chuột ảo</span>
+          <span class="card-badge">Virtual Cursor</span>
+        </div>
+        <div class="card-body">
+          <div class="coord-inputs">
+            <div class="input-group">
+              <label>Tọa độ X</label>
+              <input type="number" id="mouse-x" class="form-input" value="300" min="0">
+            </div>
+            <div class="input-group">
+              <label>Tọa độ Y</label>
+              <input type="number" id="mouse-y" class="form-input" value="250" min="0">
+            </div>
+          </div>
+          <div class="btn-grid mt-2">
+            <button class="btn btn-secondary" id="btn-mouse-move">Di chuyển chuột</button>
+            <button class="btn btn-primary" id="btn-mouse-click">Click tại (X, Y)</button>
+          </div>
+          <div class="btn-grid mt-2">
+            <button class="btn btn-outline" id="btn-scroll-up">Cuộn lên ⬆</button>
+            <button class="btn btn-outline" id="btn-scroll-down">Cuộn xuống ⬇</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Virtual Typing Box -->
+      <div class="card mt-3">
+        <div class="card-header">
+          <span class="card-title">Tự động Điền văn bản</span>
+          <span class="card-badge">Virtual Typing</span>
+        </div>
+        <div class="card-body">
+          <div class="input-group">
+            <label>CSS Selector (để trống nếu gõ vào ô đang focus)</label>
+            <input type="text" id="type-selector" class="form-input" placeholder="vd: input[name='q'], #search">
+          </div>
+          <div class="input-group mt-2">
+            <label>Nội dung cần gõ</label>
+            <input type="text" id="type-text" class="form-input" placeholder="Xin chào từ Antigravity AI Agent!">
+          </div>
+          <button class="btn btn-primary btn-block mt-2" id="btn-type-submit">Gõ chữ tự động</button>
+        </div>
+      </div>
+
+      <!-- Agent JSON Action Playground (Antigravity Automation) -->
+      <div class="card mt-3">
+        <div class="card-header">
+          <span class="card-title">Kịch bản Agent (JSON Action Script)</span>
+          <button class="btn-text" id="btn-load-sample-script">Tải mẫu</button>
+        </div>
+        <div class="card-body">
+          <textarea id="agent-script-editor" class="code-editor" rows="5" placeholder='[
+  {"action": "mouse_move", "x": 300, "y": 200},
+  {"action": "mouse_click", "x": 300, "y": 200},
+  {"action": "type", "selector": "input", "text": "Hello World"}
+]'></textarea>
+          <div class="action-footer mt-2">
+            <button class="btn btn-success btn-block" id="btn-run-agent-script">▶ Chạy Kịch bản Agent</button>
+          </div>
+          <div class="script-output" id="script-output-log" style="display:none;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PANEL 2: DEVTOOLS (CDP MONITOR) ==================== -->
+    <section class="panel" id="tab-devtools">
+      <div class="subtabs-nav">
+        <button class="subtab-btn active" data-subtab="devtools-console">Console (<span id="console-count">0</span>)</button>
+        <button class="subtab-btn" data-subtab="devtools-network">Network (<span id="network-count">0</span>)</button>
+        <button class="subtab-btn" data-subtab="devtools-perf">Performance</button>
+      </div>
+
+      <!-- 2.1 Console Subpanel -->
+      <div class="subpanel active" id="devtools-console">
+        <div class="filter-bar">
+          <select id="console-level-filter" class="form-select">
+            <option value="all">Tất cả Logs</option>
+            <option value="log">Info / Log</option>
+            <option value="warn">Warnings</option>
+            <option value="error">Errors</option>
+          </select>
+          <input type="text" id="console-search-filter" class="form-input" placeholder="Lọc nội dung...">
+          <button class="btn btn-sm btn-outline" id="btn-clear-console">Xóa</button>
+        </div>
+        <div class="log-stream-container" id="console-stream">
+          <div class="empty-hint">Chưa có console log. Hãy gắn CDP và thao tác trên trang web.</div>
+        </div>
+      </div>
+
+      <!-- 2.2 Network Subpanel -->
+      <div class="subpanel" id="devtools-network">
+        <div class="filter-bar">
+          <input type="text" id="network-search-filter" class="form-input" placeholder="Lọc URL...">
+          <button class="btn btn-sm btn-outline" id="btn-clear-network">Xóa</button>
+        </div>
+        <div class="network-stream-container" id="network-stream">
+          <div class="empty-hint">Chưa có request. Tải lại trang sau khi gắn CDP để theo dõi mạng.</div>
+        </div>
+      </div>
+
+      <!-- 2.3 Performance Subpanel -->
+      <div class="subpanel" id="devtools-perf">
+        <div class="perf-toolbar">
+          <span>Thời gian thực qua Chrome DevTools Protocol</span>
+          <button class="btn btn-sm btn-primary" id="btn-refresh-perf">Làm mới</button>
+        </div>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-label">JS Heap Memory</div>
+            <div class="metric-value" id="metric-heap">-- MB</div>
+            <div class="metric-sub" id="metric-heap-total">Tổng: -- MB</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">DOM Nodes</div>
+            <div class="metric-value" id="metric-nodes">--</div>
+            <div class="metric-sub">Phần tử trên cây DOM</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Layout Count</div>
+            <div class="metric-value" id="metric-layouts">--</div>
+            <div class="metric-sub">Lần tính toán bố cục</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Style Recalcs</div>
+            <div class="metric-value" id="metric-styles">--</div>
+            <div class="metric-sub">Lần tính toán lại CSS</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PANEL 3: ELEMENT INSPECTOR & COLOR PICKER ==================== -->
+    <section class="panel" id="tab-inspector">
+      <!-- Inspector Switch -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Soi Vị trí & Phần tử DOM</span>
+          <button class="btn btn-primary" id="btn-toggle-inspector">Bật Soi Phần tử</button>
+        </div>
+        <div class="card-body">
+          <div class="inspector-details" id="inspector-result-box">
+            <div class="empty-hint">Bật chế độ soi và di chuột qua trang web để xem vị trí, kích thước và CSS Selector.</div>
+          </div>
+          <div class="element-action-buttons mt-2" id="element-actions" style="display: none;">
+            <button class="btn btn-secondary btn-sm" id="btn-move-to-element">Di chuột tới phần tử</button>
+            <button class="btn btn-primary btn-sm" id="btn-click-element">Click vào phần tử</button>
+            <button class="btn btn-outline btn-sm" id="btn-snap-element">Chụp riêng phần tử này</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Color Eyedropper Card -->
+      <div class="card mt-3">
+        <div class="card-header">
+          <span class="card-title">Lấy màu sắc (Color Eyedropper)</span>
+          <button class="btn btn-secondary" id="btn-pick-color">🎨 Lấy mã màu</button>
+        </div>
+        <div class="card-body">
+          <div class="color-preview-box" id="latest-color-box">
+            <div class="color-swatch" id="color-swatch-current" style="background: #38bdf8;"></div>
+            <div class="color-values">
+              <div class="color-val" id="color-hex">HEX: #38bdf8</div>
+              <div class="color-val" id="color-rgb">RGB: rgb(56, 189, 248)</div>
+              <div class="color-val" id="color-hsl">HSL: hsl(199, 94%, 60%)</div>
+            </div>
+          </div>
+          <div class="palette-history mt-2">
+            <div class="palette-title">Lịch sử nhặt màu:</div>
+            <div class="palette-chips" id="palette-chips"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PANEL 4: SCREENSHOT SUITE ==================== -->
+    <section class="panel" id="tab-screenshot">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Bộ Công cụ Chụp Màn hình</span>
+          <span class="card-badge">Screenshot Studio</span>
+        </div>
+        <div class="card-body">
+          <div class="screenshot-buttons-grid">
+            <button class="btn btn-primary" id="btn-capture-visible">
+              <span>🖥️</span> Chụp Toàn màn hình
+            </button>
+            <button class="btn btn-secondary" id="btn-capture-region">
+              <span>✂️</span> Kéo chọn vùng (Crop)
+            </button>
+            <button class="btn btn-outline" id="btn-capture-element">
+              <span>🎯</span> Chụp Phần tử đang chọn
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screenshot Result Preview -->
+      <div class="card mt-3" id="screenshot-preview-card" style="display: none;">
+        <div class="card-header">
+          <span class="card-title">Ảnh chụp kết quả</span>
+          <div class="preview-actions">
+            <button class="btn btn-sm btn-primary" id="btn-download-shot">💾 Tải về PNG</button>
+            <button class="btn btn-sm btn-outline" id="btn-copy-shot">📋 Sao chép</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="image-preview-wrapper">
+            <img id="screenshot-img" src="" alt="Screenshot">
+          </div>
+          <div class="shot-meta mt-1" id="shot-dimensions">Kích thước: -- × -- px</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Notification Toast inside Sidepanel -->
+  <div class="toast-popup" id="sidepanel-toast"></div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

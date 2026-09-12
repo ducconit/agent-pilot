@@ -1,0 +1,691 @@
+/**
+ * Agent Pilot - Injected Content Script
+ * Virtual Mouse, Element Inspector, Region Crop Tool, Eyedropper & Agent Bridge
+ */
+
+(function () {
+  // Prevent multiple injections
+  if (window.__AGENT_PILOT_INITIALIZED__) return;
+  window.__AGENT_PILOT_INITIALIZED__ = true;
+
+  const CONFIG = {
+    DEFAULT_MOVE_DURATION: 350,
+    CLICK_DELAY: 150,
+    TYPING_INTERVAL: 40,
+    SCROLL_AMOUNT: 300,
+    TOAST_DURATION: 3200
+  };
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  let currentMouseX = 100;
+  let currentMouseY = 100;
+  let isInspectorActive = false;
+  let lockedElement = null;
+  let cropState = { active: false, startX: 0, startY: 0, currentRect: null };
+
+  // =========================================================================
+  // 1. Virtual Mouse Subsystem
+  // =========================================================================
+
+  // Create Cursor Layer
+  const cursorLayer = document.createElement("div");
+  cursorLayer.id = "agent-pilot-cursor-layer";
+  document.documentElement.appendChild(cursorLayer);
+
+  // Virtual Pointer Element
+  const virtualCursor = document.createElement("div");
+  virtualCursor.className = "agent-pilot-virtual-cursor";
+  virtualCursor.innerHTML = `
+    <svg class="agent-pilot-cursor-svg" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 2 L26 14 L14 16 L10 28 Z" fill="#06b6d4" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+      <circle cx="14" cy="14" r="3" fill="#ffffff" />
+    </svg>
+    <div class="agent-pilot-cursor-badge" id="agent-pilot-coords">(100, 100)</div>
+  `;
+  cursorLayer.appendChild(virtualCursor);
+  updateCursorTransform(currentMouseX, currentMouseY);
+
+  function updateCursorTransform(x, y) {
+    currentMouseX = x;
+    currentMouseY = y;
+    virtualCursor.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    const coordsBadge = document.getElementById("agent-pilot-coords");
+    if (coordsBadge) coordsBadge.textContent = `(${Math.round(x)}, ${Math.round(y)})`;
+  }
+
+  /**
+   * Animate Virtual Mouse to (targetX, targetY) with smooth trajectory
+   */
+  function moveVirtualMouse(targetX, targetY, duration = CONFIG.DEFAULT_MOVE_DURATION) {
+    return new Promise((resolve) => {
+      const startX = currentMouseX;
+      const startY = currentMouseY;
+      const startTime = performance.now();
+
+      function step(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // Ease out cubic
+        const ease = 1 - Math.pow(1 - progress, 3);
+        const x = startX + (targetX - startX) * ease;
+        const y = startY + (targetY - startY) * ease;
+        updateCursorTransform(x, y);
+
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          updateCursorTransform(targetX, targetY);
+          resolve({ success: true, x: targetX, y: targetY });
+        }
+      }
+
+      requestAnimationFrame(step);
+    });
+  }
+
+  /**
+   * Trigger click animation & dispatch synthetic events on DOM element
+   */
+  async function virtualClick(x = currentMouseX, y = currentMouseY) {
+    await moveVirtualMouse(x, y, CONFIG.CLICK_DELAY);
+
+    // Render Ripple Effect
+    const ripple = document.createElement("div");
+    ripple.className = "agent-pilot-click-ripple";
+    ripple.style.left = `${x}px`;
+    ripple.style.top = `${y}px`;
+    ripple.style.width = "48px";
+    ripple.style.height = "48px";
+    cursorLayer.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 550);
+
+    // Find and dispatch event on element under pointer
+    // Temporarily hide cursor layer to accurately get elementFromPoint
+    cursorLayer.style.display = "none";
+    const el = document.elementFromPoint(x, y);
+    cursorLayer.style.display = "block";
+
+    if (el) {
+      // Focus if form control
+      if (el.focus && typeof el.focus === "function") {
+        el.focus();
+      }
+
+      // Dispatch full mouse event lifecycle
+      const eventInit = {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: x,
+        clientY: y,
+        screenX: x + window.screenX,
+        screenY: y + window.screenY,
+        button: 0
+      };
+
+      el.dispatchEvent(new PointerEvent("pointerdown", eventInit));
+      el.dispatchEvent(new MouseEvent("mousedown", eventInit));
+      el.dispatchEvent(new PointerEvent("pointerup", eventInit));
+      el.dispatchEvent(new MouseEvent("mouseup", eventInit));
+      el.dispatchEvent(new MouseEvent("click", eventInit));
+
+      return {
+        success: true,
+        element: {
+          tagName: el.tagName,
+          id: el.id,
+          className: el.className,
+          text: (el.innerText || el.value || "").slice(0, 50)
+        }
+      };
+    }
+
+    return { success: false, error: "No element at coordinates" };
+  }
+
+  /**
+   * Virtual Type text into an element with human-like typing
+   */
+  async function virtualType(selector, text) {
+    let el = null;
+    if (selector) {
+      el = document.querySelector(selector);
+    } else {
+      cursorLayer.style.display = "none";
+      el = document.elementFromPoint(currentMouseX, currentMouseY);
+      cursorLayer.style.display = "block";
+    }
+
+    if (!el) return { success: false, error: "Target element not found" };
+
+    const rect = el.getBoundingClientRect();
+    await moveVirtualMouse(rect.left + rect.width / 2, rect.top + rect.height / 2, 250);
+    await virtualClick(rect.left + rect.width / 2, rect.top + rect.height / 2);
+
+    el.focus();
+    if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) {
+      for (const char of text) {
+        if (el.isContentEditable) {
+          document.execCommand("insertText", false, char);
+        } else {
+          el.value = (el.value || "") + char;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        await new Promise((r) => setTimeout(r, CONFIG.TYPING_INTERVAL));
+      }
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      return { success: true, textEntered: text };
+    } else {
+      return { success: false, error: "Element is not an input or editable field" };
+    }
+  }
+
+  /**
+   * Virtual Scroll
+   */
+  function virtualScroll(deltaX = 0, deltaY = CONFIG.SCROLL_AMOUNT) {
+    window.scrollBy({ top: deltaY, left: deltaX, behavior: "smooth" });
+    return { success: true, scrollX: window.scrollX, scrollY: window.scrollY };
+  }
+
+  // =========================================================================
+  // 2. Element Inspector Subsystem
+  // =========================================================================
+
+  const inspectorBox = document.createElement("div");
+  inspectorBox.id = "agent-pilot-inspector-box";
+  document.documentElement.appendChild(inspectorBox);
+
+  const inspectorTooltip = document.createElement("div");
+  inspectorTooltip.id = "agent-pilot-inspector-tooltip";
+  document.documentElement.appendChild(inspectorTooltip);
+
+  function getElementSelector(el) {
+    if (!el || el === document.body || el === document.documentElement) return el ? el.tagName.toLowerCase() : "";
+    if (el.id) return `#${el.id}`;
+
+    let path = [];
+    while (el && el.nodeType === Node.ELEMENT_NODE && el !== document.body) {
+      let selector = el.nodeName.toLowerCase();
+      if (el.className && typeof el.className === "string") {
+        const classes = el.className.trim().split(/\s+/).filter(c => !c.startsWith("agent-pilot"));
+        if (classes.length) selector += "." + classes.slice(0, 2).join(".");
+      }
+      path.unshift(selector);
+      el = el.parentElement;
+    }
+    return path.join(" > ");
+  }
+
+  function getXPath(el) {
+    if (!el) return "";
+    if (el.id) return `//*[@id="${el.id}"]`;
+    if (el === document.body) return "/html/body";
+
+    let ix = 0;
+    const siblings = el.parentNode ? el.parentNode.childNodes : [];
+    for (let i = 0; i < siblings.length; i++) {
+      const sibling = siblings[i];
+      if (sibling === el) {
+        return getXPath(el.parentNode) + "/" + el.tagName.toLowerCase() + "[" + (ix + 1) + "]";
+      }
+      if (sibling.nodeType === 1 && sibling.tagName === el.tagName) {
+        ix++;
+      }
+    }
+    return "";
+  }
+
+  function getDetailedElementInfo(el) {
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    return {
+      tagName: el.tagName.toLowerCase(),
+      id: el.id || "",
+      className: typeof el.className === "string" ? el.className : "",
+      selector: getElementSelector(el),
+      xpath: getXPath(el),
+      rect: {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        top: Math.round(rect.top),
+        left: Math.round(rect.left),
+        bottom: Math.round(rect.bottom),
+        right: Math.round(rect.right)
+      },
+      text: (el.innerText || el.textContent || "").trim().slice(0, 150),
+      value: el.value !== undefined ? String(el.value) : undefined,
+      styles: {
+        color: style.color,
+        backgroundColor: style.backgroundColor,
+        fontSize: style.fontSize,
+        display: style.display,
+        visibility: style.visibility
+      }
+    };
+  }
+
+  function handleInspectorMouseMove(e) {
+    if (!isInspectorActive) return;
+
+    // Ignore inspector elements
+    if (e.target.closest("#agent-pilot-cursor-layer") || 
+        e.target.closest("#agent-pilot-inspector-box") || 
+        e.target.closest("#agent-pilot-inspector-tooltip") ||
+        e.target.closest("#agent-pilot-crop-overlay")) {
+      return;
+    }
+
+    const target = e.target;
+    const rect = target.getBoundingClientRect();
+
+    inspectorBox.style.display = "block";
+    inspectorBox.style.left = `${rect.left}px`;
+    inspectorBox.style.top = `${rect.top}px`;
+    inspectorBox.style.width = `${rect.width}px`;
+    inspectorBox.style.height = `${rect.height}px`;
+
+    const selector = getElementSelector(target);
+    const classes = target.className && typeof target.className === "string" 
+      ? target.className.trim().split(/\s+/).slice(0, 2).map(c => `.${c}`).join("") 
+      : "";
+
+    const safeTag = escapeHtml(target.tagName.toLowerCase());
+    const safeClasses = escapeHtml(classes);
+    const safeSelector = escapeHtml(selector);
+
+    inspectorTooltip.innerHTML = `
+      <div class="agent-pilot-tooltip-header">
+        <span class="agent-pilot-tag">&lt;${safeTag}&gt;</span>
+        <span class="agent-pilot-class">${safeClasses}</span>
+        <span class="agent-pilot-dimensions">${Math.round(rect.width)} × ${Math.round(rect.height)}</span>
+      </div>
+      <div class="agent-pilot-selector">${safeSelector}</div>
+      <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Tọa độ: (${Math.round(rect.left)}, ${Math.round(rect.top)})</div>
+    `;
+
+    // Position tooltip above or below element
+    let tooltipTop = rect.top - 54;
+    if (tooltipTop < 10) tooltipTop = rect.bottom + 10;
+    let tooltipLeft = Math.max(10, Math.min(rect.left, window.innerWidth - 390));
+
+    inspectorTooltip.style.top = `${tooltipTop}px`;
+    inspectorTooltip.style.left = `${tooltipLeft}px`;
+    inspectorTooltip.style.display = "block";
+  }
+
+  function handleInspectorClick(e) {
+    if (!isInspectorActive) return;
+
+    if (e.target.closest("#agent-pilot-cursor-layer") || 
+        e.target.closest("#agent-pilot-inspector-box") || 
+        e.target.closest("#agent-pilot-inspector-tooltip")) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    lockedElement = e.target;
+    const details = getDetailedElementInfo(lockedElement);
+
+    // Highlight locked element
+    inspectorBox.style.borderColor = "#f59e0b";
+    inspectorBox.style.boxShadow = "0 0 20px rgba(245, 158, 11, 0.6)";
+
+    // Send element data to Side Panel
+    chrome.runtime.sendMessage({
+      type: "ELEMENT_SELECTED",
+      details
+    }).catch(() => {});
+
+    showToast(`Đã chọn phần tử: &lt;${escapeHtml(details.tagName)}&gt; (${details.rect.width}×${details.rect.height})`);
+  }
+
+  function toggleInspector(enabled) {
+    isInspectorActive = enabled;
+    if (enabled) {
+      document.addEventListener("mousemove", handleInspectorMouseMove, true);
+      document.addEventListener("click", handleInspectorClick, true);
+      showToast("🎯 Chế độ soi phần tử: Đã BẬT. Di chuột để soi, click để chọn.");
+    } else {
+      document.removeEventListener("mousemove", handleInspectorMouseMove, true);
+      document.removeEventListener("click", handleInspectorClick, true);
+      inspectorBox.style.display = "none";
+      inspectorTooltip.style.display = "none";
+      showToast("🎯 Chế độ soi phần tử: Đã TẮT.");
+    }
+  }
+
+  // =========================================================================
+  // 3. Region Screenshot Crop Overlay
+  // =========================================================================
+
+  const cropOverlay = document.createElement("div");
+  cropOverlay.id = "agent-pilot-crop-overlay";
+  cropOverlay.innerHTML = `
+    <div id="agent-pilot-crop-box">
+      <div class="agent-pilot-crop-toolbar">
+        <span class="agent-pilot-crop-dims" id="agent-pilot-crop-dims">0 × 0</span>
+        <button class="agent-pilot-crop-btn" id="agent-pilot-crop-confirm">✓ Chụp vùng này</button>
+        <button class="agent-pilot-crop-btn cancel" id="agent-pilot-crop-cancel">✕ Hủy</button>
+      </div>
+    </div>
+  `;
+  document.documentElement.appendChild(cropOverlay);
+
+  const cropBox = document.getElementById("agent-pilot-crop-box");
+  const cropDims = document.getElementById("agent-pilot-crop-dims");
+  const cropConfirmBtn = document.getElementById("agent-pilot-crop-confirm");
+  const cropCancelBtn = document.getElementById("agent-pilot-crop-cancel");
+
+  function startRegionCrop() {
+    cropOverlay.style.display = "block";
+    cropBox.style.display = "none";
+    cropState.active = false;
+
+    function onMouseDown(e) {
+      if (e.target.closest(".agent-pilot-crop-toolbar")) return;
+      cropState.active = true;
+      cropState.startX = e.clientX;
+      cropState.startY = e.clientY;
+      cropBox.style.left = `${e.clientX}px`;
+      cropBox.style.top = `${e.clientY}px`;
+      cropBox.style.width = "0px";
+      cropBox.style.height = "0px";
+      cropBox.style.display = "block";
+    }
+
+    function onMouseMove(e) {
+      if (!cropState.active) return;
+      const x = Math.min(e.clientX, cropState.startX);
+      const y = Math.min(e.clientY, cropState.startY);
+      const w = Math.abs(e.clientX - cropState.startX);
+      const h = Math.abs(e.clientY - cropState.startY);
+
+      cropBox.style.left = `${x}px`;
+      cropBox.style.top = `${y}px`;
+      cropBox.style.width = `${w}px`;
+      cropBox.style.height = `${h}px`;
+      cropDims.textContent = `${w} × ${h}`;
+
+      cropState.currentRect = { x, y, width: w, height: h };
+    }
+
+    function onMouseUp() {
+      cropState.active = false;
+    }
+
+    cropOverlay.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+
+    function cleanup() {
+      cropOverlay.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      cropOverlay.style.display = "none";
+    }
+
+    cropCancelBtn.onclick = () => {
+      cleanup();
+      showToast("Đã hủy chụp vùng.");
+    };
+
+    cropConfirmBtn.onclick = () => {
+      if (!cropState.currentRect || cropState.currentRect.width < 5 || cropState.currentRect.height < 5) {
+        showToast("Vui lòng kéo chọn vùng lớn hơn!");
+        return;
+      }
+      const clip = { ...cropState.currentRect };
+      cleanup();
+
+      // Send to side panel / background
+      chrome.runtime.sendMessage({
+        type: "REGION_CROP_REQUESTED",
+        clip
+      }).catch(() => {});
+    };
+  }
+
+  // =========================================================================
+  // 4. Color Eyedropper Subsystem
+  // =========================================================================
+
+  function hexToRgb(hex) {
+    const clean = hex.replace("#", "");
+    const bigint = parseInt(clean, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+    if (max === min) {
+      h = s = 0;
+    } else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
+  }
+
+  async function pickColor() {
+    if (window.EyeDropper) {
+      try {
+        const eyeDropper = new window.EyeDropper();
+        const result = await eyeDropper.open();
+        const hex = result.sRGBHex;
+        const rgb = hexToRgb(hex);
+
+        // Parse RGB numbers for HSL
+        const matches = rgb.match(/\d+/g);
+        const hsl = matches ? rgbToHsl(parseInt(matches[0]), parseInt(matches[1]), parseInt(matches[2])) : "";
+
+        // Copy to clipboard
+        navigator.clipboard.writeText(hex).catch(() => {});
+
+        showToast(`🎨 Đã lấy màu: <b>${hex}</b> (đã copy vào clipboard)`);
+
+        chrome.runtime.sendMessage({
+          type: "COLOR_PICKED",
+          color: { hex, rgb, hsl, timestamp: Date.now() }
+        }).catch(() => {});
+
+        return { hex, rgb, hsl };
+      } catch (err) {
+        // User canceled picker
+        return null;
+      }
+    } else {
+      showToast("⚠️ Trình duyệt chưa hỗ trợ native EyeDropper API!");
+      return null;
+    }
+  }
+
+  // =========================================================================
+  // 5. Floating Toast Notification
+  // =========================================================================
+
+  function showToast(htmlMessage) {
+    const existing = document.querySelector(".agent-pilot-toast");
+    if (existing) existing.remove();
+
+    const toast = document.createElement("div");
+    toast.className = "agent-pilot-toast";
+    toast.innerHTML = `<span>🚀</span><div>${htmlMessage}</div>`;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transition = "opacity 0.4s ease";
+      setTimeout(() => toast.remove(), 400);
+    }, CONFIG.TOAST_DURATION);
+  }
+
+  // =========================================================================
+  // 6. Antigravity-First Global Bridge API (`window.__AGENT_PILOT__`)
+  // =========================================================================
+
+  window.__AGENT_PILOT__ = {
+    version: "1.0.0",
+    moveMouse: moveVirtualMouse,
+    click: virtualClick,
+    type: virtualType,
+    scroll: virtualScroll,
+    toggleInspector: toggleInspector,
+    getElement: (selector) => {
+      const el = document.querySelector(selector);
+      return getDetailedElementInfo(el);
+    },
+    startRegionCrop: startRegionCrop,
+    pickColor: pickColor,
+    getLockedElement: () => (lockedElement ? getDetailedElementInfo(lockedElement) : null),
+    getCursorPosition: () => ({ x: currentMouseX, y: currentMouseY })
+  };
+
+  // Bridge to Main World so page scripts, DevTools Console and Agents can access window.__AGENT_PILOT__
+  try {
+    const bridgeScript = document.createElement("script");
+    bridgeScript.textContent = `
+      (() => {
+        if (window.__AGENT_PILOT__) return;
+        function sendBridgeRequest(action, data = {}) {
+          return new Promise((resolve) => {
+            const reqId = "ap_" + Math.random().toString(36).substr(2, 9);
+            function onResponse(e) {
+              if (e.detail && e.detail.reqId === reqId) {
+                window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
+                resolve(e.detail.result);
+              }
+            }
+            window.addEventListener("__AGENT_PILOT_RESP__", onResponse);
+            window.dispatchEvent(new CustomEvent("__AGENT_PILOT_REQ__", {
+              detail: { reqId, action, data }
+            }));
+          });
+        }
+
+        window.__AGENT_PILOT__ = {
+          version: "1.0.0",
+          moveMouse: (x, y, duration) => sendBridgeRequest("virtual_mouse_move", { x, y, duration }),
+          click: (x, y) => sendBridgeRequest("virtual_mouse_click", { x, y }),
+          type: (selector, text) => sendBridgeRequest("virtual_type", { selector, text }),
+          scroll: (deltaX, deltaY) => sendBridgeRequest("virtual_scroll", { deltaX, deltaY }),
+          toggleInspector: (enabled) => sendBridgeRequest("toggle_inspector", { enabled }),
+          getElement: (selector) => sendBridgeRequest("get_element_info", { selector }),
+          pickColor: () => sendBridgeRequest("pick_color", {}),
+          getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {})
+        };
+      })();
+    `;
+    (document.head || document.documentElement).appendChild(bridgeScript);
+    bridgeScript.remove();
+  } catch (e) {}
+
+  // Listen for bridge requests from Main World
+  window.addEventListener("__AGENT_PILOT_REQ__", async (e) => {
+    if (!e.detail) return;
+    const { reqId, action, data } = e.detail;
+    let result = null;
+    if (action === "virtual_mouse_move") result = await moveVirtualMouse(data.x, data.y, data.duration);
+    else if (action === "virtual_mouse_click") result = await virtualClick(data.x, data.y);
+    else if (action === "virtual_type") result = await virtualType(data.selector, data.text);
+    else if (action === "virtual_scroll") result = virtualScroll(data.deltaX, data.deltaY);
+    else if (action === "toggle_inspector") { toggleInspector(data.enabled); result = { success: true }; }
+    else if (action === "get_element_info") {
+      const el = document.querySelector(data.selector);
+      result = getDetailedElementInfo(el);
+    }
+    else if (action === "pick_color") result = await pickColor();
+    else if (action === "get_cursor_pos") result = { x: currentMouseX, y: currentMouseY };
+
+    window.dispatchEvent(new CustomEvent("__AGENT_PILOT_RESP__", {
+      detail: { reqId, result }
+    }));
+  });
+
+  // Listen for messages from Background & Side Panel
+  chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
+    if (req.action === "virtual_mouse_move" || req.action === "move_cursor") {
+      moveVirtualMouse(req.x, req.y, req.duration || 300).then(sendResponse);
+      return true;
+    }
+
+    if (req.action === "virtual_mouse_click" || req.action === "click_cursor") {
+      if (req.selector && (!req.x || !req.y)) {
+        const el = document.querySelector(req.selector);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          req.x = rect.left + rect.width / 2;
+          req.y = rect.top + rect.height / 2;
+        }
+      }
+      virtualClick(req.x, req.y).then(sendResponse);
+      return true;
+    }
+
+    if (req.action === "virtual_type" || req.action === "type_text") {
+      virtualType(req.selector, req.text).then(sendResponse);
+      return true;
+    }
+
+    if (req.action === "virtual_scroll" || req.action === "scroll_page") {
+      sendResponse(virtualScroll(req.deltaX, req.deltaY));
+      return true;
+    }
+
+    if (req.action === "toggle_inspector") {
+      toggleInspector(req.enabled);
+      sendResponse({ success: true, active: isInspectorActive });
+      return true;
+    }
+
+    if (req.action === "get_element_info") {
+      const el = req.selector ? document.querySelector(req.selector) : lockedElement;
+      const details = el ? getDetailedElementInfo(el) : null;
+      sendResponse({ success: !!el, ...(details || {}), details });
+      return true;
+    }
+
+    if (req.action === "start_region_crop") {
+      startRegionCrop();
+      sendResponse({ success: true });
+      return true;
+    }
+
+    if (req.action === "pick_color") {
+      pickColor().then((color) => sendResponse({ success: !!color, color }));
+      return true;
+    }
+
+    if (req.action === "ping") {
+      sendResponse({ success: true, status: "ready" });
+      return true;
+    }
+  });
+
+  console.log("🚀 [Agent Pilot] Injected and ready for AI Agent control. Antigravity-First.");
+})();

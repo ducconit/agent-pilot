@@ -1,0 +1,768 @@
+/**
+ * Agent Pilot - Side Panel Stylesheet
+ * Cybernetic Dark Mode UI with Neon Accents
+ */
+
+:root {
+  --bg-primary: #090d16;
+  --bg-secondary: #0f172a;
+  --bg-tertiary: #1e293b;
+  --bg-hover: #334155;
+  --border-color: #1e293b;
+  --border-light: #334155;
+  --border-accent: #0284c7;
+
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --accent-cyan: #38bdf8;
+  --accent-blue: #0284c7;
+  --accent-purple: #818cf8;
+  --accent-green: #34d399;
+  --accent-red: #f43f5e;
+  --accent-yellow: #fbbf24;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ==========================================================================
+   1. Header
+   ========================================================================== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: linear-gradient(90deg, #38bdf8, #818cf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.debugger-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  box-shadow: 0 0 6px var(--text-muted);
+  transition: all 0.3s;
+}
+
+.status-indicator.connected {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+}
+
+/* AI Agent Bridge Bar */
+.agent-bridge-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(15, 23, 42, 0.9);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 11px;
+}
+
+.bridge-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+
+.status-dot.connected {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+}
+
+.status-dot.disconnected {
+  background: var(--text-muted);
+  box-shadow: none;
+}
+
+.bridge-status-text {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.bridge-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.port-input {
+  width: 65px;
+  padding: 2px 6px;
+  font-size: 11px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--accent-cyan);
+  text-align: center;
+}
+
+/* ==========================================================================
+   2. Nav & URL Bar
+   ========================================================================== */
+.nav-bar {
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.active-tab-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.tab-fav-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.tab-title {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.url-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.url-input {
+  flex: 1;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+/* ==========================================================================
+   3. Navigation Tabs
+   ========================================================================== */
+.tabs-nav {
+  display: flex;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.tabs-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tab-btn.active {
+  color: var(--accent-cyan);
+  border-bottom-color: var(--accent-cyan);
+  background: rgba(56, 189, 248, 0.05);
+}
+
+/* ==========================================================================
+   4. Panels Layout
+   ========================================================================== */
+.panels-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.panel {
+  display: none;
+}
+
+.panel.active {
+  display: block;
+}
+
+/* ==========================================================================
+   5. Cards & UI Controls
+   ========================================================================== */
+.card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.card-title {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.card-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  background: rgba(56, 189, 248, 0.12);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.card-body {
+  padding: 12px;
+}
+
+.coord-inputs {
+  display: flex;
+  gap: 10px;
+}
+
+.input-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.input-group label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.form-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 7px 10px;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.form-input:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.form-select {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 5px 8px;
+  font-size: 11px;
+  outline: none;
+}
+
+.code-editor {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: #38bdf8;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 11px;
+  padding: 8px;
+  outline: none;
+  resize: vertical;
+}
+
+.code-editor:focus {
+  border-color: var(--accent-cyan);
+}
+
+/* Button System */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--accent-blue);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: #0369a1;
+}
+
+.btn-secondary {
+  background: #4338ca;
+  color: #fff;
+}
+.btn-secondary:hover {
+  background: #3730a3;
+}
+
+.btn-success {
+  background: #059669;
+  color: #fff;
+}
+.btn-success:hover {
+  background: #047857;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+}
+.btn-outline:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-secondary);
+}
+
+.btn-icon {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 6px 8px;
+}
+.btn-icon:hover {
+  background: var(--bg-hover);
+}
+
+.btn-text {
+  background: none;
+  border: none;
+  color: var(--accent-cyan);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+}
+.btn-text:hover {
+  text-decoration: underline;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+
+/* ==========================================================================
+   6. DevTools Subpanel Styles
+   ========================================================================== */
+.subtabs-nav {
+  display: flex;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+}
+
+.subtab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: center;
+}
+
+.subtab-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--accent-cyan);
+}
+
+.subpanel {
+  display: none;
+}
+.subpanel.active {
+  display: block;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.log-stream-container, .network-stream-container {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  height: 380px;
+  overflow-y: auto;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 11px;
+  padding: 6px;
+}
+
+.log-entry {
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  gap: 6px;
+  word-break: break-all;
+}
+
+.log-entry.log { color: var(--text-primary); }
+.log-entry.warn { color: var(--accent-yellow); background: rgba(251, 191, 36, 0.06); }
+.log-entry.error { color: var(--accent-red); background: rgba(244, 63, 94, 0.08); }
+
+.log-time {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.net-entry {
+  padding: 5px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.net-badge {
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 9px;
+}
+.net-badge.get { background: #0369a1; color: #fff; }
+.net-badge.post { background: #059669; color: #fff; }
+.net-badge.other { background: #475569; color: #fff; }
+
+.net-status {
+  font-weight: 600;
+}
+.net-status.ok { color: var(--accent-green); }
+.net-status.err { color: var(--accent-red); }
+
+.net-url {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+}
+
+.empty-hint {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 30px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* Performance Metrics Cards */
+.perf-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.metric-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.metric-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.metric-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+   7. Inspector Details & Eyedropper Styles
+   ========================================================================== */
+.inspector-details {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  font-size: 11px;
+}
+
+.detail-row {
+  display: flex;
+  margin-bottom: 6px;
+  gap: 8px;
+}
+.detail-key {
+  color: var(--text-muted);
+  width: 70px;
+  flex-shrink: 0;
+}
+.detail-val {
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  word-break: break-all;
+  flex: 1;
+}
+
+.color-preview-box {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: var(--bg-primary);
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.color-swatch {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border-light);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.color-values {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.palette-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.palette-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.color-chip {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.color-chip:hover {
+  transform: scale(1.15);
+  border-color: #fff;
+}
+
+/* ==========================================================================
+   8. Screenshot Suite Styles
+   ========================================================================== */
+.screenshot-buttons-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.image-preview-wrapper {
+  background: #000;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  max-height: 260px;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-preview-wrapper img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.shot-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+  font-family: monospace;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ==========================================================================
+   9. Sidepanel Toast Notifications
+   ========================================================================== */
+.toast-popup {
+  position: fixed;
+  bottom: 14px;
+  left: 14px;
+  right: 14px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--accent-cyan);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1000;
+}
+
+.toast-popup.visible {
+  opacity: 1;
+  transform: translateY(0);
+}

@@ -1,0 +1,22 @@
+{
+  "name": "agent-pilot",
+  "version": "1.0.0",
+  "description": "Agent Pilot - Universal AI Agent Browser Controller (Antigravity First)",
+  "type": "module",
+  "scripts": {
+    "test": "xvfb-run -a node scripts/verify_all_features.mjs",
+    "test:agent": "xvfb-run -a node scripts/verify_agent_connection.mjs",
+    "server": "node scripts/agent_pilot_server.mjs",
+    "lint": "node -c extentions/background.js && node -c extentions/content.js && node -c extentions/sidepanel.js && node -c scripts/agent_pilot_server.mjs",
+    "sync:agk": "cp scripts/agent_pilot_server.mjs ~/.agk/scripts/agent-pilot/server.mjs && chmod +x ~/.agk/scripts/agent-pilot/server.mjs && bash ~/.agk/build/build.sh && bash ~/.agk/scripts/install.sh --app"
+  },
+  "keywords": ["browser-control", "ai-agent", "chrome-extension", "antigravity", "cdp", "mcp"],
+  "author": "Antigravity Pair Programmer",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.10.0"
+  }
+}

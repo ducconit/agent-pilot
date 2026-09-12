@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Pilot</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <div class="popup-header">
+      <img src="icons/icon32.png" alt="Agent Pilot Logo" class="popup-logo">
+      <div class="popup-title-group">
+        <span class="popup-title">AGENT PILOT</span>
+        <span class="popup-badge">Antigravity-First</span>
+      </div>
+    </div>
+
+    <!-- Active Tab Box -->
+    <div class="active-tab-box">
+      <span class="tab-dot"></span>
+      <span class="tab-title" id="popup-tab-title">Đang kết nối...</span>
+    </div>
+
+    <!-- Primary Launch Action -->
+    <button class="btn btn-launch" id="btn-open-sidepanel">
+      <span>🚀</span> Mở Bảng Điều Khiển (Side Panel)
+    </button>
+
+    <!-- Quick Tool Buttons -->
+    <div class="quick-tools-grid">
+      <button class="tool-btn" id="btn-quick-screenshot">
+        <span>📸</span>
+        <span>Chụp nhanh</span>
+      </button>
+      <button class="tool-btn" id="btn-quick-inspect">
+        <span>🎯</span>
+        <span>Soi phần tử</span>
+      </button>
+      <button class="tool-btn" id="btn-quick-color">
+        <span>🎨</span>
+        <span>Lấy màu</span>
+      </button>
+      <button class="tool-btn" id="btn-quick-newtab">
+        <span>➕</span>
+        <span>Tab mới</span>
+      </button>
+    </div>
+
+    <!-- Footer shortcut info -->
+    <div class="popup-footer">
+      <span>Phím tắt mở nhanh: <kbd>Alt+Shift+P</kbd></span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
