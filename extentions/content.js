@@ -955,5 +955,22 @@
     }
   });
 
+  // Keep background service worker alive and connected to Agent Pilot bridge
+  function setupServiceWorkerKeepAlive() {
+    try {
+      if (!chrome.runtime || !chrome.runtime.connect) return;
+      const port = chrome.runtime.connect({ name: "agent-pilot-keepalive" });
+      port.onDisconnect.addListener(() => {
+        // Automatically reconnect after a short delay if context is still valid
+        setTimeout(() => {
+          try {
+            setupServiceWorkerKeepAlive();
+          } catch (_) {}
+        }, 1500);
+      });
+    } catch (_) {}
+  }
+  setupServiceWorkerKeepAlive();
+
   console.log("🚀 [Agent Pilot] Injected and ready for AI Agent control. Antigravity-First.");
 })();

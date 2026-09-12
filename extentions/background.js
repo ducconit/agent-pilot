@@ -190,8 +190,32 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   tabLockStates.delete(tabId);
 });
 
+// Re-ensure agent bridge connection on tab activation
+if (chrome.tabs && chrome.tabs.onActivated) {
+  chrome.tabs.onActivated.addListener(() => {
+    if (typeof agentBridge !== "undefined" && agentBridge && !agentBridge.connected && agentBridge.enabled) {
+      agentBridge.connect();
+    }
+  });
+}
+
+// Accept keep-alive port connections from content scripts or sidepanel
+if (chrome.runtime && chrome.runtime.onConnect) {
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name === "agent-pilot-keepalive") {
+      if (typeof agentBridge !== "undefined" && agentBridge && !agentBridge.connected && agentBridge.enabled) {
+        agentBridge.connect();
+      }
+      port.onDisconnect.addListener(() => {});
+    }
+  });
+}
+
 // Re-notify agent tabs and restore lock state when navigation completes
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (typeof agentBridge !== "undefined" && agentBridge && !agentBridge.connected && agentBridge.enabled) {
+    agentBridge.connect();
+  }
   if (changeInfo.status === "complete") {
     if (agentControlledTabs.has(tabId)) {
       if (typeof agentBridge !== "undefined" && agentBridge && typeof agentBridge.sendTabMessageWithRetry === "function") {
@@ -730,8 +754,15 @@ class AgentBridgeClient {
   }
 
   connect() {
-    if (!this.enabled || this.ws) return;
+    if (!this.enabled) return;
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
     this.clearReconnect();
+    if (this.ws) {
+      try { this.ws.close(); } catch {}
+      this.ws = null;
+    }
 
     const url = `ws://127.0.0.1:${this.port}`;
     try {
@@ -1242,4 +1273,20 @@ class AgentBridgeClient {
 
 // Initialize the WebSocket bridge client
 const agentBridge = new AgentBridgeClient();
+
+// Periodic keepalive alarm (every ~24s = 0.4 min) to wake up and keep connection active
+if (chrome.alarms) {
+  chrome.alarms.create("agent_pilot_bridge_keepalive", { periodInMinutes: 0.4 });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "agent_pilot_bridge_keepalive") {
+      if (typeof agentBridge !== "undefined" && agentBridge) {
+        if (!agentBridge.connected && agentBridge.enabled) {
+          agentBridge.connect();
+        } else if (agentBridge.connected) {
+          agentBridge.send({ type: "HEARTBEAT", timestamp: Date.now() });
+        }
+      }
+    }
+  });
+}
 

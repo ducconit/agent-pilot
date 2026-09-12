@@ -49,7 +49,8 @@
     "scripting",
     "storage",
     "sidePanel",
-    "contextMenus"
+    "contextMenus",
+    "alarms"
   ],
   "host_permissions": [
     "<all_urls>"
