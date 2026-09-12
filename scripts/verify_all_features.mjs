@@ -215,6 +215,12 @@ async function run() {
         hasCssSearch: !!document.getElementById("inspector-css-search"),
         hasCopyAllCss: !!document.getElementById("btn-copy-all-css"),
         hasCopyAllOverview: !!document.getElementById("btn-copy-all-overview"),
+        hasSlimScrollbar: (() => {
+          const rules = Array.from(document.styleSheets).flatMap(s => {
+            try { return Array.from(s.cssRules || []); } catch (_) { return []; }
+          });
+          return rules.some(r => r.selectorText && r.selectorText.includes("::-webkit-scrollbar"));
+        })(),
         captureElementText: document.getElementById("btn-capture-element")?.textContent.replace(/\s+/g, " ").trim(),
         hasAutoCopySwitch: !!document.getElementById("toggle-auto-copy-shot")
       };
@@ -300,11 +306,12 @@ async function run() {
                         sidepanelCheck.hasCssSearch &&
                         sidepanelCheck.hasCopyAllOverview === true &&
                         overviewCopyTest.success === true &&
+                        sidepanelCheck.hasSlimScrollbar === true &&
                         sidepanelCheck.captureElementText === "🎯 Chụp phần tử" &&
                         sidepanelCheck.hasAutoCopySwitch === true &&
                         guideTest.opened === true &&
                         guideTest.singleTab === true;
-    record("8. Side Panel Control Center UI (Beta Badge, Slogan, Guide Tab Focus & Overview Copy All)", sidepanelOk, `Badge: "BETA" (${sidepanelCheck.hasBetaBadge}), Slogan: "${sidepanelCheck.brandSub}", Overview Copy Rows: ${overviewCopyTest.rowCount}, Copy All: ${overviewCopyTest.hasCopyAllBtn}`);
+    record("8. Side Panel Control Center UI (Beta Badge, Slogan, Slim Scrollbar & Overview Copy All)", sidepanelOk, `Badge: "BETA" (${sidepanelCheck.hasBetaBadge}), Slogan: "${sidepanelCheck.brandSub}", Slim Scrollbar: ${sidepanelCheck.hasSlimScrollbar}, Copy All: ${overviewCopyTest.hasCopyAllBtn}`);
     // Keep sidepanelPage open to test Extension IPC messaging
     // 10. Test Chrome DevTools Protocol (CDP) via Background Service Worker
     console.log("\n--- KIỂM THỬ CHROME DEVTOOLS PROTOCOL (CDP ENGINE) ---");
