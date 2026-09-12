@@ -412,9 +412,19 @@ async function run() {
     const bgShotRes = await sendAgentCommand("page.screenshot", { tabId, mode: "visible" });
     const bgShotSuccess = bgShotRes?.success && bgShotRes?.isBackgroundTab === true && bgShotRes?.dataUrl?.startsWith("data:image/png;base64,");
     record("18. Background Tab Screenshot via CDP", bgShotSuccess, `Background tab ${tabId} captured silently via CDP while user was on active tab`);
+
+    // 19. Test Background Screenshot Privacy Isolation (Must NOT leak active tab on failure)
+    let privacyLeakDetected = false;
+    try {
+      const invalidBgShotRes = await sendAgentCommand("page.screenshot", { tabId: 999999999, mode: "visible" });
+      if (invalidBgShotRes && invalidBgShotRes.success) privacyLeakDetected = true;
+    } catch (_) {
+      // Expected to throw or return error
+    }
+    record("19. Privacy Isolation for Background Screenshot", !privacyLeakDetected, `Invalid background tab correctly rejected without leaking foreground user screen`);
     await userActivePage.close();
 
-    // 19. Test HTTP API Endpoint (POST http://127.0.0.1:58765/api)
+    // 20. Test HTTP API Endpoint (POST http://127.0.0.1:58765/api)
     const httpRes = await new Promise((resolve) => {
       const req = http.request(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
         method: "POST",
@@ -430,9 +440,9 @@ async function run() {
       req.write(JSON.stringify({ method: "ping" }));
       req.end();
     });
-    record("19. HTTP REST/JSON-RPC API Endpoint", httpRes?.success === true && httpRes?.result?.pong === true, `POST /api response: pong=true`);
+    record("20. HTTP REST/JSON-RPC API Endpoint", httpRes?.success === true && httpRes?.result?.pong === true, `POST /api response: pong=true`);
 
-    // 20. Test Side Panel UI displays Agent Connection Status
+    // 21. Test Side Panel UI displays Agent Connection Status
     const swTarget = await browser.waitForTarget(t => t.type() === "service_worker");
     const extId = swTarget.url().split("/")[2];
     const sidepanelPage = await browser.newPage();
@@ -448,7 +458,7 @@ async function run() {
     });
 
     const isSidepanelConnected = sidepanelBridgeStatus.dotClass?.includes("connected") && sidepanelBridgeStatus.portVal === String(BRIDGE_PORT);
-    record("20. Side Panel Agent Status Indicator", isSidepanelConnected, `Badge: "${sidepanelBridgeStatus.text}", Dot: ${sidepanelBridgeStatus.dotClass}`);
+    record("21. Side Panel Agent Status Indicator", isSidepanelConnected, `Badge: "${sidepanelBridgeStatus.text}", Dot: ${sidepanelBridgeStatus.dotClass}`);
 
     await sidepanelPage.close();
 

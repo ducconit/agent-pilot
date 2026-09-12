@@ -192,6 +192,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   const state = tabLockStates.get(tabId);
   if (state && state.unlockTimer) clearTimeout(state.unlockTimer);
   tabLockStates.delete(tabId);
+  if (typeof agentBridge !== "undefined" && agentBridge && agentBridge.lastAgentTabId === tabId) {
+    agentBridge.lastAgentTabId = null;
+  }
 });
 
 // Re-ensure agent bridge connection on tab activation
@@ -556,8 +559,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               });
             } catch (err) {
               console.warn("[AgentPilot] CDP runtime screenshot failed on tab " + targetTabId + ":", err);
+              if (!isTabActive) {
+                return sendResponse({
+                  success: false,
+                  error: `CDP screenshot failed on background tab ${targetTabId}: ${err?.message || err}`
+                });
+              }
             }
+          } else if (!isTabActive) {
+            return sendResponse({
+              success: false,
+              error: `Cannot capture background tab ${targetTabId}: CDP debugger attachment failed`
+            });
           }
+        }
+
+        if (!isTabActive) {
+          return sendResponse({
+            success: false,
+            error: `Cannot capture background tab ${targetTabId} without active CDP`
+          });
         }
 
         // Fallback to captureVisibleTab (captures active tab in the window)
@@ -685,16 +706,6 @@ class AgentBridgeClient {
     this.maxReconnectDelay = 20000;
     this.enabled = true;
     this.lastAgentTabId = null;
-
-    // Track tab closures to avoid stale references
-    if (chrome.tabs && chrome.tabs.onRemoved) {
-      chrome.tabs.onRemoved.addListener((tabId) => {
-        agentControlledTabs.delete(tabId);
-        if (this.lastAgentTabId === tabId) {
-          this.lastAgentTabId = null;
-        }
-      });
-    }
 
     // Listen for window focus changes to update active target in multi-window setups
     if (chrome.windows && chrome.windows.onFocusChanged) {
@@ -909,11 +920,15 @@ class AgentBridgeClient {
   }
 
   async getTargetTabId(requestedTabId) {
-    if (requestedTabId) {
+    if (requestedTabId !== undefined && requestedTabId !== null) {
+      const numId = Number(requestedTabId);
+      if (isNaN(numId)) return null;
       try {
-        const tab = await chrome.tabs.get(Number(requestedTabId));
-        if (tab && tab.id) return tab.id;
-      } catch (_) {}
+        const tab = await chrome.tabs.get(numId);
+        return tab?.id || null;
+      } catch (_) {
+        return null; // Explicitly requested tab not found, never silently fallback
+      }
     }
     // If agent previously opened or navigated a tab, prioritize that tab
     if (this.lastAgentTabId) {
@@ -1372,8 +1387,17 @@ class AgentBridgeClient {
                 });
               } catch (cdpErr) {
                 console.warn("[AgentPilot] CDP screenshot failed on tab " + tabId + ":", cdpErr?.message || cdpErr);
+                if (!isTabActive) {
+                  return respond(null, new Error(`CDP screenshot failed on background tab ${tabId}: ${cdpErr?.message || cdpErr}`));
+                }
               }
+            } else if (!isTabActive) {
+              return respond(null, new Error(`Cannot capture background tab ${tabId}: CDP debugger attachment failed`));
             }
+          }
+
+          if (!isTabActive) {
+            return respond(null, new Error(`Cannot capture background tab ${tabId} without active CDP`));
           }
 
           // Fallback: captureVisibleTab on window (only captures the active tab of window)
