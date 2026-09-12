@@ -44,9 +44,9 @@ Agent Pilot includes an automatic **Dual Mode** engine:
 
 ---
 
-## 🛠️ Available MCP Tools (14 Tools)
+## 🛠️ Available MCP Tools (16 Tools)
 
-When the `agent-pilot` MCP server or skill is active, agents have direct access to the following 14 tools:
+When the `agent-pilot` MCP server or skill is active, agents have direct access to the following 16 tools:
 
 | Tool Name | Key Parameters | Description |
 | :--- | :--- | :--- |
@@ -64,8 +64,29 @@ When the `agent-pilot` MCP server or skill is active, agents have direct access 
 | `browser_list_instances` | `{}` | Lists all connected browser instances (Chrome, Brave, Edge, profiles/windows). |
 | `browser_select_instance` | `{ instanceId: string }` | Switches active target browser instance in multi-browser setups. |
 | `browser_set_busy` | `{ busy?: boolean, action?: string, tabId?: number }` | Displays an operator lock shield banner on the target page during mission-critical agent workflows. |
+| `browser_get_pending_feedback` | `{ sessionId?: string, limit?: number, clear?: boolean }` | **Channel B Feedback Reader**: Retrieves pending human visual UI feedback sessions saved in `~/.agent-pilot/inbox/feedback/<timestamp>/*` with component source paths, line numbers, CSS selectors, user notes, and screenshots. |
+| `browser_wait_for_feedback` | `{ timeout?: number, tabId?: number }` | **Channel A Reactive Long-Polling**: Reactively halts agent execution until a human submits visual feedback via Feedback Studio in the browser (or until timeout). Returns complete metadata, source locations, notes, and screenshots immediately upon submission. |
 
 ---
+
+## 🎨 3-Channel Visual UI Feedback System
+
+Agent Pilot bridges the communication gap between human users and AI coding agents through 3 complementary feedback channels:
+
+1. **Kênh A (Reactive Long-Polling)**:
+   - Agent calls `browser_wait_for_feedback({ timeout: 120 })` to pause and wait for user guidance.
+   - User enters **Feedback Studio** in browser, marks elements/crops, writes notes, and clicks **"🚀 Gửi Agent"**.
+   - Long-poll resolves immediately, passing exact file locations (`src/components/Navbar.tsx:42`), component names (`<Navbar />`), CSS rules, and screenshots to the agent.
+2. **Kênh B (Shared Inbox File Storage)**:
+   - User clicks **"💾 Lưu Inbox"** in Feedback Studio or Sidepanel.
+   - Extension transmits items to `~/.agent-pilot/inbox/feedback/<timestamp>/*`:
+     - `session.json` (metadata, count, component mapping, user notes).
+     - `prompt.md` (clean markdown without base64 bloat).
+     - `item_1.png`, `item_2.png` (binary PNG screenshots).
+   - Agent calls `browser_get_pending_feedback()` at any time to inspect pending requests.
+3. **Kênh C (1-Click Clipboard Prompt)**:
+   - User clicks **"📋 Copy Prompt"** in Feedback Studio or Sidepanel.
+   - Formats a comprehensive markdown prompt into the clipboard, ready to paste into any chat or prompt box.
 
 ## 🔒 Secret & Private Key Redaction Layer
 

@@ -555,6 +555,7 @@
         <a href="#section-inspector" class="jump-btn">🎯 Soi DOM & CSS</a>
         <a href="#section-eyedropper" class="jump-btn">🎨 Kính lúp Lấy màu</a>
         <a href="#section-screenshot" class="jump-btn">📸 Chụp ảnh & Auto-Copy</a>
+        <a href="#section-feedback" class="jump-btn">💬 Góp ý & Feedback Studio</a>
         <a href="#section-shortcuts" class="jump-btn">⌨️ Phím tắt & Thao tác</a>
       </div>
     </section>
@@ -887,11 +888,57 @@
       </div>
     </section>
 
-    <!-- SECTION 6: KEYBOARD SHORTCUTS -->
+    <!-- SECTION 6: VISUAL UI FEEDBACK STUDIO -->
+    <section id="section-feedback">
+      <div class="section-title-wrap">
+        <span class="section-icon">💬</span>
+        <h2 class="section-title">6. Visual UI Feedback Studio & 3 Kênh Giao Tiếp Cho AI Agent</h2>
+      </div>
+
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <span class="card-icon">🚀</span>
+          <h3 class="card-title">Giải Pháp Cho Bài Toán Chỉ Điểm Vị Trí Cần Sửa Cho Coding Agent</h3>
+        </div>
+        <p class="card-desc">
+          Khi giao tiếp với AI Agent, người dùng thường gặp khó khăn trong việc mô tả chính xác vị trí lỗi hoặc component cần sửa. <strong>Feedback Studio</strong> giải quyết triệt để vấn đề này bằng cách kết hợp thanh công cụ trực quan in-page (HUD), bóc tách tệp nguồn framework (React Fiber, Vue, Astro:line) và hỗ trợ 3 kênh giao tiếp độc lập.
+        </p>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">🎯</span>
+            <h3 class="card-title">4 Chế Độ Thu Thập Phản Hồi Đa Điểm</h3>
+          </div>
+          <ul class="features-list">
+            <li><strong>Chọn phần tử (Element)</strong>: Rà chuột bắt dính phần tử, tự động trích xuất tên Component, tệp nguồn (vd: <code>src/components/Navbar.tsx:42</code>) và cắt ảnh riêng phần tử đó.</li>
+            <li><strong>Kéo chọn vùng (Region)</strong>: Kéo thả chuột tự do trên màn hình để khoanh vùng bất kỳ khu vực lỗi nào.</li>
+            <li><strong>Màn hình hiện tại (Screen)</strong>: Chụp toàn bộ viewport và mở công cụ ghim điểm (Pins) đánh dấu nhiều vị trí trên cùng 1 ảnh.</li>
+            <li><strong>Toàn trang (Full Page)</strong>: Chụp toàn bộ trang web dài từ đầu đến cuối không bị che khuất.</li>
+            <li><strong>Quản lý linh hoạt</strong>: Chế độ Feedback duy trì liên tục trên trang web cho đến khi người dùng bấm <strong>Ngừng feedback</strong>. Danh sách các mục đã chọn có thể sửa đổi ghi chú hoặc xóa bất kỳ lúc nào.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">📡</span>
+            <h3 class="card-title">3 Kênh Giao Tiếp Phản Hồi Độc Lập</h3>
+          </div>
+          <ul class="features-list">
+            <li><strong>Kênh A (Live Push & Long-Polling)</strong>: Agent gọi công cụ <code>browser_wait_for_feedback</code> để tạm dừng chờ người dùng. Khi người dùng bấm <strong>"🚀 Gửi Agent"</strong>, toàn bộ ảnh, vị trí code và ghi chú lập tức truyền trực tiếp về cho Agent.</li>
+            <li><strong>Kênh B (Shared Inbox File System)</strong>: Bấm <strong>"💾 Lưu Inbox"</strong> để lưu phiên phản hồi vào thư mục <code>~/.agent-pilot/inbox/feedback/&lt;timestamp&gt;/*</code> (gồm <code>session.json</code>, <code>prompt.md</code>, và các ảnh <code>item_*.png</code>). Agent có thể đọc bất kỳ lúc nào bằng <code>browser_get_pending_feedback</code>.</li>
+            <li><strong>Kênh C (1-Click Clipboard Prompt)</strong>: Bấm <strong>"📋 Copy Prompt"</strong> để sao chép prompt định dạng Markdown hoàn chỉnh chứa toàn bộ ảnh, tệp nguồn component và yêu cầu chỉnh sửa vào Clipboard.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 7: KEYBOARD SHORTCUTS -->
     <section id="section-shortcuts">
       <div class="section-title-wrap">
         <span class="section-icon">⌨️</span>
-        <h2 class="section-title">6. Bảng Phím Tắt & Thao Tác Tiện Lợi</h2>
+        <h2 class="section-title">7. Bảng Phím Tắt & Thao Tác Tiện Lợi</h2>
       </div>
 
       <div class="table-container">

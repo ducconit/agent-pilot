@@ -36,7 +36,8 @@
 | **Soi & Lấy vị trí DOM** | 🎯 | Bắt dính phần tử khi hover, hiển thị kích thước `W × H`, tọa độ `(X, Y)`, trích xuất **CSS Selector** và **XPath**. |
 | **Trích xuất Mã màu** | 🎨 | Kính lúp pixel nhặt màu chính xác (HEX, RGB, HSL), tự động copy và lưu khay lịch sử màu sắc. |
 | **Bộ Chụp Màn Hình** | 📸 | Hỗ trợ 3 chế độ: Chụp toàn khung nhìn, Kéo chọn vùng cắt tùy ý (Crop), và Chụp riêng phần tử DOM đã khóa. |
-| **Tương thích Antigravity** | 🤖 | Tích hợp sẵn bộ chạy kịch bản **JSON Action**, cầu nối `window.__AGENT_PILOT__` và chuẩn hóa cho Antigravity MCP Tools. |
+| **Visual UI Feedback Studio** | 💬 | Chế độ phản hồi giao diện đa điểm: chọn nhiều phần tử, kéo nhiều vùng, đánh dấu ghim (Pins), phát hiện file component nguồn (React/Vue/Astro:line), hỗ trợ 3 kênh giao tiếp (Live Push, Persistent Inbox `~/.agent-pilot/inbox/feedback/`, Clipboard Prompt). |
+| **Tương thích Antigravity** | 🤖 | Tích hợp sẵn bộ chạy kịch bản **JSON Action**, cầu nối `window.__AGENT_PILOT__` và 16 công cụ Antigravity MCP Tools. |
 
 ---
 
@@ -76,8 +77,9 @@ browser-control/
 │   │   ├── lock-shield.js              # Lớp bảo vệ Human Input Lock khi Agent thao tác
 │   │   ├── cursor-simulator.js         # Con trỏ chuột ảo Neon & sóng ripple
 │   │   ├── dom-inspector.js            # Trích xuất thông số DOM & Element Snap
-│   │   └── eyedropper.js               # Kính lúp phóng đại 11x11 lấy mã màu
-│   ├── content.css                     # Stylesheet cho con trỏ, kính lúp, overlay
+│   │   ├── eyedropper.js               # Kính lúp phóng đại 11x11 lấy mã màu
+│   │   └── feedback-studio.js          # Feedback Studio in-page, multi-mode HUD & component inspector
+│   ├── content.css                     # Stylesheet cho con trỏ, kính lúp, overlay & feedback HUD
 │   ├── sidepanel.html                  # Giao diện trung tâm điều khiển Side Panel
 │   ├── sidepanel.css                   # Giao diện Modern Dark Cyberpunk Responsive
 │   ├── sidepanel.js                    # Bộ điều phối UI Side Panel (ES Module)
@@ -85,12 +87,13 @@ browser-control/
 │   │   ├── ui-helpers.js               # Tiện ích giao diện, toast, badge
 │   │   ├── agent-monitor.js            # Giám sát kết nối Agent & Secret Redaction toggle
 │   │   ├── inspector-panel.js          # Thẻ Tổng quan DOM & Kiểu dáng CSS
-│   │   └── screenshot-panel.js         # Studio chụp ảnh & Auto-copy Clipboard
+│   │   ├── screenshot-panel.js         # Studio chụp ảnh & Auto-copy Clipboard
+│   │   └── feedback-panel.js           # Thẻ Góp ý Feedback Studio & kênh xuất Prompt/Inbox/Live
 │   ├── popup.html                      # Popup tiện ích khởi động nhanh
 │   ├── popup.js                        # Xử lý sự kiện popup
 │   ├── popup.css
 │   └── icons/                          # Bộ icon nhận diện chuẩn các kích thước
-├── mcp/agent-pilot/                    # 14 tệp lược đồ chuẩn Single Source of Truth (SSOT)
+├── mcp/agent-pilot/                    # 16 tệp lược đồ chuẩn Single Source of Truth (SSOT)
 ├── scripts/                            # Bộ công cụ build, test, pack & sync cross-platform
 │   ├── agent_pilot_server.mjs          # Máy chủ cầu nối WebSocket & MCP Bridge Server
 │   ├── browser_resolver.mjs            # Tự động tìm kiếm Chrome/Chromium/Edge/Brave đa nền tảng
@@ -98,8 +101,9 @@ browser-control/
 │   ├── pack_extension.mjs              # Đóng gói tiện ích ra file ZIP release
 │   ├── run_test.mjs                    # Bộ chạy test tự động Windows/macOS/Linux
 │   ├── sync_agk.mjs                    # Đồng bộ sang plugin AGK Antigravity
-│   ├── verify_all_features.mjs         # Bộ kiểm thử 14 tính năng cốt lõi trên trình duyệt thật
-│   ├── verify_agent_connection.mjs     # Bộ kiểm thử 27 tính năng kết nối & điều khiển Agent
+│   ├── verify_all_features.mjs         # Bộ kiểm thử 15 tính năng cốt lõi trên trình duyệt thật
+│   ├── verify_agent_connection.mjs     # Bộ kiểm thử 29 tính năng kết nối & điều khiển Agent
+│   ├── verify_feedback_system.mjs      # Bộ kiểm thử hệ thống Feedback Channel B & Channel A
 │   └── verify_secret_sanitizer.mjs     # Bộ kiểm thử 19 kịch bản lọc che giấu Secret/API Key
 ├── test-page.html                      # Trang web tương tác phục vụ kiểm thử tức thì
 └── README.md                           # Tài liệu giới thiệu dự án
@@ -171,10 +175,27 @@ Agent Pilot trang bị sẵn máy chủ WebSocket & MCP Server tại cổng chuy
    ```
 2. **Kiểm thử tự động kết nối AI Agent điều khiển Trình duyệt**:
    ```bash
-   npm run test:agent
+   npm run test:all
    ```
-   *(Bộ test tự động hóa E2E kiểm chứng 27/27 tính năng Agent điều khiển Chrome qua cổng 58765 và 14/14 tính năng Extension đạt 100% PASS).*
+   *(Bộ test tự động hóa E2E kiểm chứng 29/29 tính năng Agent điều khiển Chrome qua cổng 58765, 15/15 tính năng Extension và 8/8 tính năng Feedback đạt 100% PASS).*
 3. **Cấu hình Antigravity MCP**: Xem hướng dẫn 1-click tại [docs/ANTIGRAVITY_INTEGRATION.md](docs/ANTIGRAVITY_INTEGRATION.md).
+
+---
+
+## 🎨 Visual UI Feedback Studio & 3 Kênh Giao Tiếp Phản Hồi
+
+Agent Pilot giải quyết bài toán cốt lõi: **Làm thế nào để AI Agent biết chính xác 100% vị trí giao diện, component nguồn, selector và lỗi UI cần chỉnh sửa do người dùng chỉ định?**
+
+### Các Chế Độ Thu Thập Phản Hồi Trực Quan:
+- 🎯 **Chọn phần tử (Element Mode)**: Rà chuột highlight bất kỳ khối nào trên trang web $\rightarrow$ Bấm chọn để tự động cắt ảnh phần tử và bóc tách tệp nguồn framework (`fileName:lineNumber` của React Fiber, Vue Component, Astro).
+- ✂️ **Kéo chọn vùng (Region Crop Mode)**: Kéo thả chuột tự do để khoanh vùng bất kỳ khu vực nào trên trang web.
+- 📱 **Màn hình hiện tại (Screen Viewport Mode)**: Chụp toàn bộ khung nhìn hiển thị và mở công cụ ghim điểm (Pins) để chú thích nhiều lỗi trên cùng 1 ảnh.
+- 📄 **Toàn bộ trang web (Full Page Mode)**: Tự động cuộn trang và ghép trọn vẹn toàn bộ trang web dài từ đầu đến cuối.
+
+### 3 Kênh Giao Tiếp Độc Lập:
+1. **Kênh A (Reactive Long-Polling)**: Agent gọi công cụ `browser_wait_for_feedback({ timeout: 120 })`. Khi người dùng thao tác xong và bấm **"🚀 Gửi Agent"**, thông tin phản hồi sẽ được truyền thẳng tới Agent ngay lập tức mà không cần copy/paste.
+2. **Kênh B (Hộp thư Inbox Lưu Trữ File)**: Người dùng bấm **"💾 Lưu Inbox"** để lưu phiên phản hồi vào thư mục `~/.agent-pilot/inbox/feedback/<timestamp>/*` (bao gồm `session.json`, `prompt.md`, `item_1.png`,...). Agent có thể đọc mọi lúc thông qua công cụ `browser_get_pending_feedback()`.
+3. **Kênh C (1-Click Sao Chép Markdown Prompt)**: Bấm **"📋 Copy Prompt"** để tạo prompt định dạng Markdown chứa toàn bộ mã nguồn, selector và ảnh minh họa sẵn sàng dán vào khung chat của bất kỳ mô hình AI nào.
 
 ---
 
