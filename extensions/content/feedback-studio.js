@@ -30,6 +30,18 @@
   let cropState = { dragging: false, startX: 0, startY: 0, currentRect: null };
   let pendingCapture = null;
 
+  // Visual Palette for Pinned Regions & Feedback Badges
+  const PIN_COLORS = [
+    { color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", glow: "rgba(56, 189, 248, 0.3)" }, // Sky Blue
+    { color: "#f59e0b", bg: "rgba(245, 158, 11, 0.12)", glow: "rgba(245, 158, 11, 0.3)" }, // Amber
+    { color: "#10b981", bg: "rgba(16, 185, 129, 0.12)", glow: "rgba(16, 185, 129, 0.3)" }, // Emerald
+    { color: "#a855f7", bg: "rgba(168, 85, 247, 0.12)", glow: "rgba(168, 85, 247, 0.3)" }, // Purple
+    { color: "#f43f5e", bg: "rgba(244, 63, 94, 0.12)", glow: "rgba(244, 63, 94, 0.3)" },   // Rose
+    { color: "#06b6d4", bg: "rgba(6, 182, 212, 0.12)", glow: "rgba(6, 182, 212, 0.3)" },   // Cyan
+    { color: "#ec4899", bg: "rgba(236, 72, 153, 0.12)", glow: "rgba(236, 72, 153, 0.3)" }, // Pink
+    { color: "#84cc16", bg: "rgba(132, 204, 22, 0.12)", glow: "rgba(132, 204, 22, 0.3)" }  // Lime
+  ];
+
   // =========================================================================
   // DOM Elements Setup (HUD, Highlighter, Overlay, Popover, Modals)
   // =========================================================================
@@ -81,6 +93,18 @@
   `;
   document.documentElement.appendChild(cropOverlay);
   const cropBox = cropOverlay.querySelector("#ap-feedback-crop-box");
+
+  // 3b. Pinned Visual Layer & Active Draft Highlight
+  const pinnedLayer = document.createElement("div");
+  pinnedLayer.id = "agent-pilot-feedback-pinned-layer";
+  pinnedLayer.className = "agent-pilot-feedback-pinned-layer hidden";
+  document.documentElement.appendChild(pinnedLayer);
+
+  const draftBox = document.createElement("div");
+  draftBox.id = "agent-pilot-feedback-draft-box";
+  draftBox.className = "ap-pinned-box draft hidden";
+  draftBox.innerHTML = `<span class="ap-pinned-badge" id="ap-draft-badge">Đang soạn...</span>`;
+  pinnedLayer.appendChild(draftBox);
 
   // 4. Quick Comment Popover (for Element & Region)
   const commentPopover = document.createElement("div");
@@ -373,6 +397,10 @@
     const clip = {
       x: Math.round(rect.left),
       y: Math.round(rect.top),
+      pageX: Math.round(rect.left + window.scrollX),
+      pageY: Math.round(rect.top + window.scrollY),
+      scrollX: Math.round(window.scrollX),
+      scrollY: Math.round(window.scrollY),
       width: Math.max(10, Math.round(rect.width)),
       height: Math.max(10, Math.round(rect.height)),
       pageWidth: window.innerWidth,
@@ -395,6 +423,7 @@
     // 2. Capture Screenshot & Crop
     try {
       showToast("📸 Đang chụp ảnh phần tử...");
+      showDraftBox(clip, feedbackItems.length + 1);
       const fullShot = await requestCapture("visible");
       const croppedShot = await cropDataUrl(fullShot, clip);
 
@@ -409,6 +438,7 @@
 
       openCommentPopover(pendingCapture, rect);
     } catch (err) {
+      hideDraftBox();
       showToast("❌ Lỗi chụp ảnh: " + err.message);
     }
   }
@@ -464,6 +494,10 @@
     const clip = {
       x: Math.round(rect.x),
       y: Math.round(rect.y),
+      pageX: Math.round(rect.x + window.scrollX),
+      pageY: Math.round(rect.y + window.scrollY),
+      scrollX: Math.round(window.scrollX),
+      scrollY: Math.round(window.scrollY),
       width: Math.round(rect.width),
       height: Math.round(rect.height),
       pageWidth: window.innerWidth,
@@ -473,6 +507,7 @@
 
     try {
       showToast("📸 Đang cắt vùng chọn...");
+      showDraftBox(clip, feedbackItems.length + 1);
       const fullShot = await requestCapture("visible");
       const croppedShot = await cropDataUrl(fullShot, clip);
 
@@ -487,6 +522,7 @@
 
       openCommentPopover(pendingCapture, rect);
     } catch (err) {
+      hideDraftBox();
       showToast("❌ Lỗi chụp vùng chọn: " + err.message);
     }
   }
@@ -513,6 +549,95 @@
     } catch (err) {
       showToast("❌ Lỗi chụp toàn trang: " + err.message);
     }
+  }
+
+  // =========================================================================
+  // Pinned Regions & Active Draft Highlight Layer
+  // =========================================================================
+
+  function showDraftBox(clip, itemNumber) {
+    if (!clip) return;
+    const pageX = (clip.pageX !== undefined) ? clip.pageX : (clip.x + (clip.scrollX !== undefined ? clip.scrollX : window.scrollX));
+    const pageY = (clip.pageY !== undefined) ? clip.pageY : (clip.y + (clip.scrollY !== undefined ? clip.scrollY : window.scrollY));
+
+    draftBox.style.left = `${pageX}px`;
+    draftBox.style.top = `${pageY}px`;
+    draftBox.style.width = `${clip.width}px`;
+    draftBox.style.height = `${clip.height}px`;
+
+    draftBox.classList.toggle("flip-badge-inside", pageY < 28);
+    const badgeEl = draftBox.querySelector("#ap-draft-badge");
+    if (badgeEl) {
+      badgeEl.textContent = `#${itemNumber} (Đang soạn...)`;
+    }
+
+    draftBox.classList.remove("hidden");
+    pinnedLayer.classList.remove("hidden");
+  }
+
+  function hideDraftBox() {
+    draftBox.classList.add("hidden");
+    const hasItemsWithClip = feedbackItems.some(it => it.clip && it.clip.width > 0);
+    if (!hasItemsWithClip) {
+      pinnedLayer.classList.add("hidden");
+    }
+  }
+
+  function renderPinnedBoxes() {
+    // Remove all existing pinned boxes except draftBox
+    pinnedLayer.querySelectorAll(".ap-pinned-box:not(#agent-pilot-feedback-draft-box)").forEach(el => el.remove());
+
+    if (!isFeedbackActive) {
+      pinnedLayer.classList.add("hidden");
+      draftBox.classList.add("hidden");
+      return;
+    }
+
+    const itemsWithClip = feedbackItems.filter(it => it.clip && it.clip.width > 0 && it.clip.height > 0);
+    if (!itemsWithClip.length && draftBox.classList.contains("hidden")) {
+      pinnedLayer.classList.add("hidden");
+      return;
+    }
+
+    pinnedLayer.classList.remove("hidden");
+
+    feedbackItems.forEach((item, idx) => {
+      if (!item.clip || !item.clip.width) return;
+      const palette = PIN_COLORS[idx % PIN_COLORS.length];
+      const pageX = (item.clip.pageX !== undefined) ? item.clip.pageX : (item.clip.x + (item.clip.scrollX !== undefined ? item.clip.scrollX : 0));
+      const pageY = (item.clip.pageY !== undefined) ? item.clip.pageY : (item.clip.y + (item.clip.scrollY !== undefined ? item.clip.scrollY : 0));
+
+      const box = document.createElement("div");
+      box.className = "ap-pinned-box";
+      box.dataset.id = item.id;
+      box.style.setProperty("--box-color", palette.color);
+      box.style.setProperty("--box-bg", palette.bg);
+      box.style.setProperty("--box-glow", palette.glow);
+      box.style.left = `${pageX}px`;
+      box.style.top = `${pageY}px`;
+      box.style.width = `${item.clip.width}px`;
+      box.style.height = `${item.clip.height}px`;
+
+      if (pageY < 28) {
+        box.classList.add("flip-badge-inside");
+      }
+
+      const badge = document.createElement("span");
+      badge.className = "ap-pinned-badge";
+      badge.innerHTML = `
+        <span>#${idx + 1}</span>
+        <button class="ap-pinned-del-btn" title="Xóa vị trí #${idx + 1}">✕</button>
+        ${item.comment ? `<div class="ap-pinned-tooltip"><strong>#${idx + 1}:</strong> ${escapeHtml(item.comment)}</div>` : ""}
+      `;
+
+      badge.querySelector(".ap-pinned-del-btn").onclick = (e) => {
+        e.stopPropagation();
+        deleteFeedbackItem(item.id);
+      };
+
+      box.appendChild(badge);
+      pinnedLayer.appendChild(box);
+    });
   }
 
   // =========================================================================
@@ -561,6 +686,7 @@
   }
 
   function closeCommentPopover() {
+    hideDraftBox();
     pendingCapture = null;
     commentPopover.classList.add("hidden");
   }
@@ -647,6 +773,7 @@
     };
     feedbackItems.push(newItem);
     updateHudCounters();
+    renderPinnedBoxes();
     showToast(`✓ Đã lưu vị trí #${feedbackItems.length} vào danh sách!`);
     return newItem;
   }
@@ -654,6 +781,7 @@
   function deleteFeedbackItem(id) {
     feedbackItems = feedbackItems.filter(item => item.id !== id);
     updateHudCounters();
+    renderPinnedBoxes();
     renderItemsListModal();
     showToast("🗑️ Đã xóa vị trí này.");
   }
@@ -663,6 +791,7 @@
     if (item) {
       item.comment = newComment;
       updateHudCounters();
+      renderPinnedBoxes();
       renderItemsListModal();
       showToast("✓ Đã cập nhật ghi chú!");
     }
@@ -672,6 +801,7 @@
     if (skipConfirm || confirm("Bạn có chắc chắn muốn xóa toàn bộ danh sách chú thích?")) {
       feedbackItems = [];
       updateHudCounters();
+      renderPinnedBoxes();
       renderItemsListModal();
       showToast("🗑️ Đã xóa toàn bộ danh sách chú thích.");
     }
@@ -690,7 +820,9 @@
       return;
     }
 
-    container.innerHTML = feedbackItems.map((item, idx) => `
+    container.innerHTML = feedbackItems.map((item, idx) => {
+      const palette = PIN_COLORS[idx % PIN_COLORS.length];
+      return `
       <div class="ap-item-card" data-id="${item.id}">
         <div class="ap-card-thumb-col">
           <img src="${item.screenshotDataUrl}" class="ap-card-thumb" alt="Item ${idx + 1}">
@@ -698,7 +830,10 @@
         </div>
         <div class="ap-card-content-col">
           <div class="ap-card-header">
-            <span class="ap-card-title">#${idx + 1}. ${escapeHtml(item.title)}</span>
+            <span class="ap-card-title">
+              <span style="display:inline-block;background:${palette.color};color:#ffffff;font-size:10px;font-weight:bold;padding:1px 6px;border-radius:4px;margin-right:6px;">#${idx + 1}</span>
+              ${escapeHtml(item.title)}
+            </span>
             <div class="ap-card-actions">
               <button class="ap-card-action-btn btn-edit" data-id="${item.id}" title="Sửa ghi chú">✏️</button>
               <button class="ap-card-action-btn btn-delete" data-id="${item.id}" title="Xóa mục này">🗑️</button>
@@ -725,7 +860,8 @@
           </div>
         </div>
       </div>
-    `).join("");
+    `;
+    }).join("");
 
     // Bind Edit & Delete buttons
     container.querySelectorAll(".btn-delete").forEach(btn => {
@@ -864,6 +1000,7 @@
     }
 
     hud.classList.remove("hidden");
+    renderPinnedBoxes();
     setMode("element");
 
     // Bind event listeners
@@ -887,6 +1024,8 @@
     closeCommentPopover();
     closeAnnotatorModal();
     listModal.classList.add("hidden");
+    hideDraftBox();
+    renderPinnedBoxes();
 
     document.removeEventListener("mousemove", onElementMouseMove, true);
     document.removeEventListener("click", onElementClick, true);
