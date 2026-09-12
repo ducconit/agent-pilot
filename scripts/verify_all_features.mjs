@@ -214,8 +214,53 @@ async function run() {
         isCssTabActive,
         hasCssSearch: !!document.getElementById("inspector-css-search"),
         hasCopyAllCss: !!document.getElementById("btn-copy-all-css"),
+        hasCopyAllOverview: !!document.getElementById("btn-copy-all-overview"),
         captureElementText: document.getElementById("btn-capture-element")?.textContent.replace(/\s+/g, " ").trim(),
         hasAutoCopySwitch: !!document.getElementById("toggle-auto-copy-shot")
+      };
+    });
+
+    // Test Inspector Overview Click-to-Copy and Copy All Overview button
+    const overviewCopyTest = await sidepanelPage.evaluate(async () => {
+      const details = {
+        tagName: "button",
+        selector: "#test-btn",
+        xpath: '//*[@id="test-btn"]',
+        rect: { x: 120, y: 80, width: 95, height: 36 },
+        text: "Nội dung mẫu cần sao chép",
+        value: "btn-sample-value"
+      };
+      if (window.__INSPECTOR_PANEL__) {
+        window.__INSPECTOR_PANEL__.displayElementDetails(details);
+      }
+
+      const toolbar = document.getElementById("overview-toolbar");
+      const copyAllBtn = document.getElementById("btn-copy-all-overview");
+      const clickableRows = Array.from(document.querySelectorAll("#inspector-result-box .detail-row.clickable"));
+      const copyTag = document.getElementById("copy-tag");
+      const copyCoords = document.getElementById("copy-coords");
+      const copyDims = document.getElementById("copy-dimensions");
+      const copySel = document.getElementById("copy-selector");
+      const copyXpath = document.getElementById("copy-xpath");
+      const copyText = document.getElementById("copy-text");
+      const copyVal = document.getElementById("copy-value");
+
+      const allPresent = Boolean(
+        toolbar && toolbar.style.display === "flex" &&
+        copyAllBtn &&
+        clickableRows.length >= 6 &&
+        copyTag && copyCoords && copyDims && copySel && copyXpath && copyText && copyVal
+      );
+
+      // Also simulate clicking copy-text and copy-all
+      if (copyText) copyText.click();
+      if (copyAllBtn) copyAllBtn.click();
+
+      return {
+        success: allPresent,
+        rowCount: clickableRows.length,
+        toolbarVisible: toolbar?.style.display === "flex",
+        hasCopyAllBtn: !!copyAllBtn
       };
     });
 
@@ -253,11 +298,13 @@ async function run() {
                         sidepanelCheck.subtabBtns.length === 2 &&
                         sidepanelCheck.isCssTabActive &&
                         sidepanelCheck.hasCssSearch &&
+                        sidepanelCheck.hasCopyAllOverview === true &&
+                        overviewCopyTest.success === true &&
                         sidepanelCheck.captureElementText === "🎯 Chụp phần tử" &&
                         sidepanelCheck.hasAutoCopySwitch === true &&
                         guideTest.opened === true &&
                         guideTest.singleTab === true;
-    record("8. Side Panel Control Center UI (Beta Badge, Slogan, Guide Tab Focus & 3 Main Tabs)", sidepanelOk, `Badge: "BETA" (${sidepanelCheck.hasBetaBadge}), Slogan: "${sidepanelCheck.brandSub}", Guide Button: ${sidepanelCheck.hasGuideBtn}`);
+    record("8. Side Panel Control Center UI (Beta Badge, Slogan, Guide Tab Focus & Overview Copy All)", sidepanelOk, `Badge: "BETA" (${sidepanelCheck.hasBetaBadge}), Slogan: "${sidepanelCheck.brandSub}", Overview Copy Rows: ${overviewCopyTest.rowCount}, Copy All: ${overviewCopyTest.hasCopyAllBtn}`);
     // Keep sidepanelPage open to test Extension IPC messaging
     // 10. Test Chrome DevTools Protocol (CDP) via Background Service Worker
     console.log("\n--- KIỂM THỬ CHROME DEVTOOLS PROTOCOL (CDP ENGINE) ---");

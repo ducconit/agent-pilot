@@ -94,7 +94,7 @@
         bottom: Math.round(rect.bottom),
         right: Math.round(rect.right)
       },
-      text: (el.innerText || el.textContent || "").trim().slice(0, 150),
+      text: (el.innerText || el.textContent || "").trim().slice(0, 1000),
       value: el.value !== undefined ? String(el.value) : undefined,
       styles: {
         color: style.color,

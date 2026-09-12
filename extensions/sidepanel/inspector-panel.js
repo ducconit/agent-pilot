@@ -18,6 +18,9 @@ export class InspectorPanel {
     this.btnClickElement = document.getElementById("btn-click-element");
     this.btnSnapElement = document.getElementById("btn-snap-element");
 
+    this.overviewToolbar = document.getElementById("overview-toolbar");
+    this.btnCopyAllOverview = document.getElementById("btn-copy-all-overview");
+
     // Inspector Subtabs & CSS Viewer Elements
     this.subtabBtns = document.querySelectorAll("#inspector-subtabs .subtab-btn");
     this.subtabContents = document.querySelectorAll("#tab-inspector .subtab-content");
@@ -99,6 +102,13 @@ export class InspectorPanel {
       this.inspectorCssSearch.addEventListener("input", (e) => {
         this.cssSearchQuery = e.target.value;
         this.renderCssProperties(this.cssSearchQuery);
+      });
+    }
+
+    // Copy All Overview Button
+    if (this.btnCopyAllOverview) {
+      this.btnCopyAllOverview.addEventListener("click", () => {
+        this.copyAllOverview();
       });
     }
 
@@ -185,54 +195,123 @@ export class InspectorPanel {
       this.elementActions.style.flexWrap = "wrap";
     }
 
-    // 1. Render Tab 1: Tổng quan
-    if (this.inspectorResultBox) {
-      this.inspectorResultBox.innerHTML = `
-        <div class="detail-row">
-          <span class="detail-key">Tag Name:</span>
-          <span class="detail-val" style="color:#f43f5e; font-weight:700;">&lt;${escapeHtml(details.tagName)}&gt;</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-key">Tọa độ:</span>
-          <span class="detail-val">X: ${details.rect.x}px, Y: ${details.rect.y}px</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-key">Kích thước:</span>
-          <span class="detail-val">${details.rect.width} × ${details.rect.height} px</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-key">Selector:</span>
-          <span class="detail-val" style="color:#38bdf8;" title="Click để copy" id="copy-selector">${escapeHtml(details.selector)}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-key">XPath:</span>
-          <span class="detail-val" style="color:#a78bfa;" title="Click để copy" id="copy-xpath">${escapeHtml(details.xpath)}</span>
-        </div>
-        ${details.text ? `
-        <div class="detail-row">
-          <span class="detail-key">Nội dung:</span>
-          <span class="detail-val">${escapeHtml(details.text)}</span>
-        </div>` : ""}
-      `;
+    if (this.overviewToolbar) {
+      this.overviewToolbar.style.display = "flex";
+    }
 
-      const copySelectorBtn = document.getElementById("copy-selector");
-      if (copySelectorBtn) {
-        copySelectorBtn.onclick = () => {
-          navigator.clipboard.writeText(details.selector);
-          showToast("Đã sao chép CSS Selector!");
-        };
+    // 1. Render Tab 1: Tổng quan (mọi mục đều hỗ trợ click để sao chép)
+    if (this.inspectorResultBox) {
+      const rows = [
+        {
+          key: "Tag Name",
+          label: "Tag Name",
+          val: `<${details.tagName}>`,
+          copyText: `<${details.tagName}>`,
+          id: "copy-tag",
+          color: "#f43f5e",
+          weight: "700"
+        },
+        {
+          key: "Tọa độ",
+          label: "Tọa độ",
+          val: `X: ${details.rect.x}px, Y: ${details.rect.y}px`,
+          copyText: `X: ${details.rect.x}px, Y: ${details.rect.y}px`,
+          id: "copy-coords",
+          color: "#94a3b8"
+        },
+        {
+          key: "Kích thước",
+          label: "Kích thước",
+          val: `${details.rect.width} × ${details.rect.height} px`,
+          copyText: `${details.rect.width} × ${details.rect.height} px`,
+          id: "copy-dimensions",
+          color: "#94a3b8"
+        },
+        {
+          key: "Selector",
+          label: "CSS Selector",
+          val: details.selector,
+          copyText: details.selector,
+          id: "copy-selector",
+          color: "#38bdf8"
+        },
+        {
+          key: "XPath",
+          label: "XPath",
+          val: details.xpath,
+          copyText: details.xpath,
+          id: "copy-xpath",
+          color: "#a78bfa"
+        }
+      ];
+
+      if (details.text) {
+        rows.push({
+          key: "Nội dung",
+          label: "Nội dung",
+          val: details.text,
+          copyText: details.text,
+          id: "copy-text",
+          color: "#34d399"
+        });
       }
-      const copyXpathBtn = document.getElementById("copy-xpath");
-      if (copyXpathBtn) {
-        copyXpathBtn.onclick = () => {
-          navigator.clipboard.writeText(details.xpath);
-          showToast("Đã sao chép XPath!");
-        };
+
+      if (details.value !== undefined && details.value !== "") {
+        rows.push({
+          key: "Giá trị",
+          label: "Giá trị (Value)",
+          val: details.value,
+          copyText: details.value,
+          id: "copy-value",
+          color: "#fbbf24"
+        });
       }
+
+      this.inspectorResultBox.innerHTML = rows.map((r) => `
+        <div class="detail-row clickable" data-copy="${escapeHtml(r.copyText)}" data-label="${escapeHtml(r.label)}" title="Click để sao chép ${escapeHtml(r.label)}">
+          <span class="detail-key">${escapeHtml(r.key)}:</span>
+          <span class="detail-val" style="${r.color ? `color:${r.color};` : ""}${r.weight ? `font-weight:${r.weight};` : ""}" ${r.id ? `id="${r.id}"` : ""}>${escapeHtml(r.val)}</span>
+          <span class="copy-hint" title="Sao chép">📋</span>
+        </div>
+      `).join("");
+
+      // Add click listeners to all clickable rows in Overview
+      const clickableRows = this.inspectorResultBox.querySelectorAll(".detail-row.clickable");
+      clickableRows.forEach((row) => {
+        row.onclick = () => {
+          const copyText = row.getAttribute("data-copy");
+          const label = row.getAttribute("data-label");
+          if (copyText) {
+            navigator.clipboard.writeText(copyText);
+            showToast(`Đã sao chép ${label}!`);
+          }
+        };
+      });
     }
 
     // 2. Render Tab 2: Thông số CSS mà phần tử đang chịu
     this.renderCssProperties(this.cssSearchQuery || "");
+  }
+
+  copyAllOverview() {
+    if (!this.selectedElementDetails) {
+      showToast("Chưa có phần tử nào được chọn để sao chép!");
+      return;
+    }
+    const d = this.selectedElementDetails;
+    const lines = [
+      `Tag Name: <${d.tagName}>`,
+      `Tọa độ: X: ${d.rect.x}px, Y: ${d.rect.y}px`,
+      `Kích thước: ${d.rect.width} × ${d.rect.height} px`,
+      `CSS Selector: ${d.selector}`,
+      `XPath: ${d.xpath}`
+    ];
+    if (d.text) lines.push(`Nội dung: ${d.text}`);
+    if (d.value !== undefined && d.value !== "") lines.push(`Giá trị: ${d.value}`);
+
+    const fullOverview = lines.join("\n");
+    navigator.clipboard.writeText(fullOverview);
+    showToast("Đã sao chép toàn bộ thông tin phần tử vào clipboard!");
   }
 
   renderCssProperties(filter = "") {

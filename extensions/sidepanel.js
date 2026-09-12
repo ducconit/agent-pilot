@@ -39,6 +39,10 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
     onCaptureElement: (rect) => screenshotPanel.captureElementScreenshot(rect)
   });
 
+  window.__INSPECTOR_PANEL__ = inspectorPanel;
+  window.__SCREENSHOT_PANEL__ = screenshotPanel;
+  window.__AGENT_MONITOR__ = agentMonitor;
+
   // =========================================================================
   // 1. Tab & Navigation Handling
   // =========================================================================
