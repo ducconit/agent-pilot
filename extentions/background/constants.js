@@ -12,10 +12,13 @@ export const tabLockStates = new Map(); // tabId -> { manualLock: boolean, autoC
 export const AGENT_GROUP_TITLE = "🤖 Agent Pilot";
 export const AGENT_GROUP_COLOR = "cyan";
 
-// Timeout constants
+// Timeout & Capacity constants
+export const CDP_PROTOCOL_VERSION = "1.3";
 export const CDP_SCREENSHOT_TIMEOUT_MS = 12000;
 export const DEFAULT_LOAD_TIMEOUT_MS = 15000;
 export const DEFAULT_AGENT_PORT = 58765;
+export const MAX_DEVTOOLS_CONSOLE_ENTRIES = 500;
+export const MAX_DEVTOOLS_NETWORK_ENTRIES = 300;
 
 export function getTabLockState(tabId) {
   if (!tabLockStates.has(tabId)) {

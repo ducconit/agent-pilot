@@ -3,7 +3,14 @@
  * Controls debugger attachment, command sending, and DevTools event listeners
  */
 
-import { attachedTabs, devtoolsBuffers, getBuffer } from "./constants.js";
+import {
+  attachedTabs,
+  devtoolsBuffers,
+  getBuffer,
+  CDP_PROTOCOL_VERSION,
+  MAX_DEVTOOLS_CONSOLE_ENTRIES,
+  MAX_DEVTOOLS_NETWORK_ENTRIES
+} from "./constants.js";
 
 /**
  * Attach Chrome DevTools Protocol (CDP) to a tab
@@ -12,7 +19,7 @@ export async function attachDebugger(tabId, broadcastFn = null) {
   if (attachedTabs.has(tabId)) return { success: true, message: "Already attached" };
 
   return new Promise((resolve) => {
-    chrome.debugger.attach({ tabId }, "1.3", async () => {
+    chrome.debugger.attach({ tabId }, CDP_PROTOCOL_VERSION, async () => {
       if (chrome.runtime.lastError) {
         resolve({ success: false, error: chrome.runtime.lastError.message });
         return;
@@ -134,7 +141,7 @@ export function initCdpEventListeners(broadcastFn) {
       };
 
       buffer.console.push(entry);
-      if (buffer.console.length > 500) buffer.console.shift();
+      if (buffer.console.length > MAX_DEVTOOLS_CONSOLE_ENTRIES) buffer.console.shift();
 
       if (typeof broadcastFn === "function") {
         broadcastFn({
@@ -154,7 +161,7 @@ export function initCdpEventListeners(broadcastFn) {
         timestamp: Date.now()
       };
       buffer.console.push(entry);
-      if (buffer.console.length > 500) buffer.console.shift();
+      if (buffer.console.length > MAX_DEVTOOLS_CONSOLE_ENTRIES) buffer.console.shift();
 
       if (typeof broadcastFn === "function") {
         broadcastFn({
@@ -168,7 +175,7 @@ export function initCdpEventListeners(broadcastFn) {
     // 2. Network Events
     else if (method === "Network.requestWillBeSent") {
       // Truncate network buffer to prevent memory leaks
-      if (buffer.network.size >= 300) {
+      if (buffer.network.size >= MAX_DEVTOOLS_NETWORK_ENTRIES) {
         const oldestKey = buffer.network.keys().next().value;
         buffer.network.delete(oldestKey);
       }

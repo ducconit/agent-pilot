@@ -5,6 +5,10 @@
 
 import { showToast, escapeHtml } from "./ui-helpers.js";
 
+const MAX_CONSOLE_ENTRIES = 300;
+const MAX_NETWORK_ENTRIES = 150;
+const MAX_EVICTED_NETWORK_IDS = 500;
+
 export class DevToolsPanel {
   constructor(options = {}) {
     this.getActiveTabId = options.getActiveTabId || (() => null);
@@ -69,7 +73,7 @@ export class DevToolsPanel {
 
   addConsoleEntry(entry) {
     this.consoleEntries.push(entry);
-    if (this.consoleEntries.length > 300) this.consoleEntries.shift();
+    if (this.consoleEntries.length > MAX_CONSOLE_ENTRIES) this.consoleEntries.shift();
     this.renderConsole();
   }
 
@@ -80,11 +84,11 @@ export class DevToolsPanel {
       this.networkEntries[existingIdx] = request;
     } else if (!this.evictedNetworkIds.has(reqId)) {
       this.networkEntries.push(request);
-      if (this.networkEntries.length > 150) {
+      if (this.networkEntries.length > MAX_NETWORK_ENTRIES) {
         const evicted = this.networkEntries.shift();
         if (evicted) {
           this.evictedNetworkIds.add(evicted.id);
-          if (this.evictedNetworkIds.size > 500) {
+          if (this.evictedNetworkIds.size > MAX_EVICTED_NETWORK_IDS) {
             const oldest = this.evictedNetworkIds.values().next().value;
             this.evictedNetworkIds.delete(oldest);
           }
