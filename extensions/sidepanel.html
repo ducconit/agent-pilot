@@ -136,9 +136,30 @@
           <button class="btn btn-primary" id="btn-toggle-inspector">Bật Soi Phần tử</button>
         </div>
         <div class="card-body">
-          <div class="inspector-details" id="inspector-result-box">
-            <div class="empty-hint">Bật chế độ soi và di chuột qua trang web để xem vị trí, kích thước và CSS Selector.</div>
+          <!-- Inspector Subtabs Navigation -->
+          <div class="sub-tabs-nav" id="inspector-subtabs">
+            <button class="subtab-btn active" data-subtab="subtab-overview" id="btn-subtab-overview">📌 Tổng quan</button>
+            <button class="subtab-btn" data-subtab="subtab-css" id="btn-subtab-css">🎨 Kiểu dáng CSS</button>
           </div>
+
+          <!-- Subtab 1: Tổng quan (Mặc định) -->
+          <div class="subtab-content active" id="subtab-overview">
+            <div class="inspector-details" id="inspector-result-box">
+              <div class="empty-hint">Bật chế độ soi và click chọn một phần tử trên trang web để xem vị trí, kích thước và CSS Selector.</div>
+            </div>
+          </div>
+
+          <!-- Subtab 2: Thông số CSS mà phần tử đang chịu -->
+          <div class="subtab-content" id="subtab-css">
+            <div class="css-search-row">
+              <input type="text" class="input input-xs" id="inspector-css-search" placeholder="🔍 Lọc CSS (color, display, font...)" />
+              <button class="btn btn-secondary btn-xs" id="btn-copy-all-css" title="Sao chép toàn bộ khai báo CSS">📋 Copy CSS</button>
+            </div>
+            <div class="inspector-details mt-1" id="inspector-css-box" style="max-height: 280px; overflow-y: auto;">
+              <div class="empty-hint">Chưa có phần tử nào được chọn để hiển thị thông số CSS. Hãy bấm "Bật Soi Phần tử" và click chọn 1 phần tử.</div>
+            </div>
+          </div>
+
           <div class="element-action-buttons mt-2" id="element-actions" style="display: none;">
             <button class="btn btn-secondary btn-sm" id="btn-move-to-element">Di chuột tới phần tử</button>
             <button class="btn btn-primary btn-sm" id="btn-click-element">Click vào phần tử</button>

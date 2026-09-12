@@ -151,8 +151,12 @@ async function run() {
       const autoTurnOff = wasActive === true && isNowActive === false;
       return { ...elDetails, autoTurnOff };
     });
-    const inspectOk = inspectRes && inspectRes.rect?.width > 0 && inspectRes.selector?.includes("inspector-special-box") && inspectRes.autoTurnOff;
-    record("6. Element Inspector (Bounding Rect, Selector, XPath, Auto Turn-Off)", inspectOk, `Selector: ${inspectRes?.selector}, Auto Turn-Off: ${inspectRes?.autoTurnOff}`);
+    const inspectOk = inspectRes &&
+                      inspectRes.rect?.width > 0 &&
+                      inspectRes.selector?.includes("inspector-special-box") &&
+                      inspectRes.autoTurnOff &&
+                      Boolean(inspectRes.computedStyles?.display);
+    record("6. Element Inspector (Bounding Rect, Selector, XPath, Computed CSS, Auto Turn-Off)", inspectOk, `Selector: ${inspectRes?.selector}, CSS display: ${inspectRes?.computedStyles?.display}, Auto Turn-Off: ${inspectRes?.autoTurnOff}`);
 
     // 7. Test Color Eyedropper Subsystem (Interactive Magnifying Loupe, Pixel Grid & Auto Turn-Off)
     const colorCheck = await page.evaluate(async () => {
@@ -184,23 +188,38 @@ async function run() {
     const colorOk = colorCheck && colorCheck.wasActive && colorCheck.hasLoupe && colorCheck.pickedColor?.hex && colorCheck.autoTurnOff;
     record("7. Color Eyedropper (Interactive Loupe, Pixel Sampling, Auto Turn-Off)", colorOk, `Hex: ${colorCheck?.pickedColor?.hex}, Loupe: ${colorCheck?.hasLoupe}, Auto Turn-Off: ${colorCheck?.autoTurnOff}`);
 
-    // 9. Test Side Panel UI
+    // 8. Test Side Panel UI & Inspector Subtabs
     console.log("\n--- KIỂM THỬ GIAO DIỆN BẢNG ĐIỀU KHIỂN (SIDE PANEL) ---");
     const sidepanelPage = await browser.newPage();
     await sidepanelPage.goto(`chrome-extension://${extId}/sidepanel.html`);
 
     const sidepanelCheck = await sidepanelPage.evaluate(() => {
+      // Test subtabs switching in Inspector panel
+      const subtabBtns = Array.from(document.querySelectorAll("#inspector-subtabs .subtab-btn")).map(b => b.textContent.trim());
+      const cssTabBtn = document.getElementById("btn-subtab-css");
+      if (cssTabBtn) cssTabBtn.click();
+      const isCssTabActive = document.getElementById("subtab-css")?.classList.contains("active");
+
       return {
         brand: document.querySelector(".brand-title")?.textContent,
         tabBtns: Array.from(document.querySelectorAll(".tab-btn")).map(b => b.textContent.trim()),
         hasAgentMonitor: !!document.getElementById("agent-activity-log"),
         hasInspectorBtn: !!document.getElementById("btn-toggle-inspector"),
         hasScreenshotBtns: !!document.getElementById("btn-capture-visible"),
-        hasSelfTestBtn: !!document.getElementById("btn-self-test-agent")
+        hasSelfTestBtn: !!document.getElementById("btn-self-test-agent"),
+        subtabBtns,
+        isCssTabActive,
+        hasCssSearch: !!document.getElementById("inspector-css-search"),
+        hasCopyAllCss: !!document.getElementById("btn-copy-all-css")
       };
     });
-    const sidepanelOk = sidepanelCheck.brand === "AGENT PILOT" && sidepanelCheck.tabBtns.length === 3 && sidepanelCheck.hasAgentMonitor;
-    record("8. Side Panel Control Center UI", sidepanelOk, `Brand: ${sidepanelCheck.brand}, Tabs: [${sidepanelCheck.tabBtns.join(" | ")}]`);
+    const sidepanelOk = sidepanelCheck.brand === "AGENT PILOT" &&
+                        sidepanelCheck.tabBtns.length === 3 &&
+                        sidepanelCheck.hasAgentMonitor &&
+                        sidepanelCheck.subtabBtns.length === 2 &&
+                        sidepanelCheck.isCssTabActive &&
+                        sidepanelCheck.hasCssSearch;
+    record("8. Side Panel Control Center UI (3 Main Tabs + Inspector Overview/CSS Subtabs)", sidepanelOk, `Brand: ${sidepanelCheck.brand}, Tabs: [${sidepanelCheck.tabBtns.join(" | ")}], Inspector Subtabs: [${sidepanelCheck.subtabBtns.join(" | ")}]`);
     // Keep sidepanelPage open to test Extension IPC messaging
     // 10. Test Chrome DevTools Protocol (CDP) via Background Service Worker
     console.log("\n--- KIỂM THỬ CHROME DEVTOOLS PROTOCOL (CDP ENGINE) ---");

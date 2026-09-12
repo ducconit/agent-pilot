@@ -1,6 +1,6 @@
 /**
  * Agent Pilot - Side Panel DOM Inspector & Color Picker Module
- * Manages element inspection, coordinates, selector copying, and color palette
+ * Manages element inspection, subtabs (Overview & CSS Styles), coordinates, and color palette
  */
 
 import { showToast, escapeHtml } from "./ui-helpers.js";
@@ -17,6 +17,14 @@ export class InspectorPanel {
     this.btnMoveToElement = document.getElementById("btn-move-to-element");
     this.btnClickElement = document.getElementById("btn-click-element");
     this.btnSnapElement = document.getElementById("btn-snap-element");
+
+    // Inspector Subtabs & CSS Viewer Elements
+    this.subtabBtns = document.querySelectorAll("#inspector-subtabs .subtab-btn");
+    this.subtabContents = document.querySelectorAll("#tab-inspector .subtab-content");
+    this.inspectorCssBox = document.getElementById("inspector-css-box");
+    this.inspectorCssSearch = document.getElementById("inspector-css-search");
+    this.btnCopyAllCss = document.getElementById("btn-copy-all-css");
+    this.cssSearchQuery = "";
 
     // Color Eyedropper Elements
     this.btnPickColor = document.getElementById("btn-pick-color");
@@ -76,6 +84,31 @@ export class InspectorPanel {
       };
     }
 
+    // Inspector Subtabs Switching
+    if (this.subtabBtns) {
+      this.subtabBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const subtabId = btn.getAttribute("data-subtab");
+          this.switchSubtab(subtabId);
+        });
+      });
+    }
+
+    // CSS Property Search & Filter
+    if (this.inspectorCssSearch) {
+      this.inspectorCssSearch.addEventListener("input", (e) => {
+        this.cssSearchQuery = e.target.value;
+        this.renderCssProperties(this.cssSearchQuery);
+      });
+    }
+
+    // Copy All CSS Button
+    if (this.btnCopyAllCss) {
+      this.btnCopyAllCss.addEventListener("click", () => {
+        this.copyAllCss();
+      });
+    }
+
     if (this.btnPickColor) {
       this.btnPickColor.onclick = () => {
         const activeTabId = this.getActiveTabId();
@@ -94,6 +127,21 @@ export class InspectorPanel {
           });
         }
       };
+    }
+  }
+
+  switchSubtab(targetSubtabId) {
+    if (this.subtabBtns) {
+      this.subtabBtns.forEach((btn) => {
+        const match = btn.getAttribute("data-subtab") === targetSubtabId;
+        btn.classList.toggle("active", match);
+      });
+    }
+    if (this.subtabContents) {
+      this.subtabContents.forEach((panel) => {
+        const match = panel.id === targetSubtabId;
+        panel.classList.toggle("active", match);
+      });
     }
   }
 
@@ -137,6 +185,7 @@ export class InspectorPanel {
       this.elementActions.style.flexWrap = "wrap";
     }
 
+    // 1. Render Tab 1: Tổng quan
     if (this.inspectorResultBox) {
       this.inspectorResultBox.innerHTML = `
         <div class="detail-row">
@@ -181,6 +230,121 @@ export class InspectorPanel {
         };
       }
     }
+
+    // 2. Render Tab 2: Thông số CSS mà phần tử đang chịu
+    this.renderCssProperties(this.cssSearchQuery || "");
+  }
+
+  renderCssProperties(filter = "") {
+    if (!this.inspectorCssBox) return;
+    if (!this.selectedElementDetails) {
+      this.inspectorCssBox.innerHTML = `<div class="empty-hint">Chưa có phần tử nào được chọn để hiển thị thông số CSS. Hãy bấm "Bật Soi Phần tử" và click chọn 1 phần tử.</div>`;
+      return;
+    }
+
+    const styles = this.selectedElementDetails.computedStyles || this.selectedElementDetails.styles || {};
+    const query = filter.trim().toLowerCase();
+
+    // Group definitions
+    const groups = [
+      {
+        title: "🔤 Kiểu Chữ (Typography)",
+        props: ["color", "font-family", "font-size", "font-weight", "font-style", "line-height", "text-align", "letter-spacing", "text-decoration", "white-space", "word-break"]
+      },
+      {
+        title: "📐 Bố Cục & Vị Trí (Layout & Box)",
+        props: ["display", "position", "top", "right", "bottom", "left", "z-index", "box-sizing", "overflow", "overflow-x", "overflow-y"]
+      },
+      {
+        title: "📏 Kích Thước & Khoảng Cách (Dimensions & Spacing)",
+        props: ["width", "height", "min-width", "max-width", "min-height", "max-height", "margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "padding", "padding-top", "padding-right", "padding-bottom", "padding-left"]
+      },
+      {
+        title: "🎨 Nền & Viền (Visuals & Border)",
+        props: ["background-color", "background-image", "background-size", "border", "border-width", "border-style", "border-color", "border-radius", "outline", "box-shadow", "opacity", "visibility", "cursor"]
+      },
+      {
+        title: "⚡ Flexbox & Grid",
+        props: ["flex-direction", "flex-wrap", "justify-content", "align-items", "align-content", "gap", "grid-template-columns", "grid-template-rows"]
+      },
+      {
+        title: "✨ Hiệu Ứng (Transform & Transition)",
+        props: ["transform", "transition"]
+      }
+    ];
+
+    let html = "";
+    let matchCount = 0;
+
+    groups.forEach((g) => {
+      let groupRows = "";
+      g.props.forEach((prop) => {
+        const val = styles[prop];
+        if (val !== undefined && val !== null && val !== "") {
+          if (!query || prop.toLowerCase().includes(query) || String(val).toLowerCase().includes(query)) {
+            matchCount++;
+            const isColor = prop.includes("color") || (typeof val === "string" && (val.startsWith("#") || val.startsWith("rgb") || val.startsWith("hsl")));
+            const colorPreview = isColor ? `<span class="css-color-preview" style="background:${escapeHtml(val)};"></span>` : "";
+            groupRows += `
+              <div class="css-prop-row" data-prop="${escapeHtml(prop)}" data-val="${escapeHtml(val)}" title="Click để copy: ${escapeHtml(prop)}: ${escapeHtml(val)};">
+                <span class="css-prop-name">${escapeHtml(prop)}:</span>
+                <div class="css-prop-val-wrap">
+                  ${colorPreview}
+                  <span class="css-prop-val">${escapeHtml(val)}</span>
+                </div>
+              </div>
+            `;
+          }
+        }
+      });
+
+      if (groupRows) {
+        html += `<div class="css-group-title">${g.title}</div>${groupRows}`;
+      }
+    });
+
+    if (!html) {
+      if (query) {
+        html = `<div class="empty-hint">Không tìm thấy thuộc tính CSS nào khớp với "${escapeHtml(query)}".</div>`;
+      } else {
+        html = `<div class="empty-hint">Không có thông số CSS nào được trích xuất.</div>`;
+      }
+    }
+
+    this.inspectorCssBox.innerHTML = html;
+
+    // Add click listeners to copy CSS property
+    const rows = this.inspectorCssBox.querySelectorAll(".css-prop-row");
+    rows.forEach((row) => {
+      row.onclick = () => {
+        const prop = row.getAttribute("data-prop");
+        const val = row.getAttribute("data-val");
+        const text = `${prop}: ${val};`;
+        navigator.clipboard.writeText(text);
+        showToast(`Đã sao chép: ${text}`);
+      };
+    });
+  }
+
+  copyAllCss() {
+    if (!this.selectedElementDetails) {
+      showToast("Chưa có phần tử nào được chọn để sao chép CSS!");
+      return;
+    }
+    const sel = this.selectedElementDetails.selector || this.selectedElementDetails.tagName;
+    const styles = this.selectedElementDetails.computedStyles || this.selectedElementDetails.styles || {};
+    const lines = [];
+    lines.push(`/* CSS computed for: ${sel} */`);
+    lines.push(`${sel} {`);
+    for (const [prop, val] of Object.entries(styles)) {
+      if (val) {
+        lines.push(`  ${prop}: ${val};`);
+      }
+    }
+    lines.push(`}`);
+    const fullCss = lines.join("\n");
+    navigator.clipboard.writeText(fullCss);
+    showToast("Đã sao chép toàn bộ khai báo CSS vào clipboard!");
   }
 
   getSelectedElementDetails() {
