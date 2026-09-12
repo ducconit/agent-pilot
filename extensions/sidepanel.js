@@ -232,6 +232,10 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
     if (msg.type === "AGENT_ACTION_LOG" && msg.log) {
       agentMonitor.addAgentActivityLog(msg.log);
     }
+
+    if (msg.type === "SECRET_FILTER_STATUS_CHANGED" && msg.enabled !== undefined) {
+      agentMonitor.updateSecretFilterUI(msg.enabled);
+    }
   });
 
   // =========================================================================

@@ -64,3 +64,26 @@ export function getBuffer(tabId) {
   }
   return devtoolsBuffers.get(tabId);
 }
+
+// Secret & Private Key Masking Configuration (Default: true)
+export const STORAGE_KEY_SECRET_FILTER = "agent_pilot_filter_secrets";
+let isSecretFilterEnabled = true;
+
+if (typeof chrome !== "undefined" && chrome.storage?.local) {
+  chrome.storage.local.get([STORAGE_KEY_SECRET_FILTER], (res) => {
+    if (res && res[STORAGE_KEY_SECRET_FILTER] !== undefined) {
+      isSecretFilterEnabled = Boolean(res[STORAGE_KEY_SECRET_FILTER]);
+    }
+  });
+}
+
+export function getSecretFilterEnabled() {
+  return isSecretFilterEnabled;
+}
+
+export function setSecretFilterEnabled(val) {
+  isSecretFilterEnabled = Boolean(val);
+  if (typeof chrome !== "undefined" && chrome.storage?.local) {
+    chrome.storage.local.set({ [STORAGE_KEY_SECRET_FILTER]: isSecretFilterEnabled });
+  }
+}

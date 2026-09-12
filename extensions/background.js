@@ -10,7 +10,9 @@ import {
   tabLockStates,
   normalizeUrl,
   getBuffer,
-  DEFAULT_AGENT_PORT
+  DEFAULT_AGENT_PORT,
+  getSecretFilterEnabled,
+  setSecretFilterEnabled
 } from "./background/constants.js";
 
 import {
@@ -402,6 +404,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const ok = agentBridge ? await agentBridge.ensureContentScript(targetId) : false;
       sendResponse({ success: ok });
     })();
+    return true;
+  }
+
+  // 7. Secret Filter Status & Settings
+  if (action === "get_secret_filter_status") {
+    sendResponse({ enabled: getSecretFilterEnabled() });
+    return true;
+  }
+
+  if (action === "set_secret_filter_status") {
+    setSecretFilterEnabled(request.enabled);
+    broadcastToExtension({
+      type: "SECRET_FILTER_STATUS_CHANGED",
+      enabled: getSecretFilterEnabled()
+    });
+    sendResponse({ success: true, enabled: getSecretFilterEnabled() });
     return true;
   }
 });

@@ -19,6 +19,7 @@ const connectedClients = new Map(); // id -> { id, ws, ip, connectedAt, lastActi
 let activeClientId = null;
 let pendingRequests = new Map();
 let requestIdCounter = 1;
+let lastSecretFilterState = true;
 
 function getActiveClient(targetId = null) {
   if (targetId && connectedClients.has(targetId)) {
@@ -114,7 +115,7 @@ const server = http.createServer(async (req, res) => {
 
         const result = await sendCommandToExtension(method, params);
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ success: true, result }));
+        res.end(JSON.stringify({ success: true, result: sanitizeServerData(result) }));
       } catch (err) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: false, error: err.message }));
@@ -154,6 +155,9 @@ wss.on("connection", (ws, req) => {
       if (msg.id && pendingRequests.has(msg.id)) {
         const { resolve, reject } = pendingRequests.get(msg.id);
         pendingRequests.delete(msg.id);
+        if (msg.secretFilterEnabled !== undefined) {
+          lastSecretFilterState = Boolean(msg.secretFilterEnabled);
+        }
         if (msg.error) {
           reject(new Error(msg.error));
         } else {
@@ -206,10 +210,178 @@ wss.on("connection", (ws, req) => {
   });
 });
 
+// Secret & Private Key Masking for AI Agents (Defense-in-Depth)
+const AGENT_SECURITY_NOTICE = "⚠️ [SECURITY NOTICE FOR AGENT] One or more sensitive credentials (API keys, private keys, or tokens) have been masked with asterisks (*) to protect secrets from leaking to LLM providers. Asterisks are redaction placeholders, NOT the literal key values. Do not attempt to use asterisks as credentials.";
+
+const SERVER_SECRET_PATTERNS = [
+  {
+    name: "Private Key",
+    regex: /-----BEGIN (?:[A-Z0-9_-]+ )?PRIVATE KEY-----[\s\S]+?-----END (?:[A-Z0-9_-]+ )?PRIVATE KEY-----/g,
+    replacer: (match) => {
+      const header = match.split("\n")[0] || "-----BEGIN PRIVATE KEY-----";
+      const footer = match.trim().split("\n").pop() || "-----END PRIVATE KEY-----";
+      return `${header}\n******************** [MASKED_SECRET: Private Key]\n${footer}`;
+    }
+  },
+  {
+    name: "OpenAI API Key",
+    regex: /\b(?:sk-proj-[a-zA-Z0-9_-]{20,}|sk-admin-[a-zA-Z0-9_-]{20,}|sk-[a-zA-Z0-9]{20,48})\b/g,
+    replacer: (match) => `${match.slice(0, 7)}******************** [MASKED_SECRET: OpenAI API Key]`
+  },
+  {
+    name: "Anthropic API Key",
+    regex: /\bsk-ant-[a-zA-Z0-9_-]{20,}\b/g,
+    replacer: (match) => `${match.slice(0, 7)}******************** [MASKED_SECRET: Anthropic API Key]`
+  },
+  {
+    name: "Google API Key",
+    regex: /\bAIzaSy[a-zA-Z0-9_-]{33}\b/g,
+    replacer: (match) => `${match.slice(0, 6)}******************** [MASKED_SECRET: Google API Key]`
+  },
+  {
+    name: "GitHub Token",
+    regex: /\b(?:ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{50,82})\b/g,
+    replacer: (match) => `${match.slice(0, 4)}******************** [MASKED_SECRET: GitHub Token]`
+  },
+  {
+    name: "AWS Access Key",
+    regex: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g,
+    replacer: (match) => `${match.slice(0, 4)}******************** [MASKED_SECRET: AWS Access Key]`
+  },
+  {
+    name: "Stripe Key",
+    regex: /\b(?:sk|pk|rk)_(?:live|test)_[0-9a-zA-Z]{24,}\b/g,
+    replacer: (match) => `${match.slice(0, 8)}******************** [MASKED_SECRET: Stripe Key]`
+  },
+  {
+    name: "Slack Token",
+    regex: /\bxox[baprs]-[0-9a-zA-Z-]{10,}\b/g,
+    replacer: (match) => `${match.slice(0, 5)}******************** [MASKED_SECRET: Slack Token]`
+  },
+  {
+    name: "JWT Token",
+    regex: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+    replacer: () => "eyJ******************** [MASKED_SECRET: JWT Token]"
+  },
+  {
+    name: "Bearer Token",
+    regex: /\bBearer\s+([A-Za-z0-9-_.+/=]{20,})\b/gi,
+    replacer: (match, token) => `Bearer ${(token || "").slice(0, 4)}******************** [MASKED_SECRET: Bearer Token]`
+  },
+  {
+    name: "URL Secret Parameter",
+    regex: /([?&](?:api_key|apikey|access_token|auth_token|token|password|passwd|secret)=)([^&\s]{6,})/gi,
+    replacer: (match, paramKey) => `${paramKey}******************** [MASKED_SECRET: URL Parameter]`
+  },
+  {
+    name: "Sensitive Key-Value",
+    regex: /(["']?(?:password|passwd|secret|client_?secret|access_?token|auth_?token|api_?key)["']?\s*[:=]\s*["'])([^"'\\,\s]{6,})(["'])/gi,
+    replacer: (match, prefix, secretVal, suffix) => {
+      const p = secretVal.slice(0, 2);
+      return `${prefix}${p}******************** [MASKED_SECRET: Sensitive Field]${suffix}`;
+    }
+  }
+];
+
+const SENSITIVE_PROP_REGEX = /^(?:password|passwd|secret|api_?key|access_?token|auth_?token|private_?key|client_?secret)$/i;
+
+function maskServerString(text) {
+  if (typeof text !== "string" || text.length < 6) return { text, masked: false, types: [] };
+  if (text.includes("[MASKED_SECRET")) return { text, masked: false, types: [] };
+  let result = text;
+  let masked = false;
+  const types = new Set();
+  for (const p of SERVER_SECRET_PATTERNS) {
+    p.regex.lastIndex = 0;
+    if (p.regex.test(result)) {
+      p.regex.lastIndex = 0;
+      result = result.replace(p.regex, (...args) => {
+        masked = true;
+        types.add(p.name);
+        return p.replacer(...args);
+      });
+    }
+  }
+  return { text: result, masked, types: Array.from(types) };
+}
+
+export function hasMaskedSecretNotice(data) {
+  if (!data) return false;
+  if (typeof data === "object") {
+    if (data._securityNotice) return true;
+    try {
+      return JSON.stringify(data).includes("[MASKED_SECRET");
+    } catch {
+      return false;
+    }
+  }
+  if (typeof data === "string") return data.includes("[MASKED_SECRET");
+  return false;
+}
+
+export function sanitizeServerData(data, isEnabled = null) {
+  const activeEnabled = isEnabled !== null ? Boolean(isEnabled) : lastSecretFilterState;
+  if (!activeEnabled || data === null || data === undefined) return data;
+  let totalMaskedCount = 0;
+  const allMaskedTypes = new Set();
+  const seen = new WeakSet();
+
+  function walk(val, keyContext = "") {
+    if (val === null || val === undefined) return val;
+    if (typeof val === "string") {
+      if (val.includes("[MASKED_SECRET")) return val;
+      if (keyContext && SENSITIVE_PROP_REGEX.test(keyContext) && val.length >= 4) {
+        totalMaskedCount++;
+        allMaskedTypes.add(`Field:${keyContext}`);
+        return `${val.slice(0, 2)}******************** [MASKED_SECRET: ${keyContext}]`;
+      }
+      const res = maskServerString(val);
+      if (res.masked) {
+        totalMaskedCount += res.types.length;
+        res.types.forEach((t) => allMaskedTypes.add(t));
+        return res.text;
+      }
+      return val;
+    }
+    if (typeof val === "number" || typeof val === "boolean" || typeof val === "symbol") return val;
+    if (Array.isArray(val)) {
+      if (seen.has(val)) return "[Circular]";
+      seen.add(val);
+      return val.map((item) => walk(item, keyContext));
+    }
+    if (typeof val === "object") {
+      if (seen.has(val)) return "[Circular]";
+      seen.add(val);
+      const copy = {};
+      for (const [k, v] of Object.entries(val)) {
+        copy[k] = walk(v, k);
+      }
+      return copy;
+    }
+    return val;
+  }
+
+  const sanitized = walk(data);
+  if (totalMaskedCount > 0) {
+    if (typeof sanitized === "string") {
+      return `${sanitized}\n\n${AGENT_SECURITY_NOTICE}`;
+    }
+    if (sanitized && typeof sanitized === "object") {
+      sanitized._securityNotice = AGENT_SECURITY_NOTICE;
+      sanitized._maskedCount = (sanitized._maskedCount || 0) + totalMaskedCount;
+      sanitized._maskedTypes = Array.from(new Set([...(sanitized._maskedTypes || []), ...allMaskedTypes]));
+    }
+  }
+  return sanitized;
+}
+
 /**
  * Dispatch command to the Chrome Extension over WebSocket
  */
 export function sendCommandToExtension(method, params = {}, timeoutMs = 15000) {
+  if (method === "config.setSecretFilter" && params.enabled !== undefined) {
+    lastSecretFilterState = Boolean(params.enabled);
+  }
   return new Promise((resolve, reject) => {
     // Local multi-instance management commands
     if (method === "instances.list") {
@@ -643,7 +815,8 @@ if (isMainScript) {
 
         const { name, arguments: toolArgs = {} } = params;
         try {
-          const res = await handleMcpToolCall(name, toolArgs);
+          const rawRes = await handleMcpToolCall(name, toolArgs);
+          const res = sanitizeServerData(rawRes);
           let content = [];
 
           if (name === "browser_screenshot" && res?.dataUrl) {
@@ -673,6 +846,16 @@ if (isMainScript) {
             content = [
               { type: "text", text: typeof res === "object" ? JSON.stringify(res, null, 2) : String(res) }
             ];
+          }
+
+          if (hasMaskedSecretNotice(res)) {
+            const alreadyHasNotice = content.some(c => c.text && c.text.includes(AGENT_SECURITY_NOTICE));
+            if (!alreadyHasNotice) {
+              content.push({
+                type: "text",
+                text: AGENT_SECURITY_NOTICE
+              });
+            }
           }
 
           process.stdout.write(JSON.stringify({

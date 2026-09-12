@@ -566,6 +566,49 @@ async function run() {
                                httpBatchRes?.result?.executedActions === 3;
     record("24. Batch Actions HTTP API Endpoint", isHttpBatchSuccess, `Executed 3 actions via HTTP /api in ${httpBatchRes?.result?.durationMs}ms`);
 
+    // 25. Secret & API Key Sanitizer over WebSocket Bridge
+    const secretEvalBatch = {
+      tabId,
+      actions: [
+        {
+          type: "evaluate",
+          expression: "JSON.stringify({ apiKey: 'sk-proj-test1234567890abcdef1234567890', awsKey: 'AKIAIOSFODNN7EXAMPLE', password: 'SecretPassword123!' })"
+        }
+      ]
+    };
+    if (selectedTestInstanceId) secretEvalBatch.instanceId = selectedTestInstanceId;
+
+    const secretRes = await sendAgentCommand("batch.run", secretEvalBatch);
+    const evalResultStr = secretRes?.results?.[0]?.value || "";
+    const isMaskedProperly =
+      evalResultStr.includes("sk-proj") &&
+      evalResultStr.includes("*****") &&
+      evalResultStr.includes("[MASKED_SECRET: OpenAI API Key]") &&
+      evalResultStr.includes("AKIA") &&
+      evalResultStr.includes("[MASKED_SECRET: AWS Access Key]") &&
+      secretRes?._securityNotice?.includes("⚠️ [SECURITY NOTICE FOR AGENT]");
+
+    record("25. Secret & API Key Redaction over WebSocket", isMaskedProperly, "Verified API keys & credentials masked with asterisks and agent security notice attached");
+
+    // 26. Secret Filter Config Dynamic Toggle & Bypass
+    const filterConfigInitial = await sendAgentCommand("config.getSecretFilter");
+    const isDefaultEnabled = filterConfigInitial?.enabled === true;
+
+    await sendAgentCommand("config.setSecretFilter", { enabled: false });
+    const disabledRes = await sendAgentCommand("batch.run", secretEvalBatch);
+    const disabledResultStr = disabledRes?.results?.[0]?.value || "";
+    const isBypassed =
+      disabledResultStr.includes("sk-proj-test1234567890abcdef1234567890") &&
+      disabledRes?._securityNotice === undefined;
+
+    // Restore to enabled: true
+    await sendAgentCommand("config.setSecretFilter", { enabled: true });
+    const restoredConfig = await sendAgentCommand("config.getSecretFilter");
+    const isRestored = restoredConfig?.enabled === true;
+
+    const isToggleWorking = isDefaultEnabled && isBypassed && isRestored;
+    record("26. Secret Filter Config Dynamic Toggle", isToggleWorking, "Verified default enabled: true, bypass when toggled false, and clean restoration");
+
     console.log("\n==================================================================");
     console.log("📊 BẢNG TỔNG KẾT KẾT QUẢ KIỂM THỬ KẾT NỐI AI AGENT:");
     const passedCount = testResults.filter(t => t.passed).length;

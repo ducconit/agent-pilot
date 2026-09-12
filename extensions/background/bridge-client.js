@@ -10,8 +10,11 @@ import {
   currentPlatform,
   platformPromise,
   getBuffer,
-  attachedTabs
+  attachedTabs,
+  getSecretFilterEnabled,
+  setSecretFilterEnabled
 } from "./constants.js";
+import { sanitizeData } from "./secret-sanitizer.js";
 import { attachDebugger, detachDebugger, sendCdpCommand } from "./cdp-manager.js";
 import {
   getActiveTabId,
@@ -280,10 +283,16 @@ export class AgentBridgeClient {
 
     const respond = (result, error = null) => {
       if (!id) return;
+      const isFilterActive = getSecretFilterEnabled();
+      const sanitizedResult = (error || result === undefined || result === null)
+        ? result
+        : sanitizeData(result, isFilterActive);
+
       this.send({
         id,
-        result: error ? undefined : result,
-        error: error ? (error.message || String(error)) : null
+        result: error ? undefined : sanitizedResult,
+        error: error ? (error.message || String(error)) : null,
+        secretFilterEnabled: isFilterActive
       });
 
       if (typeof this.broadcastFn === "function") {
@@ -292,7 +301,7 @@ export class AgentBridgeClient {
           log: {
             id,
             method,
-            params,
+            params: sanitizeData(params, isFilterActive),
             timestamp: Date.now(),
             status: error ? "error" : "success",
             error: error ? (error.message || String(error)) : null
@@ -551,6 +560,19 @@ export class AgentBridgeClient {
             network: Array.from(buffer.network.values()).slice(-100),
             attached: attachedTabs.has(tabId)
           });
+          break;
+        }
+
+        case "config.getSecretFilter": {
+          respond({ enabled: getSecretFilterEnabled() });
+          break;
+        }
+
+        case "config.setSecretFilter": {
+          if (params.enabled !== undefined) {
+            setSecretFilterEnabled(Boolean(params.enabled));
+          }
+          respond({ enabled: getSecretFilterEnabled() });
           break;
         }
 

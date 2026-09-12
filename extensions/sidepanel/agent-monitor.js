@@ -27,9 +27,23 @@ export class AgentMonitor {
     this.btnClearAgentLog = document.getElementById("btn-clear-agent-log");
     this.agentEmptyHint = document.getElementById("agent-empty-hint");
 
+    // Secret Redaction Filter Elements
+    this.toggleSecretFilter = document.getElementById("toggle-secret-filter");
+    this.secretFilterBadge = document.getElementById("secret-filter-badge");
+    this.secretWarningModal = document.getElementById("secret-warning-modal");
+    this.btnCancelSecretDisable = document.getElementById("btn-cancel-secret-disable");
+    this.btnConfirmSecretDisable = document.getElementById("btn-confirm-secret-disable");
+
     this.agentActivityTotal = 0;
 
     this.bindEvents();
+
+    // Query initial secret filter state
+    chrome.runtime.sendMessage({ action: "get_secret_filter_status" }, (res) => {
+      if (res && res.enabled !== undefined) {
+        this.updateSecretFilterUI(res.enabled);
+      }
+    });
   }
 
   bindEvents() {
@@ -79,6 +93,70 @@ export class AgentMonitor {
           showToast("Cổng không hợp lệ (1024 - 65535)");
         }
       };
+    }
+
+    // Secret Redaction Filter Event Listeners
+    if (this.toggleSecretFilter) {
+      this.toggleSecretFilter.addEventListener("change", () => {
+        if (!this.toggleSecretFilter.checked) {
+          // Prevent immediate disable: show warning confirmation modal
+          this.toggleSecretFilter.checked = true;
+          this.showSecretWarningModal();
+        } else {
+          this.setSecretFilter(true);
+        }
+      });
+    }
+
+    if (this.btnCancelSecretDisable) {
+      this.btnCancelSecretDisable.addEventListener("click", () => {
+        this.hideSecretWarningModal();
+        if (this.toggleSecretFilter) this.toggleSecretFilter.checked = true;
+        showToast("🛡️ Đã giữ nguyên chế độ bảo vệ secret");
+      });
+    }
+
+    if (this.btnConfirmSecretDisable) {
+      this.btnConfirmSecretDisable.addEventListener("click", () => {
+        this.hideSecretWarningModal();
+        if (this.toggleSecretFilter) this.toggleSecretFilter.checked = false;
+        this.setSecretFilter(false);
+      });
+    }
+  }
+
+  showSecretWarningModal() {
+    if (this.secretWarningModal) this.secretWarningModal.style.display = "flex";
+  }
+
+  hideSecretWarningModal() {
+    if (this.secretWarningModal) this.secretWarningModal.style.display = "none";
+  }
+
+  setSecretFilter(enabled) {
+    chrome.runtime.sendMessage({ action: "set_secret_filter_status", enabled }, (res) => {
+      const isEnabled = res && res.enabled !== undefined ? res.enabled : enabled;
+      this.updateSecretFilterUI(isEnabled);
+      if (isEnabled) {
+        showToast("🛡️ Đã kích hoạt lớp lọc bảo vệ secret & API key");
+      } else {
+        showToast("⚠️ Đã TẮT lọc secret theo xác nhận của bạn");
+      }
+    });
+  }
+
+  updateSecretFilterUI(enabled) {
+    const isEnabled = Boolean(enabled);
+    if (this.toggleSecretFilter) {
+      this.toggleSecretFilter.checked = isEnabled;
+    }
+    if (this.secretFilterBadge) {
+      this.secretFilterBadge.textContent = isEnabled ? "Đang bảo vệ" : "Đã tắt";
+      if (isEnabled) {
+        this.secretFilterBadge.className = "card-badge badge-success";
+      } else {
+        this.secretFilterBadge.className = "card-badge badge-warning";
+      }
     }
   }
 
