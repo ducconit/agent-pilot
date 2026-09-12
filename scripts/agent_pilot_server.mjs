@@ -410,7 +410,42 @@ export const MCP_TOOLS = [
   }
 ];
 
+let isForwarderMode = false;
+
 async function handleMcpToolCall(name, args) {
+  if (isForwarderMode) {
+    const methodMap = {
+      browser_open_tab: { method: "tabs.create", getParams: (a) => ({ url: a.url, active: a.active === true }) },
+      browser_list_tabs: { method: "tabs.listAll", getParams: () => ({}) },
+      browser_navigate: { method: "tabs.update", getParams: (a) => ({ url: a.url, tabId: a.tabId }) },
+      browser_click: { method: "page.click", getParams: (a) => a },
+      browser_type: { method: "page.type", getParams: (a) => a },
+      browser_scroll: { method: "page.scroll", getParams: (a) => a },
+      browser_get_element: { method: "page.getElement", getParams: (a) => a },
+      browser_screenshot: { method: "page.screenshot", getParams: (a) => a },
+      browser_get_devtools_data: { method: "devtools.getData", getParams: (a) => a },
+      browser_pick_color: { method: "page.pickColor", getParams: (a) => a },
+      browser_list_instances: { method: "instances.list", getParams: () => ({}) },
+      browser_select_instance: { method: "instances.select", getParams: (a) => a },
+      browser_set_busy: { method: "page.setBusy", getParams: (a) => a }
+    };
+
+    const target = methodMap[name];
+    if (!target) throw new Error(`Unsupported tool: ${name}`);
+
+    const resp = await fetch(`http://${HOST}:${PORT}/api`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        method: target.method,
+        params: target.getParams(args)
+      })
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || "Tool execution failed");
+    return data.result;
+  }
+
   switch (name) {
     case "browser_open_tab":
       return await sendCommandToExtension("tabs.create", { url: args.url, active: args.active === true });
@@ -582,25 +617,61 @@ if (isMainScript) {
   // Handle stdin close (MCP client disconnect) to prevent orphaned/zombie processes
   rl.on("close", () => {
     console.error("[BridgeServer] Stdin pipe closed (MCP client disconnected). Exiting cleanly...");
-    wss.close();
-    server.close(() => process.exit(0));
+    if (!isForwarderMode) {
+      wss.close();
+      server.close(() => process.exit(0));
+    } else {
+      process.exit(0);
+    }
   });
 
-  // Start HTTP & WebSocket Server
-  server.listen(PORT, HOST, () => {
+  // 1. Check if an existing Bridge Server is already active on PORT
+  let serverAlreadyRunning = false;
+  try {
+    const checkRes = await fetch(`http://${HOST}:${PORT}/health`, { signal: AbortSignal.timeout(600) });
+    const checkJson = await checkRes.json();
+    if (checkJson && checkJson.status === "ok") {
+      serverAlreadyRunning = true;
+    }
+  } catch (_) {}
+
+  if (serverAlreadyRunning) {
+    isForwarderMode = true;
     console.error("==================================================================");
-    console.error(`🚀 AGENT PILOT BRIDGE SERVER RUNNING`);
-    console.error(`📡 WebSocket URL: ws://${HOST}:${PORT}`);
-    console.error(`🌐 HTTP API URL : http://${HOST}:${PORT}/api`);
-    console.error(`🎯 MCP Status   : Ready for Antigravity-First AI Agent Control`);
+    console.error(`🚀 AGENT PILOT - MULTI-AGENT COMPATIBLE MCP STDIO MODE`);
+    console.error(`🔗 Shared Bridge Server detected on http://${HOST}:${PORT}`);
+    console.error(`🎯 Running in Thin Stdio Forwarder Mode (Zero Port Collision)`);
     console.error("==================================================================");
-  });
+  } else {
+    // Start HTTP & WebSocket Server as Primary Master
+    server.on("error", (err) => {
+      if (err.code === "EADDRINUSE") {
+        console.error(`[BridgeServer:MCP] ⚡ Port ${PORT} busy (EADDRINUSE). Seamlessly switching to Thin Stdio Forwarder mode.`);
+        isForwarderMode = true;
+      } else {
+        console.error("[BridgeServer] Server error:", err);
+      }
+    });
+
+    server.listen(PORT, HOST, () => {
+      console.error("==================================================================");
+      console.error(`🚀 AGENT PILOT BRIDGE SERVER RUNNING (PRIMARY MASTER)`);
+      console.error(`📡 WebSocket URL: ws://${HOST}:${PORT}`);
+      console.error(`🌐 HTTP API URL : http://${HOST}:${PORT}/api`);
+      console.error(`🎯 MCP Status   : Ready for Antigravity-First AI Agent Control`);
+      console.error("==================================================================");
+    });
+  }
 
   // Graceful shutdown
   const shutdown = (signal) => {
     console.error(`\n[BridgeServer] ${signal} received. Shutting down...`);
-    wss.close();
-    server.close(() => process.exit(0));
+    if (!isForwarderMode) {
+      wss.close();
+      server.close(() => process.exit(0));
+    } else {
+      process.exit(0);
+    }
   };
 
   process.on("SIGINT", () => shutdown("SIGINT"));
