@@ -120,7 +120,7 @@ export class FeedbackPanel {
         this.renderItemsList();
       }
     } else {
-      this.ui.showToast("Hãy mở một trang web để kích hoạt Feedback Studio!", "warning");
+      this.ui.showToast("Hãy mở một trang web để kích hoạt chế độ Chú thích UI!", "warning");
     }
   }
 
@@ -133,7 +133,7 @@ export class FeedbackPanel {
     }
 
     if (this.btnToggle) {
-      this.btnToggle.textContent = this.isActive ? "✕ Ngừng Chế Độ Feedback" : "🎯 Bật Chế Độ Feedback";
+      this.btnToggle.textContent = this.isActive ? "🛑 Dừng Chú Thích" : "✏️ Bật Chế Độ Chú Thích";
       this.btnToggle.className = this.isActive ? "btn btn-danger-outline" : "btn btn-primary";
     }
 
@@ -171,7 +171,7 @@ export class FeedbackPanel {
   async copyPromptToClipboard() {
     const res = await this.sendTabMessage({ action: "copy_feedback_prompt" });
     if (res && res.success) {
-      this.ui.showToast("📋 Đã sao chép toàn bộ Feedback vào Clipboard!");
+      this.ui.showToast("📋 Đã sao chép prompt chú thích UI vào Clipboard!");
     } else {
       this.ui.showToast("Không thể sao chép prompt từ tab này.", "warning");
     }
@@ -181,9 +181,9 @@ export class FeedbackPanel {
     const res = await this.sendTabMessage({ action: "save_feedback_inbox_tab" });
     if (res && res.success) {
       if (res.storage === "filesystem") {
-        this.ui.showToast(`✓ Đã lưu ${this.items.length} mục vào inbox ~/.agent-pilot/inbox/feedback/!`);
+        this.ui.showToast(`✓ Đã lưu ${this.items.length} vị trí vào inbox ~/.agent-pilot/inbox/feedback/!`);
       } else {
-        this.ui.showToast(`✓ Đã lưu ${this.items.length} mục vào bộ nhớ Extension!`);
+        this.ui.showToast(`✓ Đã lưu ${this.items.length} vị trí vào bộ nhớ Extension!`);
       }
     } else {
       this.ui.showToast(`Lỗi: ${res?.error || "Không thể lưu inbox"}`, "warning");
@@ -193,7 +193,7 @@ export class FeedbackPanel {
   async pushToAgent() {
     const res = await this.sendTabMessage({ action: "push_feedback_agent_tab" });
     if (res && res.success) {
-      this.ui.showToast(`🚀 Đã gửi trực tiếp ${this.items.length} mục feedback cho Agent!`);
+      this.ui.showToast(`🚀 Đã gửi trực tiếp ${this.items.length} vị trí cần sửa cho Agent!`);
     } else {
       this.ui.showToast(`Lỗi: ${res?.error || "Không có agent nào đang lắng nghe"}`, "warning");
     }
@@ -204,7 +204,7 @@ export class FeedbackPanel {
     if (res && res.success) {
       this.items = res.items || [];
       this.renderItemsList();
-      this.ui.showToast("🗑️ Đã xóa mục feedback.");
+      this.ui.showToast("🗑️ Đã xóa vị trí này.");
     }
   }
 
@@ -213,7 +213,7 @@ export class FeedbackPanel {
     if (res && res.success) {
       this.items = [];
       this.renderItemsList();
-      this.ui.showToast("🗑️ Đã xóa toàn bộ feedback.");
+      this.ui.showToast("🗑️ Đã xóa toàn bộ danh sách.");
     }
   }
 

@@ -40,8 +40,8 @@
   hud.className = "agent-pilot-feedback-hud hidden";
   hud.innerHTML = `
     <div class="ap-hud-drag-handle">
-      <span class="ap-hud-badge">🎯 FEEDBACK STUDIO</span>
-      <span class="ap-hud-status" id="ap-hud-item-count">0 mục</span>
+      <span class="ap-hud-badge">✏️ CHÚ THÍCH UI</span>
+      <span class="ap-hud-status" id="ap-hud-item-count">0 vị trí</span>
     </div>
     <div class="ap-hud-modes">
       <button class="ap-hud-btn active" data-mode="element" title="Chọn phần tử DOM (E)">🎯 Phần tử</button>
@@ -51,11 +51,11 @@
     </div>
     <div class="ap-hud-divider"></div>
     <div class="ap-hud-actions">
-      <button class="ap-hud-action-btn" id="ap-hud-btn-list" title="Xem danh sách các mục đã chọn">📋 Danh sách (<span id="ap-hud-list-count">0</span>)</button>
-      <button class="ap-hud-action-btn ap-btn-highlight" id="ap-hud-btn-copy" title="Copy toàn bộ feedback dạng Markdown để gửi Agent (Kênh C)">📋 Copy Prompt</button>
+      <button class="ap-hud-action-btn" id="ap-hud-btn-list" title="Xem danh sách các vị trí đã chọn">📋 Danh sách (<span id="ap-hud-list-count">0</span>)</button>
+      <button class="ap-hud-action-btn ap-btn-highlight" id="ap-hud-btn-copy" title="Copy toàn bộ chú thích dạng Markdown để gửi Agent (Kênh C)">📋 Copy Prompt</button>
       <button class="ap-hud-action-btn ap-btn-save" id="ap-hud-btn-inbox" title="Lưu vào Inbox của Agent (Kênh B)">💾 Lưu Inbox</button>
       <button class="ap-hud-action-btn ap-btn-send" id="ap-hud-btn-send" title="Gửi trực tiếp cho Agent qua cổng 58765 (Kênh A)">🚀 Gửi Agent</button>
-      <button class="ap-hud-close-btn" id="ap-hud-btn-close" title="Ngừng chế độ feedback">✕ Ngừng</button>
+      <button class="ap-hud-close-btn" id="ap-hud-btn-close" title="Thoát chế độ chú thích UI">✕ Thoát</button>
     </div>
   `;
   document.documentElement.appendChild(hud);
@@ -90,7 +90,7 @@
     <div class="ap-popover-header">
       <div class="ap-popover-title-row">
         <span class="ap-popover-icon">💬</span>
-        <span class="ap-popover-title" id="ap-popover-title">Ghi chú sửa đổi</span>
+        <span class="ap-popover-title" id="ap-popover-title">Ghi chú sửa giao diện</span>
       </div>
       <button class="ap-popover-close" id="ap-popover-btn-close">✕</button>
     </div>
@@ -99,11 +99,11 @@
         <img id="ap-popover-img" class="ap-popover-thumb" alt="Preview">
         <div class="ap-popover-meta" id="ap-popover-meta"></div>
       </div>
-      <textarea id="ap-popover-input" class="ap-popover-textarea" placeholder="Nhập yêu cầu sửa đổi (vd: đổi màu nút, thu nhỏ padding, sửa căn lề, thay đổi text...)" rows="3"></textarea>
+      <textarea id="ap-popover-input" class="ap-popover-textarea" placeholder="Nhập yêu cầu sửa giao diện (vd: đổi màu nút, thu nhỏ padding, sửa căn lề, thay đổi text...)" rows="3"></textarea>
     </div>
     <div class="ap-popover-footer">
       <button class="ap-popover-btn ap-btn-cancel" id="ap-popover-btn-cancel">Hủy</button>
-      <button class="ap-popover-btn ap-btn-submit" id="ap-popover-btn-save">✓ Thêm vào Feedback</button>
+      <button class="ap-popover-btn ap-btn-submit" id="ap-popover-btn-save">✓ Lưu Chú Thích</button>
     </div>
   `;
   document.documentElement.appendChild(commentPopover);
@@ -140,7 +140,7 @@
       </div>
       <div class="ap-annotator-footer">
         <button class="ap-popover-btn ap-btn-cancel" id="ap-annotator-btn-cancel">Hủy bỏ</button>
-        <button class="ap-popover-btn ap-btn-submit" id="ap-annotator-btn-save">✓ Lưu mục này</button>
+        <button class="ap-popover-btn ap-btn-submit" id="ap-annotator-btn-save">✓ Lưu Chú Thích Này</button>
       </div>
     </div>
   `;
@@ -156,7 +156,7 @@
       <div class="ap-list-header">
         <div class="ap-list-title-row">
           <span class="ap-list-icon">📋</span>
-          <span class="ap-list-title">Danh sách mục Feedback (<span id="ap-list-total-count">0</span>)</span>
+          <span class="ap-list-title">Danh sách vị trí cần sửa (<span id="ap-list-total-count">0</span>)</span>
         </div>
         <button class="ap-popover-close" id="ap-list-btn-close">✕</button>
       </div>
@@ -646,7 +646,7 @@
     };
     feedbackItems.push(newItem);
     updateHudCounters();
-    showToast(`✓ Đã lưu mục #${feedbackItems.length} vào Feedback!`);
+    showToast(`✓ Đã lưu vị trí #${feedbackItems.length} vào danh sách!`);
     return newItem;
   }
 
@@ -654,7 +654,7 @@
     feedbackItems = feedbackItems.filter(item => item.id !== id);
     updateHudCounters();
     renderItemsListModal();
-    showToast("🗑️ Đã xóa mục feedback.");
+    showToast("🗑️ Đã xóa vị trí này.");
   }
 
   function updateFeedbackComment(id, newComment) {
@@ -668,11 +668,11 @@
   }
 
   function clearAllFeedbackItems(skipConfirm = false) {
-    if (skipConfirm || confirm("Bạn có chắc chắn muốn xóa toàn bộ danh sách feedback?")) {
+    if (skipConfirm || confirm("Bạn có chắc chắn muốn xóa toàn bộ danh sách chú thích?")) {
       feedbackItems = [];
       updateHudCounters();
       renderItemsListModal();
-      showToast("🗑️ Đã xóa toàn bộ feedback.");
+      showToast("🗑️ Đã xóa toàn bộ danh sách chú thích.");
     }
   }
 
@@ -681,8 +681,8 @@
     if (!feedbackItems.length) {
       container.innerHTML = `
         <div class="ap-empty-state">
-          <div class="ap-empty-icon">🎯</div>
-          <div class="ap-empty-title">Chưa có mục feedback nào</div>
+          <div class="ap-empty-icon">✏️</div>
+          <div class="ap-empty-title">Chưa có vị trí nào được đánh dấu</div>
           <div class="ap-empty-desc">Chọn "Phần tử", "Vùng chọn" hoặc "Màn hình" trên thanh HUD để thêm yêu cầu sửa đổi cho Agent.</div>
         </div>
       `;
@@ -829,14 +829,14 @@
 
   async function copyFeedbackPrompt() {
     if (!feedbackItems.length) {
-      showToast("⚠️ Chưa có mục feedback nào để copy. Hãy chọn phần tử hoặc vùng trước!");
+      showToast("⚠️ Chưa có vị trí nào được đánh dấu để copy. Hãy chọn phần tử hoặc kéo vùng trước!");
       return;
     }
 
     const md = generateMarkdownPrompt();
     try {
       await navigator.clipboard.writeText(md);
-      showToast(`📋 Đã copy ${feedbackItems.length} mục feedback! Hãy dán (Ctrl+V) vào khung chat Agent.`);
+      showToast(`📋 Đã copy ${feedbackItems.length} vị trí chú thích! Hãy dán (Ctrl+V) vào khung chat Agent.`);
     } catch (err) {
       // Fallback via textarea
       const ta = document.createElement("textarea");
@@ -845,7 +845,7 @@
       ta.select();
       document.execCommand("copy");
       document.body.removeChild(ta);
-      showToast(`📋 Đã copy ${feedbackItems.length} mục feedback vào Clipboard!`);
+      showToast(`📋 Đã copy ${feedbackItems.length} vị trí chú thích vào Clipboard!`);
     }
   }
 
@@ -872,7 +872,7 @@
     cropOverlay.addEventListener("mousemove", onCropMouseMove);
     cropOverlay.addEventListener("mouseup", onCropMouseUp);
 
-    showToast("🎯 Đã bật Feedback Studio! Nhấp vào phần tử cần sửa.");
+    showToast("✏️ Đã bật chế độ Chú thích & Chỉ điểm UI! Nhấp vào phần tử cần sửa.");
     chrome.runtime.sendMessage({ action: "FEEDBACK_MODE_CHANGED", active: true }).catch(() => {});
   }
 
@@ -893,7 +893,7 @@
     cropOverlay.removeEventListener("mousemove", onCropMouseMove);
     cropOverlay.removeEventListener("mouseup", onCropMouseUp);
 
-    showToast("✓ Đã kết thúc chế độ Feedback Studio.");
+    showToast("✓ Đã thoát chế độ Chú thích UI.");
     chrome.runtime.sendMessage({ action: "FEEDBACK_MODE_CHANGED", active: false }).catch(() => {});
   }
 
@@ -904,10 +904,10 @@
   // Channel B: Save feedback items to ~/.agent-pilot/inbox/feedback/<timestamp>/*
   async function saveFeedbackToInbox() {
     if (feedbackItems.length === 0) {
-      showToast("⚠️ Chưa có mục feedback nào để lưu vào inbox. Hãy chọn phần tử hoặc kéo vùng trước!");
+      showToast("⚠️ Chưa có vị trí nào được đánh dấu để lưu vào inbox. Hãy chọn phần tử hoặc kéo vùng trước!");
       return { success: false, error: "No feedback items" };
     }
-    showToast("💾 Đang lưu feedback vào inbox...");
+    showToast("💾 Đang lưu chú thích vào inbox...");
     const promptMd = generateMarkdownPrompt(feedbackItems);
     const payload = {
       timestamp: Date.now(),
@@ -927,9 +927,9 @@
 
       if (resp && resp.success) {
         if (resp.storage === "filesystem") {
-          showToast(`✓ Đã lưu ${feedbackItems.length} mục vào ~/.agent-pilot/inbox/feedback/${resp.sessionId}/`);
+          showToast(`✓ Đã lưu ${feedbackItems.length} vị trí vào ~/.agent-pilot/inbox/feedback/${resp.sessionId}/`);
         } else {
-          showToast(`✓ Đã lưu ${feedbackItems.length} mục vào bộ nhớ Extension!`);
+          showToast(`✓ Đã lưu ${feedbackItems.length} vị trí vào bộ nhớ Extension!`);
         }
         return resp;
       } else {
@@ -945,10 +945,10 @@
   // Channel A: Push feedback live to waiting agent
   async function pushFeedbackToAgent() {
     if (feedbackItems.length === 0) {
-      showToast("⚠️ Chưa có mục feedback nào để gửi. Hãy chọn phần tử hoặc kéo vùng trước!");
+      showToast("⚠️ Chưa có vị trí nào được đánh dấu để gửi. Hãy chọn phần tử hoặc kéo vùng trước!");
       return { success: false, error: "No feedback items" };
     }
-    showToast("🚀 Đang gửi feedback trực tiếp cho Agent...");
+    showToast("🚀 Đang gửi chú thích trực tiếp cho Agent...");
     const promptMd = generateMarkdownPrompt(feedbackItems);
     const payload = {
       timestamp: Date.now(),
@@ -967,7 +967,7 @@
       });
 
       if (resp && resp.success) {
-        showToast(`✓ Đã truyền trực tiếp ${feedbackItems.length} mục phản hồi cho AI Agent!`);
+        showToast(`✓ Đã truyền trực tiếp ${feedbackItems.length} vị trí cần sửa cho AI Agent!`);
         return resp;
       } else {
         showToast(`⚠️ Không có Agent nào đang chờ (chạy browser_wait_for_feedback). Đã tự động lưu vào inbox!`);

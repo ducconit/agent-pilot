@@ -36,7 +36,7 @@
 | **Soi & Lấy vị trí DOM** | 🎯 | Bắt dính phần tử khi hover, hiển thị kích thước `W × H`, tọa độ `(X, Y)`, trích xuất **CSS Selector** và **XPath**. |
 | **Trích xuất Mã màu** | 🎨 | Kính lúp pixel nhặt màu chính xác (HEX, RGB, HSL), tự động copy và lưu khay lịch sử màu sắc. |
 | **Bộ Chụp Màn Hình** | 📸 | Hỗ trợ 3 chế độ: Chụp toàn khung nhìn, Kéo chọn vùng cắt tùy ý (Crop), và Chụp riêng phần tử DOM đã khóa. |
-| **Visual UI Feedback Studio** | 💬 | Chế độ phản hồi giao diện đa điểm: chọn nhiều phần tử, kéo nhiều vùng, đánh dấu ghim (Pins), phát hiện file component nguồn (React/Vue/Astro:line), hỗ trợ 3 kênh giao tiếp (Live Push, Persistent Inbox `~/.agent-pilot/inbox/feedback/`, Clipboard Prompt). |
+| **Chú Thích & Chỉ Điểm UI** | ✏️ | Khoanh vùng, chỉ điểm phần tử/component nguồn (React/Vue/Astro:line), ghim ghi chú lỗi để giao việc cho AI Agent sửa code (hỗ trợ 3 kênh Live Push, Persistent Inbox, Clipboard Prompt). |
 | **Tương thích Antigravity** | 🤖 | Tích hợp sẵn bộ chạy kịch bản **JSON Action**, cầu nối `window.__AGENT_PILOT__` và 16 công cụ Antigravity MCP Tools. |
 
 ---
@@ -46,7 +46,7 @@
 Dự án được tổ chức khoa học, module hóa chuyên sâu và tuân thủ các chuẩn kỹ thuật cao nhất:
 
 ```
-browser-control/
+agent-pilot-extension/
 ├── assets/                             # Tài nguyên đồ họa & nhận diện thương hiệu
 │   ├── banner.svg                      # Banner giới thiệu công nghệ cao
 │   └── logo.svg                        # Logo vector gốc của Agent Pilot
@@ -78,7 +78,7 @@ browser-control/
 │   │   ├── cursor-simulator.js         # Con trỏ chuột ảo Neon & sóng ripple
 │   │   ├── dom-inspector.js            # Trích xuất thông số DOM & Element Snap
 │   │   ├── eyedropper.js               # Kính lúp phóng đại 11x11 lấy mã màu
-│   │   └── feedback-studio.js          # Feedback Studio in-page, multi-mode HUD & component inspector
+│   │   └── feedback-studio.js          # Chú thích & Chỉ điểm UI in-page, multi-mode HUD & component inspector
 │   ├── content.css                     # Stylesheet cho con trỏ, kính lúp, overlay & feedback HUD
 │   ├── sidepanel.html                  # Giao diện trung tâm điều khiển Side Panel
 │   ├── sidepanel.css                   # Giao diện Modern Dark Cyberpunk Responsive
@@ -88,7 +88,7 @@ browser-control/
 │   │   ├── agent-monitor.js            # Giám sát kết nối Agent & Secret Redaction toggle
 │   │   ├── inspector-panel.js          # Thẻ Tổng quan DOM & Kiểu dáng CSS
 │   │   ├── screenshot-panel.js         # Studio chụp ảnh & Auto-copy Clipboard
-│   │   └── feedback-panel.js           # Thẻ Góp ý Feedback Studio & kênh xuất Prompt/Inbox/Live
+│   │   └── feedback-panel.js           # Thẻ Chú thích UI & kênh xuất Prompt/Inbox/Live
 │   ├── popup.html                      # Popup tiện ích khởi động nhanh
 │   ├── popup.js                        # Xử lý sự kiện popup
 │   ├── popup.css
@@ -182,9 +182,9 @@ Agent Pilot trang bị sẵn máy chủ WebSocket & MCP Server tại cổng chuy
 
 ---
 
-## 🎨 Visual UI Feedback Studio & 3 Kênh Giao Tiếp Phản Hồi
+## ✏️ Chú Thích & Chỉ Điểm UI Cho Agent (Visual UI Annotator Studio)
 
-Agent Pilot giải quyết bài toán cốt lõi: **Làm thế nào để AI Agent biết chính xác 100% vị trí giao diện, component nguồn, selector và lỗi UI cần chỉnh sửa do người dùng chỉ định?**
+Agent Pilot giải quyết bài toán cốt lõi: **Làm thế nào để AI Agent biết chính xác 100% vị trí giao diện, component nguồn, selector và lỗi UI cần chỉnh sửa do người dùng chỉ định?** (Tính năng này được thiết kế để giao việc sửa code cho AI Agent, không phải form góp ý về tiện ích).
 
 ### Các Chế Độ Thu Thập Phản Hồi Trực Quan:
 - 🎯 **Chọn phần tử (Element Mode)**: Rà chuột highlight bất kỳ khối nào trên trang web $\rightarrow$ Bấm chọn để tự động cắt ảnh phần tử và bóc tách tệp nguồn framework (`fileName:lineNumber` của React Fiber, Vue Component, Astro).
