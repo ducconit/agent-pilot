@@ -191,7 +191,6 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
     }
 
     if (msg.type === "REGION_CROP_REQUESTED" && msg.clip) {
-      const activeTabId = getActiveTabId ? getActiveTabId() : null;
       chrome.runtime.sendMessage({
         action: "capture_screenshot",
         mode: "region",
