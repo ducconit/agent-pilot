@@ -277,56 +277,7 @@ body {
 }
 
 /* ==========================================================================
-   2. Nav & URL Bar
-   ========================================================================== */
-.nav-bar {
-  padding: 6px 12px 8px;
-  background: rgba(15, 23, 42, 0.6);
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-}
-
-.active-tab-banner {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-  overflow: hidden;
-  min-width: 0;
-}
-
-.tab-fav-icon {
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.tab-title {
-  font-size: 11px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 500;
-  flex: 1;
-  min-width: 0;
-}
-
-.url-control {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-}
-
-.url-input {
-  flex: 1;
-  min-width: 0;
-  font-size: 11px;
-  padding: 5px 8px;
-}
-
-/* ==========================================================================
-   3. Navigation Tabs
+   2. Navigation Tabs
    ========================================================================== */
 .tabs-nav {
   display: flex;

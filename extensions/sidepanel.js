@@ -13,12 +13,9 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
   let activeTabId = null;
   let isCdpAttached = false;
 
-  // Header & Navigation DOM Elements
+  // Header DOM Elements
   const cdpStatusDot = document.getElementById("cdp-status-dot");
   const btnToggleCdp = document.getElementById("btn-toggle-cdp");
-  const activeTabTitle = document.getElementById("active-tab-title");
-  const inputUrl = document.getElementById("input-url");
-  const btnNavigate = document.getElementById("btn-navigate");
 
   // Main Tabs Nav
   const tabBtns = document.querySelectorAll(".tab-btn");
@@ -71,8 +68,6 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
     chrome.runtime.sendMessage({ action: "get_active_tab" }, (res) => {
       if (res && res.tab) {
         activeTabId = res.tab.id;
-        if (activeTabTitle) activeTabTitle.textContent = res.tab.title || "Tab không tên";
-        if (inputUrl) inputUrl.value = res.tab.url || "";
         agentMonitor.updateTargetTabDisplay(res.tab);
         feedbackPanel.refreshState();
         checkCdpStatus();
@@ -83,25 +78,10 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
   // Sync when user changes tabs in Chrome
   chrome.tabs.onActivated.addListener(updateActiveTab);
   chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (tabId === activeTabId && changeInfo.title && activeTabTitle) {
-      activeTabTitle.textContent = changeInfo.title;
+    if (tabId === activeTabId && changeInfo.title) {
+      agentMonitor.updateTargetTabDisplay({ id: tabId, title: changeInfo.title });
     }
   });
-
-  if (btnNavigate) {
-    btnNavigate.onclick = () => {
-      if (!activeTabId || !inputUrl || !inputUrl.value) return;
-      chrome.runtime.sendMessage({ action: "navigate", tabId: activeTabId, url: inputUrl.value }, () => {
-        showToast("Đang điều hướng...");
-      });
-    };
-  }
-
-  if (inputUrl) {
-    inputUrl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && btnNavigate) btnNavigate.click();
-    });
-  }
 
   // =========================================================================
   // 2. CDP Debugger State Management
