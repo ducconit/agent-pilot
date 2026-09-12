@@ -116,7 +116,8 @@
     else if (action === "virtual_mouse_click") result = await cursor.virtualClick(data.x, data.y);
     else if (action === "virtual_type") result = await cursor.virtualType(data.selector, data.text);
     else if (action === "virtual_scroll") result = cursor.virtualScroll(data.deltaX, data.deltaY);
-    else if (action === "toggle_inspector") { inspector.toggleInspector(data.enabled); result = { success: true }; }
+    else if (action === "toggle_inspector") { inspector.toggleInspector(data.enabled); result = { success: true, active: inspector.isInspectorActive() }; }
+    else if (action === "is_inspector_active") result = inspector.isInspectorActive();
     else if (action === "get_element_info") {
       const el = document.querySelector(data.selector);
       result = inspector.getDetailedElementInfo(el);

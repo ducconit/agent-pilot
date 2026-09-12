@@ -132,12 +132,27 @@ async function run() {
     const typeOk = typeRes.val === "Agent Pilot Antigravity Verified";
     record("5. Virtual Typing (Human-like Typing into Inputs)", typeOk, `Value: "${typeRes.val}"`);
 
-    // 7. Test Element Inspector (Selector, XPath, Bounding Rect)
+    // 7. Test Element Inspector (Selector, XPath, Bounding Rect & Auto Turn-off)
     const inspectRes = await page.evaluate(async () => {
-      return await window.__AGENT_PILOT__.getElement("#inspector-special-box");
+      const elDetails = await window.__AGENT_PILOT__.getElement("#inspector-special-box");
+      await window.__AGENT_PILOT__.toggleInspector(true);
+      const wasActive = await window.__AGENT_PILOT__.isInspectorActive();
+      const boxEl = document.getElementById("inspector-special-box");
+      const r = boxEl.getBoundingClientRect();
+      boxEl.dispatchEvent(new MouseEvent("click", {
+        clientX: r.left + r.width / 2,
+        clientY: r.top + r.height / 2,
+        bubbles: true,
+        cancelable: true
+      }));
+      // Wait tiny tick for event handling
+      await new Promise(res => setTimeout(res, 50));
+      const isNowActive = await window.__AGENT_PILOT__.isInspectorActive();
+      const autoTurnOff = wasActive === true && isNowActive === false;
+      return { ...elDetails, autoTurnOff };
     });
-    const inspectOk = inspectRes && inspectRes.rect?.width > 0 && inspectRes.selector?.includes("inspector-special-box");
-    record("6. Element Inspector (Bounding Rect, Selector, XPath)", inspectOk, `Selector: ${inspectRes?.selector}, Rect: ${inspectRes?.rect?.width}x${inspectRes?.rect?.height}px`);
+    const inspectOk = inspectRes && inspectRes.rect?.width > 0 && inspectRes.selector?.includes("inspector-special-box") && inspectRes.autoTurnOff;
+    record("6. Element Inspector (Bounding Rect, Selector, XPath, Auto Turn-Off)", inspectOk, `Selector: ${inspectRes?.selector}, Auto Turn-Off: ${inspectRes?.autoTurnOff}`);
 
     // 8. Test Color Eyedropper API
     const colorCheck = await page.evaluate(() => {

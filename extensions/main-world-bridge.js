@@ -28,6 +28,7 @@
     type: (selector, text) => sendBridgeRequest("virtual_type", { selector, text }),
     scroll: (deltaX, deltaY) => sendBridgeRequest("virtual_scroll", { deltaX, deltaY }),
     toggleInspector: (enabled) => sendBridgeRequest("toggle_inspector", { enabled }),
+    isInspectorActive: () => sendBridgeRequest("is_inspector_active", {}),
     getElement: (selector) => sendBridgeRequest("get_element_info", { selector }),
     pickColor: () => sendBridgeRequest("pick_color", {}),
     getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {})

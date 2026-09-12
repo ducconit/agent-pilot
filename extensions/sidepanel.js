@@ -157,6 +157,10 @@ import { ScreenshotPanel } from "./sidepanel/screenshot-panel.js";
       if (inspectorTabBtn) inspectorTabBtn.click();
     }
 
+    if (msg.type === "INSPECTOR_STATUS_CHANGED" && msg.enabled !== undefined) {
+      inspectorPanel.setInspectorActiveState(msg.enabled);
+    }
+
     if (msg.type === "COLOR_PICKED" && msg.color) {
       inspectorPanel.addColorToPalette(msg.color);
       const inspectorTabBtn = document.querySelector('[data-tab="tab-inspector"]');

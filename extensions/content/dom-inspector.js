@@ -154,6 +154,8 @@
     inspectorTooltip.style.display = "block";
   }
 
+  let highlightTimer = null;
+
   function handleInspectorClick(e) {
     if (!isInspectorActive) return;
 
@@ -169,31 +171,63 @@
     lockedElement = e.target;
     const details = getDetailedElementInfo(lockedElement);
 
-    // Highlight locked element
-    inspectorBox.style.borderColor = "#f59e0b";
-    inspectorBox.style.boxShadow = "0 0 20px rgba(245, 158, 11, 0.6)";
+    // Tự động tắt ngay chế độ soi sau khi chọn xong phần tử
+    toggleInspector(false, false);
 
-    // Send element data to Side Panel
+    // Hiển thị viền highlight xanh thành công trong 1.2s trước khi ẩn
+    inspectorTooltip.style.display = "none";
+    inspectorBox.style.display = "block";
+    inspectorBox.style.borderColor = "#10b981";
+    inspectorBox.style.boxShadow = "0 0 20px rgba(16, 185, 129, 0.7)";
+    if (highlightTimer) clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => {
+      inspectorBox.style.display = "none";
+      highlightTimer = null;
+    }, 1200);
+
+    // Gửi thông tin phần tử đã chọn sang Side Panel
     chrome.runtime.sendMessage({
       type: "ELEMENT_SELECTED",
       details
     }).catch(() => {});
 
-    showToast(`Đã chọn phần tử: &lt;${escapeHtml(details.tagName)}&gt; (${details.rect.width}×${details.rect.height})`);
+    showToast(`🎯 Đã chọn &lt;${escapeHtml(details.tagName)}&gt; - Đã tắt chế độ soi.`);
   }
 
-  function toggleInspector(enabled) {
-    isInspectorActive = enabled;
+  function handleInspectorKeyDown(e) {
+    if (!isInspectorActive) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      toggleInspector(false);
+      chrome.runtime.sendMessage({
+        type: "INSPECTOR_STATUS_CHANGED",
+        enabled: false
+      }).catch(() => {});
+    }
+  }
+
+  function toggleInspector(enabled, showToastNotice = true) {
+    isInspectorActive = Boolean(enabled);
     if (enabled) {
+      if (highlightTimer) {
+        clearTimeout(highlightTimer);
+        highlightTimer = null;
+      }
+      inspectorBox.style.borderColor = "#38bdf8";
+      inspectorBox.style.boxShadow = "0 0 15px rgba(56, 189, 248, 0.5)";
       document.addEventListener("mousemove", handleInspectorMouseMove, true);
       document.addEventListener("click", handleInspectorClick, true);
-      showToast("🎯 Chế độ soi phần tử: Đã BẬT. Di chuột để soi, click để chọn.");
+      document.addEventListener("keydown", handleInspectorKeyDown, true);
+      if (showToastNotice) showToast("🎯 Chế độ soi phần tử: Đã BẬT. Di chuột để soi, click để chọn.");
     } else {
       document.removeEventListener("mousemove", handleInspectorMouseMove, true);
       document.removeEventListener("click", handleInspectorClick, true);
-      inspectorBox.style.display = "none";
+      document.removeEventListener("keydown", handleInspectorKeyDown, true);
       inspectorTooltip.style.display = "none";
-      showToast("🎯 Chế độ soi phần tử: Đã TẮT.");
+      if (!highlightTimer) {
+        inspectorBox.style.display = "none";
+      }
+      if (showToastNotice) showToast("🎯 Chế độ soi phần tử: Đã TẮT.");
     }
   }
 

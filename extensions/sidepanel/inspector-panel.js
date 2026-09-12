@@ -84,21 +84,28 @@ export class InspectorPanel {
     }
   }
 
-  updateInspectorButton() {
+  updateInspectorButton(showToastNotice = true) {
     if (!this.btnToggleInspector) return;
     if (this.isInspectorActive) {
       this.btnToggleInspector.textContent = "Tắt Soi Phần tử";
       this.btnToggleInspector.classList.replace("btn-primary", "btn-secondary");
-      showToast("Đã BẬT soi phần tử. Hãy di chuột qua trang web.");
+      if (showToastNotice) showToast("Đã BẬT soi phần tử. Hãy di chuột qua trang web.");
     } else {
       this.btnToggleInspector.textContent = "Bật Soi Phần tử";
       this.btnToggleInspector.classList.replace("btn-secondary", "btn-primary");
-      showToast("Đã TẮT soi phần tử.");
+      if (showToastNotice) showToast("Đã TẮT soi phần tử.");
     }
+  }
+
+  setInspectorActiveState(enabled) {
+    this.isInspectorActive = Boolean(enabled);
+    this.updateInspectorButton(false);
   }
 
   displayElementDetails(details) {
     this.selectedElementDetails = details;
+    this.isInspectorActive = false;
+    this.updateInspectorButton(false);
     if (this.elementActions) {
       this.elementActions.style.display = "flex";
       this.elementActions.style.gap = "6px";
