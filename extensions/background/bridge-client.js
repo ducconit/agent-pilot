@@ -706,18 +706,9 @@ export class AgentBridgeClient {
   }
 
   /**
-   * Push feedback session live to waiting agent via WebSocket or HTTP long-poll (Channel A)
+   * Push feedback session live to waiting agent via HTTP or WebSocket fallback (Channel A)
    */
   async pushFeedbackLive(payload) {
-    let sentWs = false;
-    if (this.connected && this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.send({
-        type: "FEEDBACK_SUBMISSION",
-        payload
-      });
-      sentWs = true;
-    }
-
     try {
       const resp = await fetch(`http://127.0.0.1:${this.port}/api/feedback/push`, {
         method: "POST",
@@ -725,12 +716,20 @@ export class AgentBridgeClient {
         body: JSON.stringify(payload)
       });
       const data = await resp.json();
-      return { success: true, ...data, sentWs };
-    } catch (err) {
-      if (sentWs) {
-        return { success: true, sentWs: true, sessionId: String(payload?.timestamp || Date.now()) };
+      if (data && data.success) {
+        return { success: true, ...data, channel: "http_push" };
       }
-      // If server unreachable, save to extension storage as fallback
+      throw new Error(data?.error || "Push failed");
+    } catch (httpErr) {
+      // Fallback: If HTTP endpoint is unavailable, try WebSocket transmission
+      if (this.connected && this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.send({
+          type: "FEEDBACK_SUBMISSION",
+          payload
+        });
+        return { success: true, channel: "ws_push", sessionId: String(payload?.timestamp || Date.now()) };
+      }
+      // If server is completely offline, fall back to persistent extension storage
       return await this.saveFeedbackInbox(payload);
     }
   }

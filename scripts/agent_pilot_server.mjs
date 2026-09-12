@@ -357,7 +357,6 @@ const server = http.createServer(async (req, res) => {
         }
         if (method === "feedback.push") {
           const result = saveFeedbackSession(params || {});
-          checkAndNotifyFeedbackWaiters(result);
           res.writeHead(200, { "Content-Type": "application/json" });
           return res.end(JSON.stringify({ success: true, result }));
         }
@@ -463,7 +462,6 @@ const server = http.createServer(async (req, res) => {
       try {
         const payload = JSON.parse(body || "{}");
         const result = saveFeedbackSession(payload);
-        checkAndNotifyFeedbackWaiters(result);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, ...result }));
       } catch (err) {
@@ -560,7 +558,6 @@ wss.on("connection", (ws, req) => {
       } else if (msg.type === "FEEDBACK_SUBMISSION") {
         clientInfo.lastActive = Date.now();
         const saved = saveFeedbackSession(msg.payload || {});
-        checkAndNotifyFeedbackWaiters(saved);
         console.error(`[BridgeServer] 🚀 Received live FEEDBACK_SUBMISSION from [${clientId}] - Session: ${saved.sessionId} (${saved.metadata?.count || 0} items)`);
         if (msg.id && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ id: msg.id, result: { success: true, sessionId: saved.sessionId, count: saved.metadata?.count } }));
