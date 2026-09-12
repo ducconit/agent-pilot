@@ -6,6 +6,8 @@
  */
 
 import http from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import readline from "node:readline";
 import { WebSocketServer, WebSocket } from "ws";
 
@@ -256,7 +258,7 @@ export function sendCommandToExtension(method, params = {}, timeoutMs = 15000) {
 }
 
 // 2. Model Context Protocol (MCP) Stdio Interface for Antigravity
-const MCP_TOOLS = [
+export const MCP_TOOLS = [
   {
     name: "browser_open_tab",
     description: "Open a new browser tab with the specified URL",
@@ -450,13 +452,17 @@ async function handleMcpToolCall(name, args) {
   }
 }
 
-// Enable MCP stdio interface (always active for Antigravity & MCP clients)
-const rl = readline.createInterface({
-  input: process.stdin,
-  terminal: false
-});
+// Start stdio interface and HTTP server when executed directly as main script
+const isMainScript = Boolean(process.argv[1] && (path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)));
 
-rl.on("line", async (line) => {
+if (isMainScript) {
+  // Enable MCP stdio interface (always active for Antigravity & MCP clients)
+  const rl = readline.createInterface({
+    input: process.stdin,
+    terminal: false
+  });
+
+  rl.on("line", async (line) => {
     if (!line.trim()) return;
     try {
       const rpc = JSON.parse(line);
@@ -563,31 +569,32 @@ rl.on("line", async (line) => {
     }
   });
 
-// Handle stdin close (MCP client disconnect) to prevent orphaned/zombie processes
-rl.on("close", () => {
-  console.error("[BridgeServer] Stdin pipe closed (MCP client disconnected). Exiting cleanly...");
-  wss.close();
-  server.close(() => process.exit(0));
-});
+  // Handle stdin close (MCP client disconnect) to prevent orphaned/zombie processes
+  rl.on("close", () => {
+    console.error("[BridgeServer] Stdin pipe closed (MCP client disconnected). Exiting cleanly...");
+    wss.close();
+    server.close(() => process.exit(0));
+  });
 
-// Start HTTP & WebSocket Server
-server.listen(PORT, HOST, () => {
-  console.error("==================================================================");
-  console.error(`🚀 AGENT PILOT BRIDGE SERVER RUNNING`);
-  console.error(`📡 WebSocket URL: ws://${HOST}:${PORT}`);
-  console.error(`🌐 HTTP API URL : http://${HOST}:${PORT}/api`);
-  console.error(`🎯 MCP Status   : Ready for Antigravity-First AI Agent Control`);
-  console.error("==================================================================");
-});
+  // Start HTTP & WebSocket Server
+  server.listen(PORT, HOST, () => {
+    console.error("==================================================================");
+    console.error(`🚀 AGENT PILOT BRIDGE SERVER RUNNING`);
+    console.error(`📡 WebSocket URL: ws://${HOST}:${PORT}`);
+    console.error(`🌐 HTTP API URL : http://${HOST}:${PORT}/api`);
+    console.error(`🎯 MCP Status   : Ready for Antigravity-First AI Agent Control`);
+    console.error("==================================================================");
+  });
 
-// Graceful shutdown
-const shutdown = (signal) => {
-  console.error(`\n[BridgeServer] ${signal} received. Shutting down...`);
-  wss.close();
-  server.close(() => process.exit(0));
-};
+  // Graceful shutdown
+  const shutdown = (signal) => {
+    console.error(`\n[BridgeServer] ${signal} received. Shutting down...`);
+    wss.close();
+    server.close(() => process.exit(0));
+  };
 
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+}
 
 export { server, wss, PORT, HOST };

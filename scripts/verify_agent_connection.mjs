@@ -101,9 +101,11 @@ async function run() {
   let onExtensionConnected = null;
 
   if (isLiveServer) {
+    const MAX_CLIENT_POLL_RETRIES = 40;
+    const CLIENT_POLL_INTERVAL_MS = 250;
     onExtensionConnected = (async () => {
-      for (let i = 0; i < 40; i++) {
-        await new Promise(r => setTimeout(r, 250));
+      for (let i = 0; i < MAX_CLIENT_POLL_RETRIES; i++) {
+        await new Promise(r => setTimeout(r, CLIENT_POLL_INTERVAL_MS));
         try {
           const listResp = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
             method: "POST",

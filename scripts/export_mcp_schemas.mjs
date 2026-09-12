@@ -1,6 +1,6 @@
 /**
  * Agent Pilot - Export & Synchronize MCP Tool Schemas
- * Source of Truth: scripts/agent_pilot_server.mjs
+ * Source of Truth: scripts/agent_pilot_server.mjs (MCP_TOOLS)
  * Targets:
  *   1. Repository Directory: mcp/agent-pilot/
  *   2. Antigravity MCP Directory: ~/.gemini/antigravity/mcp/agent-pilot/
@@ -10,6 +10,8 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
+
+import { MCP_TOOLS } from "./agent_pilot_server.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,30 +24,39 @@ const ANTIGRAVITY_MCP_DIR = path.join(HOME_DIR, ".gemini", "antigravity", "mcp",
 
 console.log("==================================================================");
 console.log("📦 AGENT PILOT - EXPORTING MCP TOOL SCHEMAS (SSOT)");
-console.log(`📌 Source File: ${SERVER_FILE}`);
-console.log(`📁 Repo Target: ${REPO_MCP_DIR}`);
-console.log(`📁 User Target: ${ANTIGRAVITY_MCP_DIR}`);
+console.log(`📌 Source Module: ${SERVER_FILE}`);
+console.log(`📁 Repo Target  : ${REPO_MCP_DIR}`);
+console.log(`📁 User Target  : ${ANTIGRAVITY_MCP_DIR}`);
 console.log("==================================================================");
 
-// 1. Read and extract MCP_TOOLS from server.mjs
-const serverContent = fs.readFileSync(SERVER_FILE, "utf8");
-const match = serverContent.match(/const MCP_TOOLS = (\[[\s\S]*?\]);\n\nasync function handleMcpToolCall/);
-
-if (!match) {
-  console.error("❌ Failed to parse MCP_TOOLS definition from server.mjs");
+if (!Array.isArray(MCP_TOOLS) || MCP_TOOLS.length === 0) {
+  console.error("❌ No tools found in MCP_TOOLS export");
   process.exit(1);
 }
+console.log(`✓ Loaded ${MCP_TOOLS.length} tool definitions from server module`);
 
-const tools = eval(match[1]);
-console.log(`✓ Parsed ${tools.length} tool definitions from server.mjs`);
-
-// 2. Ensure directories exist
+// Ensure directories exist
 fs.mkdirSync(REPO_MCP_DIR, { recursive: true });
 fs.mkdirSync(ANTIGRAVITY_MCP_DIR, { recursive: true });
 
-// 3. Export each tool schema
+// Clean up stale JSON files to prevent ghost/orphaned tools
+function cleanDirectory(dir) {
+  if (fs.existsSync(dir)) {
+    const files = fs.readdirSync(dir);
+    for (const f of files) {
+      if (f.endsWith(".json")) {
+        fs.unlinkSync(path.join(dir, f));
+      }
+    }
+  }
+}
+cleanDirectory(REPO_MCP_DIR);
+cleanDirectory(ANTIGRAVITY_MCP_DIR);
+console.log("✓ Cleaned target directories of stale schemas");
+
+// Export each tool schema
 let count = 0;
-for (const tool of tools) {
+for (const tool of MCP_TOOLS) {
   const schema = {
     name: tool.name,
     description: tool.description,
