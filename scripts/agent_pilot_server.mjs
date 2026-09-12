@@ -263,9 +263,18 @@ const MCP_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        url: { type: "string", description: "The URL to navigate to (e.g. https://github.com)" }
+        url: { type: "string", description: "The URL to navigate to (e.g. https://github.com)" },
+        active: { type: "boolean", description: "Whether to make the newly opened tab active/focused (default true). Set to false to open quietly in the background without stealing user focus.", default: true }
       },
       required: ["url"]
+    }
+  },
+  {
+    name: "browser_list_tabs",
+    description: "List all open browser tabs with tabId, title, url, active state, and whether they belong to the agent",
+    inputSchema: {
+      type: "object",
+      properties: {}
     }
   },
   {
@@ -282,10 +291,11 @@ const MCP_TOOLS = [
   },
   {
     name: "browser_click",
-    description: "Simulate virtual mouse movement and click at (x, y) coordinates or on a CSS selector",
+    description: "Simulate virtual mouse movement and click at (x, y) coordinates or on a CSS selector on the agent's tab or specified tab",
     inputSchema: {
       type: "object",
       properties: {
+        tabId: { type: "integer", description: "Optional target Tab ID" },
         x: { type: "number", description: "Target X pixel coordinate" },
         y: { type: "number", description: "Target Y pixel coordinate" },
         selector: { type: "string", description: "Optional CSS selector to click" }
@@ -294,10 +304,11 @@ const MCP_TOOLS = [
   },
   {
     name: "browser_type",
-    description: "Simulate human-like typing into an input or textarea element",
+    description: "Simulate human-like typing into an input or textarea element on the agent's tab or specified tab",
     inputSchema: {
       type: "object",
       properties: {
+        tabId: { type: "integer", description: "Optional target Tab ID" },
         selector: { type: "string", description: "CSS selector of the input field" },
         text: { type: "string", description: "Text string to type" },
         delay: { type: "number", description: "Typing delay between keys in ms (default 50)" }
@@ -307,10 +318,11 @@ const MCP_TOOLS = [
   },
   {
     name: "browser_scroll",
-    description: "Scroll the active web page smoothly",
+    description: "Scroll the agent's tab or specified tab smoothly",
     inputSchema: {
       type: "object",
       properties: {
+        tabId: { type: "integer", description: "Optional target Tab ID" },
         deltaX: { type: "number", description: "Horizontal scroll amount" },
         deltaY: { type: "number", description: "Vertical scroll amount (e.g. 300 to scroll down)" }
       }
@@ -318,10 +330,11 @@ const MCP_TOOLS = [
   },
   {
     name: "browser_get_element",
-    description: "Inspect a DOM element, returning bounding box, dimensions, CSS selector, and XPath",
+    description: "Inspect a DOM element on the agent's tab or specified tab, returning bounding box, dimensions, CSS selector, and XPath",
     inputSchema: {
       type: "object",
       properties: {
+        tabId: { type: "integer", description: "Optional target Tab ID" },
         selector: { type: "string", description: "CSS selector to inspect" }
       },
       required: ["selector"]
@@ -329,11 +342,12 @@ const MCP_TOOLS = [
   },
   {
     name: "browser_screenshot",
-    description: "Capture a screenshot of the visible tab or specific region (returns PNG data)",
+    description: "Capture a screenshot of a specified tab or active tab, even if running in the background while the user works on another tab (returns PNG data)",
     inputSchema: {
       type: "object",
       properties: {
-        mode: { type: "string", enum: ["visible", "region"], description: "Screenshot mode" }
+        tabId: { type: "integer", description: "Optional Tab ID to capture. If omitted, captures the tab controlled by the agent (even if in background) or active tab" },
+        mode: { type: "string", enum: ["visible", "region"], description: "Screenshot mode (default visible)" }
       }
     }
   },
@@ -352,7 +366,9 @@ const MCP_TOOLS = [
     description: "Trigger the high-precision eyedropper color picker on the page",
     inputSchema: {
       type: "object",
-      properties: {}
+      properties: {
+        tabId: { type: "integer", description: "Optional target Tab ID" }
+      }
     }
   },
   {
@@ -391,7 +407,10 @@ const MCP_TOOLS = [
 async function handleMcpToolCall(name, args) {
   switch (name) {
     case "browser_open_tab":
-      return await sendCommandToExtension("tabs.create", { url: args.url });
+      return await sendCommandToExtension("tabs.create", { url: args.url, active: args.active });
+
+    case "browser_list_tabs":
+      return await sendCommandToExtension("tabs.listAll");
 
     case "browser_navigate":
       return await sendCommandToExtension("tabs.update", { url: args.url, tabId: args.tabId });

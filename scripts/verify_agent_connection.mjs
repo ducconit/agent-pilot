@@ -399,7 +399,22 @@ async function run() {
     const hasLog = devtoolsRes?.console?.some(c => c.text.includes("LOG_VIA_AGENT_PORT_58765_TOKEN"));
     record("16. Agent Command: devtools.getData", hasLog, `Captured ${devtoolsRes?.console?.length} log entries over bridge`);
 
-    // 17. Test HTTP API Endpoint (POST http://127.0.0.1:58765/api)
+    // 17. Test Agent Command: tabs.listAll
+    const listTabsRes = await sendAgentCommand("tabs.listAll", {});
+    const hasAgentTab = Array.isArray(listTabsRes) && listTabsRes.some(t => t.tabId === tabId && t.isAgentTab === true);
+    record("17. Agent Command: tabs.listAll", hasAgentTab, `Listed ${listTabsRes?.length} tabs (found Agent tabId: ${tabId})`);
+
+    // 18. Test Background Tab Screenshot (while user is working on another active tab)
+    const userActivePage = await browser.newPage();
+    await userActivePage.goto(`http://127.0.0.1:${HTTP_PORT}/test-page.html?user_tab=active`);
+    await userActivePage.bringToFront();
+    // Now userActivePage is active in foreground, tabId is in background!
+    const bgShotRes = await sendAgentCommand("page.screenshot", { tabId, mode: "visible" });
+    const bgShotSuccess = bgShotRes?.success && bgShotRes?.isBackgroundTab === true && bgShotRes?.dataUrl?.startsWith("data:image/png;base64,");
+    record("18. Background Tab Screenshot via CDP", bgShotSuccess, `Background tab ${tabId} captured silently via CDP while user was on active tab`);
+    await userActivePage.close();
+
+    // 19. Test HTTP API Endpoint (POST http://127.0.0.1:58765/api)
     const httpRes = await new Promise((resolve) => {
       const req = http.request(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
         method: "POST",
@@ -415,9 +430,9 @@ async function run() {
       req.write(JSON.stringify({ method: "ping" }));
       req.end();
     });
-    record("17. HTTP REST/JSON-RPC API Endpoint", httpRes?.success === true && httpRes?.result?.pong === true, `POST /api response: pong=true`);
+    record("19. HTTP REST/JSON-RPC API Endpoint", httpRes?.success === true && httpRes?.result?.pong === true, `POST /api response: pong=true`);
 
-    // 18. Test Side Panel UI displays Agent Connection Status
+    // 20. Test Side Panel UI displays Agent Connection Status
     const swTarget = await browser.waitForTarget(t => t.type() === "service_worker");
     const extId = swTarget.url().split("/")[2];
     const sidepanelPage = await browser.newPage();
@@ -433,7 +448,7 @@ async function run() {
     });
 
     const isSidepanelConnected = sidepanelBridgeStatus.dotClass?.includes("connected") && sidepanelBridgeStatus.portVal === String(BRIDGE_PORT);
-    record("18. Side Panel Agent Status Indicator", isSidepanelConnected, `Badge: "${sidepanelBridgeStatus.text}", Dot: ${sidepanelBridgeStatus.dotClass}`);
+    record("20. Side Panel Agent Status Indicator", isSidepanelConnected, `Badge: "${sidepanelBridgeStatus.text}", Dot: ${sidepanelBridgeStatus.dotClass}`);
 
     await sidepanelPage.close();
 

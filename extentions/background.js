@@ -9,6 +9,10 @@ const devtoolsBuffers = new Map(); // tabId -> { console: [], network: [], perfo
 const agentControlledTabs = new Set(); // Track tabs opened or controlled by AI Agent
 const tabLockStates = new Map(); // tabId -> { manualLock: boolean, autoCount: number, unlockTimer: any, currentAction: string }
 
+// Chrome Native Tab Group styling constants
+const AGENT_GROUP_TITLE = "🤖 Agent Pilot";
+const AGENT_GROUP_COLOR = "cyan";
+
 function getTabLockState(tabId) {
   if (!tabLockStates.has(tabId)) {
     tabLockStates.set(tabId, { manualLock: false, autoCount: 0, unlockTimer: null, currentAction: "" });
@@ -510,78 +514,73 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // 3. Screenshot Capture Operations
   if (action === "capture_screenshot") {
-    const { mode, tabId, clip } = request; // mode: "visible" | "region" | "element"
+    const { mode = "visible", tabId: requestedTabId, clip } = request; // mode: "visible" | "region" | "element"
 
-    if (mode === "visible") {
-      // If CDP is attached to tabId, use Page.captureScreenshot directly
-      if (tabId && attachedTabs.has(tabId)) {
-        sendCdpCommand(tabId, "Page.captureScreenshot", { format: "png" })
-          .then((res) => {
-            sendResponse({ success: true, dataUrl: "data:image/png;base64," + res.data });
-          })
-          .catch((err) => {
-            // Fallback to captureVisibleTab
-            chrome.tabs.captureVisibleTab(null, { format: "png" }, (dataUrl) => {
-              if (chrome.runtime.lastError) {
-                sendResponse({ success: false, error: chrome.runtime.lastError.message });
-              } else {
-                sendResponse({ success: true, dataUrl });
-              }
-            });
-          });
-        return true;
-      }
-
-      chrome.tabs.captureVisibleTab(null, { format: "png" }, (dataUrl) => {
-        if (chrome.runtime.lastError) {
-          sendResponse({ success: false, error: chrome.runtime.lastError.message });
-        } else {
-          sendResponse({ success: true, dataUrl });
+    (async () => {
+      try {
+        const targetTabId = requestedTabId || (agentBridge ? await agentBridge.getTargetTabId() : null);
+        let targetTab = null;
+        if (targetTabId) {
+          targetTab = await chrome.tabs.get(targetTabId).catch(() => null);
         }
-      });
-      return true;
-    }
+        const isTabActive = Boolean(targetTab && targetTab.active);
 
-    if (mode === "element" || mode === "region") {
-      // If CDP is attached, we can use CDP Page.captureScreenshot with clip
-      if (attachedTabs.has(tabId) && clip) {
-        sendCdpCommand(tabId, "Page.captureScreenshot", {
-          format: "png",
-          clip: {
-            x: clip.x,
-            y: clip.y,
-            width: clip.width,
-            height: clip.height,
-            scale: 1
-          },
-          captureBeyondViewport: false
-        })
-          .then((res) => {
-            const dataUrl = "data:image/png;base64," + res.data;
-            sendResponse({ success: true, dataUrl });
-          })
-          .catch(() => {
-            // Fallback to visible tab + crop via content/sidepanel
-            chrome.tabs.captureVisibleTab(null, { format: "png" }, (dataUrl) => {
-              if (chrome.runtime.lastError) {
-                sendResponse({ success: false, error: chrome.runtime.lastError.message });
-              } else {
-                sendResponse({ success: true, dataUrl, requiresCrop: true, clip });
-              }
-            });
-          });
-      } else {
-        // Capture visible tab and forward clip info for canvas cropping
-        chrome.tabs.captureVisibleTab(null, { format: "png" }, (dataUrl) => {
+        // If targetTab is running in background, or CDP is already attached, capture via CDP Page.captureScreenshot
+        if (targetTabId && (!isTabActive || attachedTabs.has(targetTabId))) {
+          if (!attachedTabs.has(targetTabId)) {
+            await attachDebugger(targetTabId).catch(() => {});
+          }
+
+          if (attachedTabs.has(targetTabId)) {
+            const cdpParams = {
+              format: "png",
+              fromSurface: true,
+              captureBeyondViewport: false
+            };
+            if ((mode === "element" || mode === "region") && clip) {
+              cdpParams.clip = {
+                x: clip.x,
+                y: clip.y,
+                width: clip.width,
+                height: clip.height,
+                scale: 1
+              };
+            }
+            try {
+              const res = await sendCdpCommand(targetTabId, "Page.captureScreenshot", cdpParams);
+              return sendResponse({
+                success: true,
+                tabId: targetTabId,
+                isBackgroundTab: !isTabActive,
+                dataUrl: "data:image/png;base64," + res.data
+              });
+            } catch (err) {
+              console.warn("[AgentPilot] CDP runtime screenshot failed on tab " + targetTabId + ":", err);
+            }
+          }
+        }
+
+        // Fallback to captureVisibleTab (captures active tab in the window)
+        const windowId = targetTab?.windowId || null;
+        chrome.tabs.captureVisibleTab(windowId, { format: "png" }, (dataUrl) => {
           if (chrome.runtime.lastError) {
             sendResponse({ success: false, error: chrome.runtime.lastError.message });
           } else {
-            sendResponse({ success: true, dataUrl, requiresCrop: true, clip });
+            sendResponse({
+              success: true,
+              tabId: targetTab?.id || null,
+              isBackgroundTab: false,
+              dataUrl,
+              requiresCrop: (mode === "element" || mode === "region"),
+              clip
+            });
           }
         });
+      } catch (err) {
+        sendResponse({ success: false, error: err?.message || String(err) });
       }
-      return true;
-    }
+    })();
+    return true;
   }
 
   // 4. Input Emulation via CDP (Alternative to Content Script DOM simulation)
@@ -685,6 +684,17 @@ class AgentBridgeClient {
     this.reconnectDelay = 2000;
     this.maxReconnectDelay = 20000;
     this.enabled = true;
+    this.lastAgentTabId = null;
+
+    // Track tab closures to avoid stale references
+    if (chrome.tabs && chrome.tabs.onRemoved) {
+      chrome.tabs.onRemoved.addListener((tabId) => {
+        agentControlledTabs.delete(tabId);
+        if (this.lastAgentTabId === tabId) {
+          this.lastAgentTabId = null;
+        }
+      });
+    }
 
     // Listen for window focus changes to update active target in multi-window setups
     if (chrome.windows && chrome.windows.onFocusChanged) {
@@ -898,6 +908,38 @@ class AgentBridgeClient {
     });
   }
 
+  async getTargetTabId(requestedTabId) {
+    if (requestedTabId) {
+      try {
+        const tab = await chrome.tabs.get(Number(requestedTabId));
+        if (tab && tab.id) return tab.id;
+      } catch (_) {}
+    }
+    // If agent previously opened or navigated a tab, prioritize that tab
+    if (this.lastAgentTabId) {
+      try {
+        const tab = await chrome.tabs.get(this.lastAgentTabId);
+        if (tab && tab.id) return tab.id;
+      } catch (_) {
+        this.lastAgentTabId = null;
+      }
+    }
+    // Check any other agent-controlled tab that is still valid
+    for (const tid of agentControlledTabs) {
+      try {
+        const tab = await chrome.tabs.get(tid);
+        if (tab && tab.id) {
+          this.lastAgentTabId = tab.id;
+          return tab.id;
+        }
+      } catch (_) {
+        agentControlledTabs.delete(tid);
+      }
+    }
+    // Fallback to active tab in focused window
+    return await this.getActiveTabId();
+  }
+
   async ensureContentScript(tabId) {
     if (!tabId) return false;
     try {
@@ -957,7 +999,7 @@ class AgentBridgeClient {
       if (chrome.tabGroups && chrome.tabGroups.query) {
         try {
           const groups = await chrome.tabGroups.query({ windowId });
-          const existing = groups.find((g) => g.title === "🤖 Agent Pilot" || g.title === "Agent Pilot");
+          const existing = groups.find((g) => g.title === AGENT_GROUP_TITLE || g.title === "Agent Pilot");
           if (existing) targetGroupId = existing.id;
         } catch (_) {}
       }
@@ -969,8 +1011,8 @@ class AgentBridgeClient {
 
       if (chrome.tabGroups && chrome.tabGroups.update && (!targetGroupId || groupId !== targetGroupId)) {
         await chrome.tabGroups.update(groupId, {
-          title: "🤖 Agent Pilot",
-          color: "cyan"
+          title: AGENT_GROUP_TITLE,
+          color: AGENT_GROUP_COLOR
         }).catch(() => {});
       }
     } catch (err) {
@@ -1077,6 +1119,25 @@ class AgentBridgeClient {
           break;
         }
 
+        case "tabs.listAll": {
+          chrome.tabs.query({}, (tabs) => {
+            if (chrome.runtime.lastError) {
+              return respond(null, chrome.runtime.lastError);
+            }
+            const list = (tabs || []).map((t) => ({
+              tabId: t.id,
+              title: t.title,
+              url: t.url,
+              active: t.active,
+              windowId: t.windowId,
+              isAgentTab: agentControlledTabs.has(t.id),
+              groupId: t.groupId
+            }));
+            respond(list);
+          });
+          break;
+        }
+
         case "tabs.getActive": {
           chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
@@ -1090,13 +1151,17 @@ class AgentBridgeClient {
           if (url && !url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("chrome://")) {
             url = "https://" + url;
           }
-          chrome.tabs.create({ url, active: params.active !== false }, async (tab) => {
+          const makeActive = params.active !== false;
+          chrome.tabs.create({ url, active: makeActive }, async (tab) => {
             if (chrome.runtime.lastError) {
               respond(null, chrome.runtime.lastError);
             } else {
               if (tab && tab.id) {
                 agentControlledTabs.add(tab.id);
+                this.lastAgentTabId = tab.id;
                 await this.assignTabToAgentGroup(tab).catch(() => {});
+                // Auto-attach CDP for background capture & DevTools inspection
+                await attachDebugger(tab.id).catch(() => {});
               }
               respond(tab);
             }
@@ -1105,7 +1170,7 @@ class AgentBridgeClient {
         }
 
         case "tabs.update": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           let url = params.url || "";
           if (url && !url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("chrome://")) {
@@ -1114,7 +1179,6 @@ class AgentBridgeClient {
           const updateProps = {};
           if (url) updateProps.url = url;
           if (params.active !== undefined) updateProps.active = Boolean(params.active);
-          else updateProps.active = true;
 
           chrome.tabs.update(tabId, updateProps, async (tab) => {
             if (chrome.runtime.lastError) {
@@ -1122,7 +1186,9 @@ class AgentBridgeClient {
             } else {
               if (tab && tab.id) {
                 agentControlledTabs.add(tab.id);
+                this.lastAgentTabId = tab.id;
                 await this.assignTabToAgentGroup(tab).catch(() => {});
+                await attachDebugger(tab.id).catch(() => {});
               }
               respond(tab);
             }
@@ -1131,7 +1197,7 @@ class AgentBridgeClient {
         }
 
         case "tabs.remove": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           chrome.tabs.remove(tabId, () => {
             if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
@@ -1141,7 +1207,7 @@ class AgentBridgeClient {
         }
 
         case "cdp.attach": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           const res = await attachDebugger(tabId);
           respond(res);
@@ -1149,7 +1215,7 @@ class AgentBridgeClient {
         }
 
         case "cdp.detach": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           const res = await detachDebugger(tabId);
           respond(res);
@@ -1157,7 +1223,7 @@ class AgentBridgeClient {
         }
 
         case "cdp.send": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           const res = await sendCdpCommand(tabId, params.cdpMethod, params.cdpParams || {});
           respond(res);
@@ -1165,7 +1231,7 @@ class AgentBridgeClient {
         }
 
         case "page.moveMouse": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           this.runWithTabLock(tabId, "page.moveMouse", () =>
             this.sendTabMessageWithRetry(tabId, {
@@ -1181,7 +1247,7 @@ class AgentBridgeClient {
         }
 
         case "page.click": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           this.runWithTabLock(tabId, "page.click", () =>
             this.sendTabMessageWithRetry(tabId, {
@@ -1197,7 +1263,7 @@ class AgentBridgeClient {
         }
 
         case "page.type": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           this.runWithTabLock(tabId, "page.type", () =>
             this.sendTabMessageWithRetry(tabId, {
@@ -1213,7 +1279,7 @@ class AgentBridgeClient {
         }
 
         case "page.scroll": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           this.runWithTabLock(tabId, "page.scroll", () =>
             this.sendTabMessageWithRetry(tabId, {
@@ -1230,7 +1296,7 @@ class AgentBridgeClient {
 
         case "page.setBusy":
         case "agent.setBusy": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           const res = await this.setTabLock(tabId, params.busy !== false, params.action || "");
           respond(res || { success: true });
@@ -1238,7 +1304,7 @@ class AgentBridgeClient {
         }
 
         case "page.getElement": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           this.sendTabMessageWithRetry(tabId, {
             action: "get_element_info",
@@ -1252,7 +1318,7 @@ class AgentBridgeClient {
         }
 
         case "page.pickColor": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           this.sendTabMessageWithRetry(tabId, { action: "pick_color" })
             .then(res => respond(res || null))
@@ -1262,34 +1328,74 @@ class AgentBridgeClient {
 
         case "page.screenshot": {
           const mode = params.mode || "visible";
-          const tabId = params.tabId || (await this.getActiveTabId());
-          if (mode === "visible") {
-            if (tabId && attachedTabs.has(tabId)) {
-              sendCdpCommand(tabId, "Page.captureScreenshot", { format: "png" })
-                .then((r) => respond({ success: true, dataUrl: "data:image/png;base64," + r.data }))
-                .catch(() => {
-                  chrome.tabs.captureVisibleTab(null, { format: "png" }, (dataUrl) => {
-                    if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
-                    else respond({ success: true, dataUrl });
-                  });
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+
+          let targetTab = null;
+          try {
+            targetTab = await chrome.tabs.get(tabId);
+          } catch (e) {
+            return respond(null, new Error(`Target tab ${tabId} not found: ${e.message}`));
+          }
+
+          const isTabActive = Boolean(targetTab && targetTab.active);
+
+          // If target tab is running in background (user is on another tab) OR CDP is already attached,
+          // capture via CDP Page.captureScreenshot so we don't disrupt user or capture wrong tab.
+          if (!isTabActive || attachedTabs.has(tabId)) {
+            if (!attachedTabs.has(tabId)) {
+              await attachDebugger(tabId).catch(() => {});
+            }
+
+            if (attachedTabs.has(tabId)) {
+              const cdpParams = {
+                format: "png",
+                fromSurface: true,
+                captureBeyondViewport: false
+              };
+              if ((mode === "element" || mode === "region") && params.clip) {
+                cdpParams.clip = {
+                  x: params.clip.x,
+                  y: params.clip.y,
+                  width: params.clip.width,
+                  height: params.clip.height,
+                  scale: 1
+                };
+              }
+              try {
+                const res = await sendCdpCommand(tabId, "Page.captureScreenshot", cdpParams);
+                return respond({
+                  success: true,
+                  tabId,
+                  isBackgroundTab: !isTabActive,
+                  dataUrl: "data:image/png;base64," + res.data
                 });
+              } catch (cdpErr) {
+                console.warn("[AgentPilot] CDP screenshot failed on tab " + tabId + ":", cdpErr?.message || cdpErr);
+              }
+            }
+          }
+
+          // Fallback: captureVisibleTab on window (only captures the active tab of window)
+          const winId = targetTab?.windowId || null;
+          chrome.tabs.captureVisibleTab(winId, { format: "png" }, (dataUrl) => {
+            if (chrome.runtime.lastError) {
+              respond(null, chrome.runtime.lastError);
             } else {
-              chrome.tabs.captureVisibleTab(null, { format: "png" }, (dataUrl) => {
-                if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
-                else respond({ success: true, dataUrl });
+              respond({
+                success: true,
+                tabId,
+                isBackgroundTab: false,
+                dataUrl,
+                clip: params.clip
               });
             }
-          } else {
-            chrome.tabs.captureVisibleTab(null, { format: "png" }, (dataUrl) => {
-              if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
-              else respond({ success: true, dataUrl, clip: params.clip });
-            });
-          }
+          });
           break;
         }
 
         case "devtools.getData": {
-          const tabId = params.tabId || (await this.getActiveTabId());
+          const tabId = await this.getTargetTabId(params.tabId);
           const buffer = getBuffer(tabId);
           respond({
             console: buffer.console,
