@@ -33,3 +33,4 @@ assets/verified_*.png
 dist/
 /tmp/
 *.log
+states/
