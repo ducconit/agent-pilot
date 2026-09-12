@@ -121,6 +121,18 @@ async function main() {
   });
   console.log("- Draft Box #1 state:", draftBoxState1);
 
+  const popoverPosition = await page.evaluate(() => {
+    const popover = document.getElementById("agent-pilot-feedback-popover");
+    return {
+      left: popover.style.left,
+      top: popover.style.top
+    };
+  });
+  console.log("- Popover position (anchored to crop rect):", popoverPosition);
+  if (popoverPosition.left !== "150px" || popoverPosition.top !== "362px") {
+    throw new Error(`Popover position incorrect: expected (150px, 362px), got (${popoverPosition.left}, ${popoverPosition.top})`);
+  }
+
   // Capture screenshot of Draft Box #1 with Popover
   const shot1Path = path.resolve("assets/test_region_1_drafting.png");
   await page.screenshot({ path: shot1Path });

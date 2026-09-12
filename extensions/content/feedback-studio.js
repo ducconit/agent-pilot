@@ -565,7 +565,8 @@
     draftBox.style.width = `${clip.width}px`;
     draftBox.style.height = `${clip.height}px`;
 
-    draftBox.classList.toggle("flip-badge-inside", pageY < 28);
+    const viewportY = (clip.y !== undefined) ? clip.y : (pageY - window.scrollY);
+    draftBox.classList.toggle("flip-badge-inside", viewportY < 28);
     const badgeEl = draftBox.querySelector("#ap-draft-badge");
     if (badgeEl) {
       badgeEl.textContent = `#${itemNumber} (Đang soạn...)`;
@@ -618,7 +619,8 @@
       box.style.width = `${item.clip.width}px`;
       box.style.height = `${item.clip.height}px`;
 
-      if (pageY < 28) {
+      const viewportY = (item.clip.y !== undefined) ? item.clip.y : (pageY - window.scrollY);
+      if (viewportY < 28) {
         box.classList.add("flip-badge-inside");
       }
 
@@ -668,12 +670,16 @@
 
     metaEl.innerHTML = metaHtml;
 
-    // Position popover near anchor
-    let left = anchorRect.left || 20;
-    let top = (anchorRect.bottom || 50) + 12;
+    // Position popover near anchor (supports both DOMRect and {x, y, width, height})
+    const aLeft = anchorRect.left ?? anchorRect.x ?? 0;
+    const aTop = anchorRect.top ?? anchorRect.y ?? 0;
+    const aBottom = anchorRect.bottom ?? ((anchorRect.y !== undefined && anchorRect.height !== undefined) ? anchorRect.y + anchorRect.height : aTop + 40);
+
+    let left = aLeft;
+    let top = aBottom + 12;
 
     if (top + 260 > window.innerHeight) {
-      top = Math.max(10, (anchorRect.top || 50) - 270);
+      top = Math.max(10, aTop - 270);
     }
     if (left + 340 > window.innerWidth) {
       left = Math.max(10, window.innerWidth - 350);
