@@ -23,7 +23,7 @@ assignees: []
 ## 💻 Môi Trường Chạy Ứng Dụng (Environment Info)
 - **Hệ điều hành**: [ví dụ: Windows 11, macOS Sequoia, Ubuntu 24.04]
 - **Trình duyệt**: [ví dụ: Chrome 128, Brave 1.69, Edge 128]
-- **Phiên bản Agent Pilot**: [ví dụ: v1.0.0-beta]
+- **Phiên bản Agent Pilot**: [ví dụ: v1.0.1-beta]
 - **Node.js (nếu dùng Server MCP)**: [ví dụ: v20.12.0, v22.0.0]
 - **AI Agent (nếu có)**: [ví dụ: Antigravity, Claude Desktop, Cursor, OpenCode]
 

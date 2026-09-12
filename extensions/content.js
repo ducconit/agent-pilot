@@ -42,12 +42,16 @@
 
   let isAgentTab = false;
 
+  const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
+    ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
+    : "1.0.1-beta";
+
   // =========================================================================
   // Antigravity-First Global Bridge API (`window.__AGENT_PILOT__`)
   // =========================================================================
 
   window.__AGENT_PILOT__ = {
-    version: "1.0.0",
+    version: EXTENSION_VERSION,
     moveMouse: (x, y, duration) => cursor.moveVirtualMouse(x, y, duration),
     click: (x, y, selector) => cursor.virtualClick(x, y, selector),
     type: (selector, text, clear, pressEnter) => cursor.virtualType(selector, text, clear, pressEnter),
@@ -98,7 +102,7 @@
         }
 
         window.__AGENT_PILOT__ = {
-          version: "1.0.0",
+          version: EXTENSION_VERSION,
           moveMouse: (x, y, duration) => sendBridgeRequest("virtual_mouse_move", { x, y, duration }),
           click: (x, y) => sendBridgeRequest("virtual_mouse_click", { x, y }),
           type: (selector, text) => sendBridgeRequest("virtual_type", { selector, text }),

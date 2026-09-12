@@ -5,11 +5,18 @@
  * Default Port: 58765 (Dynamic/Private range, collision-free)
  */
 
+import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline";
 import { WebSocketServer, WebSocket } from "ws";
+
+let SERVER_VERSION = "1.0.1-beta";
+try {
+  const pkg = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf-8"));
+  if (pkg && pkg.version) SERVER_VERSION = pkg.version;
+} catch (_) {}
 
 const PORT = Number(process.env.AGENT_PILOT_PORT || process.env.PORT || 58765);
 const HOST = process.env.AGENT_PILOT_HOST || "127.0.0.1";
@@ -65,7 +72,7 @@ const server = http.createServer(async (req, res) => {
       clientCount: clientsList.length,
       activeClientId,
       clients: clientsList,
-      version: "1.0.0"
+      version: SERVER_VERSION
     }));
     return;
   }
@@ -139,7 +146,7 @@ wss.on("connection", (ws, req) => {
     connectedAt: Date.now(),
     lastActive: Date.now(),
     agent: "AgentPilot-Extension",
-    version: "1.0.0",
+    version: SERVER_VERSION,
     details: { browser: "Chromium", os: "linux", windowCount: 1, activeTabTitle: "", activeTabUrl: "" }
   };
   connectedClients.set(clientId, clientInfo);
@@ -795,7 +802,7 @@ if (isMainScript) {
             protocolVersion: "2024-11-05",
             serverInfo: {
               name: "agent-pilot-mcp",
-              version: "1.0.0"
+              version: SERVER_VERSION
             },
             capabilities: {
               tools: {}

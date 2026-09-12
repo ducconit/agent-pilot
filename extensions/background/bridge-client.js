@@ -28,6 +28,10 @@ import {
 import { captureTabScreenshot } from "./screenshot-service.js";
 import { executeBatchActions } from "./batch-executor.js";
 
+const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
+  ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
+  : "1.0.1-beta";
+
 export class AgentBridgeClient {
   constructor(broadcastFn = null) {
     this.port = DEFAULT_AGENT_PORT;
@@ -136,7 +140,7 @@ export class AgentBridgeClient {
 
         this.send({
           type: "HANDSHAKE",
-          version: "1.0.0",
+          version: EXTENSION_VERSION,
           agent: "AgentPilot-Extension",
           capabilities: ["tabs", "cdp", "cursor", "type", "click", "scroll", "inspector", "eyedropper", "screenshot"],
           details: {
@@ -313,7 +317,7 @@ export class AgentBridgeClient {
     try {
       switch (method) {
         case "ping":
-          respond({ pong: true, timestamp: Date.now(), version: "1.0.0" });
+          respond({ pong: true, timestamp: Date.now(), version: EXTENSION_VERSION });
           break;
 
         case "tabs.query": {
