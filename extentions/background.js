@@ -33,6 +33,9 @@ function normalizeUrl(url) {
   return "https://" + trimmed;
 }
 
+const CDP_SCREENSHOT_TIMEOUT_MS = 12000;
+const DEFAULT_LOAD_TIMEOUT_MS = 15000;
+
 // Cached host platform: "win", "mac", "linux", "cros"
 let currentPlatform = "unknown";
 const platformPromise = (typeof chrome !== "undefined" && chrome.runtime?.getPlatformInfo)
@@ -1157,10 +1160,10 @@ class AgentBridgeClient {
         try {
           let res;
           try {
-            res = await sendCdpCommand(tabId, "Page.captureScreenshot", cdpParams, 12000);
+            res = await sendCdpCommand(tabId, "Page.captureScreenshot", cdpParams, CDP_SCREENSHOT_TIMEOUT_MS);
           } catch (firstErr) {
             console.warn("[AgentPilot] CDP screenshot initial attempt note:", firstErr?.message || firstErr);
-            res = await sendCdpCommand(tabId, "Page.captureScreenshot", { format: "png" }, 12000);
+            res = await sendCdpCommand(tabId, "Page.captureScreenshot", { format: "png" }, CDP_SCREENSHOT_TIMEOUT_MS);
           }
           return {
             success: true,
@@ -1248,7 +1251,7 @@ class AgentBridgeClient {
                 const timeout = setTimeout(() => {
                   chrome.tabs.onUpdated.removeListener(onUpdated);
                   resolve();
-                }, Number(act.loadTimeout || 15000));
+                }, Number(act.loadTimeout || DEFAULT_LOAD_TIMEOUT_MS));
 
                 const onUpdated = (tId, changeInfo) => {
                   if (tId === tab.id && changeInfo.status === "complete") {
@@ -1259,6 +1262,7 @@ class AgentBridgeClient {
                 };
                 chrome.tabs.onUpdated.addListener(onUpdated);
                 chrome.tabs.get(tab.id, (t) => {
+                  if (chrome.runtime.lastError) return;
                   if (t && t.status === "complete") {
                     clearTimeout(timeout);
                     chrome.tabs.onUpdated.removeListener(onUpdated);
@@ -1279,28 +1283,44 @@ class AgentBridgeClient {
             const targetTabId = act.tabId ? await this.getTargetTabId(act.tabId) : currentTabId;
             if (!targetTabId) throw new Error("No active tab for navigate");
             const url = normalizeUrl(act.url);
-            await new Promise((resolve, reject) => {
-              chrome.tabs.update(targetTabId, { url }, (t) => {
-                if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-                resolve(t);
-              });
-            });
 
             if (act.waitUntil !== false) {
-              await new Promise((resolve) => {
-                const timeout = setTimeout(() => {
+              await new Promise((resolve, reject) => {
+                let resolved = false;
+                const done = () => {
+                  if (resolved) return;
+                  resolved = true;
+                  clearTimeout(timeout);
                   chrome.tabs.onUpdated.removeListener(onUpdated);
                   resolve();
-                }, Number(act.loadTimeout || 15000));
+                };
+
+                const timeout = setTimeout(done, Number(act.loadTimeout || DEFAULT_LOAD_TIMEOUT_MS));
 
                 const onUpdated = (tId, changeInfo) => {
                   if (tId === targetTabId && changeInfo.status === "complete") {
-                    clearTimeout(timeout);
-                    chrome.tabs.onUpdated.removeListener(onUpdated);
-                    resolve();
+                    done();
                   }
                 };
                 chrome.tabs.onUpdated.addListener(onUpdated);
+
+                chrome.tabs.update(targetTabId, { url }, (t) => {
+                  if (chrome.runtime.lastError) {
+                    clearTimeout(timeout);
+                    chrome.tabs.onUpdated.removeListener(onUpdated);
+                    return reject(new Error(chrome.runtime.lastError.message));
+                  }
+                  if (t && t.status === "complete") {
+                    done();
+                  }
+                });
+              });
+            } else {
+              await new Promise((resolve, reject) => {
+                chrome.tabs.update(targetTabId, { url }, (t) => {
+                  if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+                  resolve(t);
+                });
               });
             }
 

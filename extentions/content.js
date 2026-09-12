@@ -244,6 +244,12 @@
       } else if (el.value !== undefined) {
         el.value = "";
       }
+      try {
+        isAgentDispatching = true;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      } finally {
+        isAgentDispatching = false;
+      }
     }
     const cleanText = String(text ?? "").replace(/\r\n/g, "\n");
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) {
