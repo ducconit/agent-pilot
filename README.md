@@ -90,7 +90,7 @@ chrome://extensions
    ```
 
 ### Bước 3: Khởi động Bảng điều khiển (Side Panel)
-* Nhấn phím tắt nhanh: <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> (hoặc <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> trên Mac).
+* Nhấn phím tắt nhanh: <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> (hoặc <kbd>Option</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> trên Mac).
 * Hoặc nhấp vào biểu tượng Agent Pilot trên thanh công cụ và chọn **🚀 Mở Bảng Điều Khiển (Side Panel)**.
 
 ---

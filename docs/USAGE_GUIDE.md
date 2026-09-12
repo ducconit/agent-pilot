@@ -24,7 +24,7 @@ Do Agent Pilot được phát triển dưới dạng mã nguồn mở chuẩn Ma
 ## 2. Khởi Động Bảng Điều Khiển (Side Panel)
 
 Có 3 cách đơn giản để mở trung tâm điều khiển Side Panel:
-1. **Cách 1 (Nhanh nhất)**: Nhấn tổ hợp phím tắt <kbd>Ctrl + Shift + P</kbd> (hoặc <kbd>Command + Shift + P</kbd> trên macOS).
+1. **Cách 1 (Nhanh nhất)**: Nhấn tổ hợp phím tắt <kbd>Alt + Shift + P</kbd> (hoặc <kbd>Option + Shift + P</kbd> trên macOS).
 2. **Cách 2**: Nhấp vào biểu tượng Agent Pilot trên thanh công cụ -> Nhấn nút **🚀 Mở Bảng Điều Khiển (Side Panel)**.
 3. **Cách 3**: Nhấp chuột phải vào bất kỳ đâu trên trang web -> Chọn **Mở Agent Pilot (Side Panel)**.
 
