@@ -179,12 +179,20 @@ async function detachDebugger(tabId) {
 /**
  * Send arbitrary command to CDP
  */
-function sendCdpCommand(tabId, method, params = {}) {
+function sendCdpCommand(tabId, method, params = {}, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     if (!attachedTabs.has(tabId)) {
       return reject(new Error("Debugger not attached to tab " + tabId));
     }
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      reject(new Error(`CDP command ${method} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
     chrome.debugger.sendCommand({ tabId }, method, params, (result) => {
+      if (timedOut) return;
+      clearTimeout(timer);
       if (chrome.runtime.lastError) {
         reject(new Error(chrome.runtime.lastError.message));
       } else {
@@ -1197,16 +1205,18 @@ class AgentBridgeClient {
                 agentControlledTabs.add(tab.id);
                 this.lastAgentTabId = tab.id;
                 await this.assignTabToAgentGroup(tab).catch(() => {});
-                // Auto-attach CDP for background capture & DevTools inspection
-                await attachDebugger(tab.id).catch(() => {});
 
-                // Guarantee user focus is preserved if makeActive was false
-                if (!makeActive && activeTabBefore) {
+                // Safeguard: Only restore focus if the newly created tab itself accidentally stole focus.
+                // Never yank focus away if the user is working on or switched to another tab.
+                if (!makeActive && activeTabBefore && activeTabBefore !== tab.id) {
                   const currentActive = await this.getActiveTabId();
-                  if (currentActive !== activeTabBefore) {
+                  if (currentActive === tab.id) {
                     await chrome.tabs.update(activeTabBefore, { active: true }).catch(() => {});
                   }
                 }
+
+                // Auto-attach CDP for background capture & DevTools inspection
+                await attachDebugger(tab.id).catch(() => {});
               }
               respond(tab);
             }
@@ -1404,7 +1414,13 @@ class AgentBridgeClient {
                 };
               }
               try {
-                const res = await sendCdpCommand(tabId, "Page.captureScreenshot", cdpParams);
+                let res;
+                try {
+                  res = await sendCdpCommand(tabId, "Page.captureScreenshot", cdpParams, 12000);
+                } catch (firstErr) {
+                  console.warn("[AgentPilot] CDP screenshot initial attempt note:", firstErr?.message || firstErr);
+                  res = await sendCdpCommand(tabId, "Page.captureScreenshot", { format: "png" }, 12000);
+                }
                 return respond({
                   success: true,
                   tabId,

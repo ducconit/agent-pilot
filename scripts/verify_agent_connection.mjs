@@ -176,7 +176,7 @@ async function run() {
     console.log(`[Bridge Server] Listening on ws://127.0.0.1:${BRIDGE_PORT}`);
   }
 
-  async function sendAgentCommand(method, params = {}, timeoutMs = 8000) {
+  async function sendAgentCommand(method, params = {}, timeoutMs = 15000) {
     if (isLiveServer) {
       const payloadParams = { ...params };
       if (selectedTestInstanceId && payloadParams.instanceId === undefined) {
