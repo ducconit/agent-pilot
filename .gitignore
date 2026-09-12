@@ -33,4 +33,11 @@ assets/verified_*.png
 dist/
 /tmp/
 *.log
+
+# AI Agent Workspace State & Implementation Plans
+active-plan.md
+active-plan.json
+**/active-plan.md
+**/active-plan.json
 states/
+.agk/
