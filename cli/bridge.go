@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -216,10 +217,36 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Handle feedback push from extension HUD
-		if t, _ := msg["type"].(string); t == "FEEDBACK_PUSH_AGENT" {
+		// Handle extension events and feedback messages
+		switch t := msg["type"].(string); t {
+		case "HANDSHAKE":
+			if details, ok := msg["details"].(map[string]interface{}); ok {
+				client.Details = details
+			}
+		case "WINDOW_FOCUS":
+			clientsLock.Lock()
+			activeClientID = clientID
+			if tabTitle, ok := msg["activeTabTitle"].(string); ok {
+				if client.Details == nil {
+					client.Details = make(map[string]interface{})
+				}
+				client.Details["activeTabTitle"] = tabTitle
+			}
+			clientsLock.Unlock()
+		case "FEEDBACK_PUSH_AGENT", "FEEDBACK_SUBMISSION", "FEEDBACK_SAVE":
 			if payload, ok := msg["payload"].(map[string]interface{}); ok {
-				_, _ = SaveFeedbackSession(payload)
+				saved, _ := SaveFeedbackSession(payload)
+				if idVal, hasID := msg["id"]; hasID {
+					client.WriteMu.Lock()
+					_ = client.WS.WriteJSON(map[string]interface{}{
+						"id": idVal,
+						"result": map[string]interface{}{
+							"success":   true,
+							"sessionId": saved["sessionId"],
+						},
+					})
+					client.WriteMu.Unlock()
+				}
 			}
 		}
 	}
@@ -368,6 +395,9 @@ func StartBridgeServer(port int) error {
 
 	mux.HandleFunc("/api", handleHTTPAPI)
 	mux.HandleFunc("/api/feedback/save", handleFeedbackSaveEndpoint)
+	mux.HandleFunc("/api/feedback/push", handleFeedbackSaveEndpoint)
+	mux.HandleFunc("/api/feedback/pending", handleFeedbackPendingEndpoint)
+	mux.HandleFunc("/api/feedback/wait", handleFeedbackWaitEndpoint)
 
 	log.Printf("[AgentPilot Go] 🚀 Bridge Server listening on http://%s (WebSocket: ws://%s)", addr, addr)
 	return http.Serve(listener, mux)
@@ -418,6 +448,109 @@ func handleFeedbackSaveEndpoint(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": res})
+}
+
+func handleFeedbackPendingEndpoint(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if !IsOriginAllowed(origin) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Forbidden origin"})
+		return
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	q := r.URL.Query()
+	sessionId := q.Get("sessionId")
+	limit := 10
+	if lStr := q.Get("limit"); lStr != "" {
+		if l, err := strconv.Atoi(lStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+	clear := q.Get("clear") == "true"
+
+	if r.Method == "POST" {
+		body, err := io.ReadAll(io.LimitReader(r.Body, 5*1024*1024))
+		if err == nil && len(body) > 0 {
+			var p map[string]interface{}
+			if err := json.Unmarshal(body, &p); err == nil {
+				if sid, ok := p["sessionId"].(string); ok && sid != "" {
+					sessionId = sid
+				}
+				if l, ok := p["limit"].(float64); ok && l > 0 {
+					limit = int(l)
+				}
+				if c, ok := p["clear"].(bool); ok {
+					clear = c
+				}
+			}
+		}
+	}
+
+	res, err := GetPendingFeedback(limit, sessionId, clear)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":       true,
+		"sessionsCount": len(res),
+		"sessions":      res,
+	})
+}
+
+func handleFeedbackWaitEndpoint(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if !IsOriginAllowed(origin) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Forbidden origin"})
+		return
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "POST method required"})
+		return
+	}
+
+	timeout := 120
+	var tabID interface{}
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, 5*1024*1024))
+	if err == nil && len(body) > 0 {
+		var p map[string]interface{}
+		if err := json.Unmarshal(body, &p); err == nil {
+			if t, ok := p["timeout"].(float64); ok && t > 0 {
+				timeout = int(t)
+			}
+			tabID = p["tabId"]
+		}
+	}
+
+	res := WaitForFeedback(timeout, tabID)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": res})
 }
 
