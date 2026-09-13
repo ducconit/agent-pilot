@@ -22,26 +22,37 @@
       case "page.click":
       case "click_cursor":
       case "browser_click":
-        return "Đang thực hiện click phần tử...";
+        return "Đang click...";
       case "page.type":
       case "type_text":
       case "browser_type":
-        return "Đang nhập dữ liệu tự động...";
+        return "Đang nhập dữ liệu...";
       case "page.moveMouse":
       case "move_cursor":
-        return "Đang di chuyển con trỏ chuột...";
+        return "Đang di chuyển chuột...";
       case "page.scroll":
       case "scroll_page":
       case "browser_scroll":
-        return "Đang cuộn nội dung trang...";
+        return "Đang cuộn trang...";
       case "page.screenshot":
       case "browser_screenshot":
-        return "Đang chụp ảnh màn hình...";
+        return "Đang chụp ảnh...";
       case "tabs.update":
       case "browser_navigate":
-        return "Đang chuyển hướng trang...";
+        return "Đang chuyển trang...";
       default:
-        return action ? `Đang thực thi: ${action}` : "AI Agent đang thực hiện thao tác...";
+        return action ? `Đang thực thi: ${action}` : "AI Agent đang thao tác...";
+    }
+  }
+
+  function triggerEmergencyUnlock() {
+    setAgentBusyState(false);
+    try {
+      chrome.runtime.sendMessage({ action: "agent_emergency_unlocked" }).catch((err) => {
+        console.debug("[AgentPilot Shield] notify unlock rejected:", err);
+      });
+    } catch (err) {
+      console.debug("[AgentPilot Shield] notify unlock error:", err);
     }
   }
 
@@ -53,15 +64,14 @@
         <div class="agent-pilot-lock-card">
           <div class="agent-pilot-lock-spinner"></div>
           <div class="agent-pilot-lock-info">
-            <div class="agent-pilot-lock-title">
+            <span class="agent-pilot-lock-title">
               <span>🤖</span>
-              <span id="agent-pilot-lock-title-text">AI Agent đang thao tác...</span>
-            </div>
-            <div class="agent-pilot-lock-desc" id="agent-pilot-lock-action-desc">
-              Vui lòng không can thiệp chuột hoặc bàn phím lúc này.
-            </div>
+              <span id="agent-pilot-lock-title-text">AI Agent</span>
+            </span>
+            <span class="agent-pilot-lock-separator">•</span>
+            <span class="agent-pilot-lock-desc" id="agent-pilot-lock-action-desc">Đang thao tác...</span>
           </div>
-          <button class="agent-pilot-unlock-btn" id="agent-pilot-emergency-unlock" title="Lấy lại quyền điều khiển thủ công">
+          <button class="agent-pilot-unlock-btn" id="agent-pilot-emergency-unlock" title="Lấy lại quyền điều khiển thủ công (Phím Esc)">
             <span>🔓</span> Chiếm quyền
           </button>
         </div>
@@ -73,10 +83,7 @@
         unlockBtn.addEventListener("click", (e) => {
           e.stopPropagation();
           e.preventDefault();
-          setAgentBusyState(false);
-          try {
-            chrome.runtime.sendMessage({ action: "agent_emergency_unlocked" }).catch(() => {});
-          } catch (_) {}
+          triggerEmergencyUnlock();
         });
       }
     }
@@ -84,7 +91,7 @@
     const descEl = document.getElementById("agent-pilot-lock-action-desc");
     if (descEl) {
       const desc = getActionDescription(action);
-      descEl.textContent = `${desc} Vui lòng không can thiệp.`;
+      descEl.textContent = desc;
     }
     lockOverlayEl.style.display = "flex";
   }
@@ -103,12 +110,20 @@
       return;
     }
 
+    // Allow emergency takeover via Escape key
+    if (e.key === "Escape") {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      triggerEmergencyUnlock();
+      return;
+    }
+
     // Allow emergency takeover button clicks
     if (e.target && typeof e.target.closest === "function" && e.target.closest("#agent-pilot-emergency-unlock")) {
       return;
     }
 
-    // Block human interactions
+    // Block human interactions during automated actions
     e.stopImmediatePropagation();
     e.preventDefault();
   }
