@@ -57,8 +57,32 @@ if (fs.existsSync(skillSource)) {
     fs.mkdirSync(targetSkillDir, { recursive: true });
     fs.copyFileSync(skillSource, targetSkillFile);
     console.log(`✓ Synchronized SKILL.md -> ${targetSkillFile}`);
+
+    const geminiSkillDir = path.join(homeDir, ".gemini", "config", "plugins", "agk", "skills", "agent-pilot");
+    if (fs.existsSync(path.dirname(geminiSkillDir))) {
+      fs.mkdirSync(geminiSkillDir, { recursive: true });
+      fs.copyFileSync(skillSource, path.join(geminiSkillDir, "SKILL.md"));
+      console.log(`✓ Synchronized SKILL.md -> ${path.join(geminiSkillDir, "SKILL.md")}`);
+    }
   } catch (err) {
     console.warn("⚠️ Note: Could not copy SKILL.md to AGK:", err.message);
+  }
+}
+
+// Synchronize cli/agent-pilot binary if compiled
+const binarySource = path.join(ROOT_DIR, "cli", process.platform === "win32" ? "agent-pilot.exe" : "agent-pilot");
+if (fs.existsSync(binarySource)) {
+  try {
+    const agkBinDir = path.join(agkDir, "bin");
+    fs.mkdirSync(agkBinDir, { recursive: true });
+    const targetBin = path.join(agkBinDir, path.basename(binarySource));
+    fs.copyFileSync(binarySource, targetBin);
+    if (process.platform !== "win32") {
+      fs.chmodSync(targetBin, 0o755);
+    }
+    console.log(`✓ Synchronized agent-pilot binary -> ${targetBin}`);
+  } catch (err) {
+    console.warn("⚠️ Note: Could not copy agent-pilot binary to AGK bin:", err.message);
   }
 }
 

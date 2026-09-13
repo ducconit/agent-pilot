@@ -30,10 +30,16 @@ npx skills add https://github.com/ducconit/agent-pilot-extension -g --all
 
 ```mermaid
 flowchart TD
-    Agent["<b>AI Agent (Claude / Cursor / Antigravity)</b><br/>Stdio MCP or HTTP REST"] -->|Stdio JSON-RPC| Server["<b>Agent Pilot Bridge Server</b><br/>scripts/agent_pilot_server.mjs (Dual Mode)"]
-    Server -->|WebSocket ws://127.0.0.1:58765| Ext["<b>Agent Pilot Extension (MV3)</b><br/>Service Worker (background.js)"]
+    Agent["<b>AI Agent (Claude / Cursor / Antigravity)</b><br/>Stdio MCP, Direct CLI, or HTTP REST"]
+    GoCLI["<b>Golang Standalone CLI / MCP</b><br/>cli/agent-pilot (Zero-dep, &lt;5ms)"]
+    NodeServer["<b>Node.js Bridge Server</b><br/>scripts/agent_pilot_server.mjs"]
+    
+    Agent -->|Stdio MCP or CLI Command| GoCLI
+    Agent -->|Stdio JSON-RPC| NodeServer
+    GoCLI -->|WebSocket ws://127.0.0.1:58765| Ext["<b>Agent Pilot Extension (MV3)</b><br/>Service Worker (background.js)"]
+    NodeServer -->|WebSocket ws://127.0.0.1:58765| Ext
     Ext -->|chrome.debugger CDP| CDP["<b>Chrome DevTools Protocol</b><br/>Console, Network, Performance"]
-    Ext -->|chrome.tabs.sendMessage| Content["<b>Content Scripts</b><br/>Virtual Mouse, Floating Badge, DOM Inspector, Eyedropper"]
+    Ext -->|chrome.tabs.sendMessage| Content["<b>Content Scripts & Feedback Studio</b><br/>Virtual Mouse, DOM Inspector, Annotator HUD"]
     Content --> WebPage["<b>Target Web Page DOM</b>"]
 ```
 
@@ -43,6 +49,26 @@ Agent Pilot includes an automatic **Dual Mode** engine:
 - **Forwarder Mode**: If multiple AI agents, multi-agent swarms, or multiple IDE windows run concurrently, subsequent agent processes detect the active bridge, skip port binding without `EADDRINUSE` conflicts, and seamlessly forward stdio MCP calls over the local HTTP bridge (`http://127.0.0.1:58765/api`).
 
 ---
+
+## ⚡ Standalone Go CLI & MCP Server (`cli/agent-pilot`)
+
+Agent Pilot provides an all-in-one compiled Go binary (`cli/agent-pilot`) for ultra-fast startup and environments without Node.js:
+- **Zero Runtime Dependencies**: Stripped ~7MB binary, `<5ms` startup time, `~12MB` RAM usage.
+- **MCP Server Mode (`stdio`)**: Run `agent-pilot mcp` directly inside MCP client configs (Claude Desktop, Cursor, Antigravity, OpenCode).
+- **Direct CLI Automation**: Fast, scriptable commands for agents, QC/testers, and CI/CD pipelines:
+  ```bash
+  agent-pilot open https://example.com
+  agent-pilot click "#login-button"
+  agent-pilot type "#search-box" "automation testing" --enter
+  agent-pilot screenshot --mode visible -o ./report.png
+  agent-pilot inspect "#target-element"
+  agent-pilot tabs
+  agent-pilot batch flow.json
+  agent-pilot feedback list
+  ```
+
+---
+
 
 ## 🛠️ Available MCP Tools (16 Tools)
 
