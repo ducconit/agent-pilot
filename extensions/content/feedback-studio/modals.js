@@ -92,6 +92,64 @@
     document.getElementById("ap-popover-input").focus();
   }
 
+  function openEditCommentPopover(item, anchorRect) {
+    if (!item) return;
+    const capture = {
+      isEditing: true,
+      id: item.id,
+      mode: item.mode,
+      title: item.title,
+      screenshotDataUrl: item.screenshotDataUrl,
+      component: item.component,
+      dom: item.dom,
+      clip: item.clip
+    };
+    const state = window.__AP_INTERNAL__.feedbackStudio.state;
+    if (state) state.setPendingCapture(capture);
+
+    document.getElementById("ap-popover-title").textContent = `Sửa ghi chú (${item.mode === "element" ? "Phần tử" : "Vùng chọn"})`;
+    document.getElementById("ap-popover-img").src = item.screenshotDataUrl || "";
+    document.getElementById("ap-popover-input").value = item.comment || "";
+
+    const metaEl = document.getElementById("ap-popover-meta");
+    let metaHtml = "";
+    if (item.component) {
+      metaHtml += `<div class="ap-badge-comp">⚡ ${escapeHtml(item.component.framework || "Component")}: <strong>${escapeHtml(item.component.componentName)}</strong></div>`;
+      if (item.component.fileName) {
+        metaHtml += `<div class="ap-meta-file">📁 ${escapeHtml(item.component.fileName)}${item.component.lineNumber ? `:${item.component.lineNumber}` : ""}</div>`;
+      }
+    } else if (item.dom) {
+      metaHtml += `<div class="ap-meta-selector">🎯 <code>${escapeHtml(item.dom.selector || item.dom.tagName)}</code></div>`;
+      if (item.dom.text) {
+        metaHtml += `<div class="ap-meta-text">"${escapeHtml(item.dom.text.slice(0, 60))}"</div>`;
+      }
+    } else if (item.clip) {
+      metaHtml += `<div class="ap-meta-pos">📐 ${item.clip.width}×${item.clip.height}px (x:${item.clip.x}, y:${item.clip.y})</div>`;
+    }
+    metaEl.innerHTML = metaHtml;
+
+    // Position popover near anchor
+    const aLeft = anchorRect?.left ?? anchorRect?.x ?? 0;
+    const aTop = anchorRect?.top ?? anchorRect?.y ?? 0;
+    const aBottom = anchorRect?.bottom ?? ((anchorRect?.y !== undefined && anchorRect?.height !== undefined) ? anchorRect.y + anchorRect.height : aTop + 40);
+
+    let left = aLeft;
+    let top = aBottom + 12;
+    if (top + 260 > window.innerHeight) {
+      top = Math.max(10, aTop - 270);
+    }
+    if (left + 340 > window.innerWidth) {
+      left = Math.max(10, window.innerWidth - 350);
+    }
+
+    commentPopover.style.left = `${left}px`;
+    commentPopover.style.top = `${top}px`;
+    commentPopover.classList.remove("hidden");
+    const input = document.getElementById("ap-popover-input");
+    input.focus();
+    input.select();
+  }
+
   function closeCommentPopover() {
     const pinned = window.__AP_INTERNAL__.feedbackStudio.pinned;
     if (pinned) pinned.hideDraftBox();
@@ -451,7 +509,11 @@
     if (!pendingCapture) return;
 
     const comment = document.getElementById("ap-popover-input").value.trim();
-    if (window.__AP_INTERNAL__.feedbackStudio.actions?.addItem) {
+    if (pendingCapture.isEditing && pendingCapture.id) {
+      if (window.__AP_INTERNAL__.feedbackStudio.actions?.updateComment) {
+        window.__AP_INTERNAL__.feedbackStudio.actions.updateComment(pendingCapture.id, comment);
+      }
+    } else if (window.__AP_INTERNAL__.feedbackStudio.actions?.addItem) {
       window.__AP_INTERNAL__.feedbackStudio.actions.addItem({
         ...pendingCapture,
         comment
@@ -600,6 +662,7 @@
     annotatorModal,
     listModal,
     openCommentPopover,
+    openEditCommentPopover,
     closeCommentPopover,
     openAnnotatorModal,
     closeAnnotatorModal,

@@ -27,13 +27,15 @@ export async function attachDebugger(tabId, broadcastFn = null) {
       attachedTabs.add(tabId);
       getBuffer(tabId);
 
-      // Enable CDP domains
+      // Enable CDP domains concurrently
       try {
-        await sendCdpCommand(tabId, "Console.enable");
-        await sendCdpCommand(tabId, "Runtime.enable");
-        await sendCdpCommand(tabId, "Network.enable");
-        await sendCdpCommand(tabId, "Performance.enable");
-        await sendCdpCommand(tabId, "Page.enable");
+        await Promise.all([
+          sendCdpCommand(tabId, "Console.enable", {}, 2500).catch(() => {}),
+          sendCdpCommand(tabId, "Runtime.enable", {}, 2500).catch(() => {}),
+          sendCdpCommand(tabId, "Network.enable", {}, 2500).catch(() => {}),
+          sendCdpCommand(tabId, "Performance.enable", {}, 2500).catch(() => {}),
+          sendCdpCommand(tabId, "Page.enable", {}, 2500).catch(() => {})
+        ]);
       } catch (err) {
         console.warn("[AgentPilot] Error enabling CDP domains:", err);
       }

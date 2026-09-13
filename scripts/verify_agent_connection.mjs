@@ -182,6 +182,9 @@ async function run() {
       if (selectedTestInstanceId && payloadParams.instanceId === undefined) {
         payloadParams.instanceId = selectedTestInstanceId;
       }
+      if (method === "batch.run" && payloadParams.timeoutMs === undefined) {
+        payloadParams.timeoutMs = timeoutMs;
+      }
       const resp = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -511,7 +514,7 @@ async function run() {
     // Sequence: open -> wait_for_selector -> click -> type (with clear) -> devtools -> screenshot -> close
     const batchRes = await sendAgentCommand("batch.run", {
       actions: [
-        { type: "open", url: `http://127.0.0.1:${HTTP_PORT}/test-page.html` },
+        { type: "open", url: `http://127.0.0.1:${HTTP_PORT}/test-page.html`, loadTimeout: 3000 },
         { type: "wait_for_selector", selector: "#btn-sample-click", timeoutMs: 4000 },
         { type: "click", selector: "#btn-sample-click" },
         { type: "type", selector: "#test-search-input", text: "Batch Action Automation Verified", clear: true },
@@ -519,7 +522,7 @@ async function run() {
         { type: "screenshot", label: "batch_test" },
         { type: "close" }
       ]
-    });
+    }, 30000);
 
     const isBatchSuccess = batchRes?.success === true &&
                            batchRes?.results?.length === 7 &&

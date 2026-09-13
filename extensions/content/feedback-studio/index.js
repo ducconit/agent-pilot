@@ -19,10 +19,22 @@
   // Centralized Action Dispatchers
   // =========================================================================
 
+  function notifyItemsUpdated() {
+    try {
+      if (chrome?.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({
+          action: "FEEDBACK_ITEMS_UPDATED",
+          items: state.getItems()
+        }).catch(() => {});
+      }
+    } catch (_) {}
+  }
+
   function addItem(item) {
     const newItem = state.addItem(item);
     hud.updateCounters();
     pinned.renderPinnedBoxes();
+    notifyItemsUpdated();
     showToast(`✓ Đã lưu vị trí #${state.getItems().length} vào danh sách!`);
     return newItem;
   }
@@ -32,6 +44,7 @@
     hud.updateCounters();
     pinned.renderPinnedBoxes();
     modals.renderItemsListModal();
+    notifyItemsUpdated();
     showToast("🗑️ Đã xóa vị trí này.");
   }
 
@@ -41,6 +54,7 @@
       hud.updateCounters();
       pinned.renderPinnedBoxes();
       modals.renderItemsListModal();
+      notifyItemsUpdated();
       showToast("✓ Đã cập nhật ghi chú!");
     }
   }
@@ -51,6 +65,7 @@
       hud.updateCounters();
       pinned.renderPinnedBoxes();
       modals.renderItemsListModal();
+      notifyItemsUpdated();
       showToast("🗑️ Đã xóa toàn bộ danh sách chú thích.");
     }
   }
@@ -155,6 +170,7 @@
     setMode: (mode) => selection.setMode(mode),
     copyPrompt: () => channels.copyFeedbackPrompt(),
     deleteItem,
+    updateComment,
     clearAll: (skipConfirm = true) => clearAll(skipConfirm),
     generateMarkdownPrompt: (items) => channels.generateMarkdownPrompt(items),
     saveToInbox: () => channels.saveFeedbackToInbox(),

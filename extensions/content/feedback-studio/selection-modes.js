@@ -69,7 +69,8 @@
     if (e.target.closest("#agent-pilot-feedback-hud") ||
         e.target.closest("#agent-pilot-feedback-popover") ||
         e.target.closest("#agent-pilot-feedback-annotator") ||
-        e.target.closest("#agent-pilot-feedback-list-modal")) {
+        e.target.closest("#agent-pilot-feedback-list-modal") ||
+        e.target.closest("#agent-pilot-feedback-pinned-layer")) {
       hideHighlighter();
       return;
     }
@@ -109,7 +110,8 @@
     if (e.target.closest("#agent-pilot-feedback-hud") ||
         e.target.closest("#agent-pilot-feedback-popover") ||
         e.target.closest("#agent-pilot-feedback-annotator") ||
-        e.target.closest("#agent-pilot-feedback-list-modal")) {
+        e.target.closest("#agent-pilot-feedback-list-modal") ||
+        e.target.closest("#agent-pilot-feedback-pinned-layer")) {
       return;
     }
 

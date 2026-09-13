@@ -4,8 +4,9 @@
  */
 
 export class FeedbackPanel {
-  constructor(uiHelpers) {
-    this.ui = uiHelpers;
+  constructor(options = {}) {
+    this.ui = options.showToast ? { showToast: options.showToast } : options;
+    this.getTabIdCallback = typeof options.getActiveTabId === "function" ? options.getActiveTabId : null;
     this.isActive = false;
     this.currentMode = "element";
     this.items = [];
@@ -79,8 +80,34 @@ export class FeedbackPanel {
   }
 
   async getActiveTabId() {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    return tabs[0]?.id || null;
+    const isWeb = (t) => t && t.url && (t.url.startsWith("http://") || t.url.startsWith("https://") || t.url.startsWith("file://"));
+
+    if (this.getTabIdCallback) {
+      try {
+        const id = await this.getTabIdCallback();
+        if (id) {
+          try {
+            const tab = await chrome.tabs.get(id);
+            if (isWeb(tab)) return id;
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
+    try {
+      const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      const webTab = tabs && tabs.find(isWeb);
+      if (webTab?.id) return webTab.id;
+
+      const allTabs = await chrome.tabs.query({});
+      const activeWeb = allTabs && allTabs.find(t => t.active && isWeb(t));
+      if (activeWeb?.id) return activeWeb.id;
+
+      const candidate = allTabs && allTabs.find(isWeb);
+      if (candidate?.id) return candidate.id;
+    } catch (_) {}
+
+    return null;
   }
 
   async sendTabMessage(msg) {
@@ -92,7 +119,7 @@ export class FeedbackPanel {
     try {
       return await chrome.tabs.sendMessage(tabId, msg);
     } catch (e) {
-      console.warn("[AgentPilot] Tab message warning:", e);
+      console.warn("[AgentPilot] Tab message warning:", tabId, msg, e);
       return null;
     }
   }
@@ -203,8 +230,50 @@ export class FeedbackPanel {
     const res = await this.sendTabMessage({ action: "delete_feedback_item", id });
     if (res && res.success) {
       this.items = res.items || [];
-      this.renderItemsList();
-      this.ui.showToast("🗑️ Đã xóa vị trí này.");
+    } else {
+      this.items = this.items.filter(it => it.id !== id);
+    }
+    this.renderItemsList();
+    this.ui.showToast("🗑️ Đã xóa vị trí này.");
+  }
+
+  async updateComment(id, newComment) {
+    const res = await this.sendTabMessage({ action: "update_feedback_comment", id, comment: newComment });
+    if (res && res.success) {
+      this.items = res.items || [];
+    } else {
+      const target = this.items.find(it => it.id === id);
+      if (target) target.comment = newComment;
+    }
+    this.renderItemsList();
+    this.ui.showToast("✓ Đã cập nhật ghi chú!");
+  }
+
+  showEditForm(id) {
+    const viewEl = document.getElementById(`side-comment-view-${id}`);
+    const editEl = document.getElementById(`side-comment-edit-${id}`);
+    if (viewEl) viewEl.classList.add("hidden");
+    if (editEl) {
+      editEl.classList.remove("hidden");
+      const ta = editEl.querySelector("textarea");
+      if (ta) {
+        ta.focus();
+        ta.select();
+      }
+    }
+  }
+
+  hideEditForm(id) {
+    const viewEl = document.getElementById(`side-comment-view-${id}`);
+    const editEl = document.getElementById(`side-comment-edit-${id}`);
+    if (viewEl) viewEl.classList.remove("hidden");
+    if (editEl) {
+      editEl.classList.add("hidden");
+      const ta = editEl.querySelector("textarea");
+      const item = this.items.find(i => i.id === id);
+      if (ta && item) {
+        ta.value = item.comment || "";
+      }
     }
   }
 
@@ -212,9 +281,11 @@ export class FeedbackPanel {
     const res = await this.sendTabMessage({ action: "clear_feedback_items" });
     if (res && res.success) {
       this.items = [];
-      this.renderItemsList();
-      this.ui.showToast("🗑️ Đã xóa toàn bộ danh sách.");
+    } else {
+      this.items = [];
     }
+    this.renderItemsList();
+    this.ui.showToast("🗑️ Đã xóa toàn bộ danh sách.");
   }
 
   renderItemsList() {
@@ -239,9 +310,14 @@ export class FeedbackPanel {
       this.itemsList.innerHTML = this.items.map((item, idx) => `
         <div class="feedback-card" data-id="${item.id}">
           <div class="feedback-card-header">
-            <span class="badge-mini mode-${item.mode}">${item.mode.toUpperCase()}</span>
-            <span class="feedback-card-title">#${idx + 1}. ${this.escapeHtml(item.title || "")}</span>
-            <button class="btn btn-icon btn-xs btn-del-item" data-id="${item.id}" title="Xóa">🗑️</button>
+            <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;">
+              <span class="badge-mini mode-${item.mode}">${item.mode.toUpperCase()}</span>
+              <span class="feedback-card-title">#${idx + 1}. ${this.escapeHtml(item.title || "")}</span>
+            </div>
+            <div class="feedback-card-actions">
+              <button class="btn btn-icon btn-xs btn-edit-item" data-id="${item.id}" title="Sửa ghi chú">✏️</button>
+              <button class="btn btn-icon btn-xs btn-del-item" data-id="${item.id}" title="Xóa">🗑️</button>
+            </div>
           </div>
           ${item.component ? `
             <div class="feedback-comp-tag">
@@ -249,14 +325,56 @@ export class FeedbackPanel {
               ${item.component.fileName ? `<span class="font-mono text-xs">(${this.escapeHtml(item.component.fileName)})</span>` : ""}
             </div>
           ` : ""}
-          <div class="feedback-comment-preview">
-            "${this.escapeHtml(item.comment || "Không có ghi chú")}"
+          <div class="feedback-comment-container">
+            <div class="feedback-comment-preview" id="side-comment-view-${item.id}" data-id="${item.id}" title="Bấm để sửa ghi chú">
+              "${this.escapeHtml(item.comment || "Không có ghi chú")}"
+            </div>
+            <div class="feedback-comment-edit hidden" id="side-comment-edit-${item.id}">
+              <textarea class="side-comment-textarea" rows="2" placeholder="Nhập ghi chú cần sửa...">${this.escapeHtml(item.comment || "")}</textarea>
+              <div class="side-comment-actions">
+                <button class="btn btn-primary btn-xs btn-save-comment" data-id="${item.id}">✓ Lưu</button>
+                <button class="btn btn-outline btn-xs btn-cancel-comment" data-id="${item.id}">Hủy</button>
+              </div>
+            </div>
           </div>
         </div>
       `).join("");
 
       this.itemsList.querySelectorAll(".btn-del-item").forEach(btn => {
-        btn.onclick = () => this.deleteItem(btn.dataset.id);
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          this.deleteItem(btn.dataset.id);
+        };
+      });
+
+      this.itemsList.querySelectorAll(".btn-edit-item").forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          this.showEditForm(btn.dataset.id);
+        };
+      });
+
+      this.itemsList.querySelectorAll(".feedback-comment-preview").forEach(preview => {
+        preview.onclick = () => {
+          this.showEditForm(preview.dataset.id);
+        };
+      });
+
+      this.itemsList.querySelectorAll(".btn-cancel-comment").forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          this.hideEditForm(btn.dataset.id);
+        };
+      });
+
+      this.itemsList.querySelectorAll(".btn-save-comment").forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const id = btn.dataset.id;
+          const textarea = document.querySelector(`#side-comment-edit-${id} textarea`);
+          const newText = textarea ? textarea.value.trim() : "";
+          this.updateComment(id, newText);
+        };
       });
     }
   }

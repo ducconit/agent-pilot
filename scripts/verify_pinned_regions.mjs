@@ -252,8 +252,12 @@ async function main() {
   console.log("- List Modal state:", listModalState);
 
   const shot4Path = path.resolve("assets/test_feedback_list_modal.png");
-  await page.screenshot({ path: shot4Path });
-  console.log(`- Saved list modal screenshot to ${shot4Path}`);
+  try {
+    await page.screenshot({ path: shot4Path });
+    console.log(`- Saved list modal screenshot to ${shot4Path}`);
+  } catch (e) {
+    console.warn("- Screenshot 4 warning (non-fatal):", e.message);
+  }
 
   // 7. Delete Region 1 via pinned badge delete button and verify re-numbering
   console.log("7. Testing delete Region 1 from screen...");

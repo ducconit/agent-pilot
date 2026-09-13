@@ -366,7 +366,7 @@ const server = http.createServer(async (req, res) => {
           return res.end(JSON.stringify({ success: true, result }));
         }
 
-        const result = await sendCommandToExtension(method, params);
+        const result = await sendCommandToExtension(method, params, params?.timeoutMs);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, result: sanitizeServerData(result) }));
       } catch (err) {
@@ -767,6 +767,7 @@ export function sendCommandToExtension(method, params = {}, timeoutMs = 15000) {
   if (method === "config.setSecretFilter" && params.enabled !== undefined) {
     lastSecretFilterState = Boolean(params.enabled);
   }
+  const effectiveTimeout = Number(params?.timeoutMs) || (method === "batch.run" ? 45000 : timeoutMs);
   return new Promise((resolve, reject) => {
     // Local multi-instance management commands
     if (method === "instances.list") {
@@ -809,9 +810,9 @@ export function sendCommandToExtension(method, params = {}, timeoutMs = 15000) {
     const timer = setTimeout(() => {
       if (pendingRequests.has(id)) {
         pendingRequests.delete(id);
-        reject(new Error(`Command '${method}' timed out after ${timeoutMs}ms`));
+        reject(new Error(`Command '${method}' timed out after ${effectiveTimeout}ms`));
       }
-    }, timeoutMs);
+    }, effectiveTimeout);
 
     pendingRequests.set(id, {
       clientId: client.id,
@@ -827,6 +828,7 @@ export function sendCommandToExtension(method, params = {}, timeoutMs = 15000) {
 
     const cleanParams = { ...params };
     delete cleanParams.instanceId;
+    delete cleanParams.timeoutMs;
     client.ws.send(JSON.stringify({ id, method, params: cleanParams }));
   });
 }

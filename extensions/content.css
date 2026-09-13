@@ -1273,7 +1273,7 @@
   width: 100%;
   min-height: 100%;
   pointer-events: none !important;
-  z-index: 2147483638;
+  z-index: 2147483642;
   overflow: visible;
 }
 
@@ -1321,7 +1321,7 @@
   padding: 0 8px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   border-radius: 4px;
   background: var(--box-color, #38bdf8);
   color: #ffffff;
@@ -1337,6 +1337,14 @@
   z-index: 2;
 }
 
+.ap-pinned-badge-num {
+  cursor: pointer;
+}
+
+.ap-pinned-badge-num:hover {
+  text-decoration: underline;
+}
+
 .ap-pinned-box.draft .ap-pinned-badge {
   background: #d97706 !important;
   border: 1px solid #fde68a;
@@ -1346,6 +1354,27 @@
 .ap-pinned-box.flip-badge-inside .ap-pinned-badge {
   top: 2px;
   left: 2px;
+}
+
+.ap-pinned-edit-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.ap-pinned-edit-btn:hover {
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.3);
+  transform: scale(1.1);
 }
 
 .ap-pinned-del-btn {

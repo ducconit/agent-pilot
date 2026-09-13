@@ -47,6 +47,7 @@
     setMode: () => {},
     copyPrompt: () => Promise.resolve(),
     deleteItem: () => {},
+    updateComment: () => {},
     clearAll: () => {},
     generateMarkdownPrompt: () => null
   };
@@ -382,6 +383,12 @@
 
     if (req.action === "copy_feedback_prompt") {
       feedback.copyPrompt().then(() => sendResponse({ success: true }));
+      return true;
+    }
+
+    if (req.action === "update_feedback_comment") {
+      feedback.updateComment(req.id, req.comment);
+      sendResponse({ success: true, items: feedback.getItems() });
       return true;
     }
 

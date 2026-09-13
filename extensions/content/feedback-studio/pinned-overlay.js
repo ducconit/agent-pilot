@@ -105,17 +105,46 @@
       const badge = document.createElement("span");
       badge.className = "ap-pinned-badge";
       badge.innerHTML = `
-        <span>#${idx + 1}</span>
+        <span class="ap-pinned-badge-num" title="Bấm để sửa ghi chú #${idx + 1}">#${idx + 1}</span>
+        <button class="ap-pinned-edit-btn" title="Sửa ghi chú #${idx + 1}">✏️</button>
         <button class="ap-pinned-del-btn" title="Xóa vị trí #${idx + 1}">✕</button>
-        ${item.comment ? `<div class="ap-pinned-tooltip"><strong>#${idx + 1}:</strong> ${escapeHtml(item.comment)}</div>` : ""}
+        ${item.comment ? `<div class="ap-pinned-tooltip" title="Bấm để sửa"><strong>#${idx + 1}:</strong> ${escapeHtml(item.comment)}</div>` : ""}
       `;
 
-      badge.querySelector(".ap-pinned-del-btn").onclick = (e) => {
-        e.stopPropagation();
-        if (window.__AP_INTERNAL__.feedbackStudio.actions?.deleteItem) {
-          window.__AP_INTERNAL__.feedbackStudio.actions.deleteItem(item.id);
-        }
-      };
+      const editBtn = badge.querySelector(".ap-pinned-edit-btn");
+      if (editBtn) {
+        editBtn.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const modals = window.__AP_INTERNAL__.feedbackStudio.modals;
+          if (modals?.openEditCommentPopover) {
+            modals.openEditCommentPopover(item, badge.getBoundingClientRect());
+          }
+        };
+      }
+
+      const numBtn = badge.querySelector(".ap-pinned-badge-num");
+      if (numBtn) {
+        numBtn.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const modals = window.__AP_INTERNAL__.feedbackStudio.modals;
+          if (modals?.openEditCommentPopover) {
+            modals.openEditCommentPopover(item, badge.getBoundingClientRect());
+          }
+        };
+      }
+
+      const delBtn = badge.querySelector(".ap-pinned-del-btn");
+      if (delBtn) {
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          if (window.__AP_INTERNAL__.feedbackStudio.actions?.deleteItem) {
+            window.__AP_INTERNAL__.feedbackStudio.actions.deleteItem(item.id);
+          }
+        };
+      }
 
       box.appendChild(badge);
       pinnedLayer.appendChild(box);

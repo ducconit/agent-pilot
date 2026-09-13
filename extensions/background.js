@@ -180,7 +180,13 @@ if (chrome.alarms) {
  * Main Message Router for Sidepanel, Popup, Content Script
  */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  const { action } = request;
+  const { action, type } = request;
+
+  if (type === "REGION_CROP_REQUESTED" || type === "ELEMENT_SNAP_REQUESTED") {
+    broadcastToExtension(request);
+    sendResponse({ success: true });
+    return true;
+  }
 
   if (action === "agent_emergency_unlocked") {
     const tabId = sender?.tab?.id;

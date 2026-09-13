@@ -31,9 +31,11 @@ export async function captureTabScreenshot(tabId, params = {}) {
     if (attachedTabs.has(tabId)) {
       const cdpParams = {
         format: "png",
-        fromSurface: true,
         captureBeyondViewport: isFullPage
       };
+      if (isTabActive) {
+        cdpParams.fromSurface = true;
+      }
       if ((mode === "element" || mode === "region") && params.clip) {
         cdpParams.clip = {
           x: params.clip.x,

@@ -487,7 +487,7 @@ async function run() {
         fs.writeFileSync(outPath, buf);
         record("14. Screenshot Suite (Capture, Region Crop, Element Snap, Delegated Clipboard & Auto-Copy)", true, `Kích thước: ${buf.length} bytes, Crop: true, Snap Auto-Off: ${elementSnapTest.autoTurnOff}, Clipboard: ${delegatedCopyTest.success}, Auto-Copy: ${autoCopyToggleTest.canToggle}`);
       } else {
-        record("14. Screenshot Suite (Capture, Region Crop, Element Snap, Delegated Clipboard & Auto-Copy)", false, shotRes?.error || `Crop: ${regionCropTest?.validDimensions}, Snap: ${elementSnapTest?.autoTurnOff}, Clipboard: ${delegatedCopyTest?.success}, Auto-Copy: ${autoCopyToggleTest?.canToggle}`);
+        record("14. Screenshot Suite (Capture, Region Crop, Element Snap, Delegated Clipboard & Auto-Copy)", false, shotRes?.error || regionCropTest?.error || `Crop: ${regionCropTest?.validDimensions}, Snap: ${elementSnapTest?.autoTurnOff}, Clipboard: ${delegatedCopyTest?.success}, Auto-Copy: ${autoCopyToggleTest?.canToggle}`);
       }
 
       // 15. Test Visual UI Feedback Studio & Channel C Clipboard Prompt

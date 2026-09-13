@@ -38,6 +38,7 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
   });
 
   const feedbackPanel = new FeedbackPanel({
+    getActiveTabId: () => activeTabId,
     showToast
   });
 
