@@ -135,7 +135,7 @@ chrome://extensions
    * **Windows**: `C:\path\to\browser-control\extensions`
    * **macOS**: `/Users/<username>/path/to/browser-control/extensions`
    * **Linux**: `/home/<username>/path/to/browser-control/extensions`
-   *(Hoặc giải nén tệp sẵn sàng cài đặt tại `dist/agent-pilot-v1.0.1-beta.zip`)*.
+   *(Hoặc giải nén tệp sẵn sàng cài đặt tại `dist/agent-pilot-v1.0.2-beta.zip`)*.
 
 ### Bước 3: Khởi động Bảng điều khiển (Side Panel)
 * **Cách 1 (Nhanh nhất)**: Nhấp chuột vào biểu tượng **Agent Pilot (📌)** trên thanh công cụ Chrome (Side Panel sẽ trượt mở tức thì).
