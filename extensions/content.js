@@ -56,7 +56,7 @@
 
   const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
     ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
-    : "1.0.6-beta";
+    : "1.0.7-beta";
 
   // =========================================================================
   // Antigravity-First Global Bridge API (`window.__AGENT_PILOT__`)
@@ -407,14 +407,36 @@
       return true;
     }
 
+    if (req.action === "set_agent_session") {
+      const active = Boolean(req.active);
+      shield.setSessionActive(active, req.sessionName || "");
+      cursor.setSessionActive(active);
+      sendResponse({
+        success: true,
+        sessionActive: active,
+        sessionName: req.sessionName || "",
+        isAgentBusy: shield.isBusy()
+      });
+      return true;
+    }
+
     if (req.action === "set_agent_busy") {
       shield.setAgentBusyState(req.busy, req.currentAction || "");
-      sendResponse({ success: true, isAgentBusy: shield.isBusy() });
+      if (req.busy) {
+        cursor.activateCursor(3000);
+      }
+      sendResponse({ success: true, isAgentBusy: shield.isBusy(), isSessionActive: shield.isSessionActive() });
       return true;
     }
 
     if (req.action === "ping") {
-      sendResponse({ success: true, status: "ready", isAgentTab, isAgentBusy: shield.isBusy() });
+      sendResponse({
+        success: true,
+        status: "ready",
+        isAgentTab,
+        isAgentBusy: shield.isBusy(),
+        isSessionActive: shield.isSessionActive()
+      });
       return true;
     }
   });

@@ -203,9 +203,31 @@ var mcpTools = []ToolInfo{
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"busy":   map[string]interface{}{"type": "boolean", "description": "Enable or disable lock shield"},
-				"action": map[string]interface{}{"type": "string", "description": "Action name shown to user"},
-				"tabId":  map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"busy":    map[string]interface{}{"type": "boolean", "description": "Enable or disable lock shield"},
+				"action":  map[string]interface{}{"type": "string", "description": "Action name shown to user"},
+				"session": map[string]interface{}{"type": "boolean", "description": "Keep cursor and lock shield continuously visible throughout the agent session"},
+				"tabId":   map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+		},
+	},
+	{
+		Name:        "browser_start_session",
+		Description: "Start an active AI Agent session. Keeps the virtual cursor and glowing neon lock shield continuously visible on the tab until ended.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"name":  map[string]interface{}{"type": "string", "description": "Session name or task description shown in the action pill"},
+				"tabId": map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+		},
+	},
+	{
+		Name:        "browser_end_session",
+		Description: "End the active AI Agent session. Fades out and dismisses the virtual cursor and lock shield.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"tabId": map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
 		},
 	},
@@ -230,6 +252,18 @@ var mcpTools = []ToolInfo{
 				"timeout": map[string]interface{}{"type": "integer", "description": "Timeout in seconds (default: 120)"},
 				"tabId":   map[string]interface{}{"type": "integer", "description": "Optional tab ID filter"},
 			},
+		},
+	},
+	{
+		Name:        "browser_evaluate",
+		Description: "Evaluate a JavaScript expression or script in the context of the page (MAIN world first, with CDP Runtime.evaluate fallback) and return the serialized result.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"expression": map[string]interface{}{"type": "string", "description": "JavaScript expression or script to evaluate"},
+				"tabId":      map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+			"required": []string{"expression"},
 		},
 	},
 }
@@ -372,6 +406,14 @@ func executeToolCall(name string, args map[string]interface{}) (string, bool) {
 		res, err := DispatchCommand("page.setBusy", args, DefaultPort)
 		return formatToolResult(res, err)
 
+	case "browser_start_session":
+		res, err := DispatchCommand("session.start", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_end_session":
+		res, err := DispatchCommand("session.end", args, DefaultPort)
+		return formatToolResult(res, err)
+
 	case "browser_get_pending_feedback":
 		limit := 10
 		if l, ok := args["limit"].(float64); ok {
@@ -389,6 +431,10 @@ func executeToolCall(name string, args map[string]interface{}) (string, bool) {
 		}
 		res := WaitForFeedback(timeout, args["tabId"])
 		return formatToolResult(res, nil)
+
+	case "browser_evaluate":
+		res, err := DispatchCommand("page.evaluate", args, DefaultPort)
+		return formatToolResult(res, err)
 
 	default:
 		return fmt.Sprintf("Unknown tool: %s", name), true

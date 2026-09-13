@@ -224,6 +224,27 @@ export async function sendTabMessageWithRetry(tabId, message, maxRetries = 3, de
 }
 
 /**
+ * Set persistent session mode on a tab
+ */
+export async function setTabSession(tabId, active, sessionName = "") {
+  if (!tabId) return false;
+  await markTabAsAgentControlled(tabId);
+  const state = getTabLockState(tabId);
+  state.sessionActive = Boolean(active);
+  state.sessionName = sessionName || (state.sessionActive ? "Session đang hoạt động" : "");
+  if (state.unlockTimer) {
+    clearTimeout(state.unlockTimer);
+    state.unlockTimer = null;
+  }
+
+  return await sendTabMessageWithRetry(tabId, {
+    action: "set_agent_session",
+    active: state.sessionActive,
+    sessionName: state.sessionName
+  });
+}
+
+/**
  * Explicit human input locking on tab
  */
 export async function setTabLock(tabId, busy, action = "") {
@@ -262,7 +283,7 @@ export async function runWithTabLock(tabId, actionName, runner) {
     state.unlockTimer = null;
   }
 
-  const wasBusy = state.manualLock || state.autoCount > 0;
+  const wasBusy = state.sessionActive || state.manualLock || state.autoCount > 0;
   state.autoCount++;
   state.currentAction = actionName;
 
@@ -277,10 +298,17 @@ export async function runWithTabLock(tabId, actionName, runner) {
     return await runner();
   } finally {
     state.autoCount = Math.max(0, state.autoCount - 1);
-    if (!state.manualLock && state.autoCount === 0) {
+    if (state.sessionActive) {
+      // During active session, do not hide shield or cursor! Revert to session standby.
+      sendTabMessageWithRetry(tabId, {
+        action: "set_agent_busy",
+        busy: false,
+        currentAction: state.sessionName || "Session đang hoạt động (Sẵn sàng)"
+      }).catch((err) => logDebug("runWithTabLock session revert error", err));
+    } else if (!state.manualLock && state.autoCount === 0) {
       state.unlockTimer = setTimeout(() => {
         state.unlockTimer = null;
-        if (!state.manualLock && state.autoCount === 0) {
+        if (!state.sessionActive && !state.manualLock && state.autoCount === 0) {
           sendTabMessageWithRetry(tabId, { action: "set_agent_busy", busy: false }).catch((err) => logDebug("runWithTabLock auto-unlock error", err));
         }
       }, 1200);

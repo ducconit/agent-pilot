@@ -15,6 +15,7 @@
   let currentMouseX = 100;
   let currentMouseY = 100;
   let cursorHideTimeout = null;
+  let isSessionActive = false;
 
   // Create Cursor Layer
   const cursorLayer = document.createElement("div");
@@ -41,10 +42,12 @@
       cursorHideTimeout = null;
     }
     virtualCursor.classList.add("visible");
-    cursorHideTimeout = setTimeout(() => {
-      virtualCursor.classList.remove("visible");
-      cursorHideTimeout = null;
-    }, timeoutMs);
+    if (!isSessionActive && timeoutMs > 0) {
+      cursorHideTimeout = setTimeout(() => {
+        virtualCursor.classList.remove("visible");
+        cursorHideTimeout = null;
+      }, timeoutMs);
+    }
   }
 
   function hideCursor() {
@@ -52,7 +55,26 @@
       clearTimeout(cursorHideTimeout);
       cursorHideTimeout = null;
     }
-    virtualCursor.classList.remove("visible");
+    if (!isSessionActive) {
+      virtualCursor.classList.remove("visible");
+    }
+  }
+
+  function setSessionActive(active) {
+    isSessionActive = Boolean(active);
+    if (isSessionActive) {
+      if (cursorHideTimeout) {
+        clearTimeout(cursorHideTimeout);
+        cursorHideTimeout = null;
+      }
+      virtualCursor.classList.add("visible");
+    } else {
+      if (cursorHideTimeout) {
+        clearTimeout(cursorHideTimeout);
+        cursorHideTimeout = null;
+      }
+      virtualCursor.classList.remove("visible");
+    }
   }
 
   function updateCursorTransform(x, y) {
@@ -259,15 +281,36 @@
     await virtualClick(rect.left + rect.width / 2, rect.top + rect.height / 2);
 
     el.focus();
+    const proto = (el instanceof HTMLTextAreaElement) ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+    const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+
     if (clear) {
       if (el.isContentEditable) {
         el.textContent = "";
       } else if (el.value !== undefined) {
-        el.value = "";
+        if (typeof el.select === "function") {
+          try {
+            el.select();
+          } catch (selectErr) {
+            console.debug("[AgentPilot] el.select failed:", selectErr);
+          }
+        }
+        try {
+          document.execCommand("selectAll", false, null);
+          document.execCommand("delete", false, null);
+        } catch (execErr) {
+          console.debug("[AgentPilot] execCommand selectAll/delete failed:", execErr);
+        }
+        if (nativeSetter) {
+          nativeSetter.call(el, "");
+        } else {
+          el.value = "";
+        }
       }
       try {
         setDispatching(true);
         el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
       } finally {
         setDispatching(false);
       }
@@ -281,7 +324,20 @@
           if (el.isContentEditable) {
             document.execCommand("insertText", false, char);
           } else {
-            el.value = (el.value || "") + char;
+            let inserted = false;
+            try {
+              inserted = document.execCommand("insertText", false, char);
+            } catch (insertErr) {
+              console.debug("[AgentPilot] execCommand insertText fallback:", insertErr);
+            }
+            if (!inserted) {
+              const nextVal = (el.value || "") + char;
+              if (nativeSetter) {
+                nativeSetter.call(el, nextVal);
+              } else {
+                el.value = nextVal;
+              }
+            }
             el.dispatchEvent(new Event("input", { bubbles: true }));
           }
         } finally {
@@ -299,7 +355,11 @@
           el.dispatchEvent(new KeyboardEvent("keypress", enterEvent));
           el.dispatchEvent(new KeyboardEvent("keyup", enterEvent));
           if (el.form && typeof el.form.requestSubmit === "function") {
-            try { el.form.requestSubmit(); } catch (_) {}
+            try {
+              el.form.requestSubmit();
+            } catch (submitErr) {
+              console.debug("[AgentPilot] form.requestSubmit failed:", submitErr);
+            }
           }
         }
       } finally {
@@ -346,7 +406,11 @@
       target.dispatchEvent(new KeyboardEvent("keypress", eventInit));
       target.dispatchEvent(new KeyboardEvent("keyup", eventInit));
       if (key === "Enter" && target.form && typeof target.form.requestSubmit === "function") {
-        try { target.form.requestSubmit(); } catch (_) {}
+        try {
+          target.form.requestSubmit();
+        } catch (keySubmitErr) {
+          console.debug("[AgentPilot] target.form.requestSubmit failed:", keySubmitErr);
+        }
       }
       return { success: true, key };
     } finally {
@@ -362,6 +426,8 @@
     dispatchKey,
     activateCursor,
     hideCursor,
+    setSessionActive,
+    isSessionActive: () => isSessionActive,
     updateCursorTransform,
     getCursorPosition: () => ({ x: currentMouseX, y: currentMouseY }),
     getCursorLayer: () => cursorLayer,

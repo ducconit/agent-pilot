@@ -25,6 +25,7 @@ import {
   ensureContentScript,
   sendTabMessageWithRetry,
   setTabLock,
+  setTabSession,
   runWithTabLock
 } from "./tab-manager.js";
 import { captureTabScreenshot } from "./screenshot-service.js";
@@ -282,6 +283,10 @@ export class AgentBridgeClient {
     return await setTabLock(tabId, busy, action);
   }
 
+  async setTabSession(tabId, active, sessionName = "") {
+    return await setTabSession(tabId, active, sessionName);
+  }
+
   async runWithTabLock(tabId, actionName, runner) {
     return await runWithTabLock(tabId, actionName, runner);
   }
@@ -450,8 +455,69 @@ export class AgentBridgeClient {
         case "cdp.send": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
-          const res = await sendCdpCommand(tabId, params.cdpMethod, params.cdpParams || {});
-          respond(res);
+          const cdpMethod = params.cdpMethod || params.method || params.action;
+          if (!cdpMethod) return respond(null, new Error("Missing CDP method (cdpMethod or method)"));
+          const cdpParams = params.cdpParams || params.commandParams || params.params || {};
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, this.broadcastFn).catch((err) => logDebug("cdp.send auto-attach error", err));
+          }
+          sendCdpCommand(tabId, cdpMethod, cdpParams)
+            .then(res => respond(res || { success: true }))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "page.evaluate":
+        case "evaluate": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          const script = params.script || params.expression || params.code || "";
+          if (!script) return respond(null, new Error("Missing script or expression to evaluate"));
+
+          this.runWithTabLock(tabId, "page.evaluate", async () => {
+            // Attempt 1: Execute in MAIN world for direct window/DOM framework access
+            try {
+              const results = await chrome.scripting.executeScript({
+                target: { tabId },
+                world: "MAIN",
+                func: async (code) => {
+                  try {
+                    const rawVal = window.eval(code);
+                    const value = await Promise.resolve(rawVal);
+                    return { __eval_ok: true, value };
+                  } catch (e) {
+                    return { __eval_err: true, message: e?.message || String(e), stack: e?.stack };
+                  }
+                },
+                args: [script]
+              });
+              if (results && results[0] && results[0].result) {
+                const resObj = results[0].result;
+                if (resObj.__eval_err) {
+                  throw new Error(resObj.message);
+                }
+                return resObj.value;
+              }
+            } catch (scriptingErr) {
+              logDebug("evaluate in MAIN world fallback to CDP", scriptingErr);
+            }
+
+            // Attempt 2: Fallback to CDP Runtime.evaluate
+            if (!attachedTabs.has(tabId)) {
+              await attachDebugger(tabId, this.broadcastFn).catch((err) => logDebug("evaluate attachDebugger", err));
+            }
+            const evalRes = await sendCdpCommand(tabId, "Runtime.evaluate", {
+              expression: script,
+              returnByValue: true,
+              awaitPromise: true
+            });
+            if (evalRes?.exceptionDetails) {
+              throw new Error(evalRes.exceptionDetails.exception?.description || evalRes.exceptionDetails.text);
+            }
+            return evalRes?.result?.value ?? evalRes;
+          })
+            .then(res => respond(res !== undefined ? res : null))
+            .catch(err => respond(null, err));
           break;
         }
 
@@ -523,8 +589,48 @@ export class AgentBridgeClient {
         case "agent.setBusy": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
+          if (params.session !== undefined) {
+            const res = await this.setTabSession(tabId, params.session !== false, params.action || params.name || "");
+            respond(res || { success: true, tabId, sessionActive: params.session !== false });
+            break;
+          }
           const res = await this.setTabLock(tabId, params.busy !== false, params.action || "");
           respond(res || { success: true });
+          break;
+        }
+
+        case "session.start": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          const sessionName = params.name || params.action || "Session đang hoạt động";
+          const res = await this.setTabSession(tabId, true, sessionName);
+          respond(res || { success: true, tabId, sessionActive: true, sessionName });
+          break;
+        }
+
+        case "session.end":
+        case "session.stop": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          const res = await this.setTabSession(tabId, false);
+          respond(res || { success: true, tabId, sessionActive: false });
+          break;
+        }
+
+        case "session.status": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          const pingRes = await this.sendTabMessageWithRetry(tabId, { action: "ping" }).catch((err) => {
+            logDebug("session.status ping error", err);
+            return null;
+          });
+          respond({
+            success: true,
+            tabId,
+            sessionActive: Boolean(pingRes?.isSessionActive),
+            isAgentBusy: Boolean(pingRes?.isAgentBusy),
+            isAgentTab: Boolean(pingRes?.isAgentTab)
+          });
           break;
         }
 

@@ -75,13 +75,16 @@ Agent Pilot provides an all-in-one compiled Go binary (`cli/agent-pilot`) for ul
 ---
 
 
-## 🛠️ Available MCP Tools (16 Tools)
+## 🛠️ Available MCP Tools (19 Tools)
 
-When the `agent-pilot` MCP server or skill is active, agents have direct access to the following 16 tools:
+When the `agent-pilot` MCP server or skill is active, agents have direct access to the following 19 tools:
 
 | Tool Name | Key Parameters | Description |
 | :--- | :--- | :--- |
 | `browser_run_actions` | `{ actions: Action[], tabId?: number, stopOnError?: boolean }` | **Batch Execution Engine**: Executes an ordered sequence of actions (`open`, `navigate`, `wait_for_selector`, `scroll_into_view`, `click`, `type`, `press_key`, `scroll`, `sleep`, `screenshot`, `get_element`, `evaluate`, `cdp`, `close`) in a single round-trip, saving ~80% context tokens and eliminating network latency. |
+| `browser_start_session` | `{ name?: string, tabId?: number }` | **Continuous Session Start**: Initiates an active AI Agent session. Keeps the virtual cursor and glowing neon lock shield continuously visible on the tab until ended. |
+| `browser_end_session` | `{ tabId?: number }` | **Continuous Session End**: Concludes the active AI Agent session. Fades out and dismisses the virtual cursor and lock shield. |
+| `browser_evaluate` | `{ expression: string, tabId?: number }` | **Page Evaluator**: Evaluates a JavaScript expression or script in the context of the page (MAIN world first for direct framework/DOM state access, with CDP Runtime.evaluate fallback) and returns the serialized result. |
 | `browser_open_tab` | `{ url: string, active?: boolean }` | Opens a new browser tab with the specified URL. Defaults to `active: false` (background mode) to never interrupt or steal focus from the user's active window. |
 | `browser_list_tabs` | `{}` | Lists all open tabs with IDs, titles, URLs, active state, and agent ownership indicators. |
 | `browser_navigate` | `{ url: string, tabId?: number }` | Navigates the specified or active tab to a URL. |
@@ -94,7 +97,7 @@ When the `agent-pilot` MCP server or skill is active, agents have direct access 
 | `browser_pick_color` | `{ tabId?: number, x?: number, y?: number }` | Samples any on-screen pixel color. Returns all 5 modern color formats (`hex`, `rgb`, `rgba`, `hsl`, `oklch`). AI agents pass coordinates for instant sampling; human users trigger the interactive Magnifying Loupe Eyedropper with 1-click copy. |
 | `browser_list_instances` | `{}` | Lists all connected browser instances (Chrome, Brave, Edge, profiles/windows). |
 | `browser_select_instance` | `{ instanceId: string }` | Switches active target browser instance in multi-browser setups. |
-| `browser_set_busy` | `{ busy?: boolean, action?: string, tabId?: number }` | Displays a subtle glowing neon border and compact floating pill with action label and emergency unlock button (`Escape`) on the target page during agent workflows without obscuring the user's view. |
+| `browser_set_busy` | `{ busy?: boolean, action?: string, session?: boolean, tabId?: number }` | Displays a subtle glowing neon border and compact floating pill with action label and emergency unlock button (`Escape`) on the target page during agent workflows without obscuring the user's view. |
 | `browser_get_pending_feedback` | `{ sessionId?: string, limit?: number, clear?: boolean }` | **Channel B Feedback Reader**: Retrieves pending human visual UI feedback sessions saved in `~/.agent-pilot/inbox/feedback/<timestamp>/*` with component source paths, line numbers, CSS selectors, user notes, and screenshots. |
 | `browser_wait_for_feedback` | `{ timeout?: number, tabId?: number }` | **Channel A Reactive Long-Polling**: Reactively halts agent execution until a human submits visual feedback via Feedback Studio in the browser (or until timeout). Returns complete metadata, source locations, notes, and screenshots immediately upon submission. |
 
@@ -189,3 +192,15 @@ curl -s -X POST http://127.0.0.1:58765/api \
 - **Default Port**: `58765` (customizable via `AGENT_PILOT_PORT=58765`).
 - **Host**: `127.0.0.1` (loopback only for maximum host security).
 - **Extension Settings**: Click the ⚙️ icon in the Extension Side Panel to change the bridge port or toggle the Secret Redaction Filter.
+
+---
+
+## 📚 References & Resources
+
+Detailed guides, troubleshooting instructions, and reference specifications are available in the skill directory:
+
+- [Setup, Installation & Troubleshooting Guide](file:///home/ubuntu/workspace/projects/browser-control/skills/agent-pilot/references/setup.md): Complete setup for Chrome Extension, Go CLI, Background Services (`systemd`, `launchd`, `Task Scheduler`), and MCP Client configurations.
+- [CLI Command & Automation Reference](file:///home/ubuntu/workspace/projects/browser-control/skills/agent-pilot/references/cli-usage.md): Syntax, arguments, and copy-paste examples for all `agent-pilot` CLI commands.
+- [Architecture, Server & Concurrency Reference](file:///home/ubuntu/workspace/projects/browser-control/skills/agent-pilot/references/architecture-and-server.md): Deep dive into Master Bridge Dual Mode, HTTP REST endpoints, WebSocket protocol, and the 12-rule Secret Redaction Layer.
+- [Batch Automation Example](file:///home/ubuntu/workspace/projects/browser-control/skills/agent-pilot/examples/batch-flow-example.json): Ready-to-use JSON batch flow for automated web testing and regression suites.
+

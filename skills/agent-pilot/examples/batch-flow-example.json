@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "E-Commerce Checkout Regression Flow",
+  "description": "Example batch automation flow demonstrating navigation, typing, clicking, waiting, and screenshot capture in a single round-trip",
+  "actions": [
+    {
+      "type": "open",
+      "url": "https://phusa.sphoton.com",
+      "active": false
+    },
+    {
+      "type": "wait_for_selector",
+      "selector": "header",
+      "timeout": 5000
+    },
+    {
+      "type": "scroll_into_view",
+      "selector": "main"
+    },
+    {
+      "type": "get_element",
+      "selector": "h1"
+    },
+    {
+      "type": "screenshot",
+      "mode": "visible"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "description": "Evaluate a JavaScript expression or script in the context of the page (MAIN world first, with CDP Runtime.evaluate fallback) and return the serialized result.",
+  "inputSchema": {
+    "properties": {
+      "expression": {
+        "description": "JavaScript expression or script to evaluate",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "expression"
+    ],
+    "type": "object"
+  },
+  "name": "browser_evaluate",
+  "parameters": {
+    "properties": {
+      "expression": {
+        "description": "JavaScript expression or script to evaluate",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "expression"
+    ],
+    "type": "object"
+  }
+}

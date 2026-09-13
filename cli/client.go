@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -214,5 +215,83 @@ func ExecBusy(busy bool, action string, tabID interface{}) error {
 		return err
 	}
 	fmt.Printf("✅ Agent busy indicator set to %v (%s): %v\n", busy, action, res)
+	return nil
+}
+
+func ExecSession(subcmd string, name string, tabID interface{}) error {
+	subcmd = strings.ToLower(strings.TrimSpace(subcmd))
+	params := map[string]interface{}{}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	if name != "" {
+		params["name"] = name
+	}
+
+	method := "session.start"
+	if subcmd == "stop" || subcmd == "end" || subcmd == "off" || subcmd == "0" || subcmd == "false" {
+		method = "session.end"
+	} else if subcmd == "status" {
+		method = "session.status"
+	}
+
+	res, err := DispatchCommand(method, params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	if method == "session.start" {
+		desc := name
+		if desc == "" {
+			desc = "Session đang hoạt động"
+		}
+		fmt.Printf("🚀 Agent session started: cursor and lock shield active continuously. (%s)\n", desc)
+	} else if method == "session.end" {
+		fmt.Printf("⏹️ Agent session ended: cursor and lock shield dismissed.\n")
+	} else {
+		resJSON, err := json.MarshalIndent(res, "", "  ")
+		if err != nil {
+			fmt.Printf("📊 Session status: %v\n", res)
+		} else {
+			fmt.Printf("📊 Session status:\n%s\n", string(resJSON))
+		}
+	}
+	return nil
+}
+
+func ExecEvaluate(expression string, tabID interface{}) error {
+	params := map[string]interface{}{
+		"expression": expression,
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("page.evaluate", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	if res == nil {
+		fmt.Println("undefined")
+		return nil
+	}
+	switch v := res.(type) {
+	case string:
+		fmt.Println(v)
+	case map[string]interface{}:
+		jsonB, err := json.MarshalIndent(v, "", "  ")
+		if err != nil {
+			fmt.Printf("%v\n", v)
+		} else {
+			fmt.Println(string(jsonB))
+		}
+	case []interface{}:
+		jsonB, err := json.MarshalIndent(v, "", "  ")
+		if err != nil {
+			fmt.Printf("%v\n", v)
+		} else {
+			fmt.Println(string(jsonB))
+		}
+	default:
+		fmt.Printf("%v\n", v)
+	}
 	return nil
 }

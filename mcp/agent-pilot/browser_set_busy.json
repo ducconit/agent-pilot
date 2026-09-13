@@ -10,6 +10,10 @@
         "description": "Enable or disable lock shield",
         "type": "boolean"
       },
+      "session": {
+        "description": "Keep cursor and lock shield continuously visible throughout the agent session",
+        "type": "boolean"
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
@@ -26,6 +30,10 @@
       },
       "busy": {
         "description": "Enable or disable lock shield",
+        "type": "boolean"
+      },
+      "session": {
+        "description": "Keep cursor and lock shield continuously visible throughout the agent session",
         "type": "boolean"
       },
       "tabId": {

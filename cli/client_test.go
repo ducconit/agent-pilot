@@ -94,3 +94,56 @@ func TestParseBusyArgs_ActionValueIsStateKeyword(t *testing.T) {
 		t.Errorf("expected tab=nil, got: %v", tab)
 	}
 }
+
+func TestParseSessionArgs_Default(t *testing.T) {
+	subcmd, name, tab, err := ParseSessionArgs([]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "start" {
+		t.Errorf("expected default subcmd='start', got: %s", subcmd)
+	}
+	if name != "AI Agent Session" {
+		t.Errorf("expected default name='AI Agent Session', got: %s", name)
+	}
+	if tab != nil {
+		t.Errorf("expected tab=nil, got: %v", tab)
+	}
+}
+
+func TestParseSessionArgs_EndAndStatus(t *testing.T) {
+	subcmd, _, tab, err := ParseSessionArgs([]string{"end", "--tab", "42"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "end" {
+		t.Errorf("expected subcmd='end', got: %s", subcmd)
+	}
+	if tab != 42 {
+		t.Errorf("expected tab=42, got: %v", tab)
+	}
+
+	subcmd2, _, _, err2 := ParseSessionArgs([]string{"status"})
+	if err2 != nil {
+		t.Fatalf("unexpected error: %v", err2)
+	}
+	if subcmd2 != "status" {
+		t.Errorf("expected subcmd='status', got: %s", subcmd2)
+	}
+}
+
+func TestParseSessionArgs_CustomName(t *testing.T) {
+	subcmd, name, tab, err := ParseSessionArgs([]string{"start", "--name", "Checkout Flow Regression", "--tab", "101"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "start" {
+		t.Errorf("expected subcmd='start', got: %s", subcmd)
+	}
+	if name != "Checkout Flow Regression" {
+		t.Errorf("expected name='Checkout Flow Regression', got: %s", name)
+	}
+	if tab != 101 {
+		t.Errorf("expected tab=101, got: %v", tab)
+	}
+}

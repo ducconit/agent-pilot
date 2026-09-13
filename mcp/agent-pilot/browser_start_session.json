@@ -1,0 +1,30 @@
+{
+  "description": "Start an active AI Agent session. Keeps the virtual cursor and glowing neon lock shield continuously visible on the tab until ended.",
+  "inputSchema": {
+    "properties": {
+      "name": {
+        "description": "Session name or task description shown in the action pill",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_start_session",
+  "parameters": {
+    "properties": {
+      "name": {
+        "description": "Session name or task description shown in the action pill",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

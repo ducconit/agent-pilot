@@ -36,25 +36,24 @@ for (const stale of staleServerFiles) {
   }
 }
 
-// Synchronize skills/agent-pilot/SKILL.md
-const skillSource = path.join(ROOT_DIR, "skills", "agent-pilot", "SKILL.md");
+// Synchronize skills/agent-pilot directory (SKILL.md, references/, examples/)
+const skillSourceDir = path.join(ROOT_DIR, "skills", "agent-pilot");
 const targetSkillDir = path.join(agkDir, "skills", "agent-pilot");
-const targetSkillFile = path.join(targetSkillDir, "SKILL.md");
 
-if (fs.existsSync(skillSource)) {
+if (fs.existsSync(skillSourceDir)) {
   try {
     fs.mkdirSync(targetSkillDir, { recursive: true });
-    fs.copyFileSync(skillSource, targetSkillFile);
-    console.log(`✓ Synchronized SKILL.md -> ${targetSkillFile}`);
+    fs.cpSync(skillSourceDir, targetSkillDir, { recursive: true });
+    console.log(`✓ Synchronized skill directory -> ${targetSkillDir}`);
 
     const geminiSkillDir = path.join(homeDir, ".gemini", "config", "plugins", "agk", "skills", "agent-pilot");
     if (fs.existsSync(path.dirname(geminiSkillDir))) {
       fs.mkdirSync(geminiSkillDir, { recursive: true });
-      fs.copyFileSync(skillSource, path.join(geminiSkillDir, "SKILL.md"));
-      console.log(`✓ Synchronized SKILL.md -> ${path.join(geminiSkillDir, "SKILL.md")}`);
+      fs.cpSync(skillSourceDir, geminiSkillDir, { recursive: true });
+      console.log(`✓ Synchronized skill directory -> ${geminiSkillDir}`);
     }
   } catch (err) {
-    console.warn("⚠️ Note: Could not copy SKILL.md to AGK:", err.message);
+    console.warn("⚠️ Note: Could not copy skill directory to AGK:", err.message);
   }
 }
 

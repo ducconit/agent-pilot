@@ -6,7 +6,7 @@
 export const attachedTabs = new Set();
 export const devtoolsBuffers = new Map(); // tabId -> { console: [], network: Map, performance: {} }
 export const agentControlledTabs = new Set(); // Track tabs opened or controlled by AI Agent
-export const tabLockStates = new Map(); // tabId -> { manualLock: boolean, autoCount: number, unlockTimer: any, currentAction: string }
+export const tabLockStates = new Map(); // tabId -> { manualLock: boolean, autoCount: number, unlockTimer: any, currentAction: string, sessionActive: boolean, sessionName: string }
 
 // Chrome Native Tab Group styling constants
 export const AGENT_GROUP_TITLE = "🤖 Agent Pilot";
@@ -22,7 +22,14 @@ export const MAX_DEVTOOLS_NETWORK_ENTRIES = 300;
 
 export function getTabLockState(tabId) {
   if (!tabLockStates.has(tabId)) {
-    tabLockStates.set(tabId, { manualLock: false, autoCount: 0, unlockTimer: null, currentAction: "" });
+    tabLockStates.set(tabId, {
+      manualLock: false,
+      autoCount: 0,
+      unlockTimer: null,
+      currentAction: "",
+      sessionActive: false,
+      sessionName: ""
+    });
   }
   return tabLockStates.get(tabId);
 }

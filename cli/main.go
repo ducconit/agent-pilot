@@ -10,7 +10,7 @@ import (
 )
 
 func printUsage() {
-	fmt.Println(`Agent Pilot CLI (v1.0.6-beta) - Universal AI Agent Browser Controller
+	fmt.Println(`Agent Pilot CLI (v1.0.7-beta) - Universal AI Agent Browser Controller
 Mã nguồn & Tài liệu: https://github.com/ducconit/agent-pilot-extension
 
 SỬ DỤNG:
@@ -28,7 +28,9 @@ THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT):
   navigate <url>                Điều hướng tab hiện tại đến URL
   screenshot [tùy chọn]         Chụp ảnh màn hình (Lưu ra file PNG)
   inspect <selector>            Soi và trích xuất thông số phần tử DOM
+  session [start|end|status]    Bắt đầu/kết thúc phiên làm việc (Giữ chuột ảo và viền neon liên tục)
   busy [on|off]                 Bật/tắt viền phát sáng và chỉ báo trạng thái AI Agent trên tab
+  evaluate <script>             Thực thi mã JavaScript trong trang web (Alias: eval)
   tabs                          Liệt kê danh sách tất cả các tab đang mở
   batch <script.json>           Thực thi chuỗi hành động automation từ file JSON
   feedback [list|wait]          Xem danh sách hoặc chờ phản hồi từ người dùng
@@ -45,6 +47,7 @@ TÙY CHỌN BỔ SUNG:
 VÍ DỤ NHANH:
   agent-pilot click "#btn-login"
   agent-pilot type "#email" "tester@example.com" --enter
+  agent-pilot eval "document.title"
   agent-pilot screenshot -o homepage.png --mode full
   agent-pilot batch test_flow.json`)
 }
@@ -99,12 +102,61 @@ func ParseBusyArgs(args []string) (bool, string, interface{}, error) {
 	return isBusy, actionDesc, targetTab, nil
 }
 
+// sessionValueFlags defines non-boolean flags that consume a following value argument.
+var sessionValueFlags = map[string]bool{
+	"-name":    true,
+	"--name":   true,
+	"-action":  true,
+	"--action": true,
+	"-tab":     true,
+	"--tab":    true,
+}
+
+func ParseSessionArgs(args []string) (string, string, interface{}, error) {
+	subcmd := "start"
+	name := "AI Agent Session"
+	tabID := 0
+
+	var flagArgs []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if i > 0 {
+			prev := args[i-1]
+			if sessionValueFlags[prev] {
+				flagArgs = append(flagArgs, arg)
+				continue
+			}
+		}
+
+		lower := strings.ToLower(arg)
+		if lower == "start" || lower == "end" || lower == "stop" || lower == "status" {
+			subcmd = lower
+		} else {
+			flagArgs = append(flagArgs, arg)
+		}
+	}
+
+	sessionFlags := flag.NewFlagSet("session", flag.ContinueOnError)
+	sessionFlags.IntVar(&tabID, "tab", 0, "Target tab ID")
+	sessionFlags.StringVar(&name, "name", name, "Session name or task description")
+	sessionFlags.StringVar(&name, "action", name, "Alias for session name")
+	if err := sessionFlags.Parse(flagArgs); err != nil {
+		return "", "", nil, err
+	}
+
+	var targetTab interface{}
+	if tabID > 0 {
+		targetTab = tabID
+	}
+	return subcmd, name, targetTab, nil
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		// If running without arguments, default to MCP Server for AI Agent stdio pipes
 		// Check if input is a pipe or terminal
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
+		stat, err := os.Stdin.Stat()
+		if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
 			RunMCPServer()
 			return
 		}
@@ -121,7 +173,9 @@ func main() {
 	case "server":
 		serverFlags := flag.NewFlagSet("server", flag.ExitOnError)
 		port := serverFlags.Int("port", DefaultPort, "Port to listen on")
-		_ = serverFlags.Parse(os.Args[2:])
+		if err := serverFlags.Parse(os.Args[2:]); err != nil {
+			os.Exit(1)
+		}
 		if err := StartBridgeServer(*port); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Server error: %v\n", err)
 			os.Exit(1)
@@ -138,7 +192,9 @@ func main() {
 		tabID := clickFlags.Int("tab", 0, "Target tab ID")
 		x := clickFlags.Float64("x", 0, "X coordinate")
 		y := clickFlags.Float64("y", 0, "Y coordinate")
-		_ = clickFlags.Parse(os.Args[2:])
+		if err := clickFlags.Parse(os.Args[2:]); err != nil {
+			os.Exit(1)
+		}
 
 		args := clickFlags.Args()
 		selector := ""
@@ -159,7 +215,9 @@ func main() {
 		tabID := typeFlags.Int("tab", 0, "Target tab ID")
 		clear := typeFlags.Bool("clear", false, "Clear field before typing")
 		enter := typeFlags.Bool("enter", false, "Press enter after typing")
-		_ = typeFlags.Parse(os.Args[2:])
+		if err := typeFlags.Parse(os.Args[2:]); err != nil {
+			os.Exit(1)
+		}
 
 		args := typeFlags.Args()
 		if len(args) < 2 {
@@ -178,7 +236,9 @@ func main() {
 	case "open":
 		openFlags := flag.NewFlagSet("open", flag.ExitOnError)
 		active := openFlags.Bool("active", false, "Make tab active")
-		_ = openFlags.Parse(os.Args[2:])
+		if err := openFlags.Parse(os.Args[2:]); err != nil {
+			os.Exit(1)
+		}
 		args := openFlags.Args()
 		if len(args) < 1 {
 			fmt.Println("Sử dụng: agent-pilot open <url> [--active]")
@@ -192,7 +252,9 @@ func main() {
 	case "navigate":
 		navFlags := flag.NewFlagSet("navigate", flag.ExitOnError)
 		tabID := navFlags.Int("tab", 0, "Target tab ID")
-		_ = navFlags.Parse(os.Args[2:])
+		if err := navFlags.Parse(os.Args[2:]); err != nil {
+			os.Exit(1)
+		}
 		args := navFlags.Args()
 		if len(args) < 1 {
 			fmt.Println("Sử dụng: agent-pilot navigate <url> [--tab <id>]")
@@ -213,7 +275,9 @@ func main() {
 		mode := shotFlags.String("mode", "visible", "Capture mode: visible, region, element, full")
 		out := shotFlags.String("o", "", "Output PNG path")
 		selector := shotFlags.String("selector", "", "CSS selector for element mode")
-		_ = shotFlags.Parse(os.Args[2:])
+		if err := shotFlags.Parse(os.Args[2:]); err != nil {
+			os.Exit(1)
+		}
 
 		var t interface{}
 		if *tabID > 0 {
@@ -227,7 +291,9 @@ func main() {
 	case "inspect":
 		inspFlags := flag.NewFlagSet("inspect", flag.ExitOnError)
 		tabID := inspFlags.Int("tab", 0, "Target tab ID")
-		_ = inspFlags.Parse(os.Args[2:])
+		if err := inspFlags.Parse(os.Args[2:]); err != nil {
+			os.Exit(1)
+		}
 		args := inspFlags.Args()
 		if len(args) < 1 {
 			fmt.Println("Sử dụng: agent-pilot inspect <selector> [--tab <id>]")
@@ -253,6 +319,37 @@ func main() {
 			os.Exit(1)
 		}
 
+	case "session":
+		subcmd, name, targetTab, err := ParseSessionArgs(os.Args[2:])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error parsing arguments: %v\n", err)
+			os.Exit(1)
+		}
+		if err := ExecSession(subcmd, name, targetTab); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+
+	case "evaluate", "eval":
+		evalFlags := flag.NewFlagSet("evaluate", flag.ExitOnError)
+		tabID := evalFlags.Int("tab", 0, "Target tab ID")
+		if err := evalFlags.Parse(os.Args[2:]); err != nil {
+			os.Exit(1)
+		}
+		args := evalFlags.Args()
+		if len(args) < 1 {
+			fmt.Println("Sử dụng: agent-pilot evaluate <script> [--tab <id>] (Alias: eval)")
+			os.Exit(1)
+		}
+		var t interface{}
+		if *tabID > 0 {
+			t = *tabID
+		}
+		if err := ExecEvaluate(args[0], t); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+
 	case "tabs":
 		if err := ExecListTabs(); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -260,8 +357,11 @@ func main() {
 		}
 
 	case "batch":
-		if len(os.Args) < 3 {
+		if len(os.Args) < 3 || os.Args[2] == "--help" || os.Args[2] == "-h" || os.Args[2] == "help" {
 			fmt.Println("Sử dụng: agent-pilot batch <path-to-script.json>")
+			if len(os.Args) >= 3 && (os.Args[2] == "--help" || os.Args[2] == "-h" || os.Args[2] == "help") {
+				os.Exit(0)
+			}
 			os.Exit(1)
 		}
 		filePath := os.Args[2]
@@ -288,8 +388,12 @@ func main() {
 			fmt.Fprintf(os.Stderr, "❌ Thực thi batch thất bại: %v\n", err)
 			os.Exit(1)
 		}
-		resJSON, _ := json.MarshalIndent(res, "", "  ")
-		fmt.Printf("✅ Kết quả thực thi Batch:\n%s\n", string(resJSON))
+		resJSON, mErr := json.MarshalIndent(res, "", "  ")
+		if mErr != nil {
+			fmt.Printf("✅ Kết quả thực thi Batch: %v\n", res)
+		} else {
+			fmt.Printf("✅ Kết quả thực thi Batch:\n%s\n", string(resJSON))
+		}
 
 	case "feedback":
 		sub := "list"
@@ -302,17 +406,27 @@ func main() {
 				fmt.Fprintf(os.Stderr, "❌ Lỗi: %v\n", err)
 				os.Exit(1)
 			}
-			jsonB, _ := json.MarshalIndent(res, "", "  ")
-			fmt.Println(string(jsonB))
+			jsonB, mErr := json.MarshalIndent(res, "", "  ")
+			if mErr != nil {
+				fmt.Printf("%v\n", res)
+			} else {
+				fmt.Println(string(jsonB))
+			}
 		} else if sub == "wait" {
 			timeout := 120
 			if len(os.Args) > 3 {
-				timeout, _ = strconv.Atoi(os.Args[3])
+				if t, parseErr := strconv.Atoi(os.Args[3]); parseErr == nil && t > 0 {
+					timeout = t
+				}
 			}
 			fmt.Printf("⏳ Đang chờ người dùng gửi feedback từ trình duyệt (Timeout: %ds)...\n", timeout)
 			res := WaitForFeedback(timeout, nil)
-			jsonB, _ := json.MarshalIndent(res, "", "  ")
-			fmt.Println(string(jsonB))
+			jsonB, mErr := json.MarshalIndent(res, "", "  ")
+			if mErr != nil {
+				fmt.Printf("%v\n", res)
+			} else {
+				fmt.Println(string(jsonB))
+			}
 		}
 
 	case "export-mcp":
@@ -321,10 +435,10 @@ func main() {
 			outDir = os.Args[2]
 		}
 		if err := ExportMCPSchemas(outDir); err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Lỗi xuất schema MCP: %v\n", err)
+			fmt.Fprintf(os.Stderr, "❌ Lỗi xuất MCP schemas: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("✅ Đã xuất 16 tool schemas MCP thành công vào: %s\n", outDir)
+		fmt.Printf("✅ Đã xuất %d tool schemas MCP thành công vào: %s\n", len(mcpTools), outDir)
 
 	case "--help", "-h", "help":
 		printUsage()

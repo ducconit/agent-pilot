@@ -6,6 +6,8 @@
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
 
   let isAgentBusy = false;
+  let isSessionActive = false;
+  let sessionName = "";
   let isAgentDispatching = false;
   let lockOverlayEl = null;
   let areBlockersAttached = false;
@@ -18,6 +20,9 @@
   ];
 
   function getActionDescription(action) {
+    if (!action && isSessionActive) {
+      return sessionName || "Session đang hoạt động (Sẵn sàng)";
+    }
     switch (action) {
       case "page.click":
       case "click_cursor":
@@ -41,12 +46,16 @@
       case "browser_navigate":
         return "Đang chuyển trang...";
       default:
-        return action ? `Đang thực thi: ${action}` : "AI Agent đang thao tác...";
+        return action ? `Đang thực thi: ${action}` : (isSessionActive ? (sessionName || "Session đang hoạt động") : "AI Agent đang thao tác...");
     }
   }
 
   function triggerEmergencyUnlock() {
+    isSessionActive = false;
     setAgentBusyState(false);
+    if (window.__AP_INTERNAL__.cursor?.setSessionActive) {
+      window.__AP_INTERNAL__.cursor.setSessionActive(false);
+    }
     try {
       chrome.runtime.sendMessage({ action: "agent_emergency_unlocked" }).catch((err) => {
         console.debug("[AgentPilot Shield] notify unlock rejected:", err);
@@ -144,7 +153,33 @@
     });
   }
 
+  function setSessionActive(active, name = "") {
+    isSessionActive = Boolean(active);
+    sessionName = name || (isSessionActive ? "Session đang hoạt động" : "");
+    if (isSessionActive) {
+      isAgentBusy = true;
+      attachInputBlockers();
+      showLockOverlay(sessionName);
+    } else {
+      isAgentBusy = false;
+      detachInputBlockers();
+      hideLockOverlay();
+    }
+  }
+
   function setAgentBusyState(busy, action = "") {
+    if (isSessionActive) {
+      // During active session, lock shield remains visible continuously.
+      // Granular actions update description, then revert to session standby on completion.
+      if (busy) {
+        attachInputBlockers();
+        showLockOverlay(action || sessionName);
+      } else {
+        showLockOverlay(sessionName || "Session đang hoạt động (Sẵn sàng)");
+      }
+      return;
+    }
+
     isAgentBusy = Boolean(busy);
     if (isAgentBusy) {
       attachInputBlockers();
@@ -157,7 +192,9 @@
 
   window.__AP_INTERNAL__.shield = {
     setAgentBusyState,
+    setSessionActive,
     isBusy: () => isAgentBusy,
+    isSessionActive: () => isSessionActive,
     isDispatching: () => isAgentDispatching,
     setIsDispatching: (val) => { isAgentDispatching = Boolean(val); },
     getLockOverlayEl: () => lockOverlayEl,

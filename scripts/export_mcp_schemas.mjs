@@ -37,6 +37,6 @@ execSync(`"${binaryPath}" export-mcp "${REPO_MCP_DIR}"`, { stdio: "inherit" });
 execSync(`"${binaryPath}" export-mcp "${ANTIGRAVITY_MCP_DIR}"`, { stdio: "inherit" });
 
 console.log("==================================================================");
-console.log("✅ Successfully exported & synced 16 MCP tool schemas!");
+console.log("✅ Successfully exported & synced all MCP tool schemas!");
 console.log("   Repo is 100% Single Source of Truth.");
 console.log("==================================================================");

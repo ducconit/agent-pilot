@@ -1,0 +1,22 @@
+{
+  "description": "End the active AI Agent session. Fades out and dismisses the virtual cursor and lock shield.",
+  "inputSchema": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_end_session",
+  "parameters": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}
