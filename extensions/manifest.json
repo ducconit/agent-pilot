@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Agent Pilot (Beta) - AI Browser Controller",
-  "version": "1.0.5",
-  "version_name": "1.0.5-beta",
-  "description": "Universal AI Agent Browser Controller with Virtual Mouse, DevTools Inspector (CDP), Element Inspector, Color Picker & Screenshot Suite. Antigravity-First (Public Beta).",
+  "name": "Agent Pilot - Universal AI Agent Browser Control",
+  "version": "1.0.6",
+  "version_name": "1.0.6-beta",
+  "description": "Cầu nối trực tiếp cho AI Agent (Google Antigravity, Claude, Cursor) điều khiển trình duyệt thời gian thực qua CDP. Element Inspector, Color Picker & Screenshot Suite. Antigravity-First (Public Beta).",
   "author": "DNT (https://github.com/ducconit)",
   "icons": {
     "16": "icons/icon16.png",

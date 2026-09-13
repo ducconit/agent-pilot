@@ -12,7 +12,8 @@ import {
   getBuffer,
   attachedTabs,
   getSecretFilterEnabled,
-  setSecretFilterEnabled
+  setSecretFilterEnabled,
+  logDebug
 } from "./constants.js";
 import { sanitizeData } from "./secret-sanitizer.js";
 import { attachDebugger, detachDebugger, sendCdpCommand } from "./cdp-manager.js";
@@ -20,6 +21,7 @@ import {
   getActiveTabId,
   getTargetTabId,
   assignTabToAgentGroup,
+  markTabAsAgentControlled,
   ensureContentScript,
   sendTabMessageWithRetry,
   setTabLock,
@@ -117,7 +119,7 @@ export class AgentBridgeClient {
     }
     this.clearReconnect();
     if (this.ws) {
-      try { this.ws.close(); } catch {}
+      try { this.ws.close(); } catch (err) { logDebug("WS previous connection close error", err); }
       this.ws = null;
     }
 
@@ -201,7 +203,7 @@ export class AgentBridgeClient {
       const socket = this.ws;
       this.ws = null;
       this.connected = false;
-      try { socket.close(); } catch {}
+      try { socket.close(); } catch (err) { logDebug("WS socket close error", err); }
       this.broadcastStatus();
     }
   }
@@ -251,7 +253,17 @@ export class AgentBridgeClient {
   }
 
   async getTargetTabId(requestedTabId) {
-    return await getTargetTabId(requestedTabId, this.lastAgentTabId);
+    const tabId = await getTargetTabId(requestedTabId, this.lastAgentTabId);
+    if (tabId) {
+      this.markTabAsAgentControlled(tabId).catch((err) => logDebug("markTabAsAgentControlled error", err));
+    }
+    return tabId;
+  }
+
+  async markTabAsAgentControlled(tabId) {
+    if (!tabId) return;
+    this.lastAgentTabId = tabId;
+    return await markTabAsAgentControlled(tabId);
   }
 
   async ensureContentScript(tabId) {
@@ -369,16 +381,16 @@ export class AgentBridgeClient {
               if (tab && tab.id) {
                 agentControlledTabs.add(tab.id);
                 this.lastAgentTabId = tab.id;
-                await this.assignTabToAgentGroup(tab).catch(() => {});
+                await this.assignTabToAgentGroup(tab).catch((err) => logDebug("assignTabToAgentGroup error", err));
 
                 if (!makeActive && activeTabBefore && activeTabBefore !== tab.id) {
                   const currentActive = await this.getActiveTabId();
                   if (currentActive === tab.id) {
-                    await chrome.tabs.update(activeTabBefore, { active: true }).catch(() => {});
+                    await chrome.tabs.update(activeTabBefore, { active: true }).catch((err) => logDebug("restore active tab error", err));
                   }
                 }
 
-                await attachDebugger(tab.id, this.broadcastFn).catch(() => {});
+                await attachDebugger(tab.id, this.broadcastFn).catch((err) => logDebug("attachDebugger error", err));
               }
               respond(tab);
             }
@@ -400,8 +412,8 @@ export class AgentBridgeClient {
               if (tab && tab.id) {
                 agentControlledTabs.add(tab.id);
                 this.lastAgentTabId = tab.id;
-                await this.assignTabToAgentGroup(tab).catch(() => {});
-                await attachDebugger(tab.id, this.broadcastFn).catch(() => {});
+                await this.assignTabToAgentGroup(tab).catch((err) => logDebug("assignTabToAgentGroup error", err));
+                await attachDebugger(tab.id, this.broadcastFn).catch((err) => logDebug("attachDebugger error", err));
               }
               respond(tab);
             }
@@ -519,12 +531,14 @@ export class AgentBridgeClient {
         case "page.getElement": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.sendTabMessageWithRetry(tabId, {
-            action: "get_element_info",
-            selector: params.selector,
-            x: params.x,
-            y: params.y
-          })
+          this.runWithTabLock(tabId, "page.getElement", () =>
+            this.sendTabMessageWithRetry(tabId, {
+              action: "get_element_info",
+              selector: params.selector,
+              x: params.x,
+              y: params.y
+            })
+          )
             .then(res => respond(res || null))
             .catch(err => respond(null, err));
           break;
@@ -533,7 +547,9 @@ export class AgentBridgeClient {
         case "page.pickColor": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.sendTabMessageWithRetry(tabId, { action: "pick_color", x: params.x, y: params.y })
+          this.runWithTabLock(tabId, "page.pickColor", () =>
+            this.sendTabMessageWithRetry(tabId, { action: "pick_color", x: params.x, y: params.y })
+          )
             .then(res => respond(res || null))
             .catch(err => respond(null, err));
           break;
@@ -542,7 +558,9 @@ export class AgentBridgeClient {
         case "page.screenshot": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.captureTabScreenshot(tabId, params)
+          this.runWithTabLock(tabId, "page.screenshot", () =>
+            this.captureTabScreenshot(tabId, params)
+          )
             .then(res => respond(res))
             .catch(err => respond(null, err));
           break;
@@ -550,7 +568,12 @@ export class AgentBridgeClient {
 
         case "batch.run":
         case "batch.execute": {
-          this.executeBatchActions(params)
+          this.getTargetTabId(params.tabId).then(tabId => {
+            if (tabId) {
+              return this.runWithTabLock(tabId, "batch.run", () => this.executeBatchActions(params));
+            }
+            return this.executeBatchActions(params);
+          })
             .then(res => respond(res))
             .catch(err => respond(null, err));
           break;

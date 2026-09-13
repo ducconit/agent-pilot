@@ -198,3 +198,21 @@ func ExecListTabs() error {
 	}
 	return nil
 }
+
+func ExecBusy(busy bool, action string, tabID interface{}) error {
+	params := map[string]interface{}{
+		"busy": busy,
+	}
+	if action != "" {
+		params["action"] = action
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("page.setBusy", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✅ Agent busy indicator set to %v (%s): %v\n", busy, action, res)
+	return nil
+}

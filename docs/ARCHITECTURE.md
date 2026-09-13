@@ -1,6 +1,6 @@
-# 🏛️ Tài Liệu Kiến Trúc Kỹ Thuật (Agent Pilot)
-**Phiên bản**: v1.0.5-beta
-**Tiêu chuẩn**: Chrome Extension Manifest V3 (MV3) & Model Context Protocol (MCP)
+# 🏛️ Tài Liệu Kiến Trúc Hệ Thống Agent Pilot
+**Phiên bản**: v1.0.6-beta
+**Mục tiêu**: Cung cấp giao diện kiểm soát trình duyệt hoàn chỉnh cho AI Coding Agent (Antigravity First), độ trễ thấp, không chiếm quyền focus, hỗ trợ CDP và phản hồi trực quan (Visual Feedback)
 **Tác giả duy trì**: DNT ([github.com/ducconit](https://github.com/ducconit))
 
 ---

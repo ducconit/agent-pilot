@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func printUsage() {
-	fmt.Println(`Agent Pilot CLI (v1.0.5-beta) - Universal AI Agent Browser Controller
-Tác giả: DNT (https://github.com/ducconit)
+	fmt.Println(`Agent Pilot CLI (v1.0.6-beta) - Universal AI Agent Browser Controller
+Mã nguồn & Tài liệu: https://github.com/ducconit/agent-pilot-extension
 
 SỬ DỤNG:
   agent-pilot [lệnh] [tùy chọn]
@@ -27,6 +28,7 @@ THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT):
   navigate <url>                Điều hướng tab hiện tại đến URL
   screenshot [tùy chọn]         Chụp ảnh màn hình (Lưu ra file PNG)
   inspect <selector>            Soi và trích xuất thông số phần tử DOM
+  busy [on|off]                 Bật/tắt viền phát sáng và chỉ báo trạng thái AI Agent trên tab
   tabs                          Liệt kê danh sách tất cả các tab đang mở
   batch <script.json>           Thực thi chuỗi hành động automation từ file JSON
   feedback [list|wait]          Xem danh sách hoặc chờ phản hồi từ người dùng
@@ -45,6 +47,56 @@ VÍ DỤ NHANH:
   agent-pilot type "#email" "tester@example.com" --enter
   agent-pilot screenshot -o homepage.png --mode full
   agent-pilot batch test_flow.json`)
+}
+
+// busyValueFlags defines non-boolean flags that consume a following value argument.
+// NOTE FOR MAINTAINERS: When registering a new non-boolean flag in busyFlags below,
+// ensure it is added to this map so its argument is not misidentified as a positional on/off toggle.
+var busyValueFlags = map[string]bool{
+	"-action":  true,
+	"--action": true,
+	"-tab":     true,
+	"--tab":    true,
+}
+
+func ParseBusyArgs(args []string) (bool, string, interface{}, error) {
+	tabID := 0
+	actionDesc := "AI Agent đang thao tác..."
+	isBusy := true
+
+	var flagArgs []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if i > 0 {
+			prev := args[i-1]
+			if busyValueFlags[prev] {
+				flagArgs = append(flagArgs, arg)
+				continue
+			}
+		}
+
+		lower := strings.ToLower(arg)
+		if lower == "on" || lower == "true" || lower == "1" {
+			isBusy = true
+		} else if lower == "off" || lower == "false" || lower == "0" {
+			isBusy = false
+		} else {
+			flagArgs = append(flagArgs, arg)
+		}
+	}
+
+	busyFlags := flag.NewFlagSet("busy", flag.ContinueOnError)
+	busyFlags.IntVar(&tabID, "tab", 0, "Target tab ID")
+	busyFlags.StringVar(&actionDesc, "action", actionDesc, "Action description")
+	if err := busyFlags.Parse(flagArgs); err != nil {
+		return false, "", nil, err
+	}
+
+	var targetTab interface{}
+	if tabID > 0 {
+		targetTab = tabID
+	}
+	return isBusy, actionDesc, targetTab, nil
 }
 
 func main() {
@@ -186,6 +238,17 @@ func main() {
 			t = *tabID
 		}
 		if err := ExecInspect(args[0], t); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+
+	case "busy":
+		isBusy, actionDesc, targetTab, err := ParseBusyArgs(os.Args[2:])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error parsing arguments: %v\n", err)
+			os.Exit(1)
+		}
+		if err := ExecBusy(isBusy, actionDesc, targetTab); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}

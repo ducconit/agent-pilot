@@ -96,7 +96,9 @@ export async function executeBatchActions(params, bridgeClient = null) {
                 if (cur && cur.status === "complete") {
                   finish();
                 }
-              } catch (_) {}
+              } catch (err) {
+                logDebug("batch create tab status check failed", err);
+              }
             });
           }
 

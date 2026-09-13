@@ -47,7 +47,9 @@ export async function getTargetTabId(requestedTabId, lastAgentTabId = null) {
     try {
       const tab = await chrome.tabs.get(lastAgentTabId);
       if (tab && tab.id) return tab.id;
-    } catch (_) {}
+    } catch (err) {
+      logDebug("resolveTabId: lastAgentTabId lookup failed", err);
+    }
   }
 
   for (const tid of agentControlledTabs) {
@@ -65,9 +67,23 @@ export async function getTargetTabId(requestedTabId, lastAgentTabId = null) {
 /**
  * Automatically assign tab to native Chrome Tab Group '🤖 Agent Pilot'
  */
-export async function assignTabToAgentGroup(tab) {
-  if (!chrome.tabs || !chrome.tabs.group || !tab || !tab.id) return;
+export async function assignTabToAgentGroup(tabOrId) {
+  if (!chrome.tabs || !chrome.tabs.group || !tabOrId) return;
   try {
+    let tab = typeof tabOrId === "object" ? tabOrId : null;
+    if (!tab || !tab.id || !tab.windowId) {
+      const tid = typeof tabOrId === "number" ? tabOrId : tabOrId.id;
+      if (!tid) return;
+      tab = await chrome.tabs.get(tid).catch((err) => {
+        logDebug("assignTabToAgentGroup get tab", err);
+        return null;
+      });
+    }
+    if (!tab || !tab.id) return;
+    if (tab.url && (tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://") || tab.url.startsWith("about:"))) {
+      return;
+    }
+
     const windowId = tab.windowId;
     let targetGroupId = null;
 
@@ -76,7 +92,9 @@ export async function assignTabToAgentGroup(tab) {
         const groups = await chrome.tabGroups.query({ windowId });
         const existing = groups.find((g) => g.title === AGENT_GROUP_TITLE || g.title === "Agent Pilot");
         if (existing) targetGroupId = existing.id;
-      } catch (_) {}
+      } catch (err) {
+        logDebug("assignTabToAgentGroup tabGroups.query error", err);
+      }
     }
 
     const groupId = await chrome.tabs.group({
@@ -88,11 +106,27 @@ export async function assignTabToAgentGroup(tab) {
       await chrome.tabGroups.update(groupId, {
         title: AGENT_GROUP_TITLE,
         color: AGENT_GROUP_COLOR
-      }).catch(() => {});
+      }).catch((err) => logDebug("tabGroups.update error", err));
+    }
+
+    // Display AI badge on extension toolbar icon for this tab
+    if (chrome.action && chrome.action.setBadgeText) {
+      chrome.action.setBadgeText({ text: "AI", tabId: tab.id }).catch((err) => logDebug("setBadgeText error", err));
+      chrome.action.setBadgeBackgroundColor({ color: "#10b981", tabId: tab.id }).catch((err) => logDebug("setBadgeBackgroundColor error", err));
+      chrome.action.setTitle({ title: "🤖 Tab đang được AI Agent điều khiển", tabId: tab.id }).catch((err) => logDebug("action.setTitle error", err));
     }
   } catch (err) {
     console.warn("[AgentPilot] Tab grouping note:", err?.message || err);
   }
+}
+
+/**
+ * Mark a tab as actively controlled by Agent and ensure Chrome Tab Grouping & toolbar badge
+ */
+export async function markTabAsAgentControlled(tabId) {
+  if (!tabId) return;
+  agentControlledTabs.add(tabId);
+  await assignTabToAgentGroup(tabId).catch((err) => logDebug("markTabAsAgentControlled assignTabToAgentGroup error", err));
 }
 
 /**
@@ -232,13 +266,12 @@ export async function runWithTabLock(tabId, actionName, runner) {
   state.autoCount++;
   state.currentAction = actionName;
 
-  if (!wasBusy) {
-    await sendTabMessageWithRetry(tabId, {
-      action: "set_agent_busy",
-      busy: true,
-      currentAction: actionName
-    }).catch(() => {});
-  }
+  // Always notify content script so action description updates live on each step
+  await sendTabMessageWithRetry(tabId, {
+    action: "set_agent_busy",
+    busy: true,
+    currentAction: actionName
+  }).catch((err) => logDebug("runWithTabLock set_agent_busy error", err));
 
   try {
     return await runner();
@@ -248,9 +281,9 @@ export async function runWithTabLock(tabId, actionName, runner) {
       state.unlockTimer = setTimeout(() => {
         state.unlockTimer = null;
         if (!state.manualLock && state.autoCount === 0) {
-          sendTabMessageWithRetry(tabId, { action: "set_agent_busy", busy: false }).catch(() => {});
+          sendTabMessageWithRetry(tabId, { action: "set_agent_busy", busy: false }).catch((err) => logDebug("runWithTabLock auto-unlock error", err));
         }
-      }, 150);
+      }, 1200);
     }
   }
 }

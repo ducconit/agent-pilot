@@ -56,7 +56,7 @@
 
   const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
     ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
-    : "1.0.5-beta";
+    : "1.0.6-beta";
 
   // =========================================================================
   // Antigravity-First Global Bridge API (`window.__AGENT_PILOT__`)
@@ -217,19 +217,6 @@
     }
 
     if (req.action === "virtual_mouse_click" || req.action === "click_cursor") {
-      if (req.selector && (!req.x || !req.y)) {
-        const el = document.querySelector(req.selector);
-        if (el) {
-          const r = el.getBoundingClientRect();
-          const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
-          if (!inView) {
-            el.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
-          }
-          const rect = el.getBoundingClientRect();
-          req.x = rect.left + rect.width / 2;
-          req.y = rect.top + rect.height / 2;
-        }
-      }
       cursor.virtualClick(req.x, req.y, req.selector).then(sendResponse);
       return true;
     }

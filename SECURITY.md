@@ -10,7 +10,7 @@ Chúng tôi cung cấp các bản vá bảo mật cho các phiên bản sau:
 
 | Phiên Bản | Trạng Thái | Hỗ Trợ Bảo Mật |
 | :--- | :---: | :---: |
-| **`v1.0.5-beta`** | **Bản Beta Hiện Tại** | ✅ Có hỗ trợ tích cực |
+| **`v1.0.6-beta`** | **Bản Beta Hiện Tại** | ✅ Có hỗ trợ tích cực |
 | `< 1.0.0` | Thử nghiệm nội bộ | ❌ Không hỗ trợ |
 
 ---

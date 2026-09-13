@@ -107,10 +107,51 @@
     });
   }
 
+  function getElementCenter(selector) {
+    if (!selector) return null;
+    try {
+      const el = document.querySelector(selector);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+      if (!inView && el.scrollIntoView) {
+        el.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+      }
+      const rect = el.getBoundingClientRect();
+      return {
+        element: el,
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      };
+    } catch (err) {
+      console.warn("[AgentPilot] getElementCenter selector error:", err);
+      return null;
+    }
+  }
+
   /**
    * Trigger click animation & dispatch synthetic events on DOM element
    */
   async function virtualClick(x = currentMouseX, y = currentMouseY, selector = null) {
+    let el = null;
+    if (selector) {
+      try {
+        el = document.querySelector(selector);
+      } catch (err) {
+        console.warn("[AgentPilot] virtualClick querySelector error:", err);
+        return { success: false, error: `Invalid selector: ${err.message}` };
+      }
+      if (!el) {
+        return { success: false, error: `Element not found for selector: ${selector}` };
+      }
+      if ((!x && !y) || (x === currentMouseX && y === currentMouseY)) {
+        const center = getElementCenter(selector);
+        if (center) {
+          x = center.x;
+          y = center.y;
+        }
+      }
+    }
     activateCursor();
     await moveVirtualMouse(x, y, CONFIG.CLICK_DELAY);
 
@@ -126,8 +167,7 @@
       setTimeout(() => ripple.remove(), 550);
     }
 
-    // Find and dispatch event on element under pointer
-    let el = selector ? document.querySelector(selector) : null;
+    // Find element under pointer if selector was not specified
     if (!el) {
       const prevCursorDisplay = cursorLayer.style.display;
       const lockOverlayEl = window.__AP_INTERNAL__.shield?.getLockOverlayEl?.();
@@ -324,6 +364,7 @@
     hideCursor,
     updateCursorTransform,
     getCursorPosition: () => ({ x: currentMouseX, y: currentMouseY }),
-    getCursorLayer: () => cursorLayer
+    getCursorLayer: () => cursorLayer,
+    getElementCenter
   };
 })();
