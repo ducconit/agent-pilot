@@ -4,6 +4,7 @@
  */
 
 import { showToast, escapeHtml } from "./ui-helpers.js";
+import { normalizeColorData } from "./color-utils.js";
 
 export class InspectorPanel {
   constructor(options = {}) {
@@ -34,7 +35,14 @@ export class InspectorPanel {
     this.colorSwatchCurrent = document.getElementById("color-swatch-current");
     this.colorHex = document.getElementById("color-hex");
     this.colorRgb = document.getElementById("color-rgb");
+    this.colorRgba = document.getElementById("color-rgba");
     this.colorHsl = document.getElementById("color-hsl");
+    this.colorOklch = document.getElementById("color-oklch");
+    this.valHex = document.getElementById("val-hex");
+    this.valRgb = document.getElementById("val-rgb");
+    this.valRgba = document.getElementById("val-rgba");
+    this.valHsl = document.getElementById("val-hsl");
+    this.valOklch = document.getElementById("val-oklch");
     this.paletteChips = document.getElementById("palette-chips");
 
     this.isInspectorActive = false;
@@ -138,6 +146,25 @@ export class InspectorPanel {
         }
       };
     }
+
+    // Color Eyedropper Format Rows Click-to-Copy (HEX, RGB, RGBA, HSL, OKLCH)
+    const colorRows = [this.colorHex, this.colorRgb, this.colorRgba, this.colorHsl, this.colorOklch].filter(Boolean);
+    colorRows.forEach((row) => {
+      row.addEventListener("click", () => {
+        const type = row.getAttribute("data-type") || "màu";
+        const val = row.getAttribute("data-value") || row.querySelector(".color-format-val")?.textContent?.trim() || "";
+        if (val) {
+          navigator.clipboard.writeText(val)
+            .then(() => {
+              showToast(`Đã sao chép ${type}: ${val}`);
+            })
+            .catch((err) => {
+              console.warn(`[AgentPilot Inspector] Không thể sao chép ${type}:`, err);
+              showToast(`Không thể sao chép vào clipboard (${type})`);
+            });
+        }
+      });
+    });
   }
 
   switchSubtab(targetSubtabId) {
@@ -430,15 +457,47 @@ export class InspectorPanel {
     return this.selectedElementDetails;
   }
 
+  updateColorDisplay(norm) {
+    if (!norm) return;
+    if (this.colorSwatchCurrent) this.colorSwatchCurrent.style.background = norm.hex;
+
+    if (this.colorHex) {
+      this.colorHex.setAttribute("data-value", norm.hex);
+      if (this.valHex) this.valHex.textContent = norm.hex;
+      else this.colorHex.textContent = `HEX: ${norm.hex}`;
+    }
+    if (this.colorRgb) {
+      this.colorRgb.setAttribute("data-value", norm.rgb);
+      if (this.valRgb) this.valRgb.textContent = norm.rgb;
+      else this.colorRgb.textContent = `RGB: ${norm.rgb}`;
+    }
+    if (this.colorRgba) {
+      this.colorRgba.setAttribute("data-value", norm.rgba);
+      if (this.valRgba) this.valRgba.textContent = norm.rgba;
+      else this.colorRgba.textContent = `RGBA: ${norm.rgba}`;
+    }
+    if (this.colorHsl) {
+      this.colorHsl.setAttribute("data-value", norm.hsl);
+      if (this.valHsl) this.valHsl.textContent = norm.hsl;
+      else this.colorHsl.textContent = `HSL: ${norm.hsl}`;
+    }
+    if (this.colorOklch) {
+      this.colorOklch.setAttribute("data-value", norm.oklch);
+      if (this.valOklch) this.valOklch.textContent = norm.oklch;
+      else this.colorOklch.textContent = `OKLCH: ${norm.oklch}`;
+    }
+  }
+
   addColorToPalette(colorObj) {
     this.setEyedropperActiveState(false);
-    if (this.colorSwatchCurrent) this.colorSwatchCurrent.style.background = colorObj.hex;
-    if (this.colorHex) this.colorHex.textContent = `HEX: ${colorObj.hex}`;
-    if (this.colorRgb) this.colorRgb.textContent = `RGB: ${colorObj.rgb}`;
-    if (this.colorHsl) this.colorHsl.textContent = `HSL: ${colorObj.hsl}`;
+    const norm = normalizeColorData(colorObj);
+    if (!norm) return;
 
-    if (!this.colorHistory.includes(colorObj.hex)) {
-      this.colorHistory.unshift(colorObj.hex);
+    this.updateColorDisplay(norm);
+
+    const hexNorm = norm.hex.toLowerCase();
+    if (!this.colorHistory.map((h) => (typeof h === "string" ? h.toLowerCase() : "")).includes(hexNorm)) {
+      this.colorHistory.unshift(norm.hex);
       if (this.colorHistory.length > 14) this.colorHistory.pop();
       this.renderPalette();
       chrome.storage.local.set({ agent_pilot_colors: this.colorHistory });
@@ -452,10 +511,19 @@ export class InspectorPanel {
       const chip = document.createElement("div");
       chip.className = "color-chip";
       chip.style.backgroundColor = hex;
-      chip.title = `${hex} (Click để copy)`;
+      chip.title = `${hex} (Click để copy & xem 5 định dạng)`;
       chip.onclick = () => {
-        navigator.clipboard.writeText(hex);
-        showToast(`Đã copy ${hex} vào clipboard!`);
+        navigator.clipboard.writeText(hex)
+          .then(() => {
+            showToast(`Đã copy ${hex} vào clipboard!`);
+          })
+          .catch((err) => {
+            console.warn("[AgentPilot Palette] Không thể copy chip màu:", err);
+          });
+        const norm = normalizeColorData(hex);
+        if (norm) {
+          this.updateColorDisplay(norm);
+        }
       };
       this.paletteChips.appendChild(chip);
     });

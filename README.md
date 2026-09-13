@@ -149,7 +149,7 @@ flowchart LR
 ### 1. Cài Đặt Chrome Extension
 
 #### Cách A: Cài đặt từ Bản Phát Hành (Khuyên dùng)
-1. Tải gói tiện ích mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (tệp `agent-pilot-v1.0.3-beta.zip` hoặc trong thư mục `dist/`).
+1. Tải gói tiện ích mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (tệp `agent-pilot-v1.0.4-beta.zip` hoặc trong thư mục `dist/`).
 2. Giải nén tệp `.zip` vào một thư mục cố định trên máy.
 3. Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
 4. Gạt bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải.

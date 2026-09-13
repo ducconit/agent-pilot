@@ -626,8 +626,11 @@ async function run() {
     const colorPickRes = await sendAgentCommand("page.pickColor", pickColorParams);
     const isColorPickSuccess = colorPickRes?.success === true &&
                                Boolean(colorPickRes?.color?.hex) &&
-                               Boolean(colorPickRes?.color?.rgb);
-    record("27. Agent Command: page.pickColor", isColorPickSuccess, `Picked Color at (200, 150): HEX: ${colorPickRes?.color?.hex}, RGB: ${colorPickRes?.color?.rgb}`);
+                               Boolean(colorPickRes?.color?.rgb) &&
+                               Boolean(colorPickRes?.color?.rgba) &&
+                               Boolean(colorPickRes?.color?.hsl) &&
+                               Boolean(colorPickRes?.color?.oklch);
+    record("27. Agent Command: page.pickColor (5 Formats: HEX, RGB, RGBA, HSL, OKLCH)", isColorPickSuccess, `HEX: ${colorPickRes?.color?.hex}, RGB: ${colorPickRes?.color?.rgb}, RGBA: ${colorPickRes?.color?.rgba}, HSL: ${colorPickRes?.color?.hsl}, OKLCH: ${colorPickRes?.color?.oklch}`);
 
     // 28. Visual UI Feedback (Channel B - Persistent Shared Inbox)
     const testFeedbackPayload = {

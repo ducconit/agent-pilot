@@ -11,6 +11,7 @@
     }
   }
 
+  // NOTE: Keep mathematical conversion algorithms in sync with extensions/sidepanel/color-utils.js
   function rgbToHex(r, g, b) {
     return "#" + [r, g, b].map((x) => {
       const h = Math.max(0, Math.min(255, Math.round(x))).toString(16);
@@ -44,6 +45,43 @@
       h /= 6;
     }
     return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
+  }
+
+  function rgbToRgba(r, g, b, a = 1) {
+    return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a})`;
+  }
+
+  function srgbToLinear(c) {
+    c = c / 255;
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
+
+  function rgbToOklch(r, g, b) {
+    const rLin = srgbToLinear(r);
+    const gLin = srgbToLinear(g);
+    const bLin = srgbToLinear(b);
+
+    const l = 0.4122214708 * rLin + 0.5363325363 * gLin + 0.0514459929 * bLin;
+    const m = 0.2119034982 * rLin + 0.6806995451 * gLin + 0.1073969566 * bLin;
+    const s = 0.0883024619 * rLin + 0.2817188376 * gLin + 0.6299787005 * bLin;
+
+    const l_ = Math.cbrt(l);
+    const m_ = Math.cbrt(m);
+    const s_ = Math.cbrt(s);
+
+    const L = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_;
+    const a = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_;
+    const b_ = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_;
+
+    const C = Math.sqrt(a * a + b_ * b_);
+    let H = (Math.atan2(b_, a) * 180) / Math.PI;
+    if (H < 0) H += 360;
+    if (C < 0.0001) H = 0;
+
+    const L_pct = (Math.round(L * 1000) / 10).toFixed(1);
+    const C_val = (Math.round(C * 1000) / 1000).toFixed(3);
+    const H_val = (Math.round(H * 10) / 10).toFixed(1);
+    return `oklch(${L_pct}% ${C_val} ${H_val})`;
   }
 
   // Eyedropper & Loupe Geometry Constants
@@ -173,8 +211,10 @@
     const b = match ? parseInt(match[2], 10) : 255;
     const hex = rgbToHex(r, g, b);
     const rgb = `rgb(${r}, ${g}, ${b})`;
+    const rgba = rgbToRgba(r, g, b, 1);
     const hsl = rgbToHsl(r, g, b);
-    return { r, g, b, hex, rgb, hsl, sx: 0, sy: 0, fromFallback: true };
+    const oklch = rgbToOklch(r, g, b);
+    return { r, g, b, hex, rgb, rgba, hsl, oklch, sx: 0, sy: 0, fromFallback: true };
   }
 
   function samplePixelAt(clientX, clientY) {
@@ -188,8 +228,10 @@
         const b = pixel[2];
         const hex = rgbToHex(r, g, b);
         const rgb = `rgb(${r}, ${g}, ${b})`;
+        const rgba = rgbToRgba(r, g, b, 1);
         const hsl = rgbToHsl(r, g, b);
-        return { r, g, b, hex, rgb, hsl, sx, sy, fromFallback: false };
+        const oklch = rgbToOklch(r, g, b);
+        return { r, g, b, hex, rgb, rgba, hsl, oklch, sx, sy, fromFallback: false };
       } catch (_) {}
     }
     return sampleFallbackColor(clientX, clientY);
@@ -362,15 +404,21 @@
       color: {
         hex: finalSample.hex,
         rgb: finalSample.rgb,
+        rgba: finalSample.rgba,
         hsl: finalSample.hsl,
+        oklch: finalSample.oklch,
         timestamp: Date.now()
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      console.debug("[AgentPilot Eyedropper] notify color picked error:", err);
+    });
 
     chrome.runtime.sendMessage({
       type: "EYEDROPPER_STATUS_CHANGED",
       active: false
-    }).catch(() => {});
+    }).catch((err) => {
+      console.debug("[AgentPilot Eyedropper] notify status error:", err);
+    });
 
     stopEyedropper(finalSample);
   }
@@ -381,7 +429,9 @@
     chrome.runtime.sendMessage({
       type: "EYEDROPPER_STATUS_CHANGED",
       active: false
-    }).catch(() => {});
+    }).catch((err) => {
+      console.debug("[AgentPilot Eyedropper] notify status error:", err);
+    });
 
     stopEyedropper(null);
   }
@@ -421,12 +471,16 @@
         color: {
           hex: sample.hex,
           rgb: sample.rgb,
+          rgba: sample.rgba,
           hsl: sample.hsl,
+          oklch: sample.oklch,
           timestamp: Date.now()
         }
-      }).catch(() => {});
+      }).catch((err) => {
+        console.debug("[AgentPilot Eyedropper] notify color picked error:", err);
+      });
 
-      return { hex: sample.hex, rgb: sample.rgb, hsl: sample.hsl };
+      return { hex: sample.hex, rgb: sample.rgb, rgba: sample.rgba, hsl: sample.hsl, oklch: sample.oklch };
     }
 
     // 2. Interactive user loupe mode

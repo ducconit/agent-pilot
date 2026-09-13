@@ -222,7 +222,15 @@ async function run() {
           return rules.some(r => r.selectorText && r.selectorText.includes("::-webkit-scrollbar"));
         })(),
         captureElementText: document.getElementById("btn-capture-element")?.textContent.replace(/\s+/g, " ").trim(),
-        hasAutoCopySwitch: !!document.getElementById("toggle-auto-copy-shot")
+        hasAutoCopySwitch: !!document.getElementById("toggle-auto-copy-shot"),
+        colorFormats: {
+          hasHex: !!document.getElementById("color-hex"),
+          hasRgb: !!document.getElementById("color-rgb"),
+          hasRgba: !!document.getElementById("color-rgba"),
+          hasHsl: !!document.getElementById("color-hsl"),
+          hasOklch: !!document.getElementById("color-oklch"),
+          copyBtnsCount: document.querySelectorAll("#latest-color-box .color-copy-btn").length
+        }
       };
     });
 
@@ -295,6 +303,43 @@ async function run() {
       });
     });
 
+    // Test Color Eyedropper 5 formats update and 1-click copy
+    const colorFormatTest = await sidepanelPage.evaluate(async () => {
+      if (!window.__INSPECTOR_PANEL__) return { success: false };
+      window.__INSPECTOR_PANEL__.addColorToPalette({ hex: "#38bdf8", r: 56, g: 189, b: 248 });
+
+      const valHex = document.getElementById("val-hex")?.textContent?.trim();
+      const valRgb = document.getElementById("val-rgb")?.textContent?.trim();
+      const valRgba = document.getElementById("val-rgba")?.textContent?.trim();
+      const valHsl = document.getElementById("val-hsl")?.textContent?.trim();
+      const valOklch = document.getElementById("val-oklch")?.textContent?.trim();
+
+      // Test click on OKLCH row
+      const oklchRow = document.getElementById("color-oklch");
+      if (oklchRow) oklchRow.click();
+
+      // Test click on RGBA row
+      const rgbaRow = document.getElementById("color-rgba");
+      if (rgbaRow) rgbaRow.click();
+
+      const valid = Boolean(
+        valHex === "#38bdf8" &&
+        valRgb === "rgb(56, 189, 248)" &&
+        valRgba === "rgba(56, 189, 248, 1)" &&
+        valHsl && valHsl.startsWith("hsl(") &&
+        valOklch && valOklch.startsWith("oklch(")
+      );
+
+      return {
+        success: valid,
+        valHex,
+        valRgb,
+        valRgba,
+        valHsl,
+        valOklch
+      };
+    });
+
     const sidepanelOk = sidepanelCheck.brand === "AGENT PILOT" &&
                         sidepanelCheck.hasBetaBadge === true &&
                         sidepanelCheck.brandSub === "Next-Gen AI Browser Companion" &&
@@ -306,12 +351,14 @@ async function run() {
                         sidepanelCheck.hasCssSearch &&
                         sidepanelCheck.hasCopyAllOverview === true &&
                         overviewCopyTest.success === true &&
+                        colorFormatTest.success === true &&
+                        sidepanelCheck.colorFormats.copyBtnsCount === 5 &&
                         sidepanelCheck.hasSlimScrollbar === true &&
                         sidepanelCheck.captureElementText === "🎯 Chụp phần tử" &&
                         sidepanelCheck.hasAutoCopySwitch === true &&
                         guideTest.opened === true &&
                         guideTest.singleTab === true;
-    record("8. Side Panel Control Center UI (Beta Badge, Slogan, Slim Scrollbar & Overview Copy All)", sidepanelOk, `Badge: "BETA" (${sidepanelCheck.hasBetaBadge}), Slogan: "${sidepanelCheck.brandSub}", Slim Scrollbar: ${sidepanelCheck.hasSlimScrollbar}, Copy All: ${overviewCopyTest.hasCopyAllBtn}`);
+    record("8. Side Panel Control Center UI (5-Format Eyedropper, Beta Badge, Slogan, Slim Scrollbar & Overview Copy All)", sidepanelOk, `Eyedropper 5 Formats: ${colorFormatTest.success} (OKLCH: ${colorFormatTest.valOklch}), CopyBtns: ${sidepanelCheck.colorFormats.copyBtnsCount}, Slogan: "${sidepanelCheck.brandSub}"`);
     // Keep sidepanelPage open to test Extension IPC messaging
     // 10. Test Chrome DevTools Protocol (CDP) via Background Service Worker
     console.log("\n--- KIỂM THỬ CHROME DEVTOOLS PROTOCOL (CDP ENGINE) ---");

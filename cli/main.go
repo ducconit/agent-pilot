@@ -9,7 +9,7 @@ import (
 )
 
 func printUsage() {
-	fmt.Println(`Agent Pilot CLI (v1.0.3-beta) - Universal AI Agent Browser Controller
+	fmt.Println(`Agent Pilot CLI (v1.0.4-beta) - Universal AI Agent Browser Controller
 Tác giả: DNT (https://github.com/ducconit)
 
 SỬ DỤNG:

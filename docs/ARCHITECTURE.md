@@ -1,5 +1,5 @@
 # 🏛️ Tài Liệu Kiến Trúc Kỹ Thuật (Agent Pilot)
-**Phiên bản**: v1.0.3-beta  
+**Phiên bản**: v1.0.4-beta  
 **Tiêu chuẩn**: Chrome Extension Manifest V3 (MV3) & Model Context Protocol (MCP)  
 **Tác giả duy trì**: DNT ([github.com/ducconit](https://github.com/ducconit))
 
