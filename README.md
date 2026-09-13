@@ -197,6 +197,26 @@ go build -ldflags="-s -w" -o agent-pilot .
 go install github.com/ducconit/agent-pilot-extension/cli@latest
 ```
 
+#### Cách Kích Hoạt Service Chạy Ngầm (Khuyên dùng cho trải nghiệm tốt nhất)
+Thay vì phải tự chạy server thủ công, bạn chỉ cần gõ 1 lệnh để hệ thống tự động đăng ký service chạy ngầm (Linux `systemd --user`, macOS `launchd`, Windows `Task Scheduler`):
+
+```bash
+# Cài đặt và kích hoạt service tự khởi động cùng máy:
+agent-pilot service install
+
+# Kiểm tra trạng thái service:
+agent-pilot service status
+
+# Các lệnh quản trị khác:
+agent-pilot service restart    # Khởi động lại
+agent-pilot service stop       # Dừng tạm thời
+agent-pilot service uninstall  # Gỡ bỏ service
+```
+
+> 💡 **Lưu Ý Khi Chạy Nhiều AI Agent Đồng Thời (Multi-Agent Concurrency)**:
+> - **Chống xung đột cổng**: Khi chạy ngầm bằng `agent-pilot service install`, server đóng vai trò Master Bridge. Bạn có thể bật đồng thời **Antigravity IDE**, **Codex**, **Claude Code**, và **Antigravity CLI** để xử lý nhiều task cùng lúc mà không lo lỗi đụng độ cổng mạng.
+> - **Chỉ định `tabId`**: Khi Agent mở tab bằng `browser_open_tab`, hãy truyền `tabId` vào các lệnh tiếp theo (`click`, `type`, `screenshot`, `run_actions`) để mỗi Agent làm việc trên tab riêng của mình mà không tranh chấp tiêu điểm (focus) với nhau.
+
 ---
 
 ### 3. Cài Đặt Kỹ Năng Cho Trợ Lý AI (Agent Skills Ecosystem)

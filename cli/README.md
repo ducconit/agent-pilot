@@ -89,7 +89,37 @@ Cấu hình MCP cho các công cụ AI coding hàng đầu:
 - **Type**: `command`
 - **Command**: `agent-pilot mcp`
 
-### 2. Dành cho Tester / QC (Lệnh CLI Trực Tiếp)
+---
+
+### 2. Quản Lý Dịch Vụ Chạy Ngầm (Background Service)
+
+Agent Pilot tích hợp sẵn trình quản lý dịch vụ chạy ngầm đa nền tảng (Linux, macOS, Windows). Chỉ với 1 lệnh duy nhất, bridge server cổng 58765 sẽ luôn sẵn sàng chạy ngầm để Chrome Extension kết nối tức thì:
+
+```bash
+# Cài đặt và kích hoạt service tự chạy khi đăng nhập máy:
+agent-pilot service install
+
+# Kiểm tra trạng thái hoạt động của service:
+agent-pilot service status
+
+# Khởi động lại service:
+agent-pilot service restart
+
+# Dừng service:
+agent-pilot service stop
+
+# Gỡ bỏ service khỏi hệ thống:
+agent-pilot service uninstall
+```
+
+**Cơ chế nền tảng tương ứng:**
+- **Linux**: Tạo `systemd --user` service tại `~/.config/systemd/user/agent-pilot.service` (User Mode, không cần `sudo`).
+- **macOS**: Tạo `launchd` User Agent tại `~/Library/LaunchAgents/com.agentpilot.bridge.plist`.
+- **Windows**: Đăng ký `Task Scheduler` (`AgentPilotBridge`) chạy ngầm không hiển thị cửa sổ console.
+
+---
+
+### 3. Dành cho Tester / QC (Lệnh CLI Trực Tiếp)
 
 Tester hoặc kỹ sư QC có thể viết script shell (`.sh`, `.bat`, Python) để điều khiển trình duyệt tự động:
 
@@ -116,7 +146,7 @@ agent-pilot tabs
 agent-pilot batch flow_test.json
 ```
 
-### 3. Cấu Trúc File Batch Automation JSON
+### 4. Cấu Trúc File Batch Automation JSON
 
 File `flow_test.json`:
 ```json
@@ -133,6 +163,14 @@ Thực thi kịch bản:
 ```bash
 agent-pilot batch flow_test.json
 ```
+
+---
+
+### 5. Lưu Ý Khi Chạy Nhiều AI Agent Đồng Thời (Multi-Agent Concurrency)
+
+Khi bạn chạy đồng thời nhiều AI Agent (như **Antigravity IDE**, **Codex**, **Claude Code**, và **Antigravity CLI**):
+1. **Dùng Service Ngầm**: Hãy chạy `agent-pilot service install` một lần để có Master Bridge lắng nghe cổng 58765. Mọi Agent sẽ gửi lệnh qua HTTP REST Gateway mà không bao giờ bị xung đột cổng mạng (`EADDRINUSE`).
+2. **Luôn Chỉ Định `tabId`**: Khi Agent mở tab bằng `browser_open_tab`, extension sẽ trả về mã `tabId`. Hãy dùng `tabId` đó cho các thao tác tiếp theo (`click`, `type`, `screenshot`, `run_actions`). Điều này giúp mỗi Agent thao tác độc lập trên tab riêng của mình mà không tranh chấp tiêu điểm (focus) với nhau.
 
 ---
 

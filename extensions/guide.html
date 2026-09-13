@@ -596,8 +596,8 @@
           <ul class="features-list">
             <li>Không phụ thuộc Node.js hay npm, khởi động <code>&lt;5ms</code>, RAM chỉ <code>~12MB</code></li>
             <li>Hỗ trợ sẵn cho Linux (x64/ARM64), macOS (Intel/M1-M4) và Windows</li>
-            <li>Đặt binary vào <code>/usr/local/bin/agent-pilot</code> hoặc biến môi trường PATH</li>
-            <li>Khởi chạy nhanh máy chủ bridge: <code>agent-pilot server</code></li>
+            <li>Cài service chạy ngầm tự khởi động 1 lệnh: <code>agent-pilot service install</code></li>
+            <li>Kiểm tra trạng thái service: <code>agent-pilot service status</code></li>
           </ul>
         </div>
 
@@ -697,8 +697,27 @@
 
         <div class="card">
           <div class="card-header">
+            <span class="card-icon">⚡</span>
+            <h3 class="card-title">Quản Lý Service Ngầm & Đa Agent</h3>
+          </div>
+          <p class="card-desc">
+            Quản lý vòng đời dịch vụ chạy ngầm đa nền tảng và hỗ trợ nhiều AI Agent hoạt động đồng thời:
+          </p>
+          <div class="code-box">agent-pilot service install
+agent-pilot service status
+agent-pilot service restart
+agent-pilot service uninstall</div>
+          <ul class="features-list">
+            <li>Tự động cấu hình <code>systemd --user</code> (Linux), <code>launchd</code> (macOS), hoặc <code>Task Scheduler</code> (Windows)</li>
+            <li>Hỗ trợ bật đồng thời Antigravity, Codex, CLI đa nhiệm không xung đột cổng</li>
+            <li>Luôn truyền <code>tabId</code> để mỗi Agent làm việc độc lập trên tab riêng</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
             <span class="card-icon">🧪</span>
-            <h3 class="card-title">Bộ Lệnh CLI Tự Động Hóa Cho Tester / QC</h3>
+            <h3 class="card-title">Bộ Lệnh CLI Cho Tester / QC</h3>
           </div>
           <p class="card-desc">
             Kỹ sư kiểm thử tự động có thể điều khiển trình duyệt trực tiếp qua terminal hoặc viết shell script kiểm thử tự động:

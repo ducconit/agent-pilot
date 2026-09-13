@@ -18,6 +18,7 @@ SỬ DỤNG:
 CÁC LỆNH HỖ TRỢ:
   mcp                           Khởi chạy MCP Server (stdio JSON-RPC) cho AI Agent (Mặc định)
   server [--port 58765]         Khởi chạy Bridge Server nền lắng nghe kết nối từ Extension
+  service <action>              Quản lý service chạy ngầm (install, uninstall, start, stop, restart, status)
 
 THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT):
   click <selector>              Click chuột ảo vào phần tử DOM
@@ -71,6 +72,12 @@ func main() {
 		_ = serverFlags.Parse(os.Args[2:])
 		if err := StartBridgeServer(*port); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Server error: %v\n", err)
+			os.Exit(1)
+		}
+
+	case "service":
+		if err := HandleServiceCommand(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Service error: %v\n", err)
 			os.Exit(1)
 		}
 

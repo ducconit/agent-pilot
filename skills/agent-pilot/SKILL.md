@@ -54,6 +54,13 @@ Agent Pilot provides an all-in-one compiled Go binary (`cli/agent-pilot`) for ul
 - **MCP Server Mode (`stdio`)**: Run `agent-pilot mcp` directly inside MCP client configs (Claude Desktop, Cursor, Antigravity, OpenCode).
 - **Direct CLI Automation**: Fast, scriptable commands for agents, QC/testers, and CI/CD pipelines:
   ```bash
+  # Background Service Management (Linux systemd, macOS launchd, Windows Task Scheduler)
+  agent-pilot service install
+  agent-pilot service status
+  agent-pilot service restart
+  agent-pilot service uninstall
+
+  # Direct Browser Actions
   agent-pilot open https://example.com
   agent-pilot click "#login-button"
   agent-pilot type "#search-box" "automation testing" --enter
@@ -63,6 +70,7 @@ Agent Pilot provides an all-in-one compiled Go binary (`cli/agent-pilot`) for ul
   agent-pilot batch flow.json
   agent-pilot feedback list
   ```
+- **Multi-Agent Multitasking**: Install the background service (`agent-pilot service install`) so port 58765 is persistently available. Agents operating concurrently should always retain and pass `tabId` across tool calls to operate on dedicated background tabs without collision.
 
 ---
 

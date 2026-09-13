@@ -145,11 +145,30 @@ Bản binary độc lập viết bằng **Golang** loại bỏ hoàn toàn sự 
   - Windows: `agent-pilot-windows-amd64.exe` hoặc `agent-pilot-windows-arm64.exe`
 - Đặt tên binary thành `agent-pilot` và di chuyển vào thư mục `/usr/local/bin/` (trên Linux/macOS) hoặc thêm vào biến môi trường `PATH` (trên Windows).
 
-### 4.2. Khởi Chạy Làm Bridge Server (Cổng 58765)
+### 4.2. Quản Lý Service Chạy Ngầm Tự Động (Background Service)
+Thay vì phải tự chạy lệnh `agent-pilot server` thủ công, bạn có thể cài đặt và quản lý service chạy ngầm đa nền tảng chỉ bằng 1 lệnh:
+
 ```bash
-agent-pilot server
+# Cài đặt và kích hoạt service tự chạy khi khởi động máy:
+agent-pilot service install
+
+# Kiểm tra trạng thái hoạt động:
+agent-pilot service status
+
+# Khởi động lại service:
+agent-pilot service restart
+
+# Dừng service:
+agent-pilot service stop
+
+# Gỡ bỏ service khỏi máy:
+agent-pilot service uninstall
 ```
-- Cơ chế **Dual Mode**: Tự động chuyển sang chế độ Forwarder nếu cổng 58765 đã có tiến trình khác lắng nghe, ngăn chặn hoàn toàn lỗi `EADDRINUSE`.
+
+**Cơ chế nền tảng tự động nhận diện:**
+- **Linux**: Tự động tạo và kích hoạt `systemd --user` tại `~/.config/systemd/user/agent-pilot.service` (hoạt động ở User Mode, không cần quyền `sudo`).
+- **macOS**: Tự động nạp LaunchAgent tại `~/Library/LaunchAgents/com.agentpilot.bridge.plist`.
+- **Windows**: Tự động đăng ký Windows Task Scheduler (`AgentPilotBridge`) chạy ngầm không hiển thị cửa sổ console.
 
 ### 4.3. Cấu Hình Làm Máy Chủ MCP (`stdio`) Cho AI Coding Assistant
 Thêm vào file cấu hình MCP của Antigravity, Claude Desktop, hoặc Cursor:
@@ -202,6 +221,15 @@ agent-pilot feedback list
   { "action": "screenshot", "label": "google_search_results" }
 ]
 ```
+
+---
+
+### 4.5. Hướng Dẫn Chạy Đa AI Agent Đồng Thời (Multi-Agent Concurrency)
+
+Khi bạn mở đồng thời nhiều AI Agent (ví dụ: Antigravity IDE, Codex, Claude Code, Antigravity CLI) để làm nhiều tác vụ song song:
+1. **Bật Service Chạy Ngầm**: Chạy `agent-pilot service install`. Cổng 58765 sẽ luôn sẵn sàng. Nhờ cơ chế **Dual Mode**, mọi AI Agent gửi lệnh qua HTTP REST Gateway tới Master Bridge mà **hoàn toàn không bị xung đột cổng mạng (EADDRINUSE)**.
+2. **Quy Tắc Chỉ Định `tabId`**: Khi Agent mở một tab web mới qua `browser_open_tab(url)`, extension sẽ trả về mã định danh `tabId` (ví dụ: `1546114498`). Hãy đảm bảo các bước tiếp theo (`browser_click`, `browser_type`, `browser_screenshot`, `browser_run_actions`) luôn truyền tham số `tabId` đó. Điều này giúp mỗi Agent hoàn toàn làm việc độc lập trên tab riêng của mình mà không tranh chấp tiêu điểm (focus) với nhau.
+3. **Thao Tác Ngầm Không Tranh Chấp Focus**: Các tab do Agent quản lý mặc định mở ngầm (`active: false`) và tự động gom vào nhóm `🤖 Agent Pilot`. Tính năng chụp ảnh ngầm qua CDP Surface Capture cho phép chụp ảnh chính xác mà không cướp màn hình làm việc của bạn.
 
 ---
 
