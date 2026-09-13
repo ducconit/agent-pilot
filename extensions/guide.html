@@ -519,7 +519,7 @@
       </div>
     </div>
     <div class="header-pills">
-      <span class="pill amber">● v1.0.4-beta (Public Beta)</span>
+      <span class="pill amber">● v1.0.5-beta (Public Beta)</span>
       <span class="pill">Cổng WebSocket 58765</span>
       <span class="pill purple">Manifest V3</span>
       <span class="pill">Cross-Platform (Win/Mac/Linux)</span>
@@ -578,7 +578,7 @@
             Tiện ích mở rộng Google Chrome Manifest V3 hiện đại, giao tiếp trực tiếp qua Chrome Side Panel API và Chrome DevTools Protocol:
           </p>
           <ul class="features-list">
-            <li>Tải tệp <code>agent-pilot-v1.0.4-beta.zip</code> từ GitHub Releases và giải nén</li>
+            <li>Tải tệp <code>agent-pilot-v1.0.5-beta.zip</code> từ GitHub Releases và giải nén</li>
             <li>Mở <code>chrome://extensions</code> $\rightarrow$ Gạt bật <strong>Developer mode</strong></li>
             <li>Nhấn <strong>Load unpacked</strong> và chọn thư mục vừa giải nén</li>
             <li>Ghim icon 📌 lên thanh công cụ và mở Side Panel (<kbd>Ctrl+Shift+P</kbd> hoặc <kbd>Cmd+Shift+P</kbd>)</li>
@@ -682,15 +682,16 @@
         <div class="card">
           <div class="card-header">
             <span class="card-icon">🔒</span>
-            <h3 class="card-title">Điều Khiển Ngầm & Khiên Khóa Thao Tác</h3>
+            <h3 class="card-title">Chỉ Báo Tinh Tế & Giám Sát Agent</h3>
           </div>
           <p class="card-desc">
-            Khi AI Agent thao tác trên tab, hệ thống tự động gắn vào nhóm Chrome Tab Group <code>🤖 Agent Pilot</code> và kích hoạt khiên chắn khóa thao tác vô tình của con người, đồng thời cung cấp nút Mở khóa khẩn cấp.
+            Khi AI Agent thao tác trên tab, hệ thống tự động hiển thị viền màn hình phát sáng neon nhẹ nhàng (subtle glowing border) và thanh trạng thái nhỏ gọn (floating pill) chi tiết hành động mà không che chắn tầm nhìn:
           </p>
           <ul class="features-list">
-            <li>Điều khiển ngầm (Background Tab Control): Không cướp tiêu điểm của người dùng</li>
-            <li>Chụp ảnh ngầm chính xác qua CDP Surface Capture</li>
-            <li>Con trỏ chuột ảo thông minh: Tự động ẩn khi tab không hoạt động</li>
+            <li>Viền phát sáng cyberpunk nhẹ nhàng không làm mờ trang web</li>
+            <li>Thanh trạng thái nổi góc trên hiển thị hành động đang chạy</li>
+            <li>Nút <code>[ 🔓 Chiếm quyền ]</code> và phím <span class="kbd-chip">Esc</span> để mở khóa tức thì</li>
+            <li>Điều khiển ngầm mượt mà, tự động gắn tab vào nhóm <code>🤖 Agent Pilot</code></li>
           </ul>
         </div>
 
@@ -773,7 +774,7 @@ agent-pilot batch flow.json</div>
             </tr>
             <tr>
               <td><span class="tag-mono">browser_pick_color</span></td>
-              <td>Lấy mã màu tại tọa độ cụ thể (HEX, RGB, HSL)</td>
+              <td>Lấy mã màu tại tọa độ cụ thể (5 định dạng: HEX, RGB, RGBA, HSL, OKLCH)</td>
               <td><code>x</code>, <code>y</code>, <code>tabId</code></td>
             </tr>
             <tr>
@@ -788,7 +789,7 @@ agent-pilot batch flow.json</div>
             </tr>
             <tr>
               <td><span class="tag-mono">browser_set_busy</span></td>
-              <td>Khóa / mở khóa khiên Human Input Lock khi Agent thao tác</td>
+              <td>Hiển thị viền màn hình sáng & pill hành động khi Agent thao tác</td>
               <td><code>busy</code>, <code>action</code>, <code>tabId</code></td>
             </tr>
             <tr>
@@ -934,16 +935,16 @@ agent-pilot batch flow.json</div>
         <div class="card">
           <div class="card-header">
             <span class="card-icon">📌</span>
-            <h3 class="card-title">Tự Động Tắt & Lưu Màu Lên Panel</h3>
+            <h3 class="card-title">Đa Định Dạng & Sao Chép 1 Chạm</h3>
           </div>
           <p class="card-desc">
-            Nhấp chuột vào điểm bất kỳ trên màn hình:
+            Nhấp chuột vào điểm bất kỳ trên màn hình để trích xuất màu sắc:
           </p>
           <ul class="features-list">
-            <li>Tự động sao chép mã HEX vào clipboard của bạn</li>
-            <li>Ghim mã màu trực tiếp lên Side Panel (HEX, RGB, HSL)</li>
-            <li>Tự động lưu vào dải màu lịch sử (Palette History Chips)</li>
-            <li><strong>Tự động tắt ngay chế độ nhặt màu</strong> để bạn tiếp tục duyệt web</li>
+            <li>Hỗ trợ trọn bộ <strong>5 chuẩn mã màu</strong>: <code>HEX</code>, <code>RGB</code>, <code>RGBA</code>, <code>HSL</code>, <code>OKLCH</code></li>
+            <li><strong>Sao chép 1 chạm (1-Click Copy)</strong>: Nhấp vào bất kỳ hàng mã màu nào hoặc biểu tượng 📋 để sao chép tức thì kèm Toast thông báo</li>
+            <li>Tự động lưu vào dải màu lịch sử (Palette History Chips) — nhấp chip màu để nạp lại cả 5 định dạng</li>
+            <li>Tự động sao chép mã HEX và <strong>tắt ngay chế độ nhặt màu</strong> để bạn tiếp tục duyệt web</li>
             <li>Nhấn phím <span class="kbd-chip">Esc</span> để hủy bất kỳ lúc nào</li>
           </ul>
         </div>

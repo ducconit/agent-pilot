@@ -1,6 +1,6 @@
 # 🏛️ Tài Liệu Kiến Trúc Kỹ Thuật (Agent Pilot)
-**Phiên bản**: v1.0.4-beta  
-**Tiêu chuẩn**: Chrome Extension Manifest V3 (MV3) & Model Context Protocol (MCP)  
+**Phiên bản**: v1.0.5-beta
+**Tiêu chuẩn**: Chrome Extension Manifest V3 (MV3) & Model Context Protocol (MCP)
 **Tác giả duy trì**: DNT ([github.com/ducconit](https://github.com/ducconit))
 
 ---
@@ -113,7 +113,7 @@ sequenceDiagram
     Note over Ext,Tab: 2. PHÂN TÍCH & BẢO VỆ PHIÊN (TAB LOCK)
     Ext->>Tab: runWithTabLock(101, "click")
     Tab->>Content: chrome.tabs.sendMessage("SET_BUSY", { busy: true, action: "AI Click" })
-    Content->>DOM: Hiển thị Shield Overlay & khóa thao tác người dùng (pointer-events: all)
+    Content->>DOM: Hiển thị Viền Màn Hình Neon & Pill Hành Động (Subtle Indicator, pointer-events: none)
 
     Note over Ext,Content: 3. THAO TÁC CHUỘT ẢO & TƯƠNG TÁC DOM
     Ext->>Content: chrome.tabs.sendMessage("simulate_click", { selector: "#submit-btn" })
@@ -126,7 +126,7 @@ sequenceDiagram
 
     Note over Ext,Tab: 4. NHẢ KHÓA & TRẢ DỮ LIỆU BẢO MẬT
     Tab->>Content: chrome.tabs.sendMessage("SET_BUSY", { busy: false })
-    Content->>DOM: Ẩn Shield Overlay & trả lại quyền cho người dùng
+    Content->>DOM: Ẩn Viền Neon & Thanh Pill Hành Động
     Ext->>Ext: sanitizeData(result) -> Quét 12 mẫu Secret / Private Key
     Ext-->>Server: WebSocket Response: { id: 42, result: { ... }, secretFilterEnabled: true }
     Server->>Server: sanitizeServerData(result) (Lớp lọc bảo mật thứ hai)

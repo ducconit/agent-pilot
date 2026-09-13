@@ -34,7 +34,7 @@
 | **Tự động Gõ chữ** | ⌨️ | Focus vào ô nhập liệu và gõ văn bản từng ký tự theo thời gian thực (Human-like Typing). |
 | **Giám sát DevTools (CDP)** | ⚡ | Kết nối cấp thấp qua Chrome DevTools Protocol để bắt trọn `console.log/error`, `Network traffic` và `Performance RAM/DOM`. |
 | **Soi & Lấy vị trí DOM** | 🎯 | Bắt dính phần tử khi hover, hiển thị kích thước `W × H`, tọa độ `(X, Y)`, trích xuất **CSS Selector** và **XPath**. |
-| **Trích xuất Mã màu** | 🎨 | Kính lúp pixel nhặt màu chính xác (HEX, RGB, HSL), tự động copy và lưu khay lịch sử màu sắc. |
+| **Trích xuất Mã màu** | 🎨 | Kính lúp pixel nhặt màu chính xác 5 định dạng (HEX, RGB, RGBA, HSL, OKLCH), 1-click copy từng định dạng và lưu khay lịch sử màu sắc. |
 | **Bộ Chụp Màn Hình** | 📸 | Hỗ trợ 3 chế độ: Chụp toàn khung nhìn, Kéo chọn vùng cắt tùy ý (Crop), và Chụp riêng phần tử DOM đã khóa. |
 | **Chú Thích & Chỉ Điểm UI** | ✏️ | Khoanh vùng, chỉ điểm phần tử/component nguồn (React/Vue/Astro:line), ghim ghi chú lỗi để giao việc cho AI Agent sửa code (hỗ trợ 3 kênh Live Push, Persistent Inbox, Clipboard Prompt). |
 | **Tương thích Antigravity** | 🤖 | Tích hợp sẵn bộ chạy kịch bản **JSON Action**, cầu nối `window.__AGENT_PILOT__` và 16 công cụ Antigravity MCP Tools. |
@@ -83,7 +83,7 @@ agent-pilot-extension/
 │   ├── content.js                      # Content Script điều phối in-page
 │   ├── content/                        # Các module tương tác DOM & Visuals
 │   │   ├── toast.js                    # Thông báo Toast HUD trên trang web
-│   │   ├── lock-shield.js              # Lớp bảo vệ Human Input Lock khi Agent thao tác
+│   │   ├── lock-shield.js              # Chỉ báo viền phát sáng & pill trạng thái khi Agent thao tác
 │   │   ├── cursor-simulator.js         # Con trỏ chuột ảo Neon & sóng ripple
 │   │   ├── dom-inspector.js            # Trích xuất thông số DOM & Element Snap
 │   │   ├── eyedropper.js               # Kính lúp phóng đại 11x11 lấy mã màu
@@ -103,6 +103,7 @@ agent-pilot-extension/
 │   ├── sidepanel.js                    # Bộ điều phối UI Side Panel (ES Module)
 │   ├── sidepanel/                      # Các module quản lý thẻ Side Panel
 │   │   ├── ui-helpers.js               # Tiện ích giao diện, toast, badge
+│   │   ├── color-utils.js              # Chuyển đổi 5 định dạng màu (HEX, RGB, RGBA, HSL, OKLCH)
 │   │   ├── agent-monitor.js            # Giám sát kết nối Agent & Secret Redaction toggle
 │   │   ├── inspector-panel.js          # Thẻ Tổng quan DOM & Kiểu dáng CSS
 │   │   ├── screenshot-panel.js         # Studio chụp ảnh & Auto-copy Clipboard
@@ -149,7 +150,7 @@ flowchart LR
 ### 1. Cài Đặt Chrome Extension
 
 #### Cách A: Cài đặt từ Bản Phát Hành (Khuyên dùng)
-1. Tải gói tiện ích mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (tệp `agent-pilot-v1.0.4-beta.zip` hoặc trong thư mục `dist/`).
+1. Tải gói tiện ích mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (tệp `agent-pilot-v1.0.5-beta.zip` hoặc trong thư mục `dist/`).
 2. Giải nén tệp `.zip` vào một thư mục cố định trên máy.
 3. Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
 4. Gạt bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải.
@@ -223,7 +224,7 @@ npx skills add https://github.com/ducconit/agent-pilot-extension -g --all
 
 #### Các Tính Năng Nổi Bật Trên Giao Diện:
 1. **🎯 Soi Phần Tử DOM (Inspector)**: Bật nút soi $\rightarrow$ rà chuột qua trang web để xem bounding box, kích thước, CSS Selector và XPath. Nhấp vào bất kỳ dòng nào để sao chép nhanh hoặc bấm **📋 Copy Tất cả**.
-2. **🎨 Kính Lúp Nhặt Mã Màu (Eyedropper)**: Phóng đại pixel 11×11 bám theo con trỏ chuột, nhặt màu chính xác (HEX, RGB, HSL) và tự động copy vào clipboard.
+2. **🎨 Kính Lúp Nhặt Mã Màu (Eyedropper)**: Phóng đại pixel 11×11 bám theo con trỏ chuột, nhặt màu chính xác 5 chuẩn hiện đại (HEX, RGB, RGBA, HSL, OKLCH), hỗ trợ 1-click copy từng dòng định dạng và lưu khay lịch sử màu sắc.
 3. **📸 Bộ Chụp Màn Hình (Screenshot Studio)**:
    - Chụp toàn màn hình, kéo khung cắt tùy chọn (Crop), hoặc chụp riêng phần tử DOM đã khóa.
    - Bật công tắc **Tự động sao chép vào Clipboard** để dán ngay lập tức mà không cần bấm lưu.
@@ -234,6 +235,9 @@ npx skills add https://github.com/ducconit/agent-pilot-extension -g --all
      - **Kênh A (Live Push)**: Đẩy trực tiếp sang cho AI Agent đang chờ.
      - **Kênh B (Shared Inbox)**: Lưu phiên vào `~/.agent-pilot/inbox/feedback/<timestamp>/`.
      - **Kênh C (Clipboard Prompt)**: 1-click tạo prompt Markdown hoàn chỉnh kèm vị trí component.
+5. **🛡️ Chỉ Báo Hoạt Động Tinh Tế (Subtle Agent Indicator)**:
+   - Khi AI Agent thao tác, giao diện hiển thị viền màn hình phát sáng neon nhẹ nhàng và thanh trạng thái nhỏ gọn (floating pill) hiển thị hành động đang thực thi.
+   - Trang bị nút `[ 🔓 Chiếm quyền ]` và lắng nghe phím <kbd>Esc</kbd> để người dùng mở khóa tức thì mà không làm mờ trang web hay cản trở tầm nhìn.
 
 ---
 

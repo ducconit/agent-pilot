@@ -7,7 +7,7 @@ Chào mừng bạn đến với **Agent Pilot**! Sổ tay này hướng dẫn ch
 ## 1. Hướng Dẫn Cài Đặt Lên Google Chrome
 
 ### Cách A: Cài Đặt Từ Bản Phát Hành ZIP (Khuyên dùng)
-1. Tải bản phát hành mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (ví dụ `agent-pilot-v1.0.4-beta.zip`).
+1. Tải bản phát hành mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (ví dụ `agent-pilot-v1.0.5-beta.zip`).
 2. Giải nén tệp `.zip` ra một thư mục cố định trên máy tính của bạn.
 3. Mở Google Chrome, truy cập: `chrome://extensions`.
 4. Bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải màn hình.
@@ -57,6 +57,7 @@ Chuyển sang tab **🤖 AI Agent** trên Side Panel:
   - Hover vào icon **`?`** để xem nhanh mô tả bảo vệ.
   - Khi người dùng gạt tắt công tắc, hộp thoại cảnh báo bảo mật sẽ xuất hiện yêu cầu xác nhận rủi ro nhà cung cấp mô hình LLM có thể thu thập thông tin.
 - **Nhật ký Lệnh Thời gian thực (Live Action Stream)**: Hiển thị thời gian thực luồng lệnh Agent gửi đến (`moveMouse`, `click`, `type`, `run_actions`...) kèm nút sao chép toàn bộ nhật ký (📋) và nút xóa nhật ký (🗑️).
+- **Chỉ Báo Hoạt Động Tinh Tế (Subtle Indicator)**: Khi AI Agent thao tác, trang web hiển thị viền neon phát sáng nhẹ nhàng và thanh trạng thái nhỏ gọn (floating pill) hiển thị hành động đang chạy kèm nút `[ 🔓 Chiếm quyền ]` và phím <kbd>Esc</kbd> để mở khóa tức thì, không làm mờ trang web hay cản trở tầm nhìn của người dùng.
 - **Tự kiểm tra hệ thống (Self-Test)**: Nhấp nút **🧪 Tự kiểm tra hệ thống** để kiểm tra tự động 3 bước:
   1. Quyền truy cập tab web hiện tại.
   2. Khả năng nạp Content Script và kích hoạt API Chuột ảo.
@@ -76,7 +77,7 @@ Chuyển sang tab **🎯 Inspector & Màu**:
 1. Nhấp nút **Bật Soi Phần tử**: Di chuyển con trỏ chuột thật qua trang web, khung bao sáng màu cyan tự động bắt dính vào từng phần tử kèm thẻ thông số hiển thị Tag name, kích thước `W x H`.
 2. **Click để chọn phần tử**: Ngay khi bạn click chọn phần tử, chế độ soi sẽ **tự động tắt ngay lập tức** để trả lại trạng thái tương tác tự nhiên cho trang web.
 3. Bảng điều khiển Side Panel chia làm 2 thẻ phụ (Subtabs) trực quan:
-   - **📌 Tổng quan**: Hiển thị Tag Name, Tọa độ `X, Y`, Kích thước `W × H`, chuỗi **CSS Selector** và biểu thức **XPath** (nhấp để sao chép nhanh).
+   - **📌 Tổng quan**: Hiển thị Tag Name, Tọa độ `X, Y`, Kích thước `W × H`, chuỗi **CSS Selector**, biểu thức **XPath**, Nội dung (Text) và Giá trị (Value). Nhấp vào bất kỳ dòng nào để sao chép nhanh hoặc bấm **📋 Copy Tất cả** để trích xuất toàn bộ metadata.
    - **🎨 Kiểu dáng CSS**: Hiển thị toàn bộ thông số CSS tính toán (Computed CSS) mà phần tử đang chịu (Typography, Layout, Dimensions, Spacing, Visuals, Flexbox, Grid...), tích hợp thanh tìm kiếm CSS thời gian thực và nút **Sao chép tất cả CSS**.
 
 ---
@@ -85,8 +86,9 @@ Chuyển sang tab **🎯 Inspector & Màu**:
 1. Nhấp nút **🎨 Lấy mã màu** trên Side Panel hoặc Popup.
 2. Một **vùng kính lúp phóng đại 11x11 pixel** cực nét sẽ xuất hiện và bám theo đầu con trỏ chuột, hiển thị rõ ràng từng điểm ảnh cùng tâm ngắm kép và bảng mã màu trực tiếp quanh chuột.
 3. Nhấp chuột trái vào điểm màu bạn chọn:
-   - Mã màu **HEX** tự động copy vào bộ nhớ đệm (clipboard).
-   - Bảng mã màu được **cố định ngay trên Side Panel** (hiển thị HEX, RGB, HSL và khay lịch sử màu).
+   - Hỗ trợ đầy đủ **5 chuẩn mã màu hiện đại**: `HEX`, `RGB`, `RGBA`, `HSL`, `OKLCH`.
+   - **Sao chép 1 chạm (1-Click Copy)**: Nhấp vào bất kỳ dòng mã màu nào hoặc biểu tượng 📋 để sao chép ngay giá trị mong muốn kèm Toast thông báo.
+   - Tự động sao chép mã **HEX** mặc định vào clipboard và lưu vào khay dải màu lịch sử (Palette History Chips). Nhấp vào bất kỳ chip màu nào để xem lại cả 5 format và sao chép.
    - Chế độ lấy mã màu **tự động tắt ngay lập tức** (hoặc nhấn phím `Esc` để hủy bất kỳ lúc nào).
 
 ---

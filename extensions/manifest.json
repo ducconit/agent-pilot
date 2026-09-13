@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Agent Pilot (Beta) - AI Browser Controller",
-  "version": "1.0.4",
-  "version_name": "1.0.4-beta",
+  "version": "1.0.5",
+  "version_name": "1.0.5-beta",
   "description": "Universal AI Agent Browser Controller with Virtual Mouse, DevTools Inspector (CDP), Element Inspector, Color Picker & Screenshot Suite. Antigravity-First (Public Beta).",
   "author": "DNT (https://github.com/ducconit)",
   "icons": {

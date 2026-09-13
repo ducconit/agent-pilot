@@ -136,10 +136,10 @@ Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/c
 7. `browser_get_element(selector)`: Trích xuất Bounding Box, kích thước, CSS selector và XPath của phần tử DOM.
 8. `browser_screenshot(mode, tabId)`: Chụp ảnh màn hình (hỗ trợ chụp cả tab ngầm trong background mà không cần focus màn hình).
 9. `browser_get_devtools_data(tabId, type, limit, clear)`: Lấy toàn bộ Console logs, Network requests và Performance metrics (JS Heap, DOM Nodes) thời gian thực qua CDP.
-10. `browser_pick_color(x, y)`: Trích xuất mã màu pixel tại vị trí chỉ định.
+10. `browser_pick_color(x, y)`: Trích xuất mã màu pixel tại vị trí chỉ định (trả về 5 định dạng: HEX, RGB, RGBA, HSL, OKLCH).
 11. `browser_list_instances()`: Liệt kê các phiên bản trình duyệt Chrome đang kết nối đến hệ thống.
 12. `browser_select_instance(instanceId)`: Lựa chọn điều khiển một trình duyệt cụ thể trong môi trường đa trình duyệt.
-13. `browser_set_busy(isBusy, message)`: Khóa hoặc mở khóa màn hình Human Input Shield khi Agent thực thi thao tác phức tạp.
+13. `browser_set_busy(busy, action)`: Hiển thị viền màn hình sáng tinh tế và thanh trạng thái nổi (floating pill) kèm nút mở khóa khi Agent thực thi thao tác phức tạp.
 14. `browser_run_actions(actions, tabId, stopOnError)`: Bộ máy gom cụm thực thi hàng loạt hành động trong 1 lệnh duy nhất (Batch Execution Engine), giảm 80%+ độ trễ và số token tiêu thụ.
 15. `browser_get_pending_feedback(limit, sessionId, clear)`: Truy vấn danh sách phiên phản hồi UI do người dùng tạo từ Feedback Studio lưu trong hộp thư máy chủ cục bộ.
 16. `browser_wait_for_feedback(timeout, tabId)`: Chế độ chờ phản hồi trực tiếp (Channel A Reactive Long-Polling), phản hồi ngay khi người dùng nhấn 'Gửi Agent'.
@@ -164,9 +164,9 @@ await window.__AGENT_PILOT__.type("#username-field", "admin@antigravity.ai");
 const info = window.__AGENT_PILOT__.getElement("#submit-button");
 console.log("Vị trí phần tử:", info.rect); // { x: 500, y: 300, width: 120, height: 40 }
 
-// Nhặt màu trên màn hình
+// Nhặt màu trên màn hình (hỗ trợ 5 định dạng)
 const color = await window.__AGENT_PILOT__.pickColor();
-console.log("Mã màu đã nhặt:", color.hex);
+console.log("Mã màu đã nhặt:", color.hex, color.rgb, color.rgba, color.hsl, color.oklch);
 ```
 
 ---

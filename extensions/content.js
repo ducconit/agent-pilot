@@ -56,7 +56,7 @@
 
   const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
     ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
-    : "1.0.4-beta";
+    : "1.0.5-beta";
 
   // =========================================================================
   // Antigravity-First Global Bridge API (`window.__AGENT_PILOT__`)

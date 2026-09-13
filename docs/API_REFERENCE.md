@@ -55,7 +55,8 @@ Các lệnh được gửi qua `chrome.tabs.sendMessage(tabId, { action: "...", 
 | `toggle_inspector` | `enabled: boolean` | `{ success: true, active }` | Bật hoặc tắt chế độ thanh tra phần tử DOM |
 | `get_element_info` | `selector?: string` | `{ success: boolean, details }` | Lấy chi tiết thông số tọa độ, selector, xpath |
 | `start_region_crop`| Không | `{ success: true }` | Bật lớp phủ kéo thả chữ nhật để chọn vùng chụp |
-| `pick_color` | Không | `{ success: boolean, color: {hex, rgb, hsl} }` | Mở công cụ lấy màu pixel trên màn hình |
+| `pick_color` | Không | `{ success: boolean, color: {hex, rgb, rgba, hsl, oklch} }` | Mở công cụ lấy màu pixel trên màn hình với 5 định dạng |
+| `set_busy` | `busy: boolean, action?: string` | `{ success: boolean }` | Bật/tắt viền phát sáng và pill trạng thái hoạt động của Agent |
 
 ---
 
@@ -69,8 +70,9 @@ Service Worker và Content Script phát sóng các sự kiện sau tới Side Pa
 | `DEVTOOLS_CONSOLE_EVENT` | `{ tabId: number, entry: { type, text, timestamp } }` | Đẩy console log mới xuất hiện |
 | `DEVTOOLS_NETWORK_EVENT` | `{ tabId: number, request: { id, url, method, status } }` | Cập nhật tiến trình của network request |
 | `ELEMENT_SELECTED` | `{ details: ElementDetailsObject }` | Người dùng đã click chọn một phần tử khi soi |
-| `COLOR_PICKED` | `{ color: { hex, rgb, hsl, timestamp } }` | Người dùng đã nhặt được một mã màu mới |
+| `COLOR_PICKED` | `{ color: { hex, rgb, rgba, hsl, oklch, timestamp } }` | Người dùng đã nhặt được một mã màu mới (5 định dạng) |
 | `REGION_CROP_REQUESTED` | `{ clip: { x, y, width, height } }` | Người dùng đã kéo chọn xong vùng cần chụp |
+| `FEEDBACK_ITEMS_UPDATED` | `{ items: FeedbackItem[] }` | Đồng bộ danh sách chú thích UI giữa Web Page và Side Panel |
 
 ---
 
@@ -89,7 +91,7 @@ interface AgentPilotBridge {
   getElement(selector: string): ElementDetails | null;
   getLockedElement(): ElementDetails | null;
   startRegionCrop(): void;
-  pickColor(): Promise<{ hex: string, rgb: string, hsl: string } | null>;
+  pickColor(): Promise<{ hex: string, rgb: string, rgba: string, hsl: string, oklch: string } | null>;
   getCursorPosition(): { x: number, y: number };
 }
 ```

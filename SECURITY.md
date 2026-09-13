@@ -10,7 +10,7 @@ Chúng tôi cung cấp các bản vá bảo mật cho các phiên bản sau:
 
 | Phiên Bản | Trạng Thái | Hỗ Trợ Bảo Mật |
 | :--- | :---: | :---: |
-| **`v1.0.4-beta`** | **Bản Beta Hiện Tại** | ✅ Có hỗ trợ tích cực |
+| **`v1.0.5-beta`** | **Bản Beta Hiện Tại** | ✅ Có hỗ trợ tích cực |
 | `< 1.0.0` | Thử nghiệm nội bộ | ❌ Không hỗ trợ |
 
 ---
@@ -26,8 +26,8 @@ Chúng tôi cung cấp các bản vá bảo mật cho các phiên bản sau:
 2. **Cô Lập Mạng Cục Bộ Loopback (Port 58765)**:
    - Máy chủ cầu nối chỉ lắng nghe trên giao diện cục bộ loopback `127.0.0.1`.
    - Vô hiệu hóa CORS ngoại lai, bảo vệ máy chủ HTTP REST khỏi các truy vấn từ web page độc hại bên ngoài.
-3. **Lớp Chắn Bảo Vệ Thao Tác Con Người (Human Input Shield)**:
-   - Khi Agent thực thi kịch bản, lớp màn chắn bảo vệ sẽ tạm thời chặn các sự kiện chuột/phím người dùng để tránh xung đột hành vi, đồng thời trang bị nút **Mở khóa khẩn cấp (Emergency Unlock)** để người dùng luôn nắm quyền kiểm soát tối cao.
+3. **Lớp Chắn Bảo Vệ Thao Tác Con Người (Human Input Shield & Indicator)**:
+   - Khi Agent thực thi kịch bản, hệ thống hiển thị viền màn hình phát sáng neon nhẹ nhàng và thanh trạng thái nhỏ gọn (floating pill) thông báo hành động, đồng thời trang bị nút **Mở khóa khẩn cấp (Emergency Unlock)** và phím <kbd>Esc</kbd> để người dùng luôn nắm quyền kiểm soát tối cao bất kỳ lúc nào.
 
 ---
 
