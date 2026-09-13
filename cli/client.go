@@ -11,7 +11,7 @@ import (
 )
 
 // DispatchCommand routes the command either via local in-memory bridge or forwarder HTTP
-func DispatchCommand(method string, params map[string]interface{}, port int) (map[string]interface{}, error) {
+func DispatchCommand(method string, params map[string]interface{}, port int) (interface{}, error) {
 	if port <= 0 {
 		port = DefaultPort
 	}
@@ -120,7 +120,8 @@ func ExecScreenshot(mode, selector, outputPath string, tabID interface{}) error 
 		return err
 	}
 
-	dataURL, _ := res["dataUrl"].(string)
+	resMap, _ := res.(map[string]interface{})
+	dataURL, _ := resMap["dataUrl"].(string)
 	if dataURL == "" {
 		return fmt.Errorf("no screenshot dataUrl returned")
 	}
@@ -160,8 +161,9 @@ func ExecInspect(selector string, tabID interface{}) error {
 	if err != nil {
 		return err
 	}
+	resMap, _ := res.(map[string]interface{})
 	fmt.Printf("🎯 Element details for '%s':\n", selector)
-	for k, v := range res {
+	for k, v := range resMap {
 		fmt.Printf("  - %s: %v\n", k, v)
 	}
 	return nil
@@ -173,7 +175,15 @@ func ExecListTabs() error {
 		return err
 	}
 	fmt.Printf("📑 Open Tabs:\n")
-	if tabs, ok := res["value"].([]interface{}); ok {
+	var tabs []interface{}
+	if tSlice, ok := res.([]interface{}); ok {
+		tabs = tSlice
+	} else if resMap, ok := res.(map[string]interface{}); ok {
+		if tSlice, ok := resMap["value"].([]interface{}); ok {
+			tabs = tSlice
+		}
+	}
+	if len(tabs) > 0 {
 		for i, t := range tabs {
 			if tm, ok := t.(map[string]interface{}); ok {
 				activeTag := ""

@@ -115,14 +115,14 @@ Thêm cấu hình sau vào Antigravity để AI Agent tự động sở hữu to
 {
   "mcpServers": {
     "agent-pilot": {
-      "command": "node",
-      "args": ["/home/ubuntu/workspace/projects/browser-control/scripts/agent_pilot_server.mjs", "--mcp"]
+      "command": "/home/ubuntu/.agk/bin/agent-pilot",
+      "args": ["mcp"]
     }
   }
 }
 ```
 
-### 3.3. Danh mục 14 Công cụ MCP Cung Cấp Cho AI Agent:
+### 3.3. Danh mục 16 Công cụ MCP Cung Cấp Cho AI Agent:
 1. `browser_open_tab(url, active)`: Mở tab trình duyệt mới (mặc định mở nền không cướp focus của người dùng, tự động phân nhóm Chrome Tab Group).
 2. `browser_list_tabs()`: Liệt kê toàn bộ các tab trình duyệt kèm trạng thái tab do Agent quản lý.
 3. `browser_navigate(url, tabId)`: Điều hướng tab đang hoạt động hoặc tab chỉ định.
@@ -137,6 +137,8 @@ Thêm cấu hình sau vào Antigravity để AI Agent tự động sở hữu to
 12. `browser_select_instance(instanceId)`: Lựa chọn điều khiển một trình duyệt cụ thể trong môi trường đa trình duyệt.
 13. `browser_set_busy(isBusy, message)`: Khóa hoặc mở khóa màn hình Human Input Shield khi Agent thực thi thao tác phức tạp.
 14. `browser_run_actions(actions, tabId, stopOnError)`: Bộ máy gom cụm thực thi hàng loạt hành động trong 1 lệnh duy nhất (Batch Execution Engine), giảm 80%+ độ trễ và số token tiêu thụ.
+15. `browser_get_pending_feedback(limit, sessionId, clear)`: Truy vấn danh sách phiên phản hồi UI do người dùng tạo từ Feedback Studio lưu trong hộp thư máy chủ cục bộ.
+16. `browser_wait_for_feedback(timeout, tabId)`: Chế độ chờ phản hồi trực tiếp (Channel A Reactive Long-Polling), phản hồi ngay khi người dùng nhấn 'Gửi Agent'.
 
 ---
 

@@ -69,7 +69,7 @@ async function run() {
   let isLiveServer = false;
   try {
     const health = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/health`, { signal: AbortSignal.timeout(1000) }).then(r => r.json());
-    if (health && health.name === "Agent Pilot Bridge Server") {
+    if (health && (health.name === "Agent Pilot Bridge Server" || health.name === "Agent Pilot Go Bridge Server")) {
       isLiveServer = true;
       console.log(`[Bridge Server] Using active live Agent Pilot Bridge Server on port ${BRIDGE_PORT}`);
     }
@@ -651,8 +651,8 @@ async function run() {
       ]
     };
 
-    let saveResp;
-    let pendingResp;
+    let saveResp = null;
+    let pendingResp = null;
     try {
       saveResp = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api/feedback/save`, {
         method: "POST",
@@ -662,24 +662,21 @@ async function run() {
       pendingResp = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api/feedback/pending?sessionId=${testFeedbackPayload.timestamp}`, {
         headers: { "Content-Type": "application/json" }
       }).then(r => r.json());
-    } catch (_) {}
-
-    if (!saveResp || !saveResp.success) {
-      const serverModule = await import("./agent_pilot_server.mjs");
-      saveResp = serverModule.saveFeedbackSession(testFeedbackPayload);
-      pendingResp = serverModule.getPendingFeedback({ sessionId: testFeedbackPayload.timestamp });
+    } catch (e) {
+      console.error("Feedback fetch error:", e);
     }
 
-    const isChannelBVerified = Boolean(saveResp?.sessionId) &&
-                              saveResp?.sessionId === String(testFeedbackPayload.timestamp) &&
-                              (pendingResp?.success === true || Array.isArray(pendingResp?.sessions)) &&
-                              pendingResp?.sessions?.length >= 1;
-    record("28. Visual UI Feedback (Channel B - Shared Inbox)", isChannelBVerified, `Saved session ${saveResp?.sessionId} with 1 item; retrieved from pending inbox`);
+    const savedSessionId = String(saveResp?.result?.sessionId || saveResp?.sessionId || "");
+    const sessionsList = Array.isArray(pendingResp?.sessions) ? pendingResp.sessions : (pendingResp?.result?.sessions || []);
+    const isChannelBVerified = Boolean(savedSessionId) &&
+                              savedSessionId === String(testFeedbackPayload.timestamp) &&
+                              (pendingResp?.success === true || pendingResp?.result?.success === true || Array.isArray(sessionsList)) &&
+                              sessionsList.length >= 1;
+    record("28. Visual UI Feedback (Channel B - Shared Inbox)", isChannelBVerified, `Saved session ${savedSessionId} with 1 item; retrieved from pending inbox`);
 
     // 29. Visual UI Feedback (Channel A - Live Reactive Long-Polling)
     let waitResolvedLive = false;
     let waitDataLive = null;
-    const { waitForFeedback, saveFeedbackSession } = await import("./agent_pilot_server.mjs");
 
     const livePushPayload = {
       timestamp: Date.now() + 50,
@@ -696,20 +693,32 @@ async function run() {
       ]
     };
 
-    const waitPromise = waitForFeedback({ timeout: 5 }).then(res => {
+    const waitPromise = fetch(`http://127.0.0.1:${BRIDGE_PORT}/api/feedback/wait`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ timeout: 5 })
+    }).then(r => r.json()).then(res => {
       waitResolvedLive = true;
-      waitDataLive = res;
+      waitDataLive = res?.result || res;
+    }).catch(e => {
+      console.error("Wait feedback error:", e);
     });
 
-    setTimeout(() => {
-      saveFeedbackSession(livePushPayload);
+    setTimeout(async () => {
+      try {
+        await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api/feedback/save`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(livePushPayload)
+        });
+      } catch (_) {}
     }, 100);
 
     await waitPromise;
     const isChannelAVerified = waitResolvedLive &&
                               waitDataLive?.success === true &&
                               waitDataLive?.channel === "reactive_channel_a" &&
-                              waitDataLive?.sessionId === String(livePushPayload.timestamp);
+                              String(waitDataLive?.sessionId) === String(livePushPayload.timestamp);
     record("29. Visual UI Feedback (Channel A - Reactive Long-Polling)", isChannelAVerified, `Long-poll resolved instantaneously upon submission (Session: ${waitDataLive?.sessionId})`);
 
 

@@ -1,17 +1,30 @@
 {
-  "name": "browser_wait_for_feedback",
-  "description": "Wait reactively for human visual feedback (Channel A). Long-polls until the user submits feedback via Feedback Studio in the browser, or until timeout. Returns component source files, element selectors, user notes, and screenshots immediately upon submission.",
-  "parameters": {
-    "type": "object",
+  "description": "Channel A: Reactively pause agent execution until human user submits visual UI feedback.",
+  "inputSchema": {
     "properties": {
-      "timeout": {
-        "type": "integer",
-        "description": "Maximum seconds to wait for user feedback (default 120, min 5, max 600)"
-      },
       "tabId": {
-        "type": "integer",
-        "description": "Optional specific browser Tab ID to expect feedback from"
+        "description": "Optional tab ID filter",
+        "type": "integer"
+      },
+      "timeout": {
+        "description": "Timeout in seconds (default: 120)",
+        "type": "integer"
       }
-    }
+    },
+    "type": "object"
+  },
+  "name": "browser_wait_for_feedback",
+  "parameters": {
+    "properties": {
+      "tabId": {
+        "description": "Optional tab ID filter",
+        "type": "integer"
+      },
+      "timeout": {
+        "description": "Timeout in seconds (default: 120)",
+        "type": "integer"
+      }
+    },
+    "type": "object"
   }
 }

@@ -245,6 +245,17 @@ func main() {
 			fmt.Println(string(jsonB))
 		}
 
+	case "export-mcp":
+		outDir := "mcp/agent-pilot"
+		if len(os.Args) > 2 {
+			outDir = os.Args[2]
+		}
+		if err := ExportMCPSchemas(outDir); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Lỗi xuất schema MCP: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ Đã xuất 16 tool schemas MCP thành công vào: %s\n", outDir)
+
 	case "--help", "-h", "help":
 		printUsage()
 

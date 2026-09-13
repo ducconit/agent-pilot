@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -63,11 +64,34 @@ func GetFeedbackStorageDir() string {
 func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}, error) {
 	ts := fmt.Sprintf("%d", time.Now().UnixMilli())
 	if tVal, ok := payload["timestamp"]; ok && tVal != nil {
-		ts = fmt.Sprintf("%v", tVal)
+		switch v := tVal.(type) {
+		case float64:
+			ts = fmt.Sprintf("%.0f", v)
+		case int64:
+			ts = fmt.Sprintf("%d", v)
+		case int:
+			ts = fmt.Sprintf("%d", v)
+		case string:
+			ts = v
+		default:
+			ts = fmt.Sprintf("%v", tVal)
+		}
+	}
+
+	// Security: Sanitize timestamp against path traversal attacks (e.g. "../../../evil")
+	ts = filepath.Base(filepath.Clean(ts))
+	if ts == "." || ts == "/" || ts == "\\" || ts == "" || strings.Contains(ts, "..") {
+		ts = fmt.Sprintf("%d", time.Now().UnixMilli())
 	}
 
 	storageDir := GetFeedbackStorageDir()
 	sessionDir := filepath.Join(storageDir, ts)
+	rel, err := filepath.Rel(storageDir, sessionDir)
+	if err != nil || strings.HasPrefix(rel, "..") || rel == "." {
+		ts = fmt.Sprintf("%d", time.Now().UnixMilli())
+		sessionDir = filepath.Join(storageDir, ts)
+	}
+
 	if err := os.MkdirAll(sessionDir, 0755); err != nil {
 		return nil, err
 	}
@@ -271,7 +295,7 @@ func GetPendingFeedback(limit int, sessionID string, clear bool) (map[string]int
 		}
 	}
 
-	var sessions []map[string]interface{}
+	sessions := make([]map[string]interface{}, 0)
 	archiveDir := filepath.Join(filepath.Dir(storageDir), "feedback_archive")
 
 	for _, id := range targetIDs {
@@ -305,7 +329,7 @@ func GetPendingFeedback(limit int, sessionID string, clear bool) (map[string]int
 	}, nil
 }
 
-func WaitForFeedback(timeoutSec int, tabID interface{}) map[string]interface{} {
+func WaitForFeedbackWithContext(ctx context.Context, timeoutSec int, tabID interface{}) map[string]interface{} {
 	if timeoutSec <= 0 {
 		timeoutSec = 120
 	}
@@ -313,6 +337,7 @@ func WaitForFeedback(timeoutSec int, tabID interface{}) map[string]interface{} {
 	ch := make(chan map[string]interface{}, 1)
 
 	timer := time.NewTimer(time.Duration(timeoutSec) * time.Second)
+	defer timer.Stop()
 
 	waiter := &FeedbackWaiter{
 		ID:      waiterID,
@@ -325,10 +350,7 @@ func WaitForFeedback(timeoutSec int, tabID interface{}) map[string]interface{} {
 	pendingWaiters = append(pendingWaiters, waiter)
 	waitersLock.Unlock()
 
-	select {
-	case res := <-ch:
-		return res
-	case <-timer.C:
+	removeWaiter := func() {
 		waitersLock.Lock()
 		var rem []*FeedbackWaiter
 		for _, w := range pendingWaiters {
@@ -338,13 +360,33 @@ func WaitForFeedback(timeoutSec int, tabID interface{}) map[string]interface{} {
 		}
 		pendingWaiters = rem
 		waitersLock.Unlock()
+	}
 
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	select {
+	case res := <-ch:
+		return res
+	case <-ctx.Done():
+		removeWaiter()
+		return map[string]interface{}{
+			"success": false,
+			"error":   "Request canceled by client",
+		}
+	case <-timer.C:
+		removeWaiter()
 		return map[string]interface{}{
 			"success": false,
 			"timeout": true,
 			"message": fmt.Sprintf("Timed out waiting for feedback after %ds", timeoutSec),
 		}
 	}
+}
+
+func WaitForFeedback(timeoutSec int, tabID interface{}) map[string]interface{} {
+	return WaitForFeedbackWithContext(context.Background(), timeoutSec, tabID)
 }
 
 func CheckAndNotifyFeedbackWaiters(data map[string]interface{}) {

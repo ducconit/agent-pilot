@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 type JSONRPCRequest struct {
@@ -410,4 +411,29 @@ func sendMCPResponse(id interface{}, result interface{}, rpcErr interface{}) {
 	bytes, _ := json.Marshal(resp)
 	os.Stdout.Write(bytes)
 	os.Stdout.Write([]byte("\n"))
+}
+
+// ExportMCPSchemas writes each MCP tool schema to a JSON file in the target directory
+func ExportMCPSchemas(outDir string) error {
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", outDir, err)
+	}
+
+	for _, tool := range mcpTools {
+		schema := map[string]interface{}{
+			"name":        tool.Name,
+			"description": tool.Description,
+			"parameters":  tool.InputSchema,
+			"inputSchema": tool.InputSchema,
+		}
+		data, err := json.MarshalIndent(schema, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal tool %s: %w", tool.Name, err)
+		}
+		targetFile := filepath.Join(outDir, tool.Name+".json")
+		if err := os.WriteFile(targetFile, data, 0644); err != nil {
+			return fmt.Errorf("failed to write schema file %s: %w", targetFile, err)
+		}
+	}
+	return nil
 }

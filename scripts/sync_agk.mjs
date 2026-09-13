@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Agent Pilot - Cross-Platform AGK Plugin Synchronization
- * Safely synchronizes scripts/agent_pilot_server.mjs to ~/.agk across Windows, macOS, and Linux.
+ * Safely synchronizes cli/agent-pilot binary and skill/MCP assets to ~/.agk across Windows, macOS, and Linux.
  */
 
 import fs from "node:fs";
@@ -16,35 +16,24 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 
 const homeDir = os.homedir();
 const agkDir = path.join(homeDir, ".agk");
-const serverSource = path.join(ROOT_DIR, "scripts", "agent_pilot_server.mjs");
 
 if (!fs.existsSync(agkDir)) {
   console.log("ℹ️ .agk directory not found in user home. Skipping local AGK plugin synchronization.");
   process.exit(0);
 }
 
-if (!fs.existsSync(serverSource)) {
-  console.error(`❌ Source server file not found: ${serverSource}`);
-  process.exit(1);
-}
-
-const targetDir = path.join(agkDir, "scripts", "agent-pilot");
-const targetServer = path.join(targetDir, "server.mjs");
-
-try {
-  fs.mkdirSync(targetDir, { recursive: true });
-  fs.copyFileSync(serverSource, targetServer);
-  console.log(`✓ Synchronized agent_pilot_server.mjs -> ${targetServer}`);
-
-  const geminiPluginDir = path.join(homeDir, ".gemini", "config", "plugins", "agk", "scripts", "agent-pilot");
-  if (fs.existsSync(path.dirname(geminiPluginDir))) {
-    fs.mkdirSync(geminiPluginDir, { recursive: true });
-    fs.copyFileSync(serverSource, path.join(geminiPluginDir, "server.mjs"));
-    console.log(`✓ Synchronized agent_pilot_server.mjs -> ${path.join(geminiPluginDir, "server.mjs")}`);
+// 1. Clean up legacy JS bridge server files if present
+const staleServerFiles = [
+  path.join(agkDir, "scripts", "agent-pilot", "server.mjs"),
+  path.join(homeDir, ".gemini", "config", "plugins", "agk", "scripts", "agent-pilot", "server.mjs")
+];
+for (const stale of staleServerFiles) {
+  if (fs.existsSync(stale)) {
+    try {
+      fs.unlinkSync(stale);
+      console.log(`✓ Removed stale JS bridge server: ${stale}`);
+    } catch (_) {}
   }
-} catch (err) {
-  console.error("❌ Error copying server.mjs:", err.message);
-  process.exit(1);
 }
 
 // Synchronize skills/agent-pilot/SKILL.md
@@ -76,11 +65,34 @@ if (fs.existsSync(binarySource)) {
     const agkBinDir = path.join(agkDir, "bin");
     fs.mkdirSync(agkBinDir, { recursive: true });
     const targetBin = path.join(agkBinDir, path.basename(binarySource));
-    fs.copyFileSync(binarySource, targetBin);
+    const tmpBin = `${targetBin}.tmp.${Date.now()}`;
+    fs.copyFileSync(binarySource, tmpBin);
     if (process.platform !== "win32") {
-      fs.chmodSync(targetBin, 0o755);
+      fs.chmodSync(tmpBin, 0o755);
+    }
+    try {
+      fs.renameSync(tmpBin, targetBin);
+    } catch (_) {
+      try { fs.unlinkSync(tmpBin); } catch (_) {}
     }
     console.log(`✓ Synchronized agent-pilot binary -> ${targetBin}`);
+
+    const geminiBinDir = path.join(homeDir, ".gemini", "config", "plugins", "agk", "bin");
+    if (fs.existsSync(path.dirname(geminiBinDir))) {
+      fs.mkdirSync(geminiBinDir, { recursive: true });
+      const geminiBin = path.join(geminiBinDir, path.basename(binarySource));
+      const tmpGeminiBin = `${geminiBin}.tmp.${Date.now()}`;
+      fs.copyFileSync(binarySource, tmpGeminiBin);
+      if (process.platform !== "win32") {
+        fs.chmodSync(tmpGeminiBin, 0o755);
+      }
+      try {
+        fs.renameSync(tmpGeminiBin, geminiBin);
+      } catch (_) {
+        try { fs.unlinkSync(tmpGeminiBin); } catch (_) {}
+      }
+      console.log(`✓ Synchronized agent-pilot binary -> ${geminiBin}`);
+    }
   } catch (err) {
     console.warn("⚠️ Note: Could not copy agent-pilot binary to AGK bin:", err.message);
   }
@@ -89,7 +101,6 @@ if (fs.existsSync(binarySource)) {
 // On Unix-like environments (Linux, macOS), set executable permissions and build plugin
 if (process.platform !== "win32") {
   try {
-    fs.chmodSync(targetServer, 0o755);
     const buildScript = path.join(agkDir, "build", "build.sh");
     const installScript = path.join(agkDir, "scripts", "install.sh");
 

@@ -111,9 +111,14 @@ agent-pilot-extension/
 │   ├── popup.js                        # Xử lý sự kiện popup
 │   ├── popup.css
 │   └── icons/                          # Bộ icon nhận diện chuẩn các kích thước
+├── cli/                                # Công cụ Golang Standalone CLI & MCP Server
+│   ├── main.go                         # Điểm vào CLI & bộ định tuyến subcommand
+│   ├── mcp.go                          # Máy chủ MCP Stdio JSON-RPC & trích xuất Schema
+│   ├── bridge.go                       # WebSocket Bridge & HTTP REST API Gateway
+│   ├── commands.go                     # Xử lý lệnh trực tiếp click, type, screenshot, v.v.
+│   └── feedback.go                     # Quản lý lưu trữ & reactive wait feedback
 ├── mcp/agent-pilot/                    # 16 tệp lược đồ chuẩn Single Source of Truth (SSOT)
 ├── scripts/                            # Bộ công cụ build, test, pack & sync cross-platform
-│   ├── agent_pilot_server.mjs          # Máy chủ cầu nối WebSocket & MCP Bridge Server
 │   ├── browser_resolver.mjs            # Tự động tìm kiếm Chrome/Chromium/Edge/Brave đa nền tảng
 │   ├── export_mcp_schemas.mjs          # Trích xuất schema MCP tự động
 │   ├── pack_extension.mjs              # Đóng gói tiện ích ra file ZIP release

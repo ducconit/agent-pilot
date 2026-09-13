@@ -1,22 +1,38 @@
 {
-  "name": "browser_set_busy",
-  "description": "Lock or unlock human interactions on a browser tab with a sleek ChatGPT Operator-style overlay banner while the agent is executing workflows",
-  "parameters": {
-    "type": "object",
+  "description": "Display or dismiss the human input lock shield during automated tasks.",
+  "inputSchema": {
     "properties": {
-      "tabId": {
-        "type": "integer",
-        "description": "Optional target Tab ID"
+      "action": {
+        "description": "Action name shown to user",
+        "type": "string"
       },
       "busy": {
-        "type": "boolean",
-        "description": "True to lock user input, false to unlock",
-        "default": true
+        "description": "Enable or disable lock shield",
+        "type": "boolean"
       },
-      "action": {
-        "type": "string",
-        "description": "Optional description of the active action to display on the banner"
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
       }
-    }
+    },
+    "type": "object"
+  },
+  "name": "browser_set_busy",
+  "parameters": {
+    "properties": {
+      "action": {
+        "description": "Action name shown to user",
+        "type": "string"
+      },
+      "busy": {
+        "description": "Enable or disable lock shield",
+        "type": "boolean"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
   }
 }

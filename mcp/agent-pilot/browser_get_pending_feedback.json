@@ -1,21 +1,38 @@
 {
-  "name": "browser_get_pending_feedback",
-  "description": "Retrieve pending human visual UI feedback sessions saved in ~/.agent-pilot/inbox/feedback/<timestamp>/* (Channel B). Reads annotated component source files, CSS selectors, user notes, and screenshots recorded by human users.",
-  "parameters": {
-    "type": "object",
+  "description": "Channel B: Retrieve pending human visual UI feedback sessions stored in ~/.agent-pilot/inbox/feedback/.",
+  "inputSchema": {
     "properties": {
-      "sessionId": {
-        "type": "string",
-        "description": "Optional specific feedback session ID (timestamp). If omitted, returns latest sessions."
+      "clear": {
+        "description": "Archive sessions after reading",
+        "type": "boolean"
       },
       "limit": {
-        "type": "integer",
-        "description": "Maximum number of feedback sessions to retrieve (default: 5)"
+        "description": "Max sessions to return",
+        "type": "integer"
       },
-      "clear": {
-        "type": "boolean",
-        "description": "Whether to archive/clear the retrieved feedback sessions from the pending inbox (default: false)"
+      "sessionId": {
+        "description": "Specific session ID",
+        "type": "string"
       }
-    }
+    },
+    "type": "object"
+  },
+  "name": "browser_get_pending_feedback",
+  "parameters": {
+    "properties": {
+      "clear": {
+        "description": "Archive sessions after reading",
+        "type": "boolean"
+      },
+      "limit": {
+        "description": "Max sessions to return",
+        "type": "integer"
+      },
+      "sessionId": {
+        "description": "Specific session ID",
+        "type": "string"
+      }
+    },
+    "type": "object"
   }
 }

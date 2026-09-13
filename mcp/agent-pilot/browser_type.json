@@ -1,29 +1,62 @@
 {
-  "name": "browser_type",
-  "description": "Simulate human-like typing into an input or textarea element on the agent's tab or specified tab",
-  "parameters": {
-    "type": "object",
+  "description": "Type text into an input or textarea with realistic human keystroke intervals.",
+  "inputSchema": {
     "properties": {
-      "tabId": {
-        "type": "integer",
-        "description": "Optional target Tab ID"
+      "clear": {
+        "description": "Clear field first",
+        "type": "boolean"
+      },
+      "pressEnter": {
+        "description": "Press Enter after typing",
+        "type": "boolean"
       },
       "selector": {
-        "type": "string",
-        "description": "CSS selector of the input field"
+        "description": "CSS selector of input",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
       },
       "text": {
-        "type": "string",
-        "description": "Text string to type"
-      },
-      "delay": {
-        "type": "number",
-        "description": "Typing delay between keys in ms (default 50)"
+        "description": "Text to type",
+        "type": "string"
       }
     },
     "required": [
       "selector",
       "text"
-    ]
+    ],
+    "type": "object"
+  },
+  "name": "browser_type",
+  "parameters": {
+    "properties": {
+      "clear": {
+        "description": "Clear field first",
+        "type": "boolean"
+      },
+      "pressEnter": {
+        "description": "Press Enter after typing",
+        "type": "boolean"
+      },
+      "selector": {
+        "description": "CSS selector of input",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "text": {
+        "description": "Text to type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "selector",
+      "text"
+    ],
+    "type": "object"
   }
 }

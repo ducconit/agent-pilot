@@ -1,21 +1,38 @@
 {
-  "name": "browser_scroll",
-  "description": "Scroll the agent's tab or specified tab smoothly",
-  "parameters": {
-    "type": "object",
+  "description": "Scroll viewport or active element smoothly by deltaX and deltaY pixels.",
+  "inputSchema": {
     "properties": {
-      "tabId": {
-        "type": "integer",
-        "description": "Optional target Tab ID"
-      },
       "deltaX": {
-        "type": "number",
-        "description": "Horizontal scroll amount"
+        "description": "Horizontal scroll offset",
+        "type": "number"
       },
       "deltaY": {
-        "type": "number",
-        "description": "Vertical scroll amount (e.g. 300 to scroll down)"
+        "description": "Vertical scroll offset",
+        "type": "number"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
       }
-    }
+    },
+    "type": "object"
+  },
+  "name": "browser_scroll",
+  "parameters": {
+    "properties": {
+      "deltaX": {
+        "description": "Horizontal scroll offset",
+        "type": "number"
+      },
+      "deltaY": {
+        "description": "Vertical scroll offset",
+        "type": "number"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
   }
 }

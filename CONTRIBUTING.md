@@ -69,7 +69,7 @@ Dự án được phân tách theo mô hình module hóa sạch (Clean Modular A
 - **`extensions/background/`**: Dịch vụ nền Manifest V3 (Service Worker). Chứa các module chuyên biệt: `cdp-manager.js`, `tab-manager.js`, `secret-sanitizer.js`, `screenshot-service.js`, `batch-executor.js`, `bridge-client.js`.
 - **`extensions/content/`**: Tương tác DOM trực tiếp: `toast.js`, `lock-shield.js`, `cursor-simulator.js`, `dom-inspector.js`, `eyedropper.js`.
 - **`extensions/sidepanel/`**: Giao diện người dùng Side Panel: `ui-helpers.js`, `agent-monitor.js`, `inspector-panel.js`, `screenshot-panel.js`.
-- **`mcp/agent-pilot/`**: Nguồn chân lý duy nhất (Single Source of Truth - SSOT) định nghĩa 14 công cụ Model Context Protocol. Nếu bạn thêm hoặc chỉnh sửa công cụ MCP, hãy cập nhật trong `scripts/agent_pilot_server.mjs` rồi chạy `npm run export:mcp` để tự động đồng bộ.
+- **`mcp/agent-pilot/`**: Nguồn chân lý duy nhất (Single Source of Truth - SSOT) định nghĩa 16 công cụ Model Context Protocol. Nếu bạn thêm hoặc chỉnh sửa công cụ MCP, hãy cập nhật trong `cli/mcp.go` rồi chạy `npm run export:mcp` để tự động đồng bộ.
 
 ---
 

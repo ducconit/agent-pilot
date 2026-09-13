@@ -1,21 +1,38 @@
 {
-  "name": "browser_screenshot",
-  "description": "Capture a screenshot of a specified tab or active tab, even if running in the background while the user works on another tab (returns PNG data)",
-  "parameters": {
-    "type": "object",
+  "description": "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs).",
+  "inputSchema": {
     "properties": {
-      "tabId": {
-        "type": "integer",
-        "description": "Optional Tab ID to capture. If omitted, captures the tab controlled by the agent (even if in background) or active tab"
-      },
       "mode": {
-        "type": "string",
-        "enum": [
-          "visible",
-          "region"
-        ],
-        "description": "Screenshot mode (default visible)"
+        "description": "visible, region, element, or full",
+        "type": "string"
+      },
+      "selector": {
+        "description": "Selector for element mode",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
       }
-    }
+    },
+    "type": "object"
+  },
+  "name": "browser_screenshot",
+  "parameters": {
+    "properties": {
+      "mode": {
+        "description": "visible, region, element, or full",
+        "type": "string"
+      },
+      "selector": {
+        "description": "Selector for element mode",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
   }
 }

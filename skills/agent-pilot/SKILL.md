@@ -31,13 +31,10 @@ npx skills add https://github.com/ducconit/agent-pilot-extension -g --all
 ```mermaid
 flowchart TD
     Agent["<b>AI Agent (Claude / Cursor / Antigravity)</b><br/>Stdio MCP, Direct CLI, or HTTP REST"]
-    GoCLI["<b>Golang Standalone CLI / MCP</b><br/>cli/agent-pilot (Zero-dep, &lt;5ms)"]
-    NodeServer["<b>Node.js Bridge Server</b><br/>scripts/agent_pilot_server.mjs"]
+    GoCLI["<b>Golang Standalone CLI & MCP Engine</b><br/>cli/agent-pilot (Zero-dep, &lt;5ms)"]
     
-    Agent -->|Stdio MCP or CLI Command| GoCLI
-    Agent -->|Stdio JSON-RPC| NodeServer
+    Agent -->|Stdio MCP, CLI Command, or HTTP /api| GoCLI
     GoCLI -->|WebSocket ws://127.0.0.1:58765| Ext["<b>Agent Pilot Extension (MV3)</b><br/>Service Worker (background.js)"]
-    NodeServer -->|WebSocket ws://127.0.0.1:58765| Ext
     Ext -->|chrome.debugger CDP| CDP["<b>Chrome DevTools Protocol</b><br/>Console, Network, Performance"]
     Ext -->|chrome.tabs.sendMessage| Content["<b>Content Scripts & Feedback Studio</b><br/>Virtual Mouse, DOM Inspector, Annotator HUD"]
     Content --> WebPage["<b>Target Web Page DOM</b>"]

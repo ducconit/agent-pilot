@@ -1,8 +1,12 @@
 {
+  "description": "List all open tabs across all browser windows.",
+  "inputSchema": {
+    "properties": {},
+    "type": "object"
+  },
   "name": "browser_list_tabs",
-  "description": "List all open browser tabs with tabId, title, url, active state, and whether they belong to the agent",
   "parameters": {
-    "type": "object",
-    "properties": {}
+    "properties": {},
+    "type": "object"
   }
 }

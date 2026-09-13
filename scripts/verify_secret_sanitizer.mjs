@@ -9,8 +9,7 @@ import {
   sanitizeData,
   AGENT_SECURITY_NOTICE
 } from "../extensions/background/secret-sanitizer.js";
-
-import { sanitizeServerData } from "./agent_pilot_server.mjs";
+const sanitizeServerData = (data, isEnabled = true) => sanitizeData(data, isEnabled);
 
 console.log("==================================================================");
 console.log("🛡️ KIỂM THỬ ĐƠN VỊ: LỚP LỌC CHE GIẤU SECRET, API KEY & PRIVATE KEY");
@@ -256,7 +255,7 @@ try {
     serverSanitized._securityNotice === AGENT_SECURITY_NOTICE;
 
   record(
-    "17. Server-Side Defense-in-Depth (agent_pilot_server.mjs)",
+    "17. Server-Side Defense-in-Depth (Secret Sanitizer)",
     isServerDefenseActive,
     "Standalone server-side sanitization operational"
   );

@@ -1,21 +1,38 @@
 {
-  "name": "browser_pick_color",
-  "description": "Trigger the interactive magnifying loupe color picker on the page, or sample pixel color directly at (x, y)",
-  "parameters": {
-    "type": "object",
+  "description": "Sample the pixel color at coordinates (X, Y) or activate the interactive eyedropper loupe.",
+  "inputSchema": {
     "properties": {
       "tabId": {
-        "type": "integer",
-        "description": "Optional target Tab ID"
+        "description": "Target tab ID",
+        "type": "integer"
       },
       "x": {
-        "type": "number",
-        "description": "Optional X coordinate to pick pixel color directly without opening interactive loupe"
+        "description": "X coordinate",
+        "type": "number"
       },
       "y": {
-        "type": "number",
-        "description": "Optional Y coordinate to pick pixel color directly without opening interactive loupe"
+        "description": "Y coordinate",
+        "type": "number"
       }
-    }
+    },
+    "type": "object"
+  },
+  "name": "browser_pick_color",
+  "parameters": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "x": {
+        "description": "X coordinate",
+        "type": "number"
+      },
+      "y": {
+        "description": "Y coordinate",
+        "type": "number"
+      }
+    },
+    "type": "object"
   }
 }

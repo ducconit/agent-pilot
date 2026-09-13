@@ -30,16 +30,13 @@ Chào mừng bạn đến với **Agent Pilot** – Tiện ích mở rộng đi�
    - `🟢 AI Agent: Đã kết nối`: Tiện ích đã bắt tay thành công với máy chủ Agent.
    - `⚪ AI Agent: Đang chờ kết nối (Cổng 58765)`: Đang chờ máy chủ Agent khởi động.
 2. Cổng kết nối mặc định: **`58765`** (chống trùng lặp tuyệt đối). Bạn có thể đổi cổng linh hoạt bằng cách nhấp vào ô nhập Port trong Side Panel.
-3. Cấu hình MCP trong Antigravity hoặc Claude Desktop:
+3. Cấu hình MCP trong Antigravity, Claude Desktop hoặc Cursor:
    ```json
    {
      "mcpServers": {
        "agent-pilot": {
-         "command": "node",
-         "args": ["<path-to-server>/scripts/agent_pilot_server.mjs"],
-         "env": {
-           "AGENT_PILOT_PORT": "58765"
-         }
+         "command": "agent-pilot",
+         "args": ["mcp"]
        }
      }
    }

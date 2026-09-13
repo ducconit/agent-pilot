@@ -15,9 +15,9 @@ flowchart TB
         Agent["<b>AI Coding Agent</b><br/>(Google Antigravity / Claude Code / Cursor)"]
     end
 
-    subgraph BridgeLayer["🌉 2. TẦNG CẦU NỐI (NODE.JS BRIDGE SERVER)"]
+    subgraph BridgeLayer["🌉 2. TẦNG CẦU NỐI & CLI (GOLANG STANDALONE ENGINE)"]
         direction TB
-        ServerEntry["<b>Bridge Server (agent_pilot_server.mjs)</b><br/>Port 58765 (Local Loopback 127.0.0.1)"]
+        ServerEntry["<b>Agent Pilot Engine (cli/agent-pilot)</b><br/>Port 58765 (Local Loopback 127.0.0.1)"]
         DualMode{"<b>Dual Mode Engine</b><br/>Port Busy?"}
         Master["<b>Master Mode</b><br/>Binds WebSocket ws://127.0.0.1:58765"]
         Forwarder["<b>Forwarder Mode</b><br/>Forwards Stdio to HTTP POST /api"]

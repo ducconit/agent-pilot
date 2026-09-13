@@ -1,20 +1,36 @@
 {
-  "name": "browser_navigate",
-  "description": "Navigate active tab or specific tab to a URL",
-  "parameters": {
-    "type": "object",
+  "description": "Navigate the active or specified tab to a new URL.",
+  "inputSchema": {
     "properties": {
-      "url": {
-        "type": "string",
-        "description": "Destination URL"
-      },
       "tabId": {
-        "type": "integer",
-        "description": "Optional Tab ID. Defaults to current active tab"
+        "description": "Tab ID to navigate",
+        "type": "integer"
+      },
+      "url": {
+        "description": "Destination URL",
+        "type": "string"
       }
     },
     "required": [
       "url"
-    ]
+    ],
+    "type": "object"
+  },
+  "name": "browser_navigate",
+  "parameters": {
+    "properties": {
+      "tabId": {
+        "description": "Tab ID to navigate",
+        "type": "integer"
+      },
+      "url": {
+        "description": "Destination URL",
+        "type": "string"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "type": "object"
   }
 }
