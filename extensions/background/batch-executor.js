@@ -8,7 +8,8 @@ import {
   normalizeUrl,
   DEFAULT_LOAD_TIMEOUT_MS,
   attachedTabs,
-  getBuffer
+  getBuffer,
+  logDebug
 } from "./constants.js";
 import { attachDebugger, sendCdpCommand } from "./cdp-manager.js";
 import {
@@ -57,16 +58,16 @@ export async function executeBatchActions(params, bridgeClient = null) {
           currentTabId = tab.id;
           if (bridgeClient) bridgeClient.lastAgentTabId = tab.id;
           agentControlledTabs.add(tab.id);
-          await assignTabToAgentGroup(tab).catch(() => {});
+          await assignTabToAgentGroup(tab).catch((err) => logDebug("batch assignTabToAgentGroup", err));
 
           if (!makeActive && activeTabBefore && activeTabBefore !== tab.id) {
             const curActive = await getActiveTabId();
             if (curActive === tab.id) {
-              await chrome.tabs.update(activeTabBefore, { active: true }).catch(() => {});
+              await chrome.tabs.update(activeTabBefore, { active: true }).catch((err) => logDebug("batch restore active tab", err));
             }
           }
 
-          await attachDebugger(tab.id).catch(() => {});
+          await attachDebugger(tab.id).catch((err) => logDebug("batch attachDebugger", err));
 
           // Wait for tab load completion if requested (default true)
           if (act.waitUntil !== false) {
@@ -291,7 +292,12 @@ export async function executeBatchActions(params, bridgeClient = null) {
           if (!targetTabId) throw new Error("No active tab for screenshot");
           const shotRes = await captureTabScreenshot(targetTabId, act);
           stepResult.success = true;
-          stepResult.dataUrl = shotRes.dataUrl;
+          if (params.omitDataUrls || act.omitDataUrl) {
+            stepResult.dataUrlOmitted = true;
+            stepResult.byteLength = shotRes.dataUrl ? shotRes.dataUrl.length : 0;
+          } else {
+            stepResult.dataUrl = shotRes.dataUrl;
+          }
           stepResult.label = act.label || act.name || `step_${stepNum}`;
           break;
         }
@@ -317,7 +323,7 @@ export async function executeBatchActions(params, bridgeClient = null) {
         case "eval": {
           const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
           if (!targetTabId) throw new Error("No active tab for evaluate");
-          await attachDebugger(targetTabId).catch(() => {});
+          await attachDebugger(targetTabId).catch((err) => logDebug("batch attachDebugger evaluate", err));
           const evalRes = await sendCdpCommand(targetTabId, "Runtime.evaluate", {
             expression: act.expression,
             returnByValue: true,
@@ -331,7 +337,7 @@ export async function executeBatchActions(params, bridgeClient = null) {
         case "cdp": {
           const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
           if (!targetTabId) throw new Error("No active tab for cdp");
-          await attachDebugger(targetTabId).catch(() => {});
+          await attachDebugger(targetTabId).catch((err) => logDebug("batch attachDebugger cdp", err));
           const cdpRes = await sendCdpCommand(targetTabId, act.cdpMethod || act.method, act.cdpParams || act.params || {});
           stepResult.success = true;
           stepResult.result = cdpRes;

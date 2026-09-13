@@ -9,7 +9,8 @@ import {
   getBuffer,
   CDP_PROTOCOL_VERSION,
   MAX_DEVTOOLS_CONSOLE_ENTRIES,
-  MAX_DEVTOOLS_NETWORK_ENTRIES
+  MAX_DEVTOOLS_NETWORK_ENTRIES,
+  logDebug
 } from "./constants.js";
 
 /**
@@ -30,11 +31,11 @@ export async function attachDebugger(tabId, broadcastFn = null) {
       // Enable CDP domains concurrently
       try {
         await Promise.all([
-          sendCdpCommand(tabId, "Console.enable", {}, 2500).catch(() => {}),
-          sendCdpCommand(tabId, "Runtime.enable", {}, 2500).catch(() => {}),
-          sendCdpCommand(tabId, "Network.enable", {}, 2500).catch(() => {}),
-          sendCdpCommand(tabId, "Performance.enable", {}, 2500).catch(() => {}),
-          sendCdpCommand(tabId, "Page.enable", {}, 2500).catch(() => {})
+          sendCdpCommand(tabId, "Console.enable", {}, 2500).catch((e) => logDebug("Console.enable", e)),
+          sendCdpCommand(tabId, "Runtime.enable", {}, 2500).catch((e) => logDebug("Runtime.enable", e)),
+          sendCdpCommand(tabId, "Network.enable", {}, 2500).catch((e) => logDebug("Network.enable", e)),
+          sendCdpCommand(tabId, "Performance.enable", {}, 2500).catch((e) => logDebug("Performance.enable", e)),
+          sendCdpCommand(tabId, "Page.enable", {}, 2500).catch((e) => logDebug("Page.enable", e))
         ]);
       } catch (err) {
         console.warn("[AgentPilot] Error enabling CDP domains:", err);

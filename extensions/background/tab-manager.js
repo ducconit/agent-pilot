@@ -8,7 +8,8 @@ import {
   tabLockStates,
   getTabLockState,
   AGENT_GROUP_TITLE,
-  AGENT_GROUP_COLOR
+  AGENT_GROUP_COLOR,
+  logDebug
 } from "./constants.js";
 
 /**
@@ -100,41 +101,60 @@ export async function assignTabToAgentGroup(tab) {
 export async function ensureContentScript(tabId) {
   if (!tabId) return false;
   try {
-    const tab = await chrome.tabs.get(tabId).catch(() => null);
+    const tab = await chrome.tabs.get(tabId).catch((err) => {
+      logDebug(`probe tab ${tabId}`, err);
+      return null;
+    });
     if (!tab || !tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://") || tab.url.startsWith("about:") || tab.url.startsWith("edge://")) {
       return false;
     }
     const results = await chrome.scripting.executeScript({
       target: { tabId },
       func: () => Boolean(window.__AGENT_PILOT__)
-    }).catch(() => null);
+    }).catch((err) => {
+      logDebug(`probe __AGENT_PILOT__ on tab ${tabId}`, err);
+      return null;
+    });
 
     if (!results || !results[0] || !results[0].result) {
-      await chrome.scripting.insertCSS({ target: { tabId }, files: ["content.css"] }).catch(() => {});
+      // Dynamically extract content script & css files from manifest.json (Single Source of Truth)
+      const manifest = (typeof chrome !== "undefined" && chrome.runtime?.getManifest) ? chrome.runtime.getManifest() : null;
+      const isolatedEntry = manifest?.content_scripts?.find(cs => cs.js && (!cs.world || cs.world === "ISOLATED"));
+      const contentFiles = isolatedEntry?.js || [
+        "content/toast.js",
+        "content/lock-shield.js",
+        "content/cursor-simulator.js",
+        "content/dom-inspector.js",
+        "content/eyedropper.js",
+        "content/feedback-studio/constants.js",
+        "content/feedback-studio/state.js",
+        "content/feedback-studio/capture-service.js",
+        "content/feedback-studio/pinned-overlay.js",
+        "content/feedback-studio/hud-toolbar.js",
+        "content/feedback-studio/modals.js",
+        "content/feedback-studio/selection-modes.js",
+        "content/feedback-studio/export-channels.js",
+        "content/feedback-studio/index.js",
+        "content.js"
+      ];
+      const cssFiles = isolatedEntry?.css || ["content.css"];
+
+      if (cssFiles.length) {
+        await chrome.scripting.insertCSS({ target: { tabId }, files: cssFiles }).catch((err) => {
+          logDebug(`insertCSS on tab ${tabId}`, err);
+        });
+      }
       await chrome.scripting.executeScript({
         target: { tabId },
-        files: [
-          "content/toast.js",
-          "content/lock-shield.js",
-          "content/cursor-simulator.js",
-          "content/dom-inspector.js",
-          "content/eyedropper.js",
-          "content/feedback-studio/constants.js",
-          "content/feedback-studio/state.js",
-          "content/feedback-studio/capture-service.js",
-          "content/feedback-studio/pinned-overlay.js",
-          "content/feedback-studio/hud-toolbar.js",
-          "content/feedback-studio/modals.js",
-          "content/feedback-studio/selection-modes.js",
-          "content/feedback-studio/export-channels.js",
-          "content/feedback-studio/index.js",
-          "content.js"
-        ]
-      }).catch(() => {});
+        files: contentFiles
+      }).catch((err) => {
+        logDebug(`dynamic script injection on tab ${tabId}`, err);
+      });
       await new Promise(r => setTimeout(r, 80));
     }
     return true;
   } catch (e) {
+    logDebug(`ensureContentScript(${tabId})`, e);
     return false;
   }
 }

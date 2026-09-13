@@ -87,3 +87,13 @@ export function setSecretFilterEnabled(val) {
     chrome.storage.local.set({ [STORAGE_KEY_SECRET_FILTER]: isSecretFilterEnabled });
   }
 }
+
+/**
+ * Safe debug logger for background operations
+ */
+export function logDebug(context, error) {
+  if (typeof console !== "undefined" && console.debug) {
+    const msg = error?.message || String(error || "");
+    console.debug(`[AgentPilot:DEBUG] ${context}:`, msg);
+  }
+}

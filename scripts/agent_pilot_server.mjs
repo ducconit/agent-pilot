@@ -12,6 +12,12 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline";
 import { WebSocketServer, WebSocket } from "ws";
+import {
+  AGENT_SECURITY_NOTICE,
+  SECRET_PATTERNS,
+  maskString,
+  sanitizeData
+} from "../extensions/background/secret-sanitizer.js";
 
 let SERVER_VERSION = "1.0.1-beta";
 try {
@@ -270,6 +276,18 @@ function getActiveClient(targetId = null) {
   return openClients[0];
 }
 
+// Helper to validate origin for loopback / extension requests
+export const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  if (origin.startsWith("chrome-extension://")) return true;
+  try {
+    const url = new URL(origin);
+    return url.hostname === "127.0.0.1" || url.hostname === "localhost";
+  } catch {
+    return false;
+  }
+};
+
 // 1. Create HTTP & WebSocket Server (Local loopback only, no external CORS)
 const server = http.createServer(async (req, res) => {
 
@@ -301,14 +319,6 @@ const server = http.createServer(async (req, res) => {
     }));
     return;
   }
-
-  // Helper to validate origin for loopback / extension requests
-  const isOriginAllowed = (origin) => {
-    if (!origin) return true;
-    return origin.startsWith("chrome-extension://") ||
-           origin.startsWith("http://127.0.0.1:") ||
-           origin.startsWith("http://localhost:");
-  };
 
   // HTTP API Endpoint for non-WebSocket scripts / curl
   if (req.url === "/api" && req.method === "POST") {
@@ -499,7 +509,18 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: "Not Found" }));
 });
 
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({
+  server,
+  verifyClient: (info, callback) => {
+    const origin = info.origin || info.req?.headers?.origin;
+    if (isOriginAllowed(origin)) {
+      callback(true);
+    } else {
+      console.warn(`[BridgeServer] ⛔ Blocked unauthorized WebSocket connection from origin: ${origin}`);
+      callback(false, 403, "Forbidden: Cross-origin WebSocket connection rejected");
+    }
+  }
+});
 
 wss.on("connection", (ws, req) => {
   const clientId = "browser_" + Math.random().toString(36).slice(2, 8);
@@ -596,99 +617,8 @@ wss.on("connection", (ws, req) => {
 });
 
 // Secret & Private Key Masking for AI Agents (Defense-in-Depth)
-const AGENT_SECURITY_NOTICE = "⚠️ [SECURITY NOTICE FOR AGENT] One or more sensitive credentials (API keys, private keys, or tokens) have been masked with asterisks (*) to protect secrets from leaking to LLM providers. Asterisks are redaction placeholders, NOT the literal key values. Do not attempt to use asterisks as credentials.";
-
-const SERVER_SECRET_PATTERNS = [
-  {
-    name: "Private Key",
-    regex: /-----BEGIN (?:[A-Z0-9_-]+ )?PRIVATE KEY-----[\s\S]+?-----END (?:[A-Z0-9_-]+ )?PRIVATE KEY-----/g,
-    replacer: (match) => {
-      const header = match.split("\n")[0] || "-----BEGIN PRIVATE KEY-----";
-      const footer = match.trim().split("\n").pop() || "-----END PRIVATE KEY-----";
-      return `${header}\n******************** [MASKED_SECRET: Private Key]\n${footer}`;
-    }
-  },
-  {
-    name: "OpenAI API Key",
-    regex: /\b(?:sk-proj-[a-zA-Z0-9_-]{20,}|sk-admin-[a-zA-Z0-9_-]{20,}|sk-[a-zA-Z0-9]{20,48})\b/g,
-    replacer: (match) => `${match.slice(0, 7)}******************** [MASKED_SECRET: OpenAI API Key]`
-  },
-  {
-    name: "Anthropic API Key",
-    regex: /\bsk-ant-[a-zA-Z0-9_-]{20,}\b/g,
-    replacer: (match) => `${match.slice(0, 7)}******************** [MASKED_SECRET: Anthropic API Key]`
-  },
-  {
-    name: "Google API Key",
-    regex: /\bAIzaSy[a-zA-Z0-9_-]{33}\b/g,
-    replacer: (match) => `${match.slice(0, 6)}******************** [MASKED_SECRET: Google API Key]`
-  },
-  {
-    name: "GitHub Token",
-    regex: /\b(?:ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{50,82})\b/g,
-    replacer: (match) => `${match.slice(0, 4)}******************** [MASKED_SECRET: GitHub Token]`
-  },
-  {
-    name: "AWS Access Key",
-    regex: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g,
-    replacer: (match) => `${match.slice(0, 4)}******************** [MASKED_SECRET: AWS Access Key]`
-  },
-  {
-    name: "Stripe Key",
-    regex: /\b(?:sk|pk|rk)_(?:live|test)_[0-9a-zA-Z]{24,}\b/g,
-    replacer: (match) => `${match.slice(0, 8)}******************** [MASKED_SECRET: Stripe Key]`
-  },
-  {
-    name: "Slack Token",
-    regex: /\bxox[baprs]-[0-9a-zA-Z-]{10,}\b/g,
-    replacer: (match) => `${match.slice(0, 5)}******************** [MASKED_SECRET: Slack Token]`
-  },
-  {
-    name: "JWT Token",
-    regex: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
-    replacer: () => "eyJ******************** [MASKED_SECRET: JWT Token]"
-  },
-  {
-    name: "Bearer Token",
-    regex: /\bBearer\s+([A-Za-z0-9-_.+/=]{20,})\b/gi,
-    replacer: (match, token) => `Bearer ${(token || "").slice(0, 4)}******************** [MASKED_SECRET: Bearer Token]`
-  },
-  {
-    name: "URL Secret Parameter",
-    regex: /([?&](?:api_key|apikey|access_token|auth_token|token|password|passwd|secret)=)([^&\s]{6,})/gi,
-    replacer: (match, paramKey) => `${paramKey}******************** [MASKED_SECRET: URL Parameter]`
-  },
-  {
-    name: "Sensitive Key-Value",
-    regex: /(["']?(?:password|passwd|secret|client_?secret|access_?token|auth_?token|api_?key)["']?\s*[:=]\s*["'])([^"'\\,\s]{6,})(["'])/gi,
-    replacer: (match, prefix, secretVal, suffix) => {
-      const p = secretVal.slice(0, 2);
-      return `${prefix}${p}******************** [MASKED_SECRET: Sensitive Field]${suffix}`;
-    }
-  }
-];
-
-const SENSITIVE_PROP_REGEX = /^(?:password|passwd|secret|api_?key|access_?token|auth_?token|private_?key|client_?secret)$/i;
-
-function maskServerString(text) {
-  if (typeof text !== "string" || text.length < 6) return { text, masked: false, types: [] };
-  if (text.includes("[MASKED_SECRET")) return { text, masked: false, types: [] };
-  let result = text;
-  let masked = false;
-  const types = new Set();
-  for (const p of SERVER_SECRET_PATTERNS) {
-    p.regex.lastIndex = 0;
-    if (p.regex.test(result)) {
-      p.regex.lastIndex = 0;
-      result = result.replace(p.regex, (...args) => {
-        masked = true;
-        types.add(p.name);
-        return p.replacer(...args);
-      });
-    }
-  }
-  return { text: result, masked, types: Array.from(types) };
-}
+// Re-uses the unified secret-sanitizer module from extensions/background/secret-sanitizer.js
+export { AGENT_SECURITY_NOTICE, SECRET_PATTERNS, maskString };
 
 export function hasMaskedSecretNotice(data) {
   if (!data) return false;
@@ -706,58 +636,7 @@ export function hasMaskedSecretNotice(data) {
 
 export function sanitizeServerData(data, isEnabled = null) {
   const activeEnabled = isEnabled !== null ? Boolean(isEnabled) : lastSecretFilterState;
-  if (!activeEnabled || data === null || data === undefined) return data;
-  let totalMaskedCount = 0;
-  const allMaskedTypes = new Set();
-  const seen = new WeakSet();
-
-  function walk(val, keyContext = "") {
-    if (val === null || val === undefined) return val;
-    if (typeof val === "string") {
-      if (val.includes("[MASKED_SECRET")) return val;
-      if (keyContext && SENSITIVE_PROP_REGEX.test(keyContext) && val.length >= 4) {
-        totalMaskedCount++;
-        allMaskedTypes.add(`Field:${keyContext}`);
-        return `${val.slice(0, 2)}******************** [MASKED_SECRET: ${keyContext}]`;
-      }
-      const res = maskServerString(val);
-      if (res.masked) {
-        totalMaskedCount += res.types.length;
-        res.types.forEach((t) => allMaskedTypes.add(t));
-        return res.text;
-      }
-      return val;
-    }
-    if (typeof val === "number" || typeof val === "boolean" || typeof val === "symbol") return val;
-    if (Array.isArray(val)) {
-      if (seen.has(val)) return "[Circular]";
-      seen.add(val);
-      return val.map((item) => walk(item, keyContext));
-    }
-    if (typeof val === "object") {
-      if (seen.has(val)) return "[Circular]";
-      seen.add(val);
-      const copy = {};
-      for (const [k, v] of Object.entries(val)) {
-        copy[k] = walk(v, k);
-      }
-      return copy;
-    }
-    return val;
-  }
-
-  const sanitized = walk(data);
-  if (totalMaskedCount > 0) {
-    if (typeof sanitized === "string") {
-      return `${sanitized}\n\n${AGENT_SECURITY_NOTICE}`;
-    }
-    if (sanitized && typeof sanitized === "object") {
-      sanitized._securityNotice = AGENT_SECURITY_NOTICE;
-      sanitized._maskedCount = (sanitized._maskedCount || 0) + totalMaskedCount;
-      sanitized._maskedTypes = Array.from(new Set([...(sanitized._maskedTypes || []), ...allMaskedTypes]));
-    }
-  }
-  return sanitized;
+  return sanitizeData(data, activeEnabled);
 }
 
 /**
