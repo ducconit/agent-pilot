@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,7 +36,7 @@ type PendingRequest struct {
 var (
 	DefaultPort     = 58765
 	DefaultHost     = "127.0.0.1"
-	ServerVersion   = "1.0.2-beta"
+	ServerVersion   = "1.0.3-beta"
 	clientsLock     sync.RWMutex
 	clients         = make(map[string]*ClientConnection)
 	activeClientID  string
@@ -364,13 +365,21 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 
 	case "instances.list":
 		clientsLock.RLock()
-		clientList := make([]map[string]interface{}, 0)
+		conns := make([]*ClientConnection, 0, len(clients))
 		for _, c := range clients {
+			conns = append(conns, c)
+		}
+		sort.Slice(conns, func(i, j int) bool {
+			return conns[i].ConnectedAt.Before(conns[j].ConnectedAt)
+		})
+		clientList := make([]map[string]interface{}, 0, len(conns))
+		for _, c := range conns {
 			clientList = append(clientList, map[string]interface{}{
-				"instanceId": c.ID,
-				"browser":    "Chromium",
-				"os":         "linux",
-				"isActive":   c.ID == activeClientID,
+				"instanceId":  c.ID,
+				"browser":     "Chromium",
+				"os":          "linux",
+				"isActive":    c.ID == activeClientID,
+				"connectedAt": c.ConnectedAt.UnixMilli(),
 			})
 		}
 		clientsLock.RUnlock()
@@ -410,13 +419,21 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	clientsLock.RLock()
-	clientList := make([]map[string]interface{}, 0)
+	conns := make([]*ClientConnection, 0, len(clients))
 	for _, c := range clients {
+		conns = append(conns, c)
+	}
+	sort.Slice(conns, func(i, j int) bool {
+		return conns[i].ConnectedAt.Before(conns[j].ConnectedAt)
+	})
+	clientList := make([]map[string]interface{}, 0, len(conns))
+	for _, c := range conns {
 		clientList = append(clientList, map[string]interface{}{
-			"instanceId": c.ID,
-			"browser":    "Chromium",
-			"os":         "linux",
-			"isActive":   c.ID == activeClientID,
+			"instanceId":  c.ID,
+			"browser":     "Chromium",
+			"os":          "linux",
+			"isActive":    c.ID == activeClientID,
+			"connectedAt": c.ConnectedAt.UnixMilli(),
 		})
 	}
 	extConnected := len(clientList) > 0

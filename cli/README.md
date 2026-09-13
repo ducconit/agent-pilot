@@ -18,9 +18,19 @@ Phiên bản dòng lệnh độc lập (**Single Executable Binary**) viết b�
 
 ## 🛠️ Biên Dịch & Cài Đặt
 
-### 1. Biên dịch từ mã nguồn
+### 1. Tải Binary Dựng Sẵn (Khuyên dùng)
+Tải tệp binary tương ứng với hệ điều hành và CPU của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases):
 
-Yêu cầu: Đã cài đặt [Go (Golang)](https://go.dev/) (>= 1.20).
+| Hệ Điều Hành | Kiến Trúc | Tệp Phát Hành | Lệnh Cài Đặt Nhanh |
+| :--- | :--- | :--- | :--- |
+| **Linux** | x86_64 (amd64) | `agent-pilot-linux-amd64` | `chmod +x agent-pilot-linux-amd64 && sudo mv agent-pilot-linux-amd64 /usr/local/bin/agent-pilot` |
+| **Linux** | ARM64 (aarch64) | `agent-pilot-linux-arm64` | `chmod +x agent-pilot-linux-arm64 && sudo mv agent-pilot-linux-arm64 /usr/local/bin/agent-pilot` |
+| **macOS** | Apple Silicon (M1-M4) | `agent-pilot-darwin-arm64` | `chmod +x agent-pilot-darwin-arm64 && sudo mv agent-pilot-darwin-arm64 /usr/local/bin/agent-pilot` |
+| **macOS** | Intel (x86_64) | `agent-pilot-darwin-amd64` | `chmod +x agent-pilot-darwin-amd64 && sudo mv agent-pilot-darwin-amd64 /usr/local/bin/agent-pilot` |
+| **Windows** | x86_64 (amd64) | `agent-pilot-windows-amd64.exe` | Đổi tên thành `agent-pilot.exe` và đưa vào thư mục PATH |
+| **Windows** | ARM64 | `agent-pilot-windows-arm64.exe` | Đổi tên thành `agent-pilot.exe` và đưa vào thư mục PATH |
+
+### 2. Tự Biên Dịch Từ Mã Nguồn (Yêu cầu Go >= 1.21)
 
 ```bash
 cd cli
@@ -28,38 +38,56 @@ cd cli
 # Tải dependencies
 go mod tidy
 
-# Biên dịch binary tối ưu kích thước
-go build -ldflags="-s -w" -o agent-pilot .
+# Biên dịch pure static binary không phụ thuộc thư viện ngoài
+CGO_ENABLED=0 go build -ldflags="-s -w" -o agent-pilot .
 ```
 
-### 2. Cài đặt vào hệ thống (Toàn cục)
+### 3. Cài Đặt Vào Hệ Thống (Toàn cục)
 
 ```bash
 # Trên Linux / macOS:
 sudo mv agent-pilot /usr/local/bin/
 
 # Hoặc cài đặt qua go install:
-go install .
+go install github.com/ducconit/agent-pilot-extension/cli@latest
 ```
 
 ---
 
 ## 📖 Hướng Dẫn Sử Dụng
 
-### 1. Sử dụng làm MCP Server cho AI Agent
+### 1. Sử Dụng Làm MCP Server Cho AI Coding Assistants (stdio)
 
-Trong cấu hình MCP của Google Antigravity hoặc Claude Code, trỏ lệnh thực thi đến binary `agent-pilot`:
+Cấu hình MCP cho các công cụ AI coding hàng đầu:
 
+#### Google Antigravity (`~/.gemini/config/mcp_config.json`):
 ```json
 {
   "mcpServers": {
     "agent-pilot": {
-      "command": "/path/to/agent-pilot",
+      "command": "agent-pilot",
       "args": ["mcp"]
     }
   }
 }
 ```
+
+#### Claude Desktop (`claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "agent-pilot": {
+      "command": "/usr/local/bin/agent-pilot",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+#### Cursor IDE (Cursor Settings > Features > MCP > Add New Server):
+- **Name**: `agent-pilot`
+- **Type**: `command`
+- **Command**: `agent-pilot mcp`
 
 ### 2. Dành cho Tester / QC (Lệnh CLI Trực Tiếp)
 

@@ -75,11 +75,12 @@ async function run() {
     }
   } catch (_) {}
 
-  let initialClientCount = 0;
+  const initialClients = new Set();
   if (isLiveServer) {
     try {
       const h = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/health`).then(r => r.json());
-      initialClientCount = h.clientCount || (h.extensionConnected ? 1 : 0);
+      const existing = (h.clients || []).map(c => c.instanceId);
+      existing.forEach(id => initialClients.add(id));
     } catch (_) {}
   }
 
@@ -104,16 +105,16 @@ async function run() {
           });
           const listData = await listResp.json();
           const clients = Array.isArray(listData?.result) ? listData.result : (listData?.result?.clients || []);
-          if (clients.length > initialClientCount || (!initialClientCount && clients.length > 0)) {
-            const targetClient = clients[clients.length - 1];
-            selectedTestInstanceId = targetClient.instanceId;
+          const newClient = clients.find(c => !initialClients.has(c.instanceId)) || (initialClients.size === 0 && clients[0]);
+          if (newClient) {
+            selectedTestInstanceId = newClient.instanceId;
             await fetch(`http://127.0.0.1:${BRIDGE_PORT}/api`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ method: "instances.select", params: { instanceId: targetClient.instanceId } }),
+              body: JSON.stringify({ method: "instances.select", params: { instanceId: newClient.instanceId } }),
               signal: AbortSignal.timeout(1000)
             });
-            console.log(`[Test] Selected test browser instance: ${targetClient.instanceId}`);
+            console.log(`[Test] Selected test browser instance: ${newClient.instanceId}`);
             return {
               type: "HANDSHAKE",
               agent: "AgentPilot-Extension",

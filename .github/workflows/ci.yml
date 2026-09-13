@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint-and-package:
-    name: Lint & Package Verification
+    name: Lint, Test & Package Verification
     runs-on: ubuntu-latest
 
     steps:
@@ -21,11 +21,25 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      - name: Install Dependencies
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: cli/go.sum
+
+      - name: Install Node Dependencies
         run: npm ci
 
       - name: Run Syntax & Lint Checks
         run: npm run lint
+
+      - name: Run Go Unit Tests
+        run: npm run test:cli
+
+      - name: Test Go CLI Build (Static Binary)
+        run: |
+          npm run build:cli
+          ./cli/agent-pilot --help
 
       - name: Test Extension Packaging
         run: npm run pack

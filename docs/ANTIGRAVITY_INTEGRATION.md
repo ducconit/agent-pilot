@@ -100,27 +100,31 @@ Antigravity có thể tạo ra các chuỗi lệnh JSON có cấu trúc để n�
 
 Agent Pilot trang bị sẵn một máy chủ cầu nối hai chiều chuẩn **Model Context Protocol (MCP)** và **WebSocket** tại cổng chuyên dụng **`58765`** (dải cổng riêng tư IANA `49152 – 65535`, chống trùng lặp hoàn toàn với các dịch vụ dev thông thường).
 
-### 3.1. Khởi chạy Máy chủ Cầu nối:
+### 3.1. Khởi chạy Máy chủ Cầu nối (Bridge Server):
 ```bash
-# Khởi chạy chế độ thông thường (WebSocket + HTTP API)
+# Sử dụng binary Go (khuyên dùng, không phụ thuộc Node.js):
+agent-pilot server
+
+# Hoặc khởi chạy qua npm script:
 npm run server
 
-# Hoặc khởi chạy cổng tùy chỉnh
-AGENT_PILOT_PORT=58765 npm run server
+# Hoặc khởi chạy với cổng tùy chỉnh:
+AGENT_PILOT_PORT=58765 agent-pilot server
 ```
 
-### 3.2. Cấu hình Antigravity MCP Server (`~/.gemini/antigravity/mcp/`):
-Thêm cấu hình sau vào Antigravity để AI Agent tự động sở hữu toàn bộ công cụ điều khiển trình duyệt:
+### 3.2. Cấu hình Antigravity MCP Server:
+Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/config/mcp_config.json` hoặc cấu hình MCP dự án) để AI Agent tự động sở hữu toàn bộ 16 công cụ điều khiển trình duyệt:
 ```json
 {
   "mcpServers": {
     "agent-pilot": {
-      "command": "/home/ubuntu/.agk/bin/agent-pilot",
+      "command": "agent-pilot",
       "args": ["mcp"]
     }
   }
 }
 ```
+*(Nếu cài đặt binary ở đường dẫn riêng, thay `"agent-pilot"` bằng đường dẫn tuyệt đối như `"/home/ubuntu/.agk/bin/agent-pilot"` hoặc `"/usr/local/bin/agent-pilot"`)*.
 
 ### 3.3. Danh mục 16 Công cụ MCP Cung Cấp Cho AI Agent:
 1. `browser_open_tab(url, active)`: Mở tab trình duyệt mới (mặc định mở nền không cướp focus của người dùng, tự động phân nhóm Chrome Tab Group).

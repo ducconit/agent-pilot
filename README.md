@@ -134,27 +134,173 @@ agent-pilot-extension/
 
 ---
 
-## 🚀 Hướng Dẫn Cài Đặt Nhanh
+## 🚀 Hướng Dẫn Cài Đặt (Installation Guide)
 
-### Bước 1: Mở Quản lý Tiện ích trên Chrome
-Truy cập đường dẫn sau trên trình duyệt Chrome:
-```text
-chrome://extensions
+Agent Pilot cung cấp 3 thành phần chính: **Chrome Extension (Giao diện & Cầu nối trình duyệt)**, **Standalone Go CLI / MCP Server (Bộ máy điều khiển độc lập)**, và **Agent Skill (Kỹ năng cho AI Coding Assistants)**.
+
+```mermaid
+flowchart LR
+    subgraph Install["3 Bước Thiết Lập Toàn Diện"]
+        A["<b>1. Cài Extension</b><br/>Nạp vào Chrome (MV3)"] --> B["<b>2. Cài Go CLI</b><br/>Tải binary hoặc build"]
+        B --> C["<b>3. Cài Kỹ Năng / MCP</b><br/>npx skills add hoặc mcp_config"]
+    end
 ```
 
-### Bước 2: Bật Chế độ Nhà phát triển & Tải Extension
-1. Gạt bật công tắc **Developer mode** ở góc trên cùng bên phải.
-2. Nhấp nút **Load unpacked** (Tải tiện ích đã giải nén) ở góc trên bên trái.
-3. Chọn đường dẫn thư mục `extensions` của dự án tương ứng với hệ điều hành của bạn:
-   * **Windows**: `C:\path\to\browser-control\extensions`
-   * **macOS**: `/Users/<username>/path/to/browser-control/extensions`
-   * **Linux**: `/home/<username>/path/to/browser-control/extensions`
-   *(Hoặc giải nén tệp sẵn sàng cài đặt tại `dist/agent-pilot-v1.0.2-beta.zip`)*.
+### 1. Cài Đặt Chrome Extension
 
-### Bước 3: Khởi động Bảng điều khiển (Side Panel)
-* **Cách 1 (Nhanh nhất)**: Nhấp chuột vào biểu tượng **Agent Pilot (📌)** trên thanh công cụ Chrome (Side Panel sẽ trượt mở tức thì).
-* **Cách 2 (Menu chuột phải)**: Nhấp chuột phải trên bất kỳ trang web nào $\rightarrow$ Chọn **Mở Agent Pilot (Side Panel)**.
-* *(Tùy chọn)*: Để gán phím tắt riêng không lo xung đột phần mềm khác, truy cập `chrome://extensions/shortcuts` để cài đặt.
+#### Cách A: Cài đặt từ Bản Phát Hành (Khuyên dùng)
+1. Tải gói tiện ích mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (tệp `agent-pilot-v1.0.3-beta.zip` hoặc trong thư mục `dist/`).
+2. Giải nén tệp `.zip` vào một thư mục cố định trên máy.
+3. Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
+4. Gạt bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải.
+5. Nhấn nút **Load unpacked** (Tải tiện ích đã giải nén) và chọn thư mục vừa giải nén.
+6. Nhấp biểu tượng Extensions (mảnh ghép) trên thanh công cụ Chrome và **Ghim (Pin)** biểu tượng **Agent Pilot (📌)**.
+
+#### Cách B: Cài đặt từ Mã Nguồn (Dành cho Lập trình viên)
+```bash
+git clone https://github.com/ducconit/agent-pilot-extension.git
+cd agent-pilot-extension
+npm ci
+npm run pack  # Đóng gói tự động ra dist/agent-pilot-v*.zip
+```
+Sau đó nạp thư mục `extensions/` trực tiếp vào `chrome://extensions`.
+
+---
+
+### 2. Cài Đặt Standalone Go CLI & MCP Server (`agent-pilot`)
+
+Bản binary độc lập viết bằng **Golang** tích hợp sẵn máy chủ **WebSocket/REST Bridge Server (cổng 58765)**, **MCP Server (stdio)** và **bộ lệnh CLI** điều khiển trình duyệt trực tiếp (khởi động `<5ms`, RAM `~12MB`, đóng gói tĩnh pure static `CGO_ENABLED=0`, không phụ thuộc Node.js hay thư viện hệ thống).
+
+#### Cách A: Tải Binary Biên Dịch Sẵn (GitHub Releases)
+Tải binary tương ứng với hệ điều hành và kiến trúc máy tính của bạn:
+
+| Hệ Điều Hành | Kiến Trúc | Tên Tệp Tải Về | Lệnh Cài Đặt Toàn Cục |
+| :--- | :--- | :--- | :--- |
+| **Linux** | x86_64 (amd64) | `agent-pilot-linux-amd64` | `sudo mv agent-pilot-linux-amd64 /usr/local/bin/agent-pilot && sudo chmod +x /usr/local/bin/agent-pilot` |
+| **Linux** | ARM64 (aarch64) | `agent-pilot-linux-arm64` | `sudo mv agent-pilot-linux-arm64 /usr/local/bin/agent-pilot && sudo chmod +x /usr/local/bin/agent-pilot` |
+| **macOS** | Apple Silicon (M1-M4) | `agent-pilot-darwin-arm64` | `sudo mv agent-pilot-darwin-arm64 /usr/local/bin/agent-pilot && sudo chmod +x /usr/local/bin/agent-pilot` |
+| **macOS** | Intel (x86_64) | `agent-pilot-darwin-amd64` | `sudo mv agent-pilot-darwin-amd64 /usr/local/bin/agent-pilot && sudo chmod +x /usr/local/bin/agent-pilot` |
+| **Windows** | x86_64 (amd64) | `agent-pilot-windows-amd64.exe` | Đổi tên thành `agent-pilot.exe` và thêm vào biến môi trường `PATH` |
+| **Windows** | ARM64 | `agent-pilot-windows-arm64.exe` | Đổi tên thành `agent-pilot.exe` và thêm vào biến môi trường `PATH` |
+
+#### Cách B: Tự Biên Dịch Từ Nguồn (Yêu cầu Go 1.21+)
+```bash
+# Cách 1: Sử dụng npm script
+npm run build:cli
+
+# Cách 2: Tự biên dịch trực tiếp qua go build
+cd cli
+go build -ldflags="-s -w" -o agent-pilot .
+
+# Hoặc cài đặt trực tiếp qua Go toolchain
+go install github.com/ducconit/agent-pilot-extension/cli@latest
+```
+
+---
+
+### 3. Cài Đặt Kỹ Năng Cho Trợ Lý AI (Agent Skills Ecosystem)
+
+Agent Pilot tuân thủ chuẩn mở **Agent Skills** ([skills.sh](https://skills.sh/)). Mọi trợ lý AI coding (như **Claude Code**, **Cursor**, **Codex**, **OpenCode**, **Antigravity**, **Amp**, **Roo Code**, **Devin**, v.v.) đều có thể tự động tải và kích hoạt kỹ năng chỉ với 1 lệnh:
+
+```bash
+# Cài đặt cho thư mục dự án hiện tại:
+npx skills add https://github.com/ducconit/agent-pilot-extension
+
+# Hoặc cài đặt toàn cục (Global) cho mọi AI agent trên hệ thống:
+npx skills add https://github.com/ducconit/agent-pilot-extension -g --all
+```
+
+---
+
+## 📖 Hướng Dẫn Sử Dụng (User & Developer Guide)
+
+### 1. Dành Cho Người Dùng (Humans)
+
+#### Khởi Động Bảng Điều Khiển (Side Panel)
+- **Cách 1**: Nhấp chuột trực tiếp vào biểu tượng **Agent Pilot (📌)** trên thanh công cụ Chrome (Side Panel sẽ trượt mở tức thì).
+- **Cách 2**: Nhấp chuột phải trên bất kỳ trang web nào $\rightarrow$ Chọn **Mở Agent Pilot (Side Panel)**.
+- **Phím tắt nhanh**: <kbd>Ctrl + Shift + P</kbd> (trên macOS: <kbd>Cmd + Shift + P</kbd>). Bạn có thể tùy chỉnh lại phím tắt tại `chrome://extensions/shortcuts`.
+
+#### Các Tính Năng Nổi Bật Trên Giao Diện:
+1. **🎯 Soi Phần Tử DOM (Inspector)**: Bật nút soi $\rightarrow$ rà chuột qua trang web để xem bounding box, kích thước, CSS Selector và XPath. Nhấp vào bất kỳ dòng nào để sao chép nhanh hoặc bấm **📋 Copy Tất cả**.
+2. **🎨 Kính Lúp Nhặt Mã Màu (Eyedropper)**: Phóng đại pixel 11×11 bám theo con trỏ chuột, nhặt màu chính xác (HEX, RGB, HSL) và tự động copy vào clipboard.
+3. **📸 Bộ Chụp Màn Hình (Screenshot Studio)**:
+   - Chụp toàn màn hình, kéo khung cắt tùy chọn (Crop), hoặc chụp riêng phần tử DOM đã khóa.
+   - Bật công tắc **Tự động sao chép vào Clipboard** để dán ngay lập tức mà không cần bấm lưu.
+4. **✏️ Chú Thích & Chỉ Điểm UI Cho Agent (Feedback Studio)**:
+   - **4 chế độ chọn**: Chọn phần tử (tự động phát hiện React/Vue/Astro source line), Kéo chọn vùng (ghim khung số hóa #1, #2,...), Toàn màn hình viewport (vẽ khung box & cắm ghim pin), và Toàn trang web cuộn (Full Page).
+   - **Chỉnh sửa / Xóa linh hoạt**: Nhấp nút ✏️ để sửa ghi chú trực tiếp trên trang hoặc trên thẻ Side Panel; bấm ✕ để xóa khung ghim.
+   - **3 kênh xuất linh hoạt**:
+     - **Kênh A (Live Push)**: Đẩy trực tiếp sang cho AI Agent đang chờ.
+     - **Kênh B (Shared Inbox)**: Lưu phiên vào `~/.agent-pilot/inbox/feedback/<timestamp>/`.
+     - **Kênh C (Clipboard Prompt)**: 1-click tạo prompt Markdown hoàn chỉnh kèm vị trí component.
+
+---
+
+### 2. Dành Cho Trợ Lý AI Coding Agents (Antigravity, Claude, Cursor)
+
+#### Cấu Hình MCP Server (`stdio`):
+Thêm vào file cấu hình MCP của bạn (`~/.gemini/antigravity/mcp/` hoặc `claude_desktop_config.json` hoặc Cursor Settings):
+
+```json
+{
+  "mcpServers": {
+    "agent-pilot": {
+      "command": "agent-pilot",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+#### Khởi Chạy Bridge Server Chống Xung Đột Cổng (Dual Mode):
+```bash
+# Khởi chạy server độc lập
+agent-pilot server
+```
+Khi chạy đa tác vụ hoặc nhiều cửa sổ IDE, Agent Pilot tự động chuyển sang chế độ **Forwarder**, chuyển tiếp lệnh qua HTTP REST API `http://127.0.0.1:58765/api` mà không bao giờ gặp lỗi xung đột cổng `EADDRINUSE`.
+
+#### 16 Công Cụ MCP Điều Khiển Trình Duyệt:
+- `browser_run_actions`: Động cơ thực thi chuỗi kịch bản hàng loạt (Batch Engine), tiết kiệm >80% token.
+- `browser_open_tab`, `browser_list_tabs`, `browser_navigate`: Quản lý và điều hướng các tab trình duyệt (mặc định mở ngầm không cướp focus).
+- `browser_click`, `browser_type`, `browser_scroll`: Mô phỏng chuột ảo neon với sóng click ripple, tự động gõ chữ và cuộn trang.
+- `browser_get_element`, `browser_pick_color`, `browser_screenshot`: Đọc DOM, trích xuất mã màu pixel, chụp ảnh màn hình ngầm qua CDP.
+- `browser_get_devtools_data`: Bắt log Console, Network requests và Performance RAM/DOM.
+- `browser_list_instances`, `browser_select_instance`: Quản lý đa trình duyệt Chrome đồng thời.
+- `browser_set_busy`: Khóa/mở khóa khiên bảo vệ người dùng thao tác khi Agent chạy kịch bản phức tạp.
+- `browser_wait_for_feedback`: Chờ phản hồi trực quan từ người dùng theo thời gian thực (Channel A).
+- `browser_get_pending_feedback`: Đọc danh sách phản hồi UI trong Inbox cục bộ (Channel B).
+
+---
+
+### 3. Dành Cho Kỹ Sư Kiểm Thử / QC (Standalone CLI Automation)
+
+Kỹ sư kiểm thử tự động có thể điều khiển trình duyệt trực tiếp qua terminal hoặc tích hợp vào shell script/CI mà không cần Node.js:
+
+```bash
+# 1. Điều hướng và mở tab
+agent-pilot open "https://github.com" --active
+
+# 2. Tương tác chuột & bàn phím
+agent-pilot type "#search-input" "agent pilot" --enter
+agent-pilot click ".repo-item:first-child"
+agent-pilot scroll 0 400
+
+# 3. Trích xuất thông tin DOM
+agent-pilot inspect "h1.entry-title"
+
+# 4. Chụp ảnh màn hình kiểm thử
+agent-pilot screenshot -o result.png --mode visible
+
+# 5. Xem danh sách các tab đang hoạt động
+agent-pilot tabs
+
+# 6. Chạy kịch bản tự động hóa từ tệp JSON
+agent-pilot batch flow_test.json
+
+# 7. Quản lý phản hồi UI
+agent-pilot feedback list
+```
 
 ---
 
@@ -169,88 +315,7 @@ Dự án có sẵn tệp `test-page.html` được thiết kế đặc biệt đ
    - Thử nghiệm **DevTools**: Nhấp các nút sinh `console.log`, `warn`, `error` hoặc nút gửi API để thấy nhật ký và network nhảy tức thì trong Side Panel.
    - Thử nghiệm **Lấy màu**: Bật nút lấy mã màu và nhặt màu từ dải các ô màu rực rỡ trên trang.
    - Thử nghiệm **Chụp ảnh**: Thử chụp toàn màn hình, kéo khung crop box hoặc chụp riêng khối `#inspector-special-box`.
-
----
-
-## ⚡ Cài Đặt Kỹ Năng Cho AI Agents (`npx skills add`)
-
-Agent Pilot tương thích hoàn toàn với chuẩn **Agent Skills Open Ecosystem** ([skills.sh](https://skills.sh/)). Mọi trợ lý AI coding (như **Claude Code**, **Cursor**, **Codex**, **OpenCode**, **Antigravity**, **Amp**, **Roo Code**, **Devin**, v.v.) đều có thể tự động tải và cài đặt kỹ năng điều khiển trình duyệt của Agent Pilot chỉ với một lệnh duy nhất:
-
-```bash
-# Cài đặt trực tiếp cho dự án hiện tại
-npx skills add https://github.com/ducconit/agent-pilot-extension
-
-# Hoặc cài đặt toàn cục (Global) cho tất cả coding agents trên máy
-npx skills add https://github.com/ducconit/agent-pilot-extension -g --all
-```
-
-Khi được kích hoạt, AI Agent sẽ tự động phát hiện bộ công cụ MCP `agent-pilot` và có thể tự chủ điều khiển tab, click chuột ảo, gõ bàn phím, cuộn trang, trích xuất DOM, chụp ảnh màn hình và theo dõi Chrome DevTools để phục vụ công việc lập trình và kiểm thử tự động.
-
----
-
-## 📡 Kết Nối AI Agent Trực Tiếp (Cổng 58765 & Chuẩn MCP)
-
-Agent Pilot trang bị sẵn máy chủ WebSocket & MCP Server tại cổng chuyên dụng **`58765`** (thuộc dải cổng riêng tư IANA `49152 – 65535`, chống trùng lặp hoàn toàn với các cổng dev phổ biến như 3000, 5000, 8000, 8080,...):
-
-1. **Khởi chạy Bridge Server**:
-   ```bash
-   npm run server
-   ```
-2. **Kiểm thử tự động kết nối AI Agent điều khiển Trình duyệt**:
-   ```bash
-   npm run test:all
-   ```
-   *(Bộ test tự động hóa E2E kiểm chứng 29/29 tính năng Agent điều khiển Chrome qua cổng 58765, 15/15 tính năng Extension và 8/8 tính năng Feedback đạt 100% PASS).*
-3. **Cấu hình Antigravity MCP**: Xem hướng dẫn 1-click tại [docs/ANTIGRAVITY_INTEGRATION.md](docs/ANTIGRAVITY_INTEGRATION.md).
-
----
-
-## ⚡ Bộ Binary CLI Độc Lập Bằng Go (`cli/`)
-
-Agent Pilot cung cấp một bản nhị phân độc lập (Single Static Binary) viết bằng **Go (Golang)** nằm trong thư mục `cli/`. Bản binary này giải quyết triệt để sự phụ thuộc vào môi trường Node.js:
-- **Tất cả trong 1**: Chứa sẵn **WebSocket/REST Bridge Server 58765**, **MCP Server chuẩn 16 tools qua `stdio`**, và **bộ lệnh CLI thao tác trình duyệt trực tiếp** cho Tester/QC.
-- **Siêu nhẹ & tốc độ cao**: Khởi động `<5ms`, tiêu thụ RAM chỉ `~12MB`, đóng gói tĩnh duy nhất `~7MB` không cần cài đặt dependencies.
-
-```bash
-# Biên dịch binary (chỉ cần Go 1.21+)
-cd cli
-go build -ldflags="-s -w" -o agent-pilot .
-
-# 1. Chạy như một MCP Server (cho Claude Desktop, Cursor, Antigravity,...)
-./agent-pilot mcp
-
-# 2. Khởi chạy Bridge Server ngầm
-./agent-pilot server
-
-# 3. Tester/QC điều khiển trình duyệt trực tiếp qua CLI:
-./agent-pilot open https://github.com
-./agent-pilot click "#login-btn"
-./agent-pilot type "#search-box" "golang automation"
-./agent-pilot screenshot --mode=visible --out=page.png
-./agent-pilot inspect "#target-elem"
-./agent-pilot tabs
-./agent-pilot batch '[{"action":"click","selector":"#submit"}]'
-./agent-pilot feedback list
-```
-*(Chi tiết xem thêm tại [cli/README.md](cli/README.md))*
-
-
----
-
-## ✏️ Chú Thích & Chỉ Điểm UI Cho Agent (Visual UI Annotator Studio)
-
-Agent Pilot giải quyết bài toán cốt lõi: **Làm thế nào để AI Agent biết chính xác 100% vị trí giao diện, component nguồn, selector và lỗi UI cần chỉnh sửa do người dùng chỉ định?** (Tính năng này được thiết kế để giao việc sửa code cho AI Agent, không phải form góp ý về tiện ích).
-
-### Các Chế Độ Thu Thập Phản Hồi Trực Quan:
-- 🎯 **Chọn phần tử (Element Mode)**: Rà chuột highlight bất kỳ khối nào trên trang web $\rightarrow$ Bấm chọn để tự động cắt ảnh phần tử và bóc tách tệp nguồn framework (`fileName:lineNumber` của React Fiber, Vue Component, Astro).
-- ✂️ **Kéo chọn vùng (Region Crop Mode)**: Kéo thả chuột tự do để khoanh vùng bất kỳ khu vực nào trên trang web.
-- 📱 **Màn hình hiện tại (Screen Viewport Mode)**: Chụp toàn bộ khung nhìn hiển thị và mở công cụ ghim điểm (Pins) để chú thích nhiều lỗi trên cùng 1 ảnh.
-- 📄 **Toàn bộ trang web (Full Page Mode)**: Tự động cuộn trang và ghép trọn vẹn toàn bộ trang web dài từ đầu đến cuối.
-
-### 3 Kênh Giao Tiếp Độc Lập:
-1. **Kênh A (Reactive Long-Polling)**: Agent gọi công cụ `browser_wait_for_feedback({ timeout: 120 })`. Khi người dùng thao tác xong và bấm **"🚀 Gửi Agent"**, thông tin phản hồi sẽ được truyền thẳng tới Agent ngay lập tức mà không cần copy/paste.
-2. **Kênh B (Hộp thư Inbox Lưu Trữ File)**: Người dùng bấm **"💾 Lưu Inbox"** để lưu phiên phản hồi vào thư mục `~/.agent-pilot/inbox/feedback/<timestamp>/*` (bao gồm `session.json`, `prompt.md`, `item_1.png`,...). Agent có thể đọc mọi lúc thông qua công cụ `browser_get_pending_feedback()`.
-3. **Kênh C (1-Click Sao Chép Markdown Prompt)**: Bấm **"📋 Copy Prompt"** để tạo prompt định dạng Markdown chứa toàn bộ mã nguồn, selector và ảnh minh họa sẵn sàng dán vào khung chat của bất kỳ mô hình AI nào.
+   - Thử nghiệm **Feedback Studio**: Bấm nút Feedback Studio, kéo chọn vùng, cắm ghim pin và bấm Copy Prompt hoặc Gửi Agent.
 
 ---
 

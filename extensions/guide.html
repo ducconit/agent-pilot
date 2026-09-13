@@ -519,7 +519,7 @@
       </div>
     </div>
     <div class="header-pills">
-      <span class="pill amber">● v1.0.2-beta (Public Beta)</span>
+      <span class="pill amber">● v1.0.3-beta (Public Beta)</span>
       <span class="pill">Cổng WebSocket 58765</span>
       <span class="pill purple">Manifest V3</span>
       <span class="pill">Cross-Platform (Win/Mac/Linux)</span>
@@ -550,6 +550,7 @@
       </div>
 
       <div class="jump-nav">
+        <a href="#section-install" class="jump-btn">🚀 Cài đặt & Khởi chạy</a>
         <a href="#section-agent" class="jump-btn">🤖 Tích hợp AI Agent</a>
         <a href="#section-security" class="jump-btn">🛡️ Bảo mật & Lọc Secret</a>
         <a href="#section-inspector" class="jump-btn">🎯 Soi DOM & CSS</a>
@@ -560,30 +561,93 @@
       </div>
     </section>
 
-    <!-- SECTION 1: AI AGENT INTEGRATION & MCP -->
-    <section id="section-agent">
+    <!-- SECTION 0: INSTALLATION & SETUP -->
+    <section id="section-install">
       <div class="section-title-wrap">
-        <span class="section-icon">🤖</span>
-        <h2 class="section-title">1. Tích Hợp AI Agent & Chuẩn Giao Thức MCP</h2>
+        <span class="section-icon">🚀</span>
+        <h2 class="section-title">0. Hướng Dẫn Cài Đặt & Khởi Chạy Nhanh (Installation & Setup)</h2>
       </div>
 
       <div class="cards-grid">
         <div class="card">
           <div class="card-header">
-            <span class="card-icon">🚀</span>
-            <h3 class="card-title">Cài Đặt Kỹ Năng Agent (skills.sh)</h3>
+            <span class="card-icon">🧩</span>
+            <h3 class="card-title">Cài Đặt Chrome Extension (MV3)</h3>
           </div>
           <p class="card-desc">
-            Tương thích chuẩn Agent Skills mở cho Claude Code, Cursor, Codex, OpenCode, Antigravity, Amp, Roo, Devin. Cài đặt tự động chỉ với một dòng lệnh:
+            Tiện ích mở rộng Google Chrome Manifest V3 hiện đại, giao tiếp trực tiếp qua Chrome Side Panel API và Chrome DevTools Protocol:
           </p>
-          <div class="code-box">npx skills add https://github.com/ducconit/agent-pilot-extension</div>
           <ul class="features-list">
-            <li>Tự động cấu hình và kích hoạt kỹ năng <code>agent-pilot</code></li>
-            <li>Hỗ trợ cài đặt theo từng dự án hoặc toàn cục máy tính (<code>-g --all</code>)</li>
-            <li>Trang bị đầy đủ 14 công cụ MCP điều khiển trình duyệt chuyên sâu</li>
+            <li>Tải tệp <code>agent-pilot-v1.0.3-beta.zip</code> từ GitHub Releases và giải nén</li>
+            <li>Mở <code>chrome://extensions</code> $\rightarrow$ Gạt bật <strong>Developer mode</strong></li>
+            <li>Nhấn <strong>Load unpacked</strong> và chọn thư mục vừa giải nén</li>
+            <li>Ghim icon 📌 lên thanh công cụ và mở Side Panel (<kbd>Ctrl+Shift+P</kbd> hoặc <kbd>Cmd+Shift+P</kbd>)</li>
           </ul>
         </div>
 
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">⚡</span>
+            <h3 class="card-title">Standalone Go CLI & MCP Server</h3>
+          </div>
+          <p class="card-desc">
+            Bản nhị phân độc lập viết bằng Golang, tích hợp sẵn Bridge Server 58765, MCP Server stdio và bộ lệnh CLI automation:
+          </p>
+          <ul class="features-list">
+            <li>Không phụ thuộc Node.js hay npm, khởi động <code>&lt;5ms</code>, RAM chỉ <code>~12MB</code></li>
+            <li>Hỗ trợ sẵn cho Linux (x64/ARM64), macOS (Intel/M1-M4) và Windows</li>
+            <li>Đặt binary vào <code>/usr/local/bin/agent-pilot</code> hoặc biến môi trường PATH</li>
+            <li>Khởi chạy nhanh máy chủ bridge: <code>agent-pilot server</code></li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">🤖</span>
+            <h3 class="card-title">Cấu Hình MCP Cho AI Assistant</h3>
+          </div>
+          <p class="card-desc">
+            Trang bị khả năng điều khiển trình duyệt cho Claude Desktop, Cursor, Google Antigravity, OpenCode qua giao thức stdio:
+          </p>
+          <div class="code-box">{
+  "mcpServers": {
+    "agent-pilot": {
+      "command": "agent-pilot",
+      "args": ["mcp"]
+    }
+  }
+}</div>
+          <ul class="features-list">
+            <li>Tự động chuyển tiếp Dual Mode: Không xung đột cổng khi chạy nhiều IDE</li>
+            <li>Tự động che giấu 12 mẫu khóa bí mật (API Key, JWT, Bearer) trước khi gửi LLM</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">📦</span>
+            <h3 class="card-title">Kỹ Năng Agent Skills (skills.sh)</h3>
+          </div>
+          <p class="card-desc">
+            Tương thích 100% chuẩn Agent Skills Open Ecosystem. Tự động tải và cài đặt toàn bộ kỹ năng cho mọi coding agent:
+          </p>
+          <div class="code-box">npx skills add https://github.com/ducconit/agent-pilot-extension</div>
+          <ul class="features-list">
+            <li>Áp dụng cho Claude Code, Cursor, Codex, Antigravity, Amp, Roo, Devin</li>
+            <li>Thêm cờ <code>-g --all</code> để cài đặt toàn cục cho mọi trợ lý trên máy tính</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 1: AI AGENT INTEGRATION & MCP -->
+    <section id="section-agent">
+      <div class="section-title-wrap">
+        <span class="section-icon">🤖</span>
+        <h2 class="section-title">1. Tích Hợp AI Agent & Bộ 16 Công Cụ MCP</h2>
+      </div>
+
+      <div class="cards-grid">
         <div class="card">
           <div class="card-header">
             <span class="card-icon">⚡</span>
@@ -606,7 +670,7 @@
             <h3 class="card-title">Động Cơ Thực Thi Hàng Loạt (Batch Engine)</h3>
           </div>
           <p class="card-desc">
-            Công cụ <code>browser_run_actions</code> cho phép AI Agent gửi một chuỗi kịch bản gồm nhiều bước chỉ trong một tool call duy nhất, giúp tiết kiệm hơn 70% token và giảm thời gian chờ phản hồi.
+            Công cụ <code>browser_run_actions</code> cho phép AI Agent gửi một chuỗi kịch bản gồm nhiều bước chỉ trong một tool call duy nhất, giúp tiết kiệm hơn 80% token và giảm thời gian chờ phản hồi.
           </p>
           <ul class="features-list">
             <li>Chuỗi hành động: mở tab, điều hướng, cuộn, gõ chữ, click, chụp ảnh</li>
@@ -629,6 +693,21 @@
             <li>Con trỏ chuột ảo thông minh: Tự động ẩn khi tab không hoạt động</li>
           </ul>
         </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-icon">🧪</span>
+            <h3 class="card-title">Bộ Lệnh CLI Tự Động Hóa Cho Tester / QC</h3>
+          </div>
+          <p class="card-desc">
+            Kỹ sư kiểm thử tự động có thể điều khiển trình duyệt trực tiếp qua terminal hoặc viết shell script kiểm thử tự động:
+          </p>
+          <div class="code-box">agent-pilot open "https://example.com"
+agent-pilot click "#login-button"
+agent-pilot type "#user" "admin" --enter
+agent-pilot screenshot -o page.png
+agent-pilot batch flow.json</div>
+        </div>
       </div>
 
       <!-- MCP Tools Table -->
@@ -636,7 +715,7 @@
         <table>
           <thead>
             <tr>
-              <th>Tên Công cụ MCP</th>
+              <th>Tên Công cụ MCP (16 Tools)</th>
               <th>Mô tả Chức năng</th>
               <th>Tham số Chính</th>
             </tr>
@@ -645,7 +724,7 @@
             <tr>
               <td><span class="tag-mono">browser_run_actions</span></td>
               <td>Chạy chuỗi kịch bản đa bước (Batch Engine) tối ưu token</td>
-              <td><code>actions: [...]</code>, <code>tabId</code></td>
+              <td><code>actions: [...]</code>, <code>tabId</code>, <code>stopOnError</code></td>
             </tr>
             <tr>
               <td><span class="tag-mono">browser_open_tab</span></td>
@@ -653,19 +732,34 @@
               <td><code>url</code>, <code>active: false</code></td>
             </tr>
             <tr>
+              <td><span class="tag-mono">browser_list_tabs</span></td>
+              <td>Liệt kê toàn bộ các tab trình duyệt kèm trạng thái quản lý</td>
+              <td><code>{}</code></td>
+            </tr>
+            <tr>
+              <td><span class="tag-mono">browser_navigate</span></td>
+              <td>Điều hướng tab hiện tại hoặc tab chỉ định đến URL</td>
+              <td><code>url</code>, <code>tabId</code></td>
+            </tr>
+            <tr>
               <td><span class="tag-mono">browser_click</span></td>
-              <td>Mô phỏng click chuột người thật kèm hiệu ứng gợn sóng</td>
-              <td><code>x</code>, <code>y</code>, <code>selector</code></td>
+              <td>Mô phỏng click chuột người thật kèm hiệu ứng gợn sóng và tọa độ</td>
+              <td><code>x</code>, <code>y</code>, <code>selector</code>, <code>tabId</code></td>
             </tr>
             <tr>
               <td><span class="tag-mono">browser_type</span></td>
               <td>Gõ ký tự tự nhiên vào ô nhập liệu (hỗ trợ xóa cũ & Enter)</td>
-              <td><code>selector</code>, <code>text</code>, <code>clear</code></td>
+              <td><code>selector</code>, <code>text</code>, <code>clear</code>, <code>pressEnter</code></td>
+            </tr>
+            <tr>
+              <td><span class="tag-mono">browser_scroll</span></td>
+              <td>Cuộn trang web mượt mà theo trục X hoặc Y</td>
+              <td><code>deltaX</code>, <code>deltaY</code>, <code>tabId</code></td>
             </tr>
             <tr>
               <td><span class="tag-mono">browser_get_element</span></td>
               <td>Soi chi tiết phần tử DOM (Selector, XPath, BoundingRect, CSS)</td>
-              <td><code>selector</code></td>
+              <td><code>selector</code>, <code>tabId</code></td>
             </tr>
             <tr>
               <td><span class="tag-mono">browser_screenshot</span></td>
@@ -681,6 +775,31 @@
               <td><span class="tag-mono">browser_pick_color</span></td>
               <td>Lấy mã màu tại tọa độ cụ thể (HEX, RGB, HSL)</td>
               <td><code>x</code>, <code>y</code>, <code>tabId</code></td>
+            </tr>
+            <tr>
+              <td><span class="tag-mono">browser_list_instances</span></td>
+              <td>Liệt kê danh sách các trình duyệt Chrome đang kết nối</td>
+              <td><code>{}</code></td>
+            </tr>
+            <tr>
+              <td><span class="tag-mono">browser_select_instance</span></td>
+              <td>Chọn trình duyệt cụ thể trong môi trường đa trình duyệt</td>
+              <td><code>instanceId</code></td>
+            </tr>
+            <tr>
+              <td><span class="tag-mono">browser_set_busy</span></td>
+              <td>Khóa / mở khóa khiên Human Input Lock khi Agent thao tác</td>
+              <td><code>busy</code>, <code>action</code>, <code>tabId</code></td>
+            </tr>
+            <tr>
+              <td><span class="tag-mono">browser_get_pending_feedback</span></td>
+              <td>Đọc danh sách phiên phản hồi UI do người dùng tạo trong Inbox</td>
+              <td><code>limit</code>, <code>sessionId</code>, <code>clear</code></td>
+            </tr>
+            <tr>
+              <td><span class="tag-mono">browser_wait_for_feedback</span></td>
+              <td>Chờ phản hồi trực tiếp (Channel A Reactive Long-Polling)</td>
+              <td><code>timeout</code>, <code>tabId</code></td>
             </tr>
           </tbody>
         </table>
