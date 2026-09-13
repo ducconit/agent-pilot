@@ -5,7 +5,7 @@ description: Control browser tabs, navigate, virtual mouse move/click/type, insp
 
 # Agent Pilot - Universal AI Agent Browser Controller
 
-> **Next-Gen AI Browser Companion & Automation Engine (Antigravity First)**  
+> **Next-Gen AI Browser Companion & Automation Engine (Antigravity First)**
 > Maintained by **DNT** ([@ducconit](https://github.com/ducconit)) • Open Source Public Beta
 
 Use this skill when an AI agent needs to automate browser flows, interact with web applications, click elements, fill forms, inspect DOM trees, capture visual screenshots, pick on-screen colors, or debug web applications via Chrome DevTools Protocol (CDP).
@@ -32,7 +32,7 @@ npx skills add https://github.com/ducconit/agent-pilot-extension -g --all
 flowchart TD
     Agent["<b>AI Agent (Claude / Cursor / Antigravity)</b><br/>Stdio MCP, Direct CLI, or HTTP REST"]
     GoCLI["<b>Golang Standalone CLI & MCP Engine</b><br/>cli/agent-pilot (Zero-dep, &lt;5ms)"]
-    
+
     Agent -->|Stdio MCP, CLI Command, or HTTP /api| GoCLI
     GoCLI -->|WebSocket ws://127.0.0.1:58765| Ext["<b>Agent Pilot Extension (MV3)</b><br/>Service Worker (background.js)"]
     Ext -->|chrome.debugger CDP| CDP["<b>Chrome DevTools Protocol</b><br/>Console, Network, Performance"]
@@ -199,8 +199,7 @@ curl -s -X POST http://127.0.0.1:58765/api \
 
 Detailed guides, troubleshooting instructions, and reference specifications are available in the skill directory:
 
-- [Setup, Installation & Troubleshooting Guide](file:///home/ubuntu/workspace/projects/browser-control/skills/agent-pilot/references/setup.md): Complete setup for Chrome Extension, Go CLI, Background Services (`systemd`, `launchd`, `Task Scheduler`), and MCP Client configurations.
-- [CLI Command & Automation Reference](file:///home/ubuntu/workspace/projects/browser-control/skills/agent-pilot/references/cli-usage.md): Syntax, arguments, and copy-paste examples for all `agent-pilot` CLI commands.
-- [Architecture, Server & Concurrency Reference](file:///home/ubuntu/workspace/projects/browser-control/skills/agent-pilot/references/architecture-and-server.md): Deep dive into Master Bridge Dual Mode, HTTP REST endpoints, WebSocket protocol, and the 12-rule Secret Redaction Layer.
-- [Batch Automation Example](file:///home/ubuntu/workspace/projects/browser-control/skills/agent-pilot/examples/batch-flow-example.json): Ready-to-use JSON batch flow for automated web testing and regression suites.
-
+- [Setup, Installation & Troubleshooting Guide](references/setup.md): Complete setup for Chrome Extension, Go CLI, Background Services (`systemd`, `launchd`, `Task Scheduler`), and MCP Client configurations.
+- [CLI Command & Automation Reference](references/cli-usage.md): Syntax, arguments, and copy-paste examples for all `agent-pilot` CLI commands.
+- [Architecture, Server & Concurrency Reference](references/architecture-and-server.md): Deep dive into Master Bridge Dual Mode, HTTP REST endpoints, WebSocket protocol, and the 12-rule Secret Redaction Layer.
+- [Batch Automation Example](examples/batch-flow-example.json): Ready-to-use JSON batch flow for automated web testing and regression suites.

@@ -191,7 +191,11 @@ func ExecListTabs() error {
 				if a, _ := tm["active"].(bool); a {
 					activeTag = " [ACTIVE]"
 				}
-				fmt.Printf("  %d. [Tab #%v] %s%s\n     URL: %v\n", i+1, tm["tabId"], tm["title"], activeTag, tm["url"])
+				tabIDStr := fmt.Sprintf("%v", tm["tabId"])
+				if f, ok := tm["tabId"].(float64); ok {
+					tabIDStr = fmt.Sprintf("%.0f", f)
+				}
+				fmt.Printf("  %d. [Tab #%s] %s%s\n     URL: %v\n", i+1, tabIDStr, tm["title"], activeTag, tm["url"])
 			}
 		}
 	} else {
