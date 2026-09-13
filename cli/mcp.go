@@ -235,6 +235,11 @@ var mcpTools = []ToolInfo{
 }
 
 func RunMCPServer() {
+	// Automatically ensure bridge server is listening on port 58765 in background
+	go func() {
+		_ = StartBridgeServer(DefaultPort)
+	}()
+
 	reader := bufio.NewReader(os.Stdin)
 
 	for {

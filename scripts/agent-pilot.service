@@ -1,0 +1,16 @@
+[Unit]
+Description=Agent Pilot Browser Control Bridge (User Mode)
+Documentation=https://github.com/ducconit/agent-pilot-extension
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/ubuntu/.local/bin/agent-pilot server
+Restart=always
+RestartSec=3s
+LimitNOFILE=65536
+KillMode=mixed
+TimeoutStopSec=10s
+
+[Install]
+WantedBy=default.target
