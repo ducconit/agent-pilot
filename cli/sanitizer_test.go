@@ -1,0 +1,157 @@
+package main
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
+
+func TestMaskStringSecrets(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "OpenAI Key",
+			input:    "sk-proj-1234567890abcdefghijklmnopqrstuvwxyz",
+			expected: "sk-proj******************** [MASKED_SECRET: OpenAI API Key]",
+		},
+		{
+			name:     "Anthropic Key",
+			input:    "sk-ant-1234567890abcdefghijklmnopqrstuvwxyz",
+			expected: "sk-ant-******************** [MASKED_SECRET: Anthropic API Key]",
+		},
+		{
+			name:     "Google Key",
+			input:    "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ0123456",
+			expected: "AIzaSy******************** [MASKED_SECRET: Google API Key]",
+		},
+		{
+			name:     "GitHub Token",
+			input:    "ghp_1234567890abcdefghijklmnopqrstuvwxyz",
+			expected: "ghp_******************** [MASKED_SECRET: GitHub Token]",
+		},
+		{
+			name:     "AWS Access Key",
+			input:    "AKIAIOSFODNN7EXAMPLE",
+			expected: "AKIA******************** [MASKED_SECRET: AWS Access Key]",
+		},
+		{
+			name:     "Stripe Key",
+			input:    "sk_live_1234567890abcdefghijklmnopqrstuvwxyz",
+			expected: "sk_live_******************** [MASKED_SECRET: Stripe Key]",
+		},
+		{
+			name:     "Slack Token",
+			input:    "xoxb-1234567890-abcdefghijklmnop",
+			expected: "xoxb-******************** [MASKED_SECRET: Slack Token]",
+		},
+		{
+			name:     "JWT Token",
+			input:    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+			expected: "eyJ******************** [MASKED_SECRET: JWT Token]",
+		},
+		{
+			name:     "Bearer Token",
+			input:    "Bearer secret_bearer_token_1234567890_abcdef",
+			expected: "Bearer secr******************** [MASKED_SECRET: Bearer Token]",
+		},
+		{
+			name:     "URL Param",
+			input:    "https://example.com/api?api_key=my_secret_key_123456&user=alice",
+			expected: "https://example.com/api?api_key=******************** [MASKED_SECRET: URL Parameter]&user=alice",
+		},
+		{
+			name:     "Sensitive Key-Value in Raw JSON String",
+			input:    `{"password": "super_secret_password_123"}`,
+			expected: `{"password": "su******************** [MASKED_SECRET: Sensitive Field]"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, masked, _ := MaskString(tt.input)
+			if !masked {
+				t.Fatalf("expected string to be masked, got masked=false")
+			}
+			if res != tt.expected {
+				t.Fatalf("expected:\n%s\ngot:\n%s", tt.expected, res)
+			}
+		})
+	}
+}
+
+func TestSanitizeDataMap(t *testing.T) {
+	data := map[string]interface{}{
+		"normal":   "Hello world",
+		"password": "super_secret_password_123",
+		"nested": map[string]interface{}{
+			"apiKey": "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ0123456",
+		},
+	}
+
+	sanitized := SanitizeData(data, true).(map[string]interface{})
+	if sanitized["_securityNotice"] != AgentSecurityNotice {
+		t.Fatalf("expected _securityNotice to be set")
+	}
+	if !strings.Contains(sanitized["password"].(string), "[MASKED_SECRET: password]") {
+		t.Fatalf("expected password to be masked")
+	}
+	nested := sanitized["nested"].(map[string]interface{})
+	if !strings.Contains(nested["apiKey"].(string), "[MASKED_SECRET") {
+		t.Fatalf("expected nested apiKey to be masked")
+	}
+}
+
+func TestSanitizeDataDisabled(t *testing.T) {
+	data := map[string]interface{}{
+		"password": "plain_password_123",
+	}
+	bypassed := SanitizeData(data, false).(map[string]interface{})
+	if bypassed["password"] != "plain_password_123" {
+		t.Fatalf("expected password to not be masked when disabled")
+	}
+}
+
+func TestOriginValidation(t *testing.T) {
+	if !IsOriginAllowed("") {
+		t.Fatalf("empty origin should be allowed")
+	}
+	if !IsOriginAllowed("chrome-extension://abcdefghijklm") {
+		t.Fatalf("chrome-extension should be allowed")
+	}
+	if !IsOriginAllowed("http://localhost:3000") {
+		t.Fatalf("http://localhost:3000 should be allowed")
+	}
+	if !IsOriginAllowed("https://localhost:8443") {
+		t.Fatalf("https://localhost:8443 should be allowed")
+	}
+	if !IsOriginAllowed("http://127.0.0.1:8080") {
+		t.Fatalf("http://127.0.0.1:8080 should be allowed")
+	}
+	if IsOriginAllowed("http://evil.com") {
+		t.Fatalf("evil.com should be rejected")
+	}
+	if IsOriginAllowed("https://malicious.localhost.com") {
+		t.Fatalf("subdomain of localhost on external web should be rejected")
+	}
+}
+
+func TestMaskStringPreservesValidJSON(t *testing.T) {
+	rawJSON := `{"username": "admin", "password": "super_secret_password_123", "active": true}`
+	masked, changed, _ := MaskString(rawJSON)
+	if !changed {
+		t.Fatalf("expected rawJSON to be masked")
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(masked), &parsed); err != nil {
+		t.Fatalf("masked JSON string is malformed: %v\nOutput was: %s", err, masked)
+	}
+	if !strings.Contains(parsed["password"].(string), "[MASKED_SECRET: Sensitive Field]") {
+		t.Fatalf("expected password to contain masked secret notice")
+	}
+	if parsed["username"] != "admin" {
+		t.Fatalf("expected username to remain intact")
+	}
+}

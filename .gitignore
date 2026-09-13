@@ -41,3 +41,8 @@ active-plan.json
 **/active-plan.json
 states/
 .agk/
+# Go Binaries & Build Cache
+cli/agent-pilot
+cli/agent-pilot.exe
+*.test
+
