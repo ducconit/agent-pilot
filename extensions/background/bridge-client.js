@@ -642,7 +642,39 @@ export class AgentBridgeClient {
               action: "get_element_info",
               selector: params.selector,
               x: params.x,
-              y: params.y
+              y: params.y,
+              includeStyles: Boolean(params.includeStyles)
+            })
+          )
+            .then(res => respond(res || null))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "page.snapshot": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          this.runWithTabLock(tabId, "page.snapshot", () =>
+            this.sendTabMessageWithRetry(tabId, {
+              action: "get_snapshot",
+              maxElements: params.maxElements || 80,
+              format: params.format || "text"
+            })
+          )
+            .then(res => respond(res?.result !== undefined ? res.result : (res || null)))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "page.fillForm": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          this.runWithTabLock(tabId, "page.fillForm", () =>
+            this.sendTabMessageWithRetry(tabId, {
+              action: "fill_form",
+              fields: params.fields || [],
+              submitSelector: params.submitSelector || null,
+              pressEnter: Boolean(params.pressEnter)
             })
           )
             .then(res => respond(res || null))
@@ -702,20 +734,42 @@ export class AgentBridgeClient {
           const buffer = getBuffer(tabId);
           const requestedType = params.type || "all";
           const limit = Math.min(Math.max(Number(params.limit) || 50, 1), 200);
+          const filterOrigin = params.filterOrigin !== false;
 
           let consoleData = undefined;
           let networkData = undefined;
           let performanceData = undefined;
 
           if (requestedType === "all" || requestedType === "console") {
-            consoleData = buffer.console.slice(-limit);
+            let logs = buffer.console;
+            if (filterOrigin) {
+              logs = logs.filter(item => {
+                if (item.text && item.text.includes("[Agent Pilot]")) return false;
+                if (item.stackTrace && Array.isArray(item.stackTrace.callFrames) && item.stackTrace.callFrames.length > 0) {
+                  const hasWebFrame = item.stackTrace.callFrames.some(f => f.url && (f.url.startsWith("http://") || f.url.startsWith("https://")));
+                  const isAllExt = item.stackTrace.callFrames.every(f => !f.url || f.url.startsWith("chrome-extension://") || f.url === "");
+                  if (!hasWebFrame && isAllExt) return false;
+                } else if (item.url && item.url.includes("chrome-extension://")) {
+                  return false;
+                }
+                return true;
+              });
+            }
+            consoleData = logs.slice(-limit);
             if (params.clear) {
               buffer.console = [];
             }
           }
 
           if (requestedType === "all" || requestedType === "network") {
-            networkData = Array.from(buffer.network.values()).slice(-limit);
+            let reqs = Array.from(buffer.network.values());
+            if (filterOrigin) {
+              reqs = reqs.filter(item => {
+                const url = item.url || "";
+                return !url.startsWith("chrome-extension://");
+              });
+            }
+            networkData = reqs.slice(-limit);
             if (params.clear) {
               buffer.network.clear();
             }

@@ -130,13 +130,52 @@ var mcpTools = []ToolInfo{
 		},
 	},
 	{
-		Name:        "browser_get_element",
-		Description: "Inspect a DOM element, retrieving bounding box, coordinates, XPath, selector, text content, and computed CSS.",
+		Name:        "browser_snapshot",
+		Description: "Capture a token-efficient interactive accessibility snapshot of the page with numbered element references (@1, @2, etc.). Enables agents to quickly understand page structure and target elements with minimal token usage.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"selector": map[string]interface{}{"type": "string", "description": "CSS selector"},
-				"tabId":    map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"maxElements": map[string]interface{}{"type": "integer", "description": "Maximum number of interactive elements to include (default: 80)"},
+				"format":      map[string]interface{}{"type": "string", "description": "Output format: 'text' (default, compact tree) or 'json'"},
+				"tabId":       map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+		},
+	},
+	{
+		Name:        "browser_fill_form",
+		Description: "Fill multiple form fields (inputs, selects, checkboxes, textareas) and optionally submit in a single tool call. Compatible with React Hook Form, Vue, and standard HTML5 forms.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"fields": map[string]interface{}{
+					"type":        "array",
+					"description": "List of fields to fill: [{selector: '@1' or '#id', value: 'my text', clear: true}]",
+					"items": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"selector": map[string]interface{}{"type": "string", "description": "CSS selector or snapshot ref (e.g. '@1')"},
+							"value":    map[string]interface{}{"type": []string{"string", "boolean", "number"}, "description": "Value to set (string, boolean for checkbox, etc.)"},
+							"clear":    map[string]interface{}{"type": "boolean", "description": "Clear field before typing (default: true)"},
+						},
+						"required": []string{"selector", "value"},
+					},
+				},
+				"submitSelector": map[string]interface{}{"type": "string", "description": "Optional selector or snapshot ref (e.g. '@4') of submit button to click after filling"},
+				"pressEnter":     map[string]interface{}{"type": "boolean", "description": "Press enter on the last input after filling (default: false)"},
+				"tabId":          map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+			"required": []string{"fields"},
+		},
+	},
+	{
+		Name:        "browser_get_element",
+		Description: "Inspect a DOM element, retrieving bounding box, coordinates, XPath, selector, text content, and optionally computed CSS.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"selector":      map[string]interface{}{"type": "string", "description": "CSS selector or snapshot ref (e.g. '@1')"},
+				"includeStyles": map[string]interface{}{"type": "boolean", "description": "Include computed CSS styles. Omitted by default to minimize token usage."},
+				"tabId":         map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
 			"required": []string{"selector"},
 		},
@@ -159,10 +198,11 @@ var mcpTools = []ToolInfo{
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"type":  map[string]interface{}{"type": "string", "description": "all, console, network, performance"},
-				"tabId": map[string]interface{}{"type": "integer", "description": "Target tab ID"},
-				"limit": map[string]interface{}{"type": "integer", "description": "Max entries to return"},
-				"clear": map[string]interface{}{"type": "boolean", "description": "Clear buffer after reading"},
+				"type":         map[string]interface{}{"type": "string", "description": "all, console, network, performance"},
+				"filterOrigin": map[string]interface{}{"type": "boolean", "description": "Filter out internal extension logs/warnings (chrome-extension://*). Default: true"},
+				"tabId":        map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"limit":        map[string]interface{}{"type": "integer", "description": "Max entries to return"},
+				"clear":        map[string]interface{}{"type": "boolean", "description": "Clear buffer after reading"},
 			},
 		},
 	},
@@ -376,6 +416,20 @@ func executeToolCall(name string, args map[string]interface{}) (string, bool) {
 
 	case "browser_scroll":
 		res, err := DispatchCommand("page.scroll", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_snapshot":
+		res, err := DispatchCommand("page.snapshot", args, DefaultPort)
+		if err != nil {
+			return fmt.Sprintf("Error: %v", err), true
+		}
+		if str, ok := res.(string); ok {
+			return str, false
+		}
+		return formatToolResult(res, nil)
+
+	case "browser_fill_form":
+		res, err := DispatchCommand("page.fillForm", args, DefaultPort)
 		return formatToolResult(res, err)
 
 	case "browser_get_element":

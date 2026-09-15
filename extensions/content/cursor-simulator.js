@@ -129,10 +129,29 @@
     });
   }
 
+  function resolveElement(selector) {
+    if (!selector) return null;
+    if (selector instanceof Element) return selector;
+    if (typeof selector === "string" && selector.startsWith("@")) {
+      const idx = parseInt(selector.slice(1), 10);
+      const snapList = window.__AP_INTERNAL__?.snapshotElements;
+      if (snapList && snapList[idx] && document.contains(snapList[idx])) {
+        return snapList[idx];
+      }
+      return null;
+    }
+    try {
+      return document.querySelector(selector);
+    } catch (err) {
+      console.warn("[AgentPilot] querySelector error for selector:", selector, err);
+      return null;
+    }
+  }
+
   function getElementCenter(selector) {
     if (!selector) return null;
     try {
-      const el = document.querySelector(selector);
+      const el = resolveElement(selector);
       if (!el) return null;
       const r = el.getBoundingClientRect();
       const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
@@ -154,26 +173,23 @@
   /**
    * Trigger click animation & dispatch synthetic events on DOM element
    */
-  async function virtualClick(x = currentMouseX, y = currentMouseY, selector = null) {
+  async function virtualClick(x, y, selector = null) {
     let el = null;
     if (selector) {
-      try {
-        el = document.querySelector(selector);
-      } catch (err) {
-        console.warn("[AgentPilot] virtualClick querySelector error:", err);
-        return { success: false, error: `Invalid selector: ${err.message}` };
-      }
+      el = resolveElement(selector);
       if (!el) {
         return { success: false, error: `Element not found for selector: ${selector}` };
       }
-      if ((!x && !y) || (x === currentMouseX && y === currentMouseY)) {
-        const center = getElementCenter(selector);
-        if (center) {
-          x = center.x;
-          y = center.y;
-        }
+      const center = getElementCenter(selector);
+      if (center) {
+        x = center.x;
+        y = center.y;
       }
     }
+
+    if (x === undefined || x === null) x = currentMouseX;
+    if (y === undefined || y === null) y = currentMouseY;
+
     activateCursor();
     await moveVirtualMouse(x, y, CONFIG.CLICK_DELAY);
 
@@ -253,11 +269,11 @@
     activateCursor();
     let el = null;
     if (selector) {
-      el = document.querySelector(selector);
+      el = resolveElement(selector);
       if (el) {
         const r = el.getBoundingClientRect();
         const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
-        if (!inView) {
+        if (!inView && el.scrollIntoView) {
           el.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
         }
       }
@@ -392,7 +408,7 @@
    * Dispatch keyboard event
    */
   function dispatchKey(key = "Enter", code = null, keyCode = null, selector = null) {
-    let target = selector ? document.querySelector(selector) : null;
+    let target = selector ? resolveElement(selector) : null;
     if (!target) {
       target = document.activeElement && document.activeElement !== document.body ? document.activeElement : document.body;
     }
@@ -418,12 +434,109 @@
     }
   }
 
+  /**
+   * Fast batch fill for forms with React/Vue/Angular/HTML5 compatibility
+   */
+  async function virtualFillForm(fields = [], submitSelector = null, pressEnter = false) {
+    if (!Array.isArray(fields) || fields.length === 0) {
+      return { success: false, error: "Fields array must not be empty" };
+    }
+
+    activateCursor();
+    let filledCount = 0;
+    let lastTargetEl = null;
+
+    for (const field of fields) {
+      const selector = field.selector || field.name || field.id;
+      if (!selector) continue;
+      const el = resolveElement(selector);
+      if (!el) {
+        console.warn("[AgentPilot] virtualFillForm: element not found for", selector);
+        continue;
+      }
+
+      // Scroll into view if needed
+      const r = el.getBoundingClientRect();
+      const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+      if (!inView && el.scrollIntoView) {
+        el.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+      }
+
+      el.focus();
+      lastTargetEl = el;
+
+      const tag = el.tagName.toLowerCase();
+      const type = (el.getAttribute("type") || "").toLowerCase();
+      const val = field.value !== undefined ? field.value : "";
+
+      try {
+        setDispatching(true);
+
+        if (tag === "select") {
+          el.value = String(val);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+          filledCount++;
+        } else if (type === "checkbox" || type === "radio") {
+          const shouldCheck = typeof val === "boolean" ? val : (val === "true" || val === "1" || val === "checked");
+          if (el.checked !== shouldCheck) {
+            el.checked = shouldCheck;
+            el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+            el.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+          filledCount++;
+        } else if (el.isContentEditable) {
+          el.textContent = String(val);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          filledCount++;
+        } else {
+          // Input or Textarea
+          const proto = (el instanceof HTMLTextAreaElement) ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+          const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+
+          if (field.clear !== false) {
+            if (nativeSetter) nativeSetter.call(el, ""); else el.value = "";
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+
+          if (nativeSetter) nativeSetter.call(el, String(val)); else el.value = String(val);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+          filledCount++;
+        }
+      } finally {
+        setDispatching(false);
+      }
+
+      // Microtask delay for UI framework state propagation
+      await new Promise(r => setTimeout(r, 25));
+    }
+
+    let submitted = false;
+    if (submitSelector) {
+      const subRes = await virtualClick(undefined, undefined, submitSelector);
+      submitted = subRes?.success || false;
+    } else if (pressEnter && lastTargetEl) {
+      dispatchKey("Enter", "Enter", 13, null);
+      submitted = true;
+    }
+
+    return {
+      success: filledCount > 0,
+      filledCount,
+      totalFields: fields.length,
+      submitted
+    };
+  }
+
   window.__AP_INTERNAL__.cursor = {
     moveVirtualMouse,
     virtualClick,
     virtualType,
     virtualScroll,
+    virtualFillForm,
     dispatchKey,
+    resolveElement,
     activateCursor,
     hideCursor,
     setSessionActive,

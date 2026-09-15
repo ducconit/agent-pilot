@@ -304,6 +304,40 @@ export async function executeBatchActions(params, bridgeClient = null) {
           break;
         }
 
+        case "snapshot":
+        case "page.snapshot": {
+          const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
+          if (!targetTabId) throw new Error("No active tab for snapshot");
+          await ensureContentScript(targetTabId);
+          const res = await sendTabMessageWithRetry(targetTabId, {
+            action: "get_snapshot",
+            maxElements: act.maxElements || 80,
+            format: act.format || "text"
+          });
+          stepResult.success = true;
+          stepResult.snapshot = res?.result !== undefined ? res.result : res;
+          break;
+        }
+
+        case "fill_form":
+        case "fill":
+        case "page.fillform": {
+          const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
+          if (!targetTabId) throw new Error("No active tab for fill_form");
+          await ensureContentScript(targetTabId);
+          const res = await sendTabMessageWithRetry(targetTabId, {
+            action: "fill_form",
+            fields: act.fields || [],
+            submitSelector: act.submitSelector || null,
+            pressEnter: Boolean(act.pressEnter)
+          });
+          if (!res || !res.success) throw new Error(res?.error || "Fill form failed");
+          stepResult.success = true;
+          stepResult.filledCount = res.filledCount;
+          stepResult.submitted = res.submitted;
+          break;
+        }
+
         case "get_element":
         case "page.getelement": {
           const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
@@ -313,7 +347,8 @@ export async function executeBatchActions(params, bridgeClient = null) {
             action: "get_element_info",
             selector: act.selector,
             x: act.x,
-            y: act.y
+            y: act.y,
+            includeStyles: Boolean(act.includeStyles)
           });
           if (!res || !res.success) throw new Error(res?.error || `Element not found: ${act.selector}`);
           stepResult.success = true;

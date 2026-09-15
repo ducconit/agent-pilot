@@ -299,3 +299,54 @@ func ExecEvaluate(expression string, tabID interface{}) error {
 	}
 	return nil
 }
+
+func ExecSnapshot(maxElements int, format string, tabID interface{}) error {
+	params := map[string]interface{}{
+		"maxElements": maxElements,
+		"format":      format,
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("page.snapshot", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	if str, ok := res.(string); ok {
+		fmt.Println(str)
+		return nil
+	}
+	jsonB, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		fmt.Printf("%v\n", res)
+	} else {
+		fmt.Println(string(jsonB))
+	}
+	return nil
+}
+
+func ExecFillForm(fields []map[string]interface{}, submitSelector string, pressEnter bool, tabID interface{}) error {
+	params := map[string]interface{}{
+		"fields": fields,
+	}
+	if submitSelector != "" {
+		params["submitSelector"] = submitSelector
+	}
+	if pressEnter {
+		params["pressEnter"] = true
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("page.fillForm", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	jsonB, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		fmt.Printf("✅ Form filled: %v\n", res)
+	} else {
+		fmt.Printf("✅ Form filled:\n%s\n", string(jsonB))
+	}
+	return nil
+}

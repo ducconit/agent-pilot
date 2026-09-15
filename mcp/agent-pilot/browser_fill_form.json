@@ -1,0 +1,102 @@
+{
+  "description": "Fill multiple form fields (inputs, selects, checkboxes, textareas) and optionally submit in a single tool call. Compatible with React Hook Form, Vue, and standard HTML5 forms.",
+  "inputSchema": {
+    "properties": {
+      "fields": {
+        "description": "List of fields to fill: [{selector: '@1' or '#id', value: 'my text', clear: true}]",
+        "items": {
+          "properties": {
+            "clear": {
+              "description": "Clear field before typing (default: true)",
+              "type": "boolean"
+            },
+            "selector": {
+              "description": "CSS selector or snapshot ref (e.g. '@1')",
+              "type": "string"
+            },
+            "value": {
+              "description": "Value to set (string, boolean for checkbox, etc.)",
+              "type": [
+                "string",
+                "boolean",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "selector",
+            "value"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "pressEnter": {
+        "description": "Press enter on the last input after filling (default: false)",
+        "type": "boolean"
+      },
+      "submitSelector": {
+        "description": "Optional selector or snapshot ref (e.g. '@4') of submit button to click after filling",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "fields"
+    ],
+    "type": "object"
+  },
+  "name": "browser_fill_form",
+  "parameters": {
+    "properties": {
+      "fields": {
+        "description": "List of fields to fill: [{selector: '@1' or '#id', value: 'my text', clear: true}]",
+        "items": {
+          "properties": {
+            "clear": {
+              "description": "Clear field before typing (default: true)",
+              "type": "boolean"
+            },
+            "selector": {
+              "description": "CSS selector or snapshot ref (e.g. '@1')",
+              "type": "string"
+            },
+            "value": {
+              "description": "Value to set (string, boolean for checkbox, etc.)",
+              "type": [
+                "string",
+                "boolean",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "selector",
+            "value"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "pressEnter": {
+        "description": "Press enter on the last input after filling (default: false)",
+        "type": "boolean"
+      },
+      "submitSelector": {
+        "description": "Optional selector or snapshot ref (e.g. '@4') of submit button to click after filling",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "fields"
+    ],
+    "type": "object"
+  }
+}

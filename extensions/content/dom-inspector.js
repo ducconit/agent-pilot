@@ -74,11 +74,11 @@
     return "";
   }
 
-  function getDetailedElementInfo(el) {
+  function getDetailedElementInfo(el, includeStyles = false) {
     if (!el) return null;
     const rect = el.getBoundingClientRect();
     const style = window.getComputedStyle(el);
-    return {
+    const info = {
       tagName: el.tagName.toLowerCase(),
       id: el.id || "",
       className: typeof el.className === "string" ? el.className : "",
@@ -94,16 +94,21 @@
         bottom: Math.round(rect.bottom),
         right: Math.round(rect.right)
       },
-      text: (el.innerText || el.textContent || "").trim().slice(0, 1000),
+      text: (el.innerText || el.textContent || "").trim().slice(0, 500),
       value: el.value !== undefined ? String(el.value) : undefined,
-      styles: {
+      isVisible: style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0,
+      inlineStyle: el.getAttribute("style") || ""
+    };
+
+    if (includeStyles) {
+      info.styles = {
         color: style.color,
         backgroundColor: style.backgroundColor,
         fontSize: style.fontSize,
         display: style.display,
         visibility: style.visibility
-      },
-      computedStyles: {
+      };
+      info.computedStyles = {
         // Typography
         color: style.color,
         "font-family": style.fontFamily,
@@ -168,9 +173,153 @@
         gap: style.gap !== "normal" && style.gap !== "0px" ? style.gap : undefined,
         "grid-template-columns": style.display.includes("grid") ? style.gridTemplateColumns : undefined,
         "grid-template-rows": style.display.includes("grid") ? style.gridTemplateRows : undefined
-      },
-      inlineStyle: el.getAttribute("style") || ""
-    };
+      };
+    }
+    return info;
+  }
+
+  function getInteractiveSnapshot(maxElements = 80, format = "text") {
+    maxElements = Math.min(Math.max(Number(maxElements) || 80, 10), 300);
+    const selectorQuery = [
+      "a[href]",
+      "button",
+      "input:not([type=hidden])",
+      "textarea",
+      "select",
+      "details",
+      "summary",
+      "[role='button']",
+      "[role='link']",
+      "[role='checkbox']",
+      "[role='radio']",
+      "[role='switch']",
+      "[role='tab']",
+      "[role='menuitem']",
+      "[role='combobox']",
+      "[role='textbox']",
+      "[role='searchbox']",
+      "[tabindex]:not([tabindex='-1'])",
+      "[contenteditable='true']"
+    ].join(", ");
+
+    const rawNodes = Array.from(document.querySelectorAll(selectorQuery));
+
+    // Also include elements with direct onclick
+    const allDivsSpans = document.querySelectorAll("div, span, li, tr");
+    for (let i = 0; i < allDivsSpans.length && rawNodes.length < 500; i++) {
+      const node = allDivsSpans[i];
+      if (node.onclick || node.getAttribute("onclick")) {
+        if (!rawNodes.includes(node)) rawNodes.push(node);
+      }
+    }
+
+    const items = [];
+    const elementsList = [null]; // 1-indexed for @1, @2, ...
+
+    for (const el of rawNodes) {
+      if (items.length >= maxElements) break;
+
+      // Filter out Agent Pilot's internal UI elements
+      if ((el.id && el.id.startsWith("agent-pilot")) ||
+          el.closest("[id^='agent-pilot']") ||
+          el.closest(".agent-pilot-virtual-cursor") ||
+          el.closest("#agent-pilot-cursor-layer") ||
+          el.closest("#agent-pilot-inspector-box") ||
+          el.closest("#agent-pilot-inspector-tooltip") ||
+          el.closest("#agent-pilot-crop-overlay") ||
+          el.closest("#agent-pilot-toast-container") ||
+          el.closest("#agent-pilot-loupe") ||
+          el.closest("#agent-pilot-feedback-studio")) {
+        continue;
+      }
+
+      // Visibility & geometry check
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      const style = window.getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden" || parseFloat(style.opacity) === 0) continue;
+
+      const idx = items.length + 1;
+      elementsList.push(el);
+
+      const tag = el.tagName.toLowerCase();
+      const type = el.getAttribute("type") || (tag === "textarea" ? "textarea" : tag === "select" ? "select" : undefined);
+      const name = el.getAttribute("name") || "";
+      const placeholder = el.getAttribute("placeholder") || "";
+      const role = el.getAttribute("role") || "";
+      const ariaLabel = el.getAttribute("aria-label") || "";
+
+      let label = ariaLabel || placeholder || "";
+      if (!label && el.labels && el.labels.length > 0) {
+        label = (el.labels[0].innerText || "").trim();
+      }
+      if (!label) {
+        label = (el.title || el.innerText || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 80);
+      }
+
+      const val = el.value !== undefined && el.value !== "" ? String(el.value).slice(0, 60) : undefined;
+      const isChecked = el.checked !== undefined ? el.checked : undefined;
+      const isDisabled = el.disabled === true || el.getAttribute("aria-disabled") === "true";
+      const safeName = name ? name.replace(/["\\]/g, "\\$&") : "";
+
+      const item = {
+        ref: `@${idx}`,
+        index: idx,
+        tagName: tag,
+        type,
+        id: el.id || undefined,
+        name: name || undefined,
+        selector: el.id ? `#${el.id}` : (safeName ? `${tag}[name="${safeName}"]` : getElementSelector(el)),
+        label: label || undefined,
+        value: val,
+        checked: isChecked,
+        disabled: isDisabled || undefined,
+        role: role || undefined,
+        rect: {
+          x: Math.round(rect.left + rect.width / 2),
+          y: Math.round(rect.top + rect.height / 2),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
+        }
+      };
+      items.push(item);
+    }
+
+    // Save globally so cursor simulation and selectors can resolve @<index>
+    window.__AP_INTERNAL__.snapshotElements = elementsList;
+
+    if (format === "json") {
+      return {
+        url: window.location.href,
+        title: document.title,
+        totalInteractive: items.length,
+        elements: items
+      };
+    }
+
+    const lines = [
+      `Page: "${document.title}" (${window.location.href})`,
+      `Interactive Elements (${items.length} found - use ref like @1 or CSS selector in click/type):`
+    ];
+
+    for (const it of items) {
+      let desc = `[${it.index}] <${it.tagName}`;
+      if (it.type && it.type !== "text") desc += ` type="${it.type}"`;
+      if (it.id) desc += ` id="${it.id}"`;
+      if (it.name) desc += ` name="${it.name}"`;
+      if (it.role) desc += ` role="${it.role}"`;
+      if (it.disabled) desc += ` disabled`;
+      desc += ">";
+
+      if (it.label) desc += ` "${it.label}"`;
+      if (it.value !== undefined) desc += ` [value="${it.value}"]`;
+      if (it.checked !== undefined && (it.type === "checkbox" || it.type === "radio")) desc += ` [checked=${it.checked}]`;
+
+      desc += ` (pos: ${it.rect.x},${it.rect.y})`;
+      lines.push(desc);
+    }
+
+    return lines.join("\n");
   }
 
   function handleInspectorMouseMove(e) {
@@ -550,6 +699,7 @@
     toggleInspector,
     isInspectorActive: () => isInspectorActive,
     getDetailedElementInfo,
+    getInteractiveSnapshot,
     getElementSelector,
     getXPath,
     getLockedElement: () => (lockedElement ? getDetailedElementInfo(lockedElement) : null),

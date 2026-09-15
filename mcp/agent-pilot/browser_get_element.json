@@ -1,9 +1,13 @@
 {
-  "description": "Inspect a DOM element, retrieving bounding box, coordinates, XPath, selector, text content, and computed CSS.",
+  "description": "Inspect a DOM element, retrieving bounding box, coordinates, XPath, selector, text content, and optionally computed CSS.",
   "inputSchema": {
     "properties": {
+      "includeStyles": {
+        "description": "Include computed CSS styles. Omitted by default to minimize token usage.",
+        "type": "boolean"
+      },
       "selector": {
-        "description": "CSS selector",
+        "description": "CSS selector or snapshot ref (e.g. '@1')",
         "type": "string"
       },
       "tabId": {
@@ -19,8 +23,12 @@
   "name": "browser_get_element",
   "parameters": {
     "properties": {
+      "includeStyles": {
+        "description": "Include computed CSS styles. Omitted by default to minimize token usage.",
+        "type": "boolean"
+      },
       "selector": {
-        "description": "CSS selector",
+        "description": "CSS selector or snapshot ref (e.g. '@1')",
         "type": "string"
       },
       "tabId": {

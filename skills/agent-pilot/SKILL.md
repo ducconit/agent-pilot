@@ -75,31 +75,33 @@ Agent Pilot provides an all-in-one compiled Go binary (`cli/agent-pilot`) for ul
 ---
 
 
-## 🛠️ Available MCP Tools (19 Tools)
+## 🛠️ Available MCP Tools (21 Tools)
 
-When the `agent-pilot` MCP server or skill is active, agents have direct access to the following 19 tools:
+When the `agent-pilot` MCP server or skill is active, agents have direct access to the following 21 tools:
 
 | Tool Name | Key Parameters | Description |
 | :--- | :--- | :--- |
-| `browser_run_actions` | `{ actions: Action[], tabId?: number, stopOnError?: boolean }` | **Batch Execution Engine**: Executes an ordered sequence of actions (`open`, `navigate`, `wait_for_selector`, `scroll_into_view`, `click`, `type`, `press_key`, `scroll`, `sleep`, `screenshot`, `get_element`, `evaluate`, `cdp`, `close`) in a single round-trip, saving ~80% context tokens and eliminating network latency. |
+| `browser_snapshot` | `{ maxElements?: number, format?: "text" \| "json", tabId?: number }` | **Token-Efficient Interactive Map**: Captures an accessibility tree of interactive elements with numbered refs (`@1`, `@2`, etc.) in ~300 tokens. Enables agents to see the entire page and target inputs/buttons with minimal token consumption. |
+| `browser_fill_form` | `{ fields: Array<{ selector: string, value: any, clear?: boolean }>, submitSelector?: string, pressEnter?: boolean, tabId?: number }` | **Fast Batch Form Filler**: Fills multiple form inputs, selects, and checkboxes and optionally clicks submit in a single tool call. Fully compatible with React Hook Form, Vue, and HTML5 validation. |
+| `browser_run_actions` | `{ actions: Action[], tabId?: number, stopOnError?: boolean }` | **Batch Execution Engine**: Executes an ordered sequence of actions (`open`, `navigate`, `wait_for_selector`, `scroll_into_view`, `click`, `type`, `fill_form`, `snapshot`, `press_key`, `scroll`, `sleep`, `screenshot`, `get_element`, `evaluate`, `cdp`, `close`) in a single round-trip, saving ~80% context tokens and eliminating network latency. |
 | `browser_start_session` | `{ name?: string, tabId?: number }` | **Continuous Session Start**: Initiates an active AI Agent session. Keeps the virtual cursor and glowing neon lock shield continuously visible on the tab until ended. |
 | `browser_end_session` | `{ tabId?: number }` | **Continuous Session End**: Concludes the active AI Agent session. Fades out and dismisses the virtual cursor and lock shield. |
 | `browser_evaluate` | `{ expression: string, tabId?: number }` | **Page Evaluator**: Evaluates a JavaScript expression or script in the context of the page (MAIN world first for direct framework/DOM state access, with CDP Runtime.evaluate fallback) and returns the serialized result. |
 | `browser_open_tab` | `{ url: string, active?: boolean }` | Opens a new browser tab with the specified URL. Defaults to `active: false` (background mode) to never interrupt or steal focus from the user's active window. |
 | `browser_list_tabs` | `{}` | Lists all open tabs with IDs, titles, URLs, active state, and agent ownership indicators. |
 | `browser_navigate` | `{ url: string, tabId?: number }` | Navigates the specified or active tab to a URL. |
-| `browser_click` | `{ x?: number, y?: number, selector?: string, tabId?: number }` | Smoothly moves virtual mouse cursor and triggers a synthetic click with visual ripple and coordinate badge. Auto-scrolls off-screen elements into view. |
-| `browser_type` | `{ text: string, selector: string, clear?: boolean, delay?: number, pressEnter?: boolean, tabId?: number }` | Simulates human typing into inputs with realistic keystroke delays. Automatically brings target elements into viewport. |
+| `browser_click` | `{ x?: number, y?: number, selector?: string, tabId?: number }` | Smoothly moves virtual mouse cursor and triggers a synthetic click with visual ripple and coordinate badge. Supports CSS selector or snapshot ref (`@1`). |
+| `browser_type` | `{ text: string, selector: string, clear?: boolean, delay?: number, pressEnter?: boolean, tabId?: number }` | Simulates human typing into inputs with realistic keystroke delays. Supports CSS selector or snapshot ref (`@1`). |
 | `browser_scroll` | `{ deltaX?: number, deltaY?: number, tabId?: number }` | Smoothly scrolls the page viewport by relative pixel offsets. |
-| `browser_get_element` | `{ selector: string, tabId?: number }` | Inspects DOM elements, returning tag name, coordinates, bounding box dimensions, visible text (up to 1,000 characters), input value, and computed CSS attributes. |
+| `browser_get_element` | `{ selector: string, includeStyles?: boolean, tabId?: number }` | Inspects DOM elements, returning tag name, coordinates, bounding box dimensions, text, and value. Pass `includeStyles: true` only when styling details are needed (omitted by default to save tokens). |
 | `browser_screenshot` | `{ mode?: "visible" \| "region" \| "element", selector?: string, tabId?: number }` | Captures high-resolution PNG screenshot via CDP even on background tabs. Automatically unpacked to native MCP image blocks to avoid base64 text bloat. |
-| `browser_get_devtools_data` | `{ tabId?: number, type?: "all" \| "console" \| "network" \| "performance", limit?: number, clear?: boolean }` | Intercepts real-time CDP Console logs, Network requests (status, method, mimeType), and Chrome Performance metrics (JS Heap Used/Total, DOM Nodes, Layouts). |
-| `browser_pick_color` | `{ tabId?: number, x?: number, y?: number }` | Samples any on-screen pixel color. Returns all 5 modern color formats (`hex`, `rgb`, `rgba`, `hsl`, `oklch`). AI agents pass coordinates for instant sampling; human users trigger the interactive Magnifying Loupe Eyedropper with 1-click copy. |
+| `browser_get_devtools_data` | `{ tabId?: number, type?: "all" \| "console" \| "network" \| "performance", filterOrigin?: boolean, limit?: number, clear?: boolean }` | Intercepts real-time CDP Console logs, Network requests, and Performance metrics. Extension noise (`chrome-extension://*`) is filtered by default (`filterOrigin: true`). |
+| `browser_pick_color` | `{ tabId?: number, x?: number, y?: number }` | Samples any on-screen pixel color. Returns all 5 modern color formats (`hex`, `rgb`, `rgba`, `hsl`, `oklch`). |
 | `browser_list_instances` | `{}` | Lists all connected browser instances (Chrome, Brave, Edge, profiles/windows). |
 | `browser_select_instance` | `{ instanceId: string }` | Switches active target browser instance in multi-browser setups. |
-| `browser_set_busy` | `{ busy?: boolean, action?: string, session?: boolean, tabId?: number }` | Displays a subtle glowing neon border and compact floating pill with action label and emergency unlock button (`Escape`) on the target page during agent workflows without obscuring the user's view. |
-| `browser_get_pending_feedback` | `{ sessionId?: string, limit?: number, clear?: boolean }` | **Channel B Feedback Reader**: Retrieves pending human visual UI feedback sessions saved in `~/.agent-pilot/inbox/feedback/<timestamp>/*` with component source paths, line numbers, CSS selectors, user notes, and screenshots. |
-| `browser_wait_for_feedback` | `{ timeout?: number, tabId?: number }` | **Channel A Reactive Long-Polling**: Reactively halts agent execution until a human submits visual feedback via Feedback Studio in the browser (or until timeout). Returns complete metadata, source locations, notes, and screenshots immediately upon submission. |
+| `browser_set_busy` | `{ busy?: boolean, action?: string, session?: boolean, tabId?: number }` | Displays a subtle glowing neon border and compact floating pill with action label and emergency unlock button (`Escape`) on the target page during agent workflows. |
+| `browser_get_pending_feedback` | `{ sessionId?: string, limit?: number, clear?: boolean }` | **Channel B Feedback Reader**: Retrieves pending human visual UI feedback sessions saved in `~/.agent-pilot/inbox/feedback/<timestamp>/*`. |
+| `browser_wait_for_feedback` | `{ timeout?: number, tabId?: number }` | **Channel A Reactive Long-Polling**: Reactively halts agent execution until a human submits visual feedback via Feedback Studio in the browser. |
 
 ---
 

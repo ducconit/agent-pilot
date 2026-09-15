@@ -21,13 +21,16 @@
     virtualClick: () => Promise.resolve({ success: false }),
     virtualType: () => Promise.resolve({ success: false }),
     virtualScroll: () => ({ success: false }),
+    virtualFillForm: () => Promise.resolve({ success: false }),
     dispatchKey: () => ({ success: false }),
+    resolveElement: () => null,
     getCursorPosition: () => ({ x: 0, y: 0 })
   };
   const inspector = modules.inspector || {
     toggleInspector: () => {},
     isInspectorActive: () => false,
     getDetailedElementInfo: () => null,
+    getInteractiveSnapshot: () => null,
     getLockedElement: () => null,
     startRegionCrop: () => {},
     startElementSnap: () => {},
@@ -69,10 +72,12 @@
     type: (selector, text, clear, pressEnter) => cursor.virtualType(selector, text, clear, pressEnter),
     scroll: (deltaX, deltaY) => cursor.virtualScroll(deltaX, deltaY),
     toggleInspector: (enabled) => inspector.toggleInspector(enabled),
-    getElement: (selector) => {
-      const el = document.querySelector(selector);
-      return inspector.getDetailedElementInfo(el);
+    getElement: (selector, includeStyles = false) => {
+      const el = cursor.resolveElement ? cursor.resolveElement(selector) : document.querySelector(selector);
+      return inspector.getDetailedElementInfo(el, includeStyles);
     },
+    snapshot: (maxElements, format) => inspector.getInteractiveSnapshot(maxElements, format),
+    fillForm: (fields, submitSelector, pressEnter) => cursor.virtualFillForm(fields, submitSelector, pressEnter),
     startRegionCrop: () => inspector.startRegionCrop(),
     startElementSnap: () => inspector.startElementSnap(),
     stopElementSnap: () => inspector.stopElementSnap(),
@@ -134,7 +139,9 @@
           type: (selector, text) => sendBridgeRequest("virtual_type", { selector, text }),
           scroll: (deltaX, deltaY) => sendBridgeRequest("virtual_scroll", { deltaX, deltaY }),
           toggleInspector: (enabled) => sendBridgeRequest("toggle_inspector", { enabled }),
-          getElement: (selector) => sendBridgeRequest("get_element_info", { selector }),
+          getElement: (selector, includeStyles) => sendBridgeRequest("get_element_info", { selector, includeStyles }),
+          snapshot: (maxElements, format) => sendBridgeRequest("get_snapshot", { maxElements, format }),
+          fillForm: (fields, submitSelector, pressEnter) => sendBridgeRequest("fill_form", { fields, submitSelector, pressEnter }),
           startElementSnap: () => sendBridgeRequest("start_element_snap", {}),
           stopElementSnap: () => sendBridgeRequest("stop_element_snap", {}),
           isElementSnapActive: () => sendBridgeRequest("is_element_snap_active", {}),
@@ -176,9 +183,11 @@
       else if (action === "toggle_inspector") { inspector.toggleInspector(data.enabled); result = { success: true, active: inspector.isInspectorActive() }; }
       else if (action === "is_inspector_active") result = inspector.isInspectorActive();
       else if (action === "get_element_info") {
-        const el = document.querySelector(data.selector);
-        result = inspector.getDetailedElementInfo(el);
+        const el = cursor.resolveElement ? cursor.resolveElement(data.selector) : document.querySelector(data.selector);
+        result = inspector.getDetailedElementInfo(el, Boolean(data.includeStyles));
       }
+      else if (action === "get_snapshot") result = inspector.getInteractiveSnapshot(data.maxElements, data.format);
+      else if (action === "fill_form") result = await cursor.virtualFillForm(data.fields, data.submitSelector, data.pressEnter);
       else if (action === "start_element_snap") { inspector.startElementSnap(); result = { success: true }; }
       else if (action === "stop_element_snap") { inspector.stopElementSnap(); result = { success: true }; }
       else if (action === "is_element_snap_active") result = inspector.isElementSnapActive();
@@ -277,9 +286,20 @@
     }
 
     if (req.action === "get_element_info") {
-      const el = req.selector ? document.querySelector(req.selector) : null;
-      const details = el ? inspector.getDetailedElementInfo(el) : inspector.getLockedElement();
+      const el = req.selector ? (cursor.resolveElement ? cursor.resolveElement(req.selector) : document.querySelector(req.selector)) : null;
+      const details = el ? inspector.getDetailedElementInfo(el, Boolean(req.includeStyles)) : inspector.getLockedElement();
       sendResponse({ success: !!(el || details), ...(details || {}), details });
+      return true;
+    }
+
+    if (req.action === "get_snapshot") {
+      const result = inspector.getInteractiveSnapshot(req.maxElements, req.format);
+      sendResponse({ success: true, result });
+      return true;
+    }
+
+    if (req.action === "fill_form") {
+      cursor.virtualFillForm(req.fields, req.submitSelector, req.pressEnter).then(sendResponse);
       return true;
     }
 

@@ -1,0 +1,38 @@
+{
+  "description": "Capture a token-efficient interactive accessibility snapshot of the page with numbered element references (@1, @2, etc.). Enables agents to quickly understand page structure and target elements with minimal token usage.",
+  "inputSchema": {
+    "properties": {
+      "format": {
+        "description": "Output format: 'text' (default, compact tree) or 'json'",
+        "type": "string"
+      },
+      "maxElements": {
+        "description": "Maximum number of interactive elements to include (default: 80)",
+        "type": "integer"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_snapshot",
+  "parameters": {
+    "properties": {
+      "format": {
+        "description": "Output format: 'text' (default, compact tree) or 'json'",
+        "type": "string"
+      },
+      "maxElements": {
+        "description": "Maximum number of interactive elements to include (default: 80)",
+        "type": "integer"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

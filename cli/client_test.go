@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"testing"
 )
 
@@ -145,5 +146,118 @@ func TestParseSessionArgs_CustomName(t *testing.T) {
 	}
 	if tab != 101 {
 		t.Errorf("expected tab=101, got: %v", tab)
+	}
+}
+
+func TestParseEvalArgs(t *testing.T) {
+	// 1. Positional script with --tab after
+	script, tab, err := parseEvalArgs([]string{"document.title", "--tab", "42"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if script != "document.title" {
+		t.Errorf("expected script='document.title', got: %s", script)
+	}
+	if tab != 42 {
+		t.Errorf("expected tab=42, got: %v", tab)
+	}
+
+	// 2. --tab before positional script
+	script, tab, err = parseEvalArgs([]string{"--tab", "100", "window.location.href"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if script != "window.location.href" {
+		t.Errorf("expected script='window.location.href', got: %s", script)
+	}
+	if tab != 100 {
+		t.Errorf("expected tab=100, got: %v", tab)
+	}
+
+	// 3. -f file argument
+	tmpFile := t.TempDir() + "/test_script.js"
+	if err := os.WriteFile(tmpFile, []byte("console.log('hello from file')"), 0644); err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	script, tab, err = parseEvalArgs([]string{"-f", tmpFile, "--tab", "77"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if script != "console.log('hello from file')" {
+		t.Errorf("expected script content from file, got: %s", script)
+	}
+	if tab != 77 {
+		t.Errorf("expected tab=77, got: %v", tab)
+	}
+
+	// 4. Empty arguments error
+	_, _, err = parseEvalArgs([]string{})
+	if err == nil {
+		t.Errorf("expected error for empty args, got nil")
+	}
+}
+
+func TestParseFillArgs(t *testing.T) {
+	tmpJSON := t.TempDir() + "/fields.json"
+	jsonContent := `[{"selector":"#email","value":"test@example.com"},{"selector":"#pass","value":"secret123"}]`
+	if err := os.WriteFile(tmpJSON, []byte(jsonContent), 0644); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+
+	// 1. Positional file first, flags after (the documented CLI usage: agent-pilot fill form.json --submit "#btn-submit")
+	fields, submit, enter, tab, err := parseFillArgs([]string{tmpJSON, "--submit", "#btn-submit", "--tab", "42", "--enter"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(fields) != 2 {
+		t.Errorf("expected 2 fields, got %d", len(fields))
+	}
+	if submit != "#btn-submit" {
+		t.Errorf("expected submit='#btn-submit', got %s", submit)
+	}
+	if !enter {
+		t.Errorf("expected enter=true, got false")
+	}
+	if tab != 42 {
+		t.Errorf("expected tab=42, got %v", tab)
+	}
+
+	// 2. Flags first, positional file after
+	fields, submit, enter, tab, err = parseFillArgs([]string{"--tab", "99", "--submit", "@5", tmpJSON})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(fields) != 2 {
+		t.Errorf("expected 2 fields, got %d", len(fields))
+	}
+	if submit != "@5" {
+		t.Errorf("expected submit='@5', got %s", submit)
+	}
+	if tab != 99 {
+		t.Errorf("expected tab=99, got %v", tab)
+	}
+
+	// 3. Raw JSON string directly
+	fields, submit, _, _, err = parseFillArgs([]string{`[{"selector":"#q","value":"search term"}]`, "--submit", "#search-btn"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(fields) != 1 || fields[0]["value"] != "search term" {
+		t.Errorf("unexpected fields from inline JSON: %v", fields)
+	}
+	if submit != "#search-btn" {
+		t.Errorf("expected submit='#search-btn', got %s", submit)
+	}
+
+	// 4. Missing arguments error
+	_, _, _, _, err = parseFillArgs([]string{})
+	if err == nil {
+		t.Errorf("expected error for empty args, got nil")
+	}
+
+	// 5. Invalid JSON error
+	_, _, _, _, err = parseFillArgs([]string{"invalid-not-json"})
+	if err == nil {
+		t.Errorf("expected error for invalid JSON string, got nil")
 	}
 }

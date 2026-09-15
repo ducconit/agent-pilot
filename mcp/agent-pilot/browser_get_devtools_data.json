@@ -6,6 +6,10 @@
         "description": "Clear buffer after reading",
         "type": "boolean"
       },
+      "filterOrigin": {
+        "description": "Filter out internal extension logs/warnings (chrome-extension://*). Default: true",
+        "type": "boolean"
+      },
       "limit": {
         "description": "Max entries to return",
         "type": "integer"
@@ -26,6 +30,10 @@
     "properties": {
       "clear": {
         "description": "Clear buffer after reading",
+        "type": "boolean"
+      },
+      "filterOrigin": {
+        "description": "Filter out internal extension logs/warnings (chrome-extension://*). Default: true",
         "type": "boolean"
       },
       "limit": {
