@@ -21,6 +21,18 @@ import {
 } from "./tab-manager.js";
 import { captureTabScreenshot } from "./screenshot-service.js";
 
+function getPositiveNumber(...candidates) {
+  for (const c of candidates) {
+    if (c !== undefined && c !== null && c !== "") {
+      const num = Number(c);
+      if (!isNaN(num) && num > 0) {
+        return num;
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Execute batch action list sequentially
  */
@@ -82,7 +94,8 @@ export async function executeBatchActions(params, bridgeClient = null) {
                 }
               };
 
-              const timeout = setTimeout(finish, Number(act.loadTimeout || act.timeoutMs || act.timeout || DEFAULT_LOAD_TIMEOUT_MS));
+              const loadTimeout = getPositiveNumber(act.loadTimeout, act.timeoutMs, act.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
+              const timeout = setTimeout(finish, loadTimeout);
 
               const onUpdated = (tId, changeInfo) => {
                 if (tId === tab.id && changeInfo.status === "complete") {
@@ -125,7 +138,8 @@ export async function executeBatchActions(params, bridgeClient = null) {
                 resolve();
               };
 
-              const timeout = setTimeout(done, Number(act.loadTimeout || act.timeoutMs || act.timeout || DEFAULT_LOAD_TIMEOUT_MS));
+              const loadTimeout = getPositiveNumber(act.loadTimeout, act.timeoutMs, act.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
+              const timeout = setTimeout(done, loadTimeout);
 
               const onUpdated = (tId, changeInfo) => {
                 if (tId === targetTabId && changeInfo.status === "complete") {
@@ -190,7 +204,7 @@ export async function executeBatchActions(params, bridgeClient = null) {
           const res = await sendTabMessageWithRetry(targetTabId, {
             action: "wait_for_selector",
             selector: act.selector,
-            timeoutMs: act.timeoutMs || act.timeout || 5000
+            timeoutMs: getPositiveNumber(act.timeoutMs, act.timeout) || 5000
           });
           if (!res || !res.success) throw new Error(res?.error || `Selector '${act.selector}' not found within timeout`);
           stepResult.success = true;
@@ -320,7 +334,7 @@ export async function executeBatchActions(params, bridgeClient = null) {
             selector: act.selector,
             text: act.text,
             state: act.state || "visible",
-            timeoutMs: act.timeoutMs || act.timeout || 10000
+            timeoutMs: getPositiveNumber(act.timeoutMs, act.timeout) || 10000
           });
           if (!res || !res.success) throw new Error(res?.error || "Wait timed out");
           stepResult.success = true;
@@ -366,14 +380,14 @@ export async function executeBatchActions(params, bridgeClient = null) {
               selector: act.selector,
               text: act.text,
               state: act.state || "visible",
-              timeoutMs: act.timeoutMs || act.timeout || 10000
+              timeoutMs: getPositiveNumber(act.timeoutMs, act.timeout) || 10000
             });
             if (!res || !res.success) throw new Error(res?.error || "Wait timed out");
             stepResult.success = true;
             stepResult.waited = res;
             break;
           }
-          const ms = Number(act.ms || act.duration || 1000);
+          const ms = getPositiveNumber(act.ms, act.duration) || 1000;
           await new Promise(r => setTimeout(r, ms));
           stepResult.success = true;
           stepResult.ms = ms;
