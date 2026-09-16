@@ -605,9 +605,11 @@ export class AgentBridgeClient {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           this.runWithTabLock(tabId, "page.hover", async () => {
+            // First locate coordinates, scroll into view and move visual cursor without dispatching duplicate DOM events
             const res = await this.sendTabMessageWithRetry(tabId, {
               action: "virtual_hover",
-              selector: params.selector
+              selector: params.selector,
+              dispatchSynthetic: false
             });
             if (res && res.coords) {
               try {
@@ -615,8 +617,16 @@ export class AgentBridgeClient {
                   await attachDebugger(tabId, this.broadcastFn);
                 }
                 await dispatchCdpMouseMove(tabId, res.coords.x, res.coords.y);
+                return res;
               } catch (cdpErr) {
-                console.debug("[AgentPilot] dispatchCdpMouseMove ignored:", cdpErr);
+                console.debug("[AgentPilot] CDP hover failed, falling back to synthetic events:", cdpErr);
+                // Fallback to synthetic pointer/mouse events if CDP fails
+                await this.sendTabMessageWithRetry(tabId, {
+                  action: "virtual_hover",
+                  selector: params.selector,
+                  dispatchSynthetic: true
+                });
+                return res;
               }
             }
             return res || { success: true };
@@ -1084,7 +1094,18 @@ export class AgentBridgeClient {
           if (!chrome.management) {
             return respond(null, new Error("chrome.management API is not available"));
           }
-          const action = params.action || "list";
+          const rawAction = (params.action || "list").toLowerCase();
+          let action = rawAction;
+          if (rawAction === "enable") {
+            action = "setEnabled";
+            params.enabled = true;
+          } else if (rawAction === "disable") {
+            action = "setEnabled";
+            params.enabled = false;
+          } else if (rawAction === "setenabled") {
+            action = "setEnabled";
+          }
+
           if (action === "list") {
             chrome.management.getAll((extList) => {
               if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
@@ -1114,6 +1135,12 @@ export class AgentBridgeClient {
                 if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
                 respond({ success: true, extensionId: params.extensionId, enabled: targetEnabled });
               });
+            });
+          } else if (action === "uninstall") {
+            if (!params.extensionId) return respond(null, new Error("extensionId is required"));
+            chrome.management.uninstall(params.extensionId, { showConfirmDialog: false }, () => {
+              if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
+              respond({ success: true, extensionId: params.extensionId, uninstalled: true });
             });
           } else {
             respond(null, new Error(`Unsupported extension action: ${action}`));

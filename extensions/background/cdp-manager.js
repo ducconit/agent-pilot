@@ -359,33 +359,34 @@ export async function uploadFileInput(tabId, selector, filePaths) {
     console.debug("[AgentPilot] Could not mark upload target via content script:", err);
   }
 
-  // 2. Locate element via CDP Runtime.evaluate
-  const evalScript = `(() => {
-    const el = document.querySelector(${JSON.stringify(resolvedSelector)});
-    if (!el) throw new Error("Element not found for selector: " + ${JSON.stringify(selector)});
-    if (el.tagName !== 'INPUT' || (el.type && el.type.toLowerCase() !== 'file')) {
-      const fileInput = el.querySelector ? el.querySelector('input[type=file]') : null;
-      if (fileInput) return fileInput;
-    }
-    return el;
-  })()`;
-
-  const evalResult = await sendCdpCommand(tabId, "Runtime.evaluate", {
-    expression: evalScript,
-    returnByValue: false
-  });
-
-  if (evalResult && evalResult.exceptionDetails) {
-    const desc = evalResult.exceptionDetails.exception?.description || evalResult.exceptionDetails.text || "Failed to find element";
-    throw new Error(desc);
-  }
-
-  const objectId = evalResult.result?.objectId;
-  if (!objectId) {
-    throw new Error("Failed to obtain remote object ID for selector: " + selector);
-  }
-
+  // 2. Locate element via CDP Runtime.evaluate and set files
+  let objectId = null;
   try {
+    const evalScript = `(() => {
+      const el = document.querySelector(${JSON.stringify(resolvedSelector)});
+      if (!el) throw new Error("Element not found for selector: " + ${JSON.stringify(selector)});
+      if (el.tagName !== 'INPUT' || (el.type && el.type.toLowerCase() !== 'file')) {
+        const fileInput = el.querySelector ? el.querySelector('input[type=file]') : null;
+        if (fileInput) return fileInput;
+      }
+      return el;
+    })()`;
+
+    const evalResult = await sendCdpCommand(tabId, "Runtime.evaluate", {
+      expression: evalScript,
+      returnByValue: false
+    });
+
+    if (evalResult && evalResult.exceptionDetails) {
+      const desc = evalResult.exceptionDetails.exception?.description || evalResult.exceptionDetails.text || "Failed to find element";
+      throw new Error(desc);
+    }
+
+    objectId = evalResult.result?.objectId;
+    if (!objectId) {
+      throw new Error("Failed to obtain remote object ID for selector: " + selector);
+    }
+
     const nodeResult = await sendCdpCommand(tabId, "DOM.requestNode", { objectId });
     if (!nodeResult || !nodeResult.nodeId) {
       throw new Error("Failed to resolve DOM nodeId for file input element");
@@ -654,7 +655,18 @@ export async function dispatchCdpKeyEvent(tabId, keyCombo, selector = null) {
   // Focus element first if selector provided
   if (selector) {
     try {
-      await chrome.tabs.sendMessage(tabId, { action: "focus_element", selector });
+      const res = await new Promise((resolve) => {
+        chrome.tabs.sendMessage(tabId, { action: "focus_element", selector }, (resp) => {
+          if (chrome.runtime.lastError) {
+            resolve({ success: false, error: chrome.runtime.lastError.message });
+          } else {
+            resolve(resp || { success: true });
+          }
+        });
+      });
+      if (!res || !res.success) {
+        console.debug("[AgentPilot] focus_element warning:", res ? res.error : "no response");
+      }
     } catch (err) {
       console.debug("[AgentPilot] focus_element message failed:", err);
     }

@@ -34,7 +34,7 @@ func DispatchCommand(method string, params map[string]interface{}, port int) (in
 	time.Sleep(300 * time.Millisecond)
 
 	// Now try dispatching
-	return SendCommandToExtension(method, params, 15000)
+	return SendCommandToExtension(method, params, DeriveCommandTimeout(method, params, 15000))
 }
 
 func ExecClick(selector string, x, y float64, tabID interface{}) error {

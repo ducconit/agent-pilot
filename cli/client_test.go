@@ -388,9 +388,47 @@ func TestParseWaitArgs(t *testing.T) {
 		t.Fatalf("expected error for negative tab ID, got nil")
 	}
 
-	// 12. Negative test: flags only without selector or text
-	_, _, _, _, _, err = parseWaitArgs([]string{"--timeout", "5000"})
+	// 13. Dash-leading text value (e.g. -Loading)
+	sel, text, state, timeout, tab, err = parseWaitArgs([]string{"--text", "-Loading"})
+	if err != nil || text != "-Loading" {
+		t.Fatalf("case 13 failed: text=%s, err=%v", text, err)
+	}
+
+	// 14. Negative test: unknown flag should be rejected
+	_, _, _, _, _, err = parseWaitArgs([]string{"#submit", "--ta", "42"})
 	if err == nil {
-		t.Fatalf("expected error for missing selector/text, got nil")
+		t.Fatalf("expected error for unknown flag --ta, got nil")
+	}
+}
+
+func TestDeriveCommandTimeout(t *testing.T) {
+	// 1. Default timeout fallback
+	to := DeriveCommandTimeout("page.click", nil, 0)
+	if to != 15000 {
+		t.Errorf("expected 15000, got %d", to)
+	}
+
+	// 2. Custom default timeout
+	to = DeriveCommandTimeout("page.click", nil, 5000)
+	if to != 5000 {
+		t.Errorf("expected 5000, got %d", to)
+	}
+
+	// 3. batch.run minimum 45000
+	to = DeriveCommandTimeout("batch.run", nil, 10000)
+	if to != 45000 {
+		t.Errorf("expected 45000, got %d", to)
+	}
+
+	// 4. page.waitFor with explicit timeoutMs (int)
+	to = DeriveCommandTimeout("page.waitFor", map[string]interface{}{"timeoutMs": 20000}, 0)
+	if to != 25000 {
+		t.Errorf("expected 25000, got %d", to)
+	}
+
+	// 5. page.waitFor with explicit timeoutMs (float64 from JSON)
+	to = DeriveCommandTimeout("page.waitFor", map[string]interface{}{"timeoutMs": float64(12000)}, 15000)
+	if to != 17000 {
+		t.Errorf("expected 17000, got %d", to)
 	}
 }

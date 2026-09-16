@@ -118,20 +118,7 @@ func SendCommandToExtension(method string, params map[string]interface{}, timeou
 		return nil, fmt.Errorf("failed to send command to extension: %w", err)
 	}
 
-	if timeoutMs <= 0 {
-		timeoutMs = 15000
-		if method == "batch.run" {
-			timeoutMs = 45000
-		} else if method == "page.waitFor" || method == "page.wait" {
-			if t, ok := params["timeoutMs"].(int); ok && t > 0 {
-				timeoutMs = t + 5000
-			} else if tFloat, ok := params["timeoutMs"].(float64); ok && tFloat > 0 {
-				timeoutMs = int(tFloat) + 5000
-			} else {
-				timeoutMs = 35000
-			}
-		}
-	}
+	timeoutMs = DeriveCommandTimeout(method, params, timeoutMs)
 
 	select {
 	case res := <-resChan:
@@ -640,6 +627,35 @@ func handleFeedbackWaitEndpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 // ForwardCommandToActiveServer sends HTTP POST /api to the running master bridge
+// DeriveCommandTimeout derives the appropriate RPC/HTTP timeout in ms based on command type and params
+func DeriveCommandTimeout(method string, params map[string]interface{}, defaultTimeoutMs int) int {
+	if method == "batch.run" {
+		if defaultTimeoutMs < 45000 {
+			return 45000
+		}
+		return defaultTimeoutMs
+	}
+	if method == "page.waitFor" || method == "page.wait" {
+		waitMs := 30000
+		if params != nil {
+			if t, ok := params["timeoutMs"].(int); ok && t > 0 {
+				waitMs = t
+			} else if tFloat, ok := params["timeoutMs"].(float64); ok && tFloat > 0 {
+				waitMs = int(tFloat)
+			}
+		}
+		effective := waitMs + 5000
+		if defaultTimeoutMs > effective {
+			return defaultTimeoutMs
+		}
+		return effective
+	}
+	if defaultTimeoutMs <= 0 {
+		return 15000
+	}
+	return defaultTimeoutMs
+}
+
 func ForwardCommandToActiveServer(method string, params map[string]interface{}, port int) (interface{}, error) {
 	if port <= 0 {
 		port = DefaultPort
@@ -654,7 +670,11 @@ func ForwardCommandToActiveServer(method string, params map[string]interface{}, 
 		return nil, err
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewReader(jsonBytes))
+	timeoutDuration := time.Duration(DeriveCommandTimeout(method, params, 30000)) * time.Millisecond
+	client := &http.Client{
+		Timeout: timeoutDuration,
+	}
+	resp, err := client.Post(url, "application/json", bytes.NewReader(jsonBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to contact Agent Pilot Bridge at %s: %w", url, err)
 	}

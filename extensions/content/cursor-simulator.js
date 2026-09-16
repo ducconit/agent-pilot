@@ -572,7 +572,7 @@
   /**
    * Virtual Hover on element
    */
-  async function virtualHover(selector) {
+  async function virtualHover(selector, options = {}) {
     const el = resolveElement(selector);
     if (!el) {
       return { success: false, error: "Element not found for selector: " + selector };
@@ -586,28 +586,31 @@
     activateCursor();
     await moveVirtualMouse(center.x, center.y, CONFIG.DEFAULT_MOVE_DURATION);
 
-    const eventInit = {
-      bubbles: true,
-      cancelable: true,
-      view: window,
-      clientX: center.x,
-      clientY: center.y,
-      screenX: center.x + window.screenX,
-      screenY: center.y + window.screenY
-    };
+    const shouldDispatch = options.dispatchSynthetic !== false;
+    if (shouldDispatch) {
+      const eventInit = {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: center.x,
+        clientY: center.y,
+        screenX: center.x + window.screenX,
+        screenY: center.y + window.screenY
+      };
 
-    try {
-      setDispatching(true);
-      if (typeof PointerEvent !== "undefined") {
-        el.dispatchEvent(new PointerEvent("pointerenter", { ...eventInit, bubbles: false, pointerType: "mouse" }));
-        el.dispatchEvent(new PointerEvent("pointerover", { ...eventInit, pointerType: "mouse" }));
-        el.dispatchEvent(new PointerEvent("pointermove", { ...eventInit, pointerType: "mouse" }));
+      try {
+        setDispatching(true);
+        if (typeof PointerEvent !== "undefined") {
+          el.dispatchEvent(new PointerEvent("pointerenter", { ...eventInit, bubbles: false, pointerType: "mouse" }));
+          el.dispatchEvent(new PointerEvent("pointerover", { ...eventInit, pointerType: "mouse" }));
+          el.dispatchEvent(new PointerEvent("pointermove", { ...eventInit, pointerType: "mouse" }));
+        }
+        el.dispatchEvent(new MouseEvent("mouseenter", { ...eventInit, bubbles: false }));
+        el.dispatchEvent(new MouseEvent("mouseover", eventInit));
+        el.dispatchEvent(new MouseEvent("mousemove", eventInit));
+      } finally {
+        setDispatching(false);
       }
-      el.dispatchEvent(new MouseEvent("mouseenter", { ...eventInit, bubbles: false }));
-      el.dispatchEvent(new MouseEvent("mouseover", eventInit));
-      el.dispatchEvent(new MouseEvent("mousemove", eventInit));
-    } finally {
-      setDispatching(false);
     }
 
     return { success: true, selector, coords: { x: center.x, y: center.y }, x: center.x, y: center.y };
@@ -669,10 +672,11 @@
         updateCursorTransform(curX, curY);
 
         const moveInit = { ...baseInit, clientX: curX, clientY: curY, buttons: 1 };
+        const targetEl = document.elementFromPoint(curX, curY) || fromEl || document.body;
         if (typeof PointerEvent !== "undefined") {
-          window.dispatchEvent(new PointerEvent("pointermove", { ...moveInit, pointerType: "mouse", isPrimary: true }));
+          targetEl.dispatchEvent(new PointerEvent("pointermove", { ...moveInit, pointerType: "mouse", isPrimary: true }));
         }
-        window.dispatchEvent(new MouseEvent("mousemove", moveInit));
+        targetEl.dispatchEvent(new MouseEvent("mousemove", moveInit));
         if (fromEl.draggable) {
           toEl.dispatchEvent(new DragEvent("dragover", { ...moveInit, dataTransfer }));
         }

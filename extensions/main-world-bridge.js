@@ -3,13 +3,20 @@
  * Exposes window.__AGENT_PILOT__ directly to the web page execution context
  */
 (() => {
-  function sendBridgeRequest(action, data = {}) {
+  function sendBridgeRequest(action, data = {}, customTimeout = null) {
+    let timeoutMs = 5000;
+    if (customTimeout && Number(customTimeout) > 0) {
+      timeoutMs = Number(customTimeout);
+    } else if (action === "wait_for") {
+      const waitDur = (data && (data.timeout || data.timeoutMs)) ? Number(data.timeout || data.timeoutMs) : 10000;
+      timeoutMs = waitDur + 3000;
+    }
     return new Promise((resolve) => {
       const reqId = "ap_" + Math.random().toString(36).substr(2, 9);
       const timer = setTimeout(() => {
         window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
         resolve(null);
-      }, 5000);
+      }, timeoutMs);
       function onResponse(e) {
         if (e.detail && e.detail.reqId === reqId) {
           clearTimeout(timer);

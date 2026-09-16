@@ -318,38 +318,67 @@ func parseFillArgs(args []string) ([]map[string]interface{}, string, bool, inter
 	return fields, submitSelector, pressEnter, t, nil
 }
 
+type FlagDef struct {
+	Name    string
+	Aliases []string
+	IsBool  bool
+}
+
 type FlexibleCmdArgs struct {
 	Flags      map[string]string
 	Positional []string
 }
 
-func parseCmdArgs(args []string) FlexibleCmdArgs {
+func parseCmdArgs(args []string, allowedFlags []FlagDef) (FlexibleCmdArgs, error) {
 	res := FlexibleCmdArgs{
 		Flags:      make(map[string]string),
 		Positional: make([]string, 0),
 	}
+
+	lookup := make(map[string]FlagDef)
+	for _, f := range allowedFlags {
+		lookup[f.Name] = f
+		for _, a := range f.Aliases {
+			lookup[a] = f
+		}
+	}
+
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		if strings.HasPrefix(arg, "--") || strings.HasPrefix(arg, "-") {
-			trimmed := strings.TrimLeft(arg, "-")
-			if strings.Contains(trimmed, "=") {
-				parts := strings.SplitN(trimmed, "=", 2)
-				res.Flags[parts[0]] = parts[1]
-			} else if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				if trimmed == "enter" || trimmed == "gc" || trimmed == "clear" {
-					res.Flags[trimmed] = "true"
+		if arg == "--" {
+			res.Positional = append(res.Positional, args[i+1:]...)
+			break
+		}
+		if strings.HasPrefix(arg, "-") {
+			if strings.Contains(arg, "=") {
+				parts := strings.SplitN(arg, "=", 2)
+				flagName := strings.TrimLeft(parts[0], "-")
+				def, ok := lookup[flagName]
+				if !ok {
+					return res, fmt.Errorf("cờ không hợp lệ: %s", parts[0])
+				}
+				res.Flags[def.Name] = parts[1]
+			} else {
+				flagName := strings.TrimLeft(arg, "-")
+				def, ok := lookup[flagName]
+				if !ok {
+					return res, fmt.Errorf("cờ không hợp lệ: %s", arg)
+				}
+				if def.IsBool {
+					res.Flags[def.Name] = "true"
 				} else {
-					res.Flags[trimmed] = args[i+1]
+					if i+1 >= len(args) {
+						return res, fmt.Errorf("cờ %s yêu cầu một giá trị", arg)
+					}
+					res.Flags[def.Name] = args[i+1]
 					i++
 				}
-			} else {
-				res.Flags[trimmed] = "true"
 			}
 		} else {
 			res.Positional = append(res.Positional, arg)
 		}
 	}
-	return res
+	return res, nil
 }
 
 func (a FlexibleCmdArgs) TabID() (interface{}, error) {
@@ -392,7 +421,17 @@ func (a FlexibleCmdArgs) Bool(flagName string) bool {
 }
 
 func parseWaitArgs(args []string) (string, string, string, int, interface{}, error) {
-	cmdArgs := parseCmdArgs(args)
+	allowedFlags := []FlagDef{
+		{Name: "tab", Aliases: []string{"t"}},
+		{Name: "timeout"},
+		{Name: "state"},
+		{Name: "text"},
+		{Name: "selector", Aliases: []string{"sel", "s"}},
+	}
+	cmdArgs, err := parseCmdArgs(args, allowedFlags)
+	if err != nil {
+		return "", "", "", 0, nil, err
+	}
 	tab, err := cmdArgs.TabID()
 	if err != nil {
 		return "", "", "", 0, nil, err
@@ -733,7 +772,13 @@ func main() {
 		}
 
 	case "hover":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -749,7 +794,14 @@ func main() {
 		}
 
 	case "drag":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "steps", Aliases: []string{"s"}},
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -770,7 +822,14 @@ func main() {
 		}
 
 	case "key", "press-key":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "selector", Aliases: []string{"sel", "s"}},
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -799,7 +858,13 @@ func main() {
 		}
 
 	case "upload":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -815,7 +880,14 @@ func main() {
 		}
 
 	case "dialog":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "prompt", Aliases: []string{"p"}},
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -838,7 +910,16 @@ func main() {
 		}
 
 	case "emulate":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "network"},
+			{Name: "cpu"},
+			{Name: "theme"},
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -853,7 +934,13 @@ func main() {
 		}
 
 	case "resize":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -879,7 +966,17 @@ func main() {
 		}
 
 	case "network":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "filter"},
+			{Name: "method"},
+			{Name: "type"},
+			{Name: "limit"},
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -906,7 +1003,14 @@ func main() {
 		}
 
 	case "trace":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "categories"},
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -923,7 +1027,13 @@ func main() {
 		}
 
 	case "metrics":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -935,7 +1045,14 @@ func main() {
 		}
 
 	case "heap", "heapsnapshot":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "gc", IsBool: true},
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -948,29 +1065,66 @@ func main() {
 		}
 
 	case "extensions", "ext":
-		cmdArgs := parseCmdArgs(os.Args[2:])
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "enabled", Aliases: []string{"e"}},
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		action := "list"
 		extID := ""
 		var enabled *bool
 		if len(cmdArgs.Positional) > 0 {
 			sub := strings.ToLower(cmdArgs.Positional[0])
-			if sub == "list" || sub == "enable" || sub == "disable" || sub == "toggle" || sub == "uninstall" {
-				action = sub
+			switch sub {
+			case "list":
+				action = "list"
 				if len(cmdArgs.Positional) > 1 {
 					extID = cmdArgs.Positional[1]
 				}
-			} else {
+			case "enable":
+				action = "setEnabled"
+				val := true
+				enabled = &val
+				if len(cmdArgs.Positional) > 1 {
+					extID = cmdArgs.Positional[1]
+				}
+			case "disable":
+				action = "setEnabled"
+				val := false
+				enabled = &val
+				if len(cmdArgs.Positional) > 1 {
+					extID = cmdArgs.Positional[1]
+				}
+			case "setenabled":
+				action = "setEnabled"
+				if len(cmdArgs.Positional) > 1 {
+					extID = cmdArgs.Positional[1]
+				}
+				if cmdArgs.Flags["enabled"] != "" {
+					b := cmdArgs.Bool("enabled")
+					enabled = &b
+				} else if len(cmdArgs.Positional) > 2 {
+					b := strings.ToLower(cmdArgs.Positional[2]) == "true" || cmdArgs.Positional[2] == "1"
+					enabled = &b
+				}
+			case "toggle":
+				action = "toggle"
+				if len(cmdArgs.Positional) > 1 {
+					extID = cmdArgs.Positional[1]
+				}
+			case "uninstall":
+				action = "uninstall"
+				if len(cmdArgs.Positional) > 1 {
+					extID = cmdArgs.Positional[1]
+				}
+			default:
 				extID = cmdArgs.Positional[0]
 			}
 		}
-		if action == "enable" {
-			val := true
-			enabled = &val
-		} else if action == "disable" {
-			val := false
-			enabled = &val
-		}
-		if (action == "enable" || action == "disable" || action == "toggle" || action == "uninstall") && extID == "" {
+		if (action == "setEnabled" || action == "toggle" || action == "uninstall") && extID == "" {
 			fmt.Printf("Sử dụng: agent-pilot extensions %s <extensionId>\n", action)
 			os.Exit(1)
 		}

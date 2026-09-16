@@ -114,13 +114,20 @@
     bridgeScript.textContent = `
       (() => {
         if (window.__AGENT_PILOT__) return;
-        function sendBridgeRequest(action, data = {}) {
+        function sendBridgeRequest(action, data = {}, customTimeout = null) {
+          let timeoutMs = 5000;
+          if (customTimeout && Number(customTimeout) > 0) {
+            timeoutMs = Number(customTimeout);
+          } else if (action === "wait_for") {
+            const waitDur = (data && (data.timeout || data.timeoutMs)) ? Number(data.timeout || data.timeoutMs) : 10000;
+            timeoutMs = waitDur + 3000;
+          }
           return new Promise((resolve) => {
             const reqId = "ap_" + Math.random().toString(36).substr(2, 9);
             const timer = setTimeout(() => {
               window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
               resolve(null);
-            }, 5000);
+            }, timeoutMs);
             function onResponse(e) {
               if (e.detail && e.detail.reqId === reqId) {
                 clearTimeout(timer);
@@ -253,7 +260,7 @@
     }
 
     if (req.action === "virtual_hover" || req.action === "hover") {
-      cursor.virtualHover(req.selector).then(sendResponse);
+      cursor.virtualHover(req.selector, { dispatchSynthetic: req.dispatchSynthetic }).then(sendResponse);
       return true;
     }
 
@@ -264,6 +271,19 @@
 
     if (req.action === "wait_for") {
       cursor.waitFor(req).then(sendResponse);
+      return true;
+    }
+
+    if (req.action === "focus_element") {
+      const el = cursor.resolveElement ? cursor.resolveElement(req.selector) : document.querySelector(req.selector);
+      if (!el) {
+        sendResponse({ success: false, error: "Element not found for selector: " + req.selector });
+        return true;
+      }
+      if (typeof el.focus === "function") {
+        el.focus();
+      }
+      sendResponse({ success: true });
       return true;
     }
 
