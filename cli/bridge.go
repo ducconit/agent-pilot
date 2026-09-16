@@ -678,23 +678,64 @@ func deriveBatchTimeout(params map[string]interface{}, defaultTimeoutMs int) int
 				}
 				switch actType {
 				case "wait", "sleep":
-					if ms, ok := getIntOrFloat(act, "ms"); ok && ms > 0 {
-						actsSum += ms
-					} else if ms, ok := getIntOrFloat(act, "duration"); ok && ms > 0 {
-						actsSum += ms
-					} else {
-						actsSum += 5000
+					hasTarget := false
+					if sel, ok := act["selector"].(string); ok && sel != "" {
+						hasTarget = true
 					}
+					if txt, ok := act["text"].(string); ok && txt != "" {
+						hasTarget = true
+					}
+					if hasTarget {
+						if ms, ok := getIntOrFloat(act, "timeoutMs"); ok && ms > 0 {
+							actsSum += ms
+						} else if ms, ok := getIntOrFloat(act, "timeout"); ok && ms > 0 {
+							actsSum += ms
+						} else {
+							actsSum += 10000
+						}
+					} else {
+						if ms, ok := getIntOrFloat(act, "ms"); ok && ms > 0 {
+							actsSum += ms
+						} else if ms, ok := getIntOrFloat(act, "duration"); ok && ms > 0 {
+							actsSum += ms
+						} else if ms, ok := getIntOrFloat(act, "timeoutMs"); ok && ms > 0 {
+							actsSum += ms
+						} else if ms, ok := getIntOrFloat(act, "timeout"); ok && ms > 0 {
+							actsSum += ms
+						} else {
+							actsSum += 5000
+						}
+					}
+
 				case "wait_for", "waitfor":
 					if ms, ok := getIntOrFloat(act, "timeoutMs"); ok && ms > 0 {
 						actsSum += ms
 					} else if ms, ok := getIntOrFloat(act, "timeout"); ok && ms > 0 {
 						actsSum += ms
 					} else {
-						actsSum += 15000
+						actsSum += 10000
 					}
-				case "open", "open_tab", "navigate", "load":
-					actsSum += 30000
+
+				case "wait_for_selector":
+					if ms, ok := getIntOrFloat(act, "timeoutMs"); ok && ms > 0 {
+						actsSum += ms
+					} else if ms, ok := getIntOrFloat(act, "timeout"); ok && ms > 0 {
+						actsSum += ms
+					} else {
+						actsSum += 5000
+					}
+
+				case "open", "open_tab", "tabs.create", "navigate", "tabs.update", "load":
+					loadTo := 30000
+					if lt, ok := getIntOrFloat(act, "loadTimeout"); ok && lt > 0 {
+						loadTo = lt
+					} else if lt, ok := getIntOrFloat(act, "timeoutMs"); ok && lt > 0 {
+						loadTo = lt
+					} else if lt, ok := getIntOrFloat(act, "timeout"); ok && lt > 0 {
+						loadTo = lt
+					}
+					actsSum += loadTo
+
 				default:
 					actsSum += 5000
 				}

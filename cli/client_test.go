@@ -449,4 +449,38 @@ func TestDeriveCommandTimeout(t *testing.T) {
 	if to != 460000 {
 		t.Errorf("expected 460000, got %d", to)
 	}
+
+	// 8. batch.run with wait_for_selector timeout > 5m
+	selectorWaitBatch := map[string]interface{}{
+		"actions": []interface{}{
+			map[string]interface{}{"type": "wait_for_selector", "selector": "#long-task", "timeout": 400000},
+		},
+	}
+	to = DeriveCommandTimeout("batch.run", selectorWaitBatch, 0)
+	if to != 460000 {
+		t.Errorf("expected 460000, got %d", to)
+	}
+
+	// 9. batch.run with wait on selector timeout > 5m
+	waitSelectorBatch := map[string]interface{}{
+		"actions": []interface{}{
+			map[string]interface{}{"type": "wait", "selector": ".ready", "timeoutMs": 350000},
+		},
+	}
+	to = DeriveCommandTimeout("batch.run", waitSelectorBatch, 0)
+	if to != 410000 {
+		t.Errorf("expected 410000, got %d", to)
+	}
+
+	// 10. batch.run with navigation loadTimeout and aliases
+	navBatch := map[string]interface{}{
+		"actions": []interface{}{
+			map[string]interface{}{"type": "tabs.update", "url": "https://example.com", "loadTimeout": 400000},
+			map[string]interface{}{"type": "tabs.create", "url": "https://example.com/2", "loadTimeout": 200000},
+		},
+	}
+	to = DeriveCommandTimeout("batch.run", navBatch, 0)
+	if to != 660000 {
+		t.Errorf("expected 660000, got %d", to)
+	}
 }
