@@ -318,79 +318,96 @@ func parseFillArgs(args []string) ([]map[string]interface{}, string, bool, inter
 	return fields, submitSelector, pressEnter, t, nil
 }
 
-func parseWaitArgs(args []string) (string, string, string, int, interface{}, error) {
-	state := "visible"
-	timeout := 10000
-	var text string
-	var selector string
-	var tabID int
-	var positional []string
+type FlexibleCmdArgs struct {
+	Flags      map[string]string
+	Positional []string
+}
 
+func parseCmdArgs(args []string) FlexibleCmdArgs {
+	res := FlexibleCmdArgs{
+		Flags:      make(map[string]string),
+		Positional: make([]string, 0),
+	}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		if arg == "-tab" || arg == "--tab" {
-			if i+1 < len(args) {
-				id, err := strconv.Atoi(args[i+1])
-				if err != nil || id <= 0 {
-					return "", "", "", 0, nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", args[i+1])
+		if strings.HasPrefix(arg, "--") || strings.HasPrefix(arg, "-") {
+			trimmed := strings.TrimLeft(arg, "-")
+			if strings.Contains(trimmed, "=") {
+				parts := strings.SplitN(trimmed, "=", 2)
+				res.Flags[parts[0]] = parts[1]
+			} else if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				if trimmed == "enter" || trimmed == "gc" || trimmed == "clear" {
+					res.Flags[trimmed] = "true"
+				} else {
+					res.Flags[trimmed] = args[i+1]
+					i++
 				}
-				tabID = id
-				i++
+			} else {
+				res.Flags[trimmed] = "true"
 			}
-		} else if strings.HasPrefix(arg, "-tab=") || strings.HasPrefix(arg, "--tab=") {
-			parts := strings.SplitN(arg, "=", 2)
-			id, err := strconv.Atoi(parts[1])
-			if err != nil || id <= 0 {
-				return "", "", "", 0, nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", parts[1])
-			}
-			tabID = id
-		} else if arg == "-timeout" || arg == "--timeout" {
-			if i+1 < len(args) {
-				ms, err := strconv.Atoi(args[i+1])
-				if err != nil || ms <= 0 {
-					return "", "", "", 0, nil, fmt.Errorf("giá trị timeout không hợp lệ: %s", args[i+1])
-				}
-				timeout = ms
-				i++
-			}
-		} else if strings.HasPrefix(arg, "-timeout=") || strings.HasPrefix(arg, "--timeout=") {
-			parts := strings.SplitN(arg, "=", 2)
-			ms, err := strconv.Atoi(parts[1])
-			if err != nil || ms <= 0 {
-				return "", "", "", 0, nil, fmt.Errorf("giá trị timeout không hợp lệ: %s", parts[1])
-			}
-			timeout = ms
-		} else if arg == "-state" || arg == "--state" {
-			if i+1 < len(args) {
-				state = args[i+1]
-				i++
-			}
-		} else if strings.HasPrefix(arg, "-state=") || strings.HasPrefix(arg, "--state=") {
-			parts := strings.SplitN(arg, "=", 2)
-			state = parts[1]
-		} else if arg == "-text" || arg == "--text" {
-			if i+1 < len(args) {
-				text = args[i+1]
-				i++
-			}
-		} else if strings.HasPrefix(arg, "-text=") || strings.HasPrefix(arg, "--text=") {
-			parts := strings.SplitN(arg, "=", 2)
-			text = parts[1]
-		} else if arg == "-selector" || arg == "--selector" {
-			if i+1 < len(args) {
-				selector = args[i+1]
-				i++
-			}
-		} else if strings.HasPrefix(arg, "-selector=") || strings.HasPrefix(arg, "--selector=") {
-			parts := strings.SplitN(arg, "=", 2)
-			selector = parts[1]
 		} else {
-			positional = append(positional, arg)
+			res.Positional = append(res.Positional, arg)
 		}
 	}
+	return res
+}
 
-	if len(positional) > 0 {
-		pos := positional[0]
+func (a FlexibleCmdArgs) TabID() (interface{}, error) {
+	val, ok := a.Flags["tab"]
+	if !ok {
+		return nil, nil
+	}
+	id, err := strconv.Atoi(val)
+	if err != nil || id <= 0 {
+		return nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", val)
+	}
+	return id, nil
+}
+
+func (a FlexibleCmdArgs) Int(flagName string, defaultVal int) (int, error) {
+	val, ok := a.Flags[flagName]
+	if !ok {
+		return defaultVal, nil
+	}
+	v, err := strconv.Atoi(val)
+	if err != nil {
+		return defaultVal, fmt.Errorf("giá trị %s không hợp lệ: %s", flagName, val)
+	}
+	return v, nil
+}
+
+func (a FlexibleCmdArgs) String(flagName string, defaultVal string) string {
+	if val, ok := a.Flags[flagName]; ok {
+		return val
+	}
+	return defaultVal
+}
+
+func (a FlexibleCmdArgs) Bool(flagName string) bool {
+	if val, ok := a.Flags[flagName]; ok {
+		lower := strings.ToLower(val)
+		return lower == "true" || lower == "1" || lower == ""
+	}
+	return false
+}
+
+func parseWaitArgs(args []string) (string, string, string, int, interface{}, error) {
+	cmdArgs := parseCmdArgs(args)
+	tab, err := cmdArgs.TabID()
+	if err != nil {
+		return "", "", "", 0, nil, err
+	}
+	timeout, err := cmdArgs.Int("timeout", 10000)
+	if err != nil || timeout <= 0 {
+		val := cmdArgs.Flags["timeout"]
+		return "", "", "", 0, nil, fmt.Errorf("giá trị timeout không hợp lệ: %s", val)
+	}
+	state := cmdArgs.String("state", "visible")
+	text := cmdArgs.String("text", "")
+	selector := cmdArgs.String("selector", "")
+
+	if len(cmdArgs.Positional) > 0 {
+		pos := cmdArgs.Positional[0]
 		if selector == "" && text == "" {
 			if strings.HasPrefix(pos, "@") || strings.HasPrefix(pos, "#") || strings.HasPrefix(pos, ".") || strings.HasPrefix(pos, "[") {
 				selector = pos
@@ -410,11 +427,7 @@ func parseWaitArgs(args []string) (string, string, string, int, interface{}, err
 		return "", "", "", 0, nil, fmt.Errorf("vui lòng cung cấp selector hoặc text cần chờ")
 	}
 
-	var t interface{}
-	if tabID > 0 {
-		t = tabID
-	}
-	return selector, text, state, timeout, t, nil
+	return selector, text, state, timeout, tab, nil
 }
 
 func main() {
@@ -720,63 +733,55 @@ func main() {
 		}
 
 	case "hover":
-		hoverFlags := flag.NewFlagSet("hover", flag.ExitOnError)
-		tabID := hoverFlags.Int("tab", 0, "Target tab ID")
-		if err := hoverFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs := parseCmdArgs(os.Args[2:])
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		args := hoverFlags.Args()
-		if len(args) < 1 {
+		if len(cmdArgs.Positional) < 1 {
 			fmt.Println("Sử dụng: agent-pilot hover <selector> [--tab <id>]")
 			os.Exit(1)
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
-		}
-		if err := ExecHover(args[0], t); err != nil {
+		if err := ExecHover(cmdArgs.Positional[0], tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
 
 	case "drag":
-		dragFlags := flag.NewFlagSet("drag", flag.ExitOnError)
-		tabID := dragFlags.Int("tab", 0, "Target tab ID")
-		steps := dragFlags.Int("steps", 8, "Animation steps")
-		if err := dragFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs := parseCmdArgs(os.Args[2:])
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		args := dragFlags.Args()
-		if len(args) < 2 {
+		steps, err := cmdArgs.Int("steps", 8)
+		if err != nil || steps <= 0 {
+			fmt.Fprintf(os.Stderr, "❌ Error: Số bước (steps) phải là số nguyên dương: %v\n", cmdArgs.Flags["steps"])
+			os.Exit(1)
+		}
+		if len(cmdArgs.Positional) < 2 {
 			fmt.Println("Sử dụng: agent-pilot drag <fromSelector> <toSelector> [--steps <n>] [--tab <id>]")
 			os.Exit(1)
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
-		}
-		if err := ExecDrag(args[0], args[1], *steps, t); err != nil {
+		if err := ExecDrag(cmdArgs.Positional[0], cmdArgs.Positional[1], steps, tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
 
 	case "key", "press-key":
-		keyFlags := flag.NewFlagSet("key", flag.ExitOnError)
-		tabID := keyFlags.Int("tab", 0, "Target tab ID")
-		selector := keyFlags.String("selector", "", "Target element selector")
-		if err := keyFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs := parseCmdArgs(os.Args[2:])
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		args := keyFlags.Args()
-		if len(args) < 1 {
+		selector := cmdArgs.String("selector", "")
+		if len(cmdArgs.Positional) < 1 {
 			fmt.Println("Sử dụng: agent-pilot key <keyName> [--selector <sel>] [--tab <id>]")
 			os.Exit(1)
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
-		}
-		if err := ExecPressKey(args[0], *selector, t); err != nil {
+		if err := ExecPressKey(cmdArgs.Positional[0], selector, tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -794,193 +799,180 @@ func main() {
 		}
 
 	case "upload":
-		upFlags := flag.NewFlagSet("upload", flag.ExitOnError)
-		tabID := upFlags.Int("tab", 0, "Target tab ID")
-		if err := upFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs := parseCmdArgs(os.Args[2:])
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		args := upFlags.Args()
-		if len(args) < 2 {
+		if len(cmdArgs.Positional) < 2 {
 			fmt.Println("Sử dụng: agent-pilot upload <selector> <file1> [file2...] [--tab <id>]")
 			os.Exit(1)
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
-		}
-		if err := ExecUploadFile(args[0], args[1:], t); err != nil {
+		if err := ExecUploadFile(cmdArgs.Positional[0], cmdArgs.Positional[1:], tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
 
 	case "dialog":
-		dlgFlags := flag.NewFlagSet("dialog", flag.ExitOnError)
-		tabID := dlgFlags.Int("tab", 0, "Target tab ID")
-		promptText := dlgFlags.String("prompt", "", "Prompt text for prompt() dialog")
-		if err := dlgFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs := parseCmdArgs(os.Args[2:])
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		args := dlgFlags.Args()
+		promptText := cmdArgs.String("prompt", "")
 		accept := true
-		if len(args) > 0 && (strings.ToLower(args[0]) == "dismiss" || strings.ToLower(args[0]) == "cancel" || strings.ToLower(args[0]) == "false") {
-			accept = false
+		if len(cmdArgs.Positional) > 0 {
+			first := strings.ToLower(cmdArgs.Positional[0])
+			if first == "dismiss" || first == "cancel" || first == "false" {
+				accept = false
+			}
+			if len(cmdArgs.Positional) > 1 && promptText == "" {
+				promptText = cmdArgs.Positional[1]
+			}
 		}
-		if len(args) > 1 && *promptText == "" {
-			*promptText = args[1]
-		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
-		}
-		if err := ExecHandleDialog(accept, *promptText, t); err != nil {
+		if err := ExecHandleDialog(accept, promptText, tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
 
 	case "emulate":
-		emuFlags := flag.NewFlagSet("emulate", flag.ExitOnError)
-		tabID := emuFlags.Int("tab", 0, "Target tab ID")
-		network := emuFlags.String("network", "", "Network conditions (offline, slow-3g, fast-3g, none)")
-		cpu := emuFlags.String("cpu", "", "CPU throttling rate (1, 4, 6)")
-		theme := emuFlags.String("theme", "", "Color scheme (dark, light)")
-		if err := emuFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs := parseCmdArgs(os.Args[2:])
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
-		}
-		if err := ExecEmulate(*network, *cpu, *theme, t); err != nil {
+		network := cmdArgs.String("network", "")
+		cpu := cmdArgs.String("cpu", "")
+		theme := cmdArgs.String("theme", "")
+		if err := ExecEmulate(network, cpu, theme, tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
 
 	case "resize":
-		resFlags := flag.NewFlagSet("resize", flag.ExitOnError)
-		tabID := resFlags.Int("tab", 0, "Target tab ID")
-		if err := resFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs := parseCmdArgs(os.Args[2:])
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		args := resFlags.Args()
-		if len(args) < 2 {
+		if len(cmdArgs.Positional) < 2 {
 			fmt.Println("Sử dụng: agent-pilot resize <width> <height> [--tab <id>]")
 			os.Exit(1)
 		}
-		w, err := strconv.Atoi(args[0])
+		w, err := strconv.Atoi(cmdArgs.Positional[0])
 		if err != nil || w <= 0 {
-			fmt.Fprintf(os.Stderr, "❌ Error: Chiều rộng (width) phải là số nguyên dương: %v\n", args[0])
+			fmt.Fprintf(os.Stderr, "❌ Error: Chiều rộng (width) phải là số nguyên dương: %v\n", cmdArgs.Positional[0])
 			os.Exit(1)
 		}
-		h, err := strconv.Atoi(args[1])
+		h, err := strconv.Atoi(cmdArgs.Positional[1])
 		if err != nil || h <= 0 {
-			fmt.Fprintf(os.Stderr, "❌ Error: Chiều cao (height) phải là số nguyên dương: %v\n", args[1])
+			fmt.Fprintf(os.Stderr, "❌ Error: Chiều cao (height) phải là số nguyên dương: %v\n", cmdArgs.Positional[1])
 			os.Exit(1)
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
-		}
-		if err := ExecResizePage(w, h, t); err != nil {
+		if err := ExecResizePage(w, h, tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
 
 	case "network":
-		netFlags := flag.NewFlagSet("network", flag.ExitOnError)
-		tabID := netFlags.Int("tab", 0, "Target tab ID")
-		filterUrl := netFlags.String("filter", "", "Filter requests by URL")
-		method := netFlags.String("method", "", "Filter requests by method (GET, POST...)")
-		resType := netFlags.String("type", "", "Filter by resource type (Fetch, XHR, Document...)")
-		limit := netFlags.Int("limit", 50, "Max requests to return")
-		if err := netFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs := parseCmdArgs(os.Args[2:])
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		args := netFlags.Args()
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
+		filterUrl := cmdArgs.String("filter", "")
+		method := cmdArgs.String("method", "")
+		resType := cmdArgs.String("type", "")
+		limit, err := cmdArgs.Int("limit", 50)
+		if err != nil || limit <= 0 {
+			fmt.Fprintf(os.Stderr, "❌ Error: Giới hạn (limit) phải là số nguyên dương: %v\n", cmdArgs.Flags["limit"])
+			os.Exit(1)
 		}
-		if len(args) > 1 && (args[0] == "get" || args[0] == "body") {
-			if err := ExecGetNetworkResponseBody(args[1], t); err != nil {
+		if len(cmdArgs.Positional) > 1 && (cmdArgs.Positional[0] == "get" || cmdArgs.Positional[0] == "body") {
+			if err := ExecGetNetworkResponseBody(cmdArgs.Positional[1], tabID); err != nil {
 				fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 				os.Exit(1)
 			}
 		} else {
-			if err := ExecListNetworkRequests(*filterUrl, *method, *resType, *limit, t); err != nil {
+			if err := ExecListNetworkRequests(filterUrl, method, resType, limit, tabID); err != nil {
 				fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 				os.Exit(1)
 			}
 		}
 
 	case "trace":
-		trFlags := flag.NewFlagSet("trace", flag.ExitOnError)
-		tabID := trFlags.Int("tab", 0, "Target tab ID")
-		cats := trFlags.String("categories", "", "Trace categories")
-		if err := trFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs := parseCmdArgs(os.Args[2:])
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
+		cats := cmdArgs.String("categories", "")
 		action := "start"
-		args := trFlags.Args()
-		if len(args) > 0 {
-			action = args[0]
+		if len(cmdArgs.Positional) > 0 {
+			action = cmdArgs.Positional[0]
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
-		}
-		if err := ExecPerformanceTrace(action, *cats, t); err != nil {
+		if err := ExecPerformanceTrace(action, cats, tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
 
 	case "metrics":
-		metFlags := flag.NewFlagSet("metrics", flag.ExitOnError)
-		tabID := metFlags.Int("tab", 0, "Target tab ID")
-		if err := metFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs := parseCmdArgs(os.Args[2:])
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
-		}
-		if err := ExecPerformanceMetrics(t); err != nil {
+		if err := ExecPerformanceMetrics(tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
 
 	case "heap", "heapsnapshot":
-		heapFlags := flag.NewFlagSet("heap", flag.ExitOnError)
-		tabID := heapFlags.Int("tab", 0, "Target tab ID")
-		if err := heapFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs := parseCmdArgs(os.Args[2:])
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
-		}
-		if err := ExecTakeHeapSnapshot(t); err != nil {
+		gc := cmdArgs.Bool("gc")
+		if err := ExecTakeHeapSnapshot(gc, tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
 
 	case "extensions", "ext":
-		extFlags := flag.NewFlagSet("extensions", flag.ExitOnError)
-		if err := extFlags.Parse(os.Args[2:]); err != nil {
-			os.Exit(1)
-		}
-		args := extFlags.Args()
+		cmdArgs := parseCmdArgs(os.Args[2:])
 		action := "list"
 		extID := ""
 		var enabled *bool
-		if len(args) > 0 {
-			action = args[0]
+		if len(cmdArgs.Positional) > 0 {
+			sub := strings.ToLower(cmdArgs.Positional[0])
+			if sub == "list" || sub == "enable" || sub == "disable" || sub == "toggle" || sub == "uninstall" {
+				action = sub
+				if len(cmdArgs.Positional) > 1 {
+					extID = cmdArgs.Positional[1]
+				}
+			} else {
+				extID = cmdArgs.Positional[0]
+			}
 		}
-		if len(args) > 1 {
-			extID = args[1]
-		}
-		if len(args) > 2 {
-			val := strings.ToLower(args[2]) == "on" || strings.ToLower(args[2]) == "true" || args[2] == "1"
+		if action == "enable" {
+			val := true
 			enabled = &val
+		} else if action == "disable" {
+			val := false
+			enabled = &val
+		}
+		if (action == "enable" || action == "disable" || action == "toggle" || action == "uninstall") && extID == "" {
+			fmt.Printf("Sử dụng: agent-pilot extensions %s <extensionId>\n", action)
+			os.Exit(1)
 		}
 		if err := ExecManageExtensions(action, extID, enabled); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)

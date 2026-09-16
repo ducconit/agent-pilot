@@ -66,6 +66,8 @@ export async function detachDebugger(tabId, broadcastFn = null) {
     chrome.debugger.detach({ tabId }, () => {
       attachedTabs.delete(tabId);
       devtoolsBuffers.delete(tabId);
+      activeTracingSessions.delete(tabId);
+      activeDialogs.delete(tabId);
       if (typeof broadcastFn === "function") {
         broadcastFn({
           type: "DEBUGGER_STATUS_CHANGED",
@@ -113,6 +115,8 @@ export function initCdpEventListeners(broadcastFn) {
     if (source && source.tabId) {
       attachedTabs.delete(source.tabId);
       devtoolsBuffers.delete(source.tabId);
+      activeTracingSessions.delete(source.tabId);
+      activeDialogs.delete(source.tabId);
       if (typeof broadcastFn === "function") {
         broadcastFn({
           type: "DEBUGGER_STATUS_CHANGED",
@@ -123,6 +127,15 @@ export function initCdpEventListeners(broadcastFn) {
       }
     }
   });
+
+  if (chrome.tabs && chrome.tabs.onRemoved) {
+    chrome.tabs.onRemoved.addListener((tabId) => {
+      attachedTabs.delete(tabId);
+      devtoolsBuffers.delete(tabId);
+      activeTracingSessions.delete(tabId);
+      activeDialogs.delete(tabId);
+    });
+  }
 
   // Listen for CDP events (Console, Network, Runtime)
   chrome.debugger.onEvent.addListener((source, method, params) => {
@@ -277,12 +290,18 @@ export function initCdpEventListeners(broadcastFn) {
     else if (method === "Tracing.dataCollected") {
       const trace = activeTracingSessions.get(tabId);
       if (trace && Array.isArray(params.value)) {
-        trace.buffer.push(...params.value);
+        if (trace.buffer.length < 2000) {
+          trace.buffer.push(...params.value.slice(0, 2000 - trace.buffer.length));
+        }
       }
     } else if (method === "Tracing.tracingComplete") {
       const trace = activeTracingSessions.get(tabId);
       if (trace) {
         trace.completed = true;
+        if (typeof trace.onComplete === "function") {
+          trace.onComplete();
+          trace.onComplete = null;
+        }
       }
     }
   });
@@ -312,15 +331,37 @@ export function getActiveDialog(tabId) {
  * Upload files to an <input type="file"> element via CDP DOM.setFileInputFiles
  */
 export async function uploadFileInput(tabId, selector, filePaths) {
+  if (!selector) {
+    throw new Error("selector is required for uploadFileInput");
+  }
   if (!Array.isArray(filePaths) || filePaths.length === 0) {
     throw new Error("filePaths must be a non-empty array of file paths");
   }
 
-  // Locate element using cursor resolver (@ref support) or querySelector
+  // 1. Ask isolated content script to resolve selector/@ref and tag the element with a temporary data marker
+  let resolvedSelector = selector;
+  let marker = null;
+  try {
+    const markRes = await new Promise((resolve) => {
+      chrome.tabs.sendMessage(tabId, { action: "mark_upload_target", selector }, (resp) => {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+        } else {
+          resolve(resp);
+        }
+      });
+    });
+    if (markRes && markRes.success && markRes.marker) {
+      marker = markRes.marker;
+      resolvedSelector = `[data-agent-pilot-upload="${marker}"]`;
+    }
+  } catch (err) {
+    console.debug("[AgentPilot] Could not mark upload target via content script:", err);
+  }
+
+  // 2. Locate element via CDP Runtime.evaluate
   const evalScript = `(() => {
-    const el = (typeof window.__AP_INTERNAL__ !== 'undefined' && window.__AP_INTERNAL__.cursor && typeof window.__AP_INTERNAL__.cursor.resolveElement === 'function')
-      ? window.__AP_INTERNAL__.cursor.resolveElement(${JSON.stringify(selector)})
-      : document.querySelector(${JSON.stringify(selector)});
+    const el = document.querySelector(${JSON.stringify(resolvedSelector)});
     if (!el) throw new Error("Element not found for selector: " + ${JSON.stringify(selector)});
     if (el.tagName !== 'INPUT' || (el.type && el.type.toLowerCase() !== 'file')) {
       const fileInput = el.querySelector ? el.querySelector('input[type=file]') : null;
@@ -362,9 +403,18 @@ export async function uploadFileInput(tabId, selector, filePaths) {
       message: `Successfully set ${filePaths.length} file(s) on ${selector}`
     };
   } finally {
-    sendCdpCommand(tabId, "Runtime.releaseObject", { objectId }).catch((err) => {
-      console.debug("[AgentPilot] Runtime.releaseObject cleanup error ignored:", err);
-    });
+    if (objectId) {
+      sendCdpCommand(tabId, "Runtime.releaseObject", { objectId }).catch((err) => {
+        console.debug("[AgentPilot] Runtime.releaseObject cleanup error ignored:", err);
+      });
+    }
+    if (marker) {
+      chrome.tabs.sendMessage(tabId, { action: "unmark_upload_target", marker }, () => {
+        if (chrome.runtime.lastError) {
+          console.debug("[AgentPilot] unmark_upload_target cleanup error ignored:", chrome.runtime.lastError);
+        }
+      });
+    }
   }
 }
 
@@ -490,12 +540,20 @@ export async function startPerformanceTrace(tabId, categories = null) {
 export async function stopPerformanceTrace(tabId) {
   const trace = activeTracingSessions.get(tabId);
   try {
+    const completePromise = new Promise((resolve) => {
+      if (!trace || trace.completed) {
+        resolve();
+        return;
+      }
+      trace.onComplete = resolve;
+      setTimeout(resolve, 2000);
+    });
+
     await sendCdpCommand(tabId, "Tracing.end", {}, 5000);
+    await completePromise;
   } catch (err) {
     logDebug("Tracing.end error", err);
   }
-
-  await new Promise((res) => setTimeout(res, 200));
 
   const events = trace?.buffer || [];
   activeTracingSessions.delete(tabId);
@@ -563,4 +621,128 @@ export async function takeHeapSnapshot(tabId) {
     totalBytes: totalLength,
     message: `Heap snapshot captured (${totalLength} bytes across ${chunks.length} chunks)`
   };
+}
+
+const CDP_KEY_MAP = {
+  "enter": { code: "Enter", keyCode: 13, key: "Enter", text: "\r" },
+  "tab": { code: "Tab", keyCode: 9, key: "Tab" },
+  "backspace": { code: "Backspace", keyCode: 8, key: "Backspace" },
+  "escape": { code: "Escape", keyCode: 27, key: "Escape" },
+  "esc": { code: "Escape", keyCode: 27, key: "Escape" },
+  "space": { code: "Space", keyCode: 32, key: " ", text: " " },
+  "arrowup": { code: "ArrowUp", keyCode: 38, key: "ArrowUp" },
+  "up": { code: "ArrowUp", keyCode: 38, key: "ArrowUp" },
+  "arrowdown": { code: "ArrowDown", keyCode: 40, key: "ArrowDown" },
+  "down": { code: "ArrowDown", keyCode: 40, key: "ArrowDown" },
+  "arrowleft": { code: "ArrowLeft", keyCode: 37, key: "ArrowLeft" },
+  "left": { code: "ArrowLeft", keyCode: 37, key: "ArrowLeft" },
+  "arrowright": { code: "ArrowRight", keyCode: 39, key: "ArrowRight" },
+  "right": { code: "ArrowRight", keyCode: 39, key: "ArrowRight" },
+  "delete": { code: "Delete", keyCode: 46, key: "Delete" },
+  "home": { code: "Home", keyCode: 36, key: "Home" },
+  "end": { code: "End", keyCode: 35, key: "End" },
+  "pageup": { code: "PageUp", keyCode: 33, key: "PageUp" },
+  "pagedown": { code: "PageDown", keyCode: 34, key: "PageDown" }
+};
+
+/**
+ * Dispatch real, trusted keyboard events via CDP Input.dispatchKeyEvent
+ */
+export async function dispatchCdpKeyEvent(tabId, keyCombo, selector = null) {
+  if (!keyCombo) throw new Error("key is required");
+
+  // Focus element first if selector provided
+  if (selector) {
+    try {
+      await chrome.tabs.sendMessage(tabId, { action: "focus_element", selector });
+    } catch (err) {
+      console.debug("[AgentPilot] focus_element message failed:", err);
+    }
+  }
+
+  const parts = keyCombo.split("+").map(s => s.trim()).filter(Boolean);
+  let modifiers = 0;
+  let mainKey = "";
+
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    const lower = p.toLowerCase();
+    if (lower === "ctrl" || lower === "control") {
+      modifiers |= 2;
+    } else if (lower === "alt" || lower === "option") {
+      modifiers |= 1;
+    } else if (lower === "shift") {
+      modifiers |= 8;
+    } else if (lower === "meta" || lower === "cmd" || lower === "command" || lower === "win") {
+      modifiers |= 4;
+    } else {
+      mainKey = p;
+    }
+  }
+
+  if (!mainKey && parts.length > 0) {
+    mainKey = parts[parts.length - 1];
+  }
+
+  const lowerKey = mainKey.toLowerCase();
+  let keyInfo = CDP_KEY_MAP[lowerKey];
+
+  if (!keyInfo) {
+    if (mainKey.length === 1) {
+      const isAlpha = /[a-zA-Z]/.test(mainKey);
+      const isDigit = /[0-9]/.test(mainKey);
+      const upper = mainKey.toUpperCase();
+      const code = isAlpha ? `Key${upper}` : isDigit ? `Digit${mainKey}` : mainKey;
+      keyInfo = {
+        code,
+        keyCode: upper.charCodeAt(0),
+        key: modifiers & 8 ? upper : mainKey,
+        text: (modifiers & 2 || modifiers & 4) ? "" : mainKey
+      };
+    } else {
+      keyInfo = { code: mainKey, keyCode: 0, key: mainKey };
+    }
+  }
+
+  // 1. rawKeyDown
+  await sendCdpCommand(tabId, "Input.dispatchKeyEvent", {
+    type: "rawKeyDown",
+    modifiers,
+    key: keyInfo.key,
+    code: keyInfo.code,
+    windowsVirtualKeyCode: keyInfo.keyCode
+  });
+
+  // 2. char (for character input when not a shortcut)
+  if (keyInfo.text && !(modifiers & 2) && !(modifiers & 4)) {
+    await sendCdpCommand(tabId, "Input.dispatchKeyEvent", {
+      type: "char",
+      modifiers,
+      text: keyInfo.text,
+      unmodifiedText: keyInfo.text
+    });
+  }
+
+  // 3. keyUp
+  await sendCdpCommand(tabId, "Input.dispatchKeyEvent", {
+    type: "keyUp",
+    modifiers,
+    key: keyInfo.key,
+    code: keyInfo.code,
+    windowsVirtualKeyCode: keyInfo.keyCode
+  });
+
+  return { success: true, key: keyCombo, selector, trusted: true };
+}
+
+/**
+ * Dispatch real, trusted mouse move via CDP Input.dispatchMouseEvent
+ */
+export async function dispatchCdpMouseMove(tabId, x, y) {
+  await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
+    type: "mouseMoved",
+    x: Math.round(x),
+    y: Math.round(y)
+  });
+  return { success: true, x: Math.round(x), y: Math.round(y) };
 }

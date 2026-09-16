@@ -142,6 +142,10 @@
           click: (x, y) => sendBridgeRequest("virtual_mouse_click", { x, y }),
           type: (selector, text) => sendBridgeRequest("virtual_type", { selector, text }),
           scroll: (deltaX, deltaY) => sendBridgeRequest("virtual_scroll", { deltaX, deltaY }),
+          hover: (selector) => sendBridgeRequest("virtual_hover", { selector }),
+          drag: (from, to, steps) => sendBridgeRequest("virtual_drag", { from, to, steps }),
+          pressKey: (key, selector) => sendBridgeRequest("press_key", { key, selector }),
+          waitFor: (options) => sendBridgeRequest("wait_for", options),
           toggleInspector: (enabled) => sendBridgeRequest("toggle_inspector", { enabled }),
           getElement: (selector, includeStyles) => sendBridgeRequest("get_element_info", { selector, includeStyles }),
           snapshot: (maxElements, format) => sendBridgeRequest("get_snapshot", { maxElements, format }),
@@ -184,6 +188,10 @@
       else if (action === "virtual_mouse_click") result = await cursor.virtualClick(data.x, data.y);
       else if (action === "virtual_type") result = await cursor.virtualType(data.selector, data.text);
       else if (action === "virtual_scroll") result = cursor.virtualScroll(data.deltaX, data.deltaY);
+      else if (action === "virtual_hover") result = await cursor.virtualHover(data.selector);
+      else if (action === "virtual_drag") result = await cursor.virtualDrag(data.from, data.to, data.steps);
+      else if (action === "press_key") result = cursor.dispatchKey(data.key, data.code, data.keyCode, data.selector);
+      else if (action === "wait_for") result = await cursor.waitFor(data);
       else if (action === "toggle_inspector") { inspector.toggleInspector(data.enabled); result = { success: true, active: inspector.isInspectorActive() }; }
       else if (action === "is_inspector_active") result = inspector.isInspectorActive();
       else if (action === "get_element_info") {
@@ -256,6 +264,32 @@
 
     if (req.action === "wait_for") {
       cursor.waitFor(req).then(sendResponse);
+      return true;
+    }
+
+    if (req.action === "mark_upload_target") {
+      const el = cursor.resolveElement ? cursor.resolveElement(req.selector) : document.querySelector(req.selector);
+      if (!el) {
+        sendResponse({ success: false, error: "Element not found for selector: " + req.selector });
+        return true;
+      }
+      let target = el;
+      if (target.tagName !== "INPUT" || (target.type && target.type.toLowerCase() !== "file")) {
+        const fileInput = target.querySelector ? target.querySelector("input[type=file]") : null;
+        if (fileInput) target = fileInput;
+      }
+      const marker = "ap-upload-" + Math.random().toString(36).slice(2, 9);
+      target.setAttribute("data-agent-pilot-upload", marker);
+      sendResponse({ success: true, marker });
+      return true;
+    }
+
+    if (req.action === "unmark_upload_target") {
+      const target = document.querySelector(`[data-agent-pilot-upload="${req.marker}"]`);
+      if (target) {
+        target.removeAttribute("data-agent-pilot-upload");
+      }
+      sendResponse({ success: true });
       return true;
     }
 

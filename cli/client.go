@@ -578,12 +578,16 @@ func ExecPerformanceMetrics(tabID interface{}) error {
 	return nil
 }
 
-func ExecTakeHeapSnapshot(tabID interface{}) error {
+func ExecTakeHeapSnapshot(gc bool, tabID interface{}) error {
 	params := map[string]interface{}{}
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("memory.heapSnapshot", params, DefaultPort)
+	method := "memory.heapSnapshot"
+	if gc {
+		method = "memory.collectGarbage"
+	}
+	res, err := DispatchCommand(method, params, DefaultPort)
 	if err != nil {
 		return err
 	}

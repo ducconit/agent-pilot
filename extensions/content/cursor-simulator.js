@@ -170,6 +170,21 @@
     }
   }
 
+  function isElementVisible(el) {
+    if (!el || !document.contains(el)) return false;
+    try {
+      const style = window.getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+        return false;
+      }
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    } catch (err) {
+      console.debug("[AgentPilot] isElementVisible check error:", err);
+      return false;
+    }
+  }
+
   /**
    * Trigger click animation & dispatch synthetic events on DOM element
    */
@@ -583,6 +598,11 @@
 
     try {
       setDispatching(true);
+      if (typeof PointerEvent !== "undefined") {
+        el.dispatchEvent(new PointerEvent("pointerenter", { ...eventInit, bubbles: false, pointerType: "mouse" }));
+        el.dispatchEvent(new PointerEvent("pointerover", { ...eventInit, pointerType: "mouse" }));
+        el.dispatchEvent(new PointerEvent("pointermove", { ...eventInit, pointerType: "mouse" }));
+      }
       el.dispatchEvent(new MouseEvent("mouseenter", { ...eventInit, bubbles: false }));
       el.dispatchEvent(new MouseEvent("mouseover", eventInit));
       el.dispatchEvent(new MouseEvent("mousemove", eventInit));
@@ -590,7 +610,7 @@
       setDispatching(false);
     }
 
-    return { success: true, selector, x: center.x, y: center.y };
+    return { success: true, selector, coords: { x: center.x, y: center.y }, x: center.x, y: center.y };
   }
 
   /**
@@ -630,7 +650,10 @@
 
     try {
       setDispatching(true);
-      fromEl.dispatchEvent(new MouseEvent("mousedown", baseInit));
+      if (typeof PointerEvent !== "undefined") {
+        fromEl.dispatchEvent(new PointerEvent("pointerdown", { ...baseInit, buttons: 1, pointerType: "mouse", isPrimary: true }));
+      }
+      fromEl.dispatchEvent(new MouseEvent("mousedown", { ...baseInit, buttons: 1 }));
       if (fromEl.draggable) {
         fromEl.dispatchEvent(new DragEvent("dragstart", { ...baseInit, dataTransfer }));
       }
@@ -645,7 +668,10 @@
         currentMouseY = curY;
         updateCursorTransform(curX, curY);
 
-        const moveInit = { ...baseInit, clientX: curX, clientY: curY };
+        const moveInit = { ...baseInit, clientX: curX, clientY: curY, buttons: 1 };
+        if (typeof PointerEvent !== "undefined") {
+          window.dispatchEvent(new PointerEvent("pointermove", { ...moveInit, pointerType: "mouse", isPrimary: true }));
+        }
         window.dispatchEvent(new MouseEvent("mousemove", moveInit));
         if (fromEl.draggable) {
           toEl.dispatchEvent(new DragEvent("dragover", { ...moveInit, dataTransfer }));
@@ -653,12 +679,15 @@
         await new Promise((r) => setTimeout(r, 25));
       }
 
-      const dropInit = { ...baseInit, clientX: toCenter.x, clientY: toCenter.y };
+      const dropInit = { ...baseInit, clientX: toCenter.x, clientY: toCenter.y, buttons: 0 };
       if (fromEl.draggable) {
         toEl.dispatchEvent(new DragEvent("dragenter", { ...dropInit, dataTransfer }));
         toEl.dispatchEvent(new DragEvent("dragover", { ...dropInit, dataTransfer }));
         toEl.dispatchEvent(new DragEvent("drop", { ...dropInit, dataTransfer }));
         fromEl.dispatchEvent(new DragEvent("dragend", { ...dropInit, dataTransfer }));
+      }
+      if (typeof PointerEvent !== "undefined") {
+        toEl.dispatchEvent(new PointerEvent("pointerup", { ...dropInit, pointerType: "mouse", isPrimary: true }));
       }
       toEl.dispatchEvent(new MouseEvent("mouseup", dropInit));
     } finally {
@@ -689,21 +718,23 @@
 
       if (selector) {
         const el = resolveElement(selector);
-        if (state === "hidden") {
-          const isHidden = !el || el.offsetParent === null || (el.offsetWidth === 0 && el.offsetHeight === 0);
-          if (!isHidden) conditionMet = false;
-        } else if (state === "attached") {
-          if (!el) conditionMet = false;
+        const attached = !!(el && document.contains(el));
+        if (state === "attached") {
+          if (!attached) conditionMet = false;
+        } else if (state === "hidden") {
+          if (attached && isElementVisible(el)) conditionMet = false;
         } else { // "visible"
-          const isVisible = el && (el.offsetWidth > 0 || el.offsetHeight > 0 || (el.getClientRects && el.getClientRects().length > 0));
-          if (!isVisible) conditionMet = false;
+          if (!attached || !isElementVisible(el)) conditionMet = false;
         }
       }
 
       if (conditionMet && text) {
-        const bodyText = document.body ? document.body.innerText : "";
-        if (!bodyText.includes(text)) {
-          conditionMet = false;
+        const bodyText = document.body ? (document.body.innerText || "") : "";
+        const containsText = bodyText.includes(text);
+        if (state === "hidden") {
+          if (containsText) conditionMet = false;
+        } else {
+          if (!containsText) conditionMet = false;
         }
       }
 

@@ -122,6 +122,14 @@ func SendCommandToExtension(method string, params map[string]interface{}, timeou
 		timeoutMs = 15000
 		if method == "batch.run" {
 			timeoutMs = 45000
+		} else if method == "page.waitFor" || method == "page.wait" {
+			if t, ok := params["timeoutMs"].(int); ok && t > 0 {
+				timeoutMs = t + 5000
+			} else if tFloat, ok := params["timeoutMs"].(float64); ok && tFloat > 0 {
+				timeoutMs = int(tFloat) + 5000
+			} else {
+				timeoutMs = 35000
+			}
 		}
 	}
 

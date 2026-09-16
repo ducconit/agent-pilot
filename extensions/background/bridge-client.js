@@ -29,7 +29,9 @@ import {
   stopPerformanceTrace,
   getPerformanceMetrics,
   takeHeapSnapshot,
-  collectGarbage
+  collectGarbage,
+  dispatchCdpKeyEvent,
+  dispatchCdpMouseMove
 } from "./cdp-manager.js";
 import {
   getActiveTabId,
@@ -602,13 +604,24 @@ export class AgentBridgeClient {
         case "page.hover": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.runWithTabLock(tabId, "page.hover", () =>
-            this.sendTabMessageWithRetry(tabId, {
+          this.runWithTabLock(tabId, "page.hover", async () => {
+            const res = await this.sendTabMessageWithRetry(tabId, {
               action: "virtual_hover",
               selector: params.selector
-            })
-          )
-            .then(res => respond(res || { success: true }))
+            });
+            if (res && res.coords) {
+              try {
+                if (!attachedTabs.has(tabId)) {
+                  await attachDebugger(tabId, this.broadcastFn);
+                }
+                await dispatchCdpMouseMove(tabId, res.coords.x, res.coords.y);
+              } catch (cdpErr) {
+                console.debug("[AgentPilot] dispatchCdpMouseMove ignored:", cdpErr);
+              }
+            }
+            return res || { success: true };
+          })
+            .then(res => respond(res))
             .catch(err => respond(null, err));
           break;
         }
@@ -633,15 +646,23 @@ export class AgentBridgeClient {
         case "page.key": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.runWithTabLock(tabId, "page.pressKey", () =>
-            this.sendTabMessageWithRetry(tabId, {
-              action: "press_key",
-              key: params.key || "Enter",
-              code: params.code,
-              keyCode: params.keyCode,
-              selector: params.selector
-            })
-          )
+          this.runWithTabLock(tabId, "page.pressKey", async () => {
+            try {
+              if (!attachedTabs.has(tabId)) {
+                await attachDebugger(tabId, this.broadcastFn);
+              }
+              return await dispatchCdpKeyEvent(tabId, params.key || "Enter", params.selector);
+            } catch (cdpErr) {
+              console.debug("[AgentPilot] CDP key event failed, falling back to synthetic event:", cdpErr);
+              return await this.sendTabMessageWithRetry(tabId, {
+                action: "press_key",
+                key: params.key || "Enter",
+                code: params.code,
+                keyCode: params.keyCode,
+                selector: params.selector
+              });
+            }
+          })
             .then(res => respond(res || { success: true }))
             .catch(err => respond(null, err));
           break;
@@ -1077,12 +1098,22 @@ export class AgentBridgeClient {
               }));
               respond({ total: list.length, extensions: list });
             });
-          } else if (action === "setEnabled" || action === "toggle") {
+          } else if (action === "setEnabled") {
             if (!params.extensionId) return respond(null, new Error("extensionId is required"));
             const enabled = params.enabled !== false;
             chrome.management.setEnabled(params.extensionId, enabled, () => {
               if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
               respond({ success: true, extensionId: params.extensionId, enabled });
+            });
+          } else if (action === "toggle") {
+            if (!params.extensionId) return respond(null, new Error("extensionId is required"));
+            chrome.management.get(params.extensionId, (info) => {
+              if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
+              const targetEnabled = !info.enabled;
+              chrome.management.setEnabled(params.extensionId, targetEnabled, () => {
+                if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
+                respond({ success: true, extensionId: params.extensionId, enabled: targetEnabled });
+              });
             });
           } else {
             respond(null, new Error(`Unsupported extension action: ${action}`));
