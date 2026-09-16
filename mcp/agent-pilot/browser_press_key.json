@@ -1,0 +1,44 @@
+{
+  "description": "Dispatch keyboard key event or combination (Enter, Tab, Escape, Control+A, Control+Shift+R...) to active element or selector.",
+  "inputSchema": {
+    "properties": {
+      "key": {
+        "description": "Key name or combination (e.g., 'Enter', 'Tab', 'Escape', 'Control+A')",
+        "type": "string"
+      },
+      "selector": {
+        "description": "Optional target element selector or @ref",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "key"
+    ],
+    "type": "object"
+  },
+  "name": "browser_press_key",
+  "parameters": {
+    "properties": {
+      "key": {
+        "description": "Key name or combination (e.g., 'Enter', 'Tab', 'Escape', 'Control+A')",
+        "type": "string"
+      },
+      "selector": {
+        "description": "Optional target element selector or @ref",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "key"
+    ],
+    "type": "object"
+  }
+}

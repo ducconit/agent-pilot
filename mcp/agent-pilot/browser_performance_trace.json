@@ -1,0 +1,46 @@
+{
+  "description": "Start or stop DevTools Performance tracing session (Tracing.start/end) to analyze browser timeline and runtime performance.",
+  "inputSchema": {
+    "properties": {
+      "action": {
+        "description": "Action: 'start' to begin recording, 'stop' to end and retrieve metrics",
+        "enum": [
+          "start",
+          "stop"
+        ],
+        "type": "string"
+      },
+      "categories": {
+        "description": "Optional trace categories string",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_performance_trace",
+  "parameters": {
+    "properties": {
+      "action": {
+        "description": "Action: 'start' to begin recording, 'stop' to end and retrieve metrics",
+        "enum": [
+          "start",
+          "stop"
+        ],
+        "type": "string"
+      },
+      "categories": {
+        "description": "Optional trace categories string",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

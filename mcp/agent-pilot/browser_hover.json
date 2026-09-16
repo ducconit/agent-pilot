@@ -1,0 +1,36 @@
+{
+  "description": "Simulate human-like virtual mouse hover over an element (triggering mouseenter, mouseover, mousemove).",
+  "inputSchema": {
+    "properties": {
+      "selector": {
+        "description": "CSS selector or @ref to hover over",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "selector"
+    ],
+    "type": "object"
+  },
+  "name": "browser_hover",
+  "parameters": {
+    "properties": {
+      "selector": {
+        "description": "CSS selector or @ref to hover over",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "selector"
+    ],
+    "type": "object"
+  }
+}

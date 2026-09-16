@@ -75,15 +75,29 @@ Agent Pilot provides an all-in-one compiled Go binary (`cli/agent-pilot`) for ul
 ---
 
 
-## 🛠️ Available MCP Tools (21 Tools)
+## 🛠️ Available MCP Tools (35 Tools)
 
-When the `agent-pilot` MCP server or skill is active, agents have direct access to the following 21 tools:
+When the `agent-pilot` MCP server or skill is active, agents have direct access to the following 35 tools:
 
 | Tool Name | Key Parameters | Description |
 | :--- | :--- | :--- |
 | `browser_snapshot` | `{ maxElements?: number, format?: "text" \| "json", tabId?: number }` | **Token-Efficient Interactive Map**: Captures an accessibility tree of interactive elements with numbered refs (`@1`, `@2`, etc.) in ~300 tokens. Enables agents to see the entire page and target inputs/buttons with minimal token consumption. |
 | `browser_fill_form` | `{ fields: Array<{ selector: string, value: any, clear?: boolean }>, submitSelector?: string, pressEnter?: boolean, tabId?: number }` | **Fast Batch Form Filler**: Fills multiple form inputs, selects, and checkboxes and optionally clicks submit in a single tool call. Fully compatible with React Hook Form, Vue, and HTML5 validation. |
-| `browser_run_actions` | `{ actions: Action[], tabId?: number, stopOnError?: boolean }` | **Batch Execution Engine**: Executes an ordered sequence of actions (`open`, `navigate`, `wait_for_selector`, `scroll_into_view`, `click`, `type`, `fill_form`, `snapshot`, `press_key`, `scroll`, `sleep`, `screenshot`, `get_element`, `evaluate`, `cdp`, `close`) in a single round-trip, saving ~80% context tokens and eliminating network latency. |
+| `browser_run_actions` | `{ actions: Action[], tabId?: number, stopOnError?: boolean }` | **Batch Execution Engine**: Executes an ordered sequence of actions (`open`, `navigate`, `wait_for_selector`, `scroll_into_view`, `click`, `type`, `fill_form`, `snapshot`, `hover`, `drag`, `upload`, `dialog`, `press_key`, `scroll`, `sleep`, `screenshot`, `get_element`, `evaluate`, `cdp`, `close`) in a single round-trip, saving ~80% context tokens and eliminating network latency. |
+| `browser_upload_file` | `{ selector: string, files: string[], tabId?: number }` | **Local File Uploader**: Uploads local files to `<input type="file">` via CDP `DOM.setFileInputFiles`. Supports `@ref` or CSS selector. |
+| `browser_handle_dialog` | `{ accept?: boolean, promptText?: string, tabId?: number }` | **JavaScript Dialog Handler**: Automatically accepts or dismisses `alert`, `confirm`, or `prompt` browser dialogs with optional text. |
+| `browser_hover` | `{ selector: string, tabId?: number }` | **Virtual Mouse Hover**: Simulates hovering over an element (triggering `mouseenter`, `mouseover`, `mousemove`) to open tooltips and dropdowns. |
+| `browser_drag` | `{ from: string, to: string, steps?: number, tabId?: number }` | **Virtual Drag & Drop**: Drags an element from source to target with animated cursor path and HTML5 drag events. |
+| `browser_press_key` | `{ key: string, selector?: string, tabId?: number }` | **Virtual Keyboard Shortcuts**: Dispatches key presses and keyboard combinations (`Enter`, `Tab`, `Escape`, `Control+A`, `Control+Shift+R`...). |
+| `browser_wait_for` | `{ selector?: string, text?: string, state?: "visible" \| "attached" \| "hidden", timeoutMs?: number, tabId?: number }` | **Smart Waiter**: Polling wait until an element or text appears/disappears or meets state condition with customizable timeout. |
+| `browser_emulate` | `{ cpuThrottlingRate?: number, networkConditions?: string, colorScheme?: "dark" \| "light", tabId?: number }` | **Environment Emulation**: Emulates CPU throttling (slowdown 1x/4x/6x), network conditions (`offline`, `slow-3g`, `fast-3g`), and dark/light mode. |
+| `browser_resize_page` | `{ width: number, height: number, deviceScaleFactor?: number, mobile?: boolean, tabId?: number }` | **Viewport Resizer**: Overrides device metrics and screen resolution for responsive UI testing. |
+| `browser_list_network_requests` | `{ filterUrl?: string, method?: string, resourceType?: string, limit?: number, tabId?: number }` | **Network Inspector**: Lists recent HTTP requests captured on the tab with filtering by URL, method, or resource type. |
+| `browser_get_network_request` | `{ requestId: string, tabId?: number }` | **Response Body Inspector**: Retrieves the full response body (JSON/text) and headers for a specific network request via CDP `Network.getResponseBody`. |
+| `browser_performance_trace` | `{ action?: "start" \| "stop", categories?: string, tabId?: number }` | **Performance Tracer**: Records DevTools timeline trace (`Tracing.start/end`) to detect rendering bottlenecks and long tasks. |
+| `browser_performance_metrics` | `{ tabId?: number }` | **Runtime Metrics**: Queries live CDP performance metrics (JSHeapUsedSize, JSHeapTotalSize, LayoutCount, Nodes...). |
+| `browser_take_heapsnapshot` | `{ collectGarbage?: boolean, tabId?: number }` | **Memory Heap Profiler**: Captures memory heap snapshot or triggers V8 Garbage Collection to detect memory leaks. |
+| `browser_manage_extensions` | `{ action?: "list" \| "setEnabled", extensionId?: string, enabled?: boolean }` | **Extension Manager**: Lists installed browser extensions or toggles them on/off via `chrome.management`. |
 | `browser_start_session` | `{ name?: string, tabId?: number }` | **Continuous Session Start**: Initiates an active AI Agent session. Keeps the virtual cursor and glowing neon lock shield continuously visible on the tab until ended. |
 | `browser_end_session` | `{ tabId?: number }` | **Continuous Session End**: Concludes the active AI Agent session. Fades out and dismisses the virtual cursor and lock shield. |
 | `browser_evaluate` | `{ expression: string, tabId?: number }` | **Page Evaluator**: Evaluates a JavaScript expression or script in the context of the page (MAIN world first for direct framework/DOM state access, with CDP Runtime.evaluate fallback) and returns the serialized result. |

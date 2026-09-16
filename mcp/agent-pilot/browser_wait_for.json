@@ -1,0 +1,64 @@
+{
+  "description": "Smart wait until a selector or text appears, disappears, or meets state condition with timeout.",
+  "inputSchema": {
+    "properties": {
+      "selector": {
+        "description": "Optional CSS selector or @ref to wait for",
+        "type": "string"
+      },
+      "state": {
+        "description": "Desired state (default: visible)",
+        "enum": [
+          "visible",
+          "attached",
+          "hidden"
+        ],
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "text": {
+        "description": "Optional text to wait for on the page",
+        "type": "string"
+      },
+      "timeoutMs": {
+        "description": "Timeout in milliseconds (default: 10000)",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_wait_for",
+  "parameters": {
+    "properties": {
+      "selector": {
+        "description": "Optional CSS selector or @ref to wait for",
+        "type": "string"
+      },
+      "state": {
+        "description": "Desired state (default: visible)",
+        "enum": [
+          "visible",
+          "attached",
+          "hidden"
+        ],
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "text": {
+        "description": "Optional text to wait for on the page",
+        "type": "string"
+      },
+      "timeoutMs": {
+        "description": "Timeout in milliseconds (default: 10000)",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "description": "Emulate environment conditions: CPU throttling (rate 1/4/6), network conditions (offline, slow-3g, fast-3g, none), dark/light theme.",
+  "inputSchema": {
+    "properties": {
+      "colorScheme": {
+        "description": "Color scheme preference",
+        "enum": [
+          "dark",
+          "light",
+          "default"
+        ],
+        "type": "string"
+      },
+      "cpuThrottlingRate": {
+        "description": "CPU throttling rate (1 = normal, 4 = 4x slowdown, 6 = 6x slowdown)",
+        "type": "number"
+      },
+      "networkConditions": {
+        "description": "Network preset: 'offline', 'slow-3g', 'fast-3g', 'none'",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_emulate",
+  "parameters": {
+    "properties": {
+      "colorScheme": {
+        "description": "Color scheme preference",
+        "enum": [
+          "dark",
+          "light",
+          "default"
+        ],
+        "type": "string"
+      },
+      "cpuThrottlingRate": {
+        "description": "CPU throttling rate (1 = normal, 4 = 4x slowdown, 6 = 6x slowdown)",
+        "type": "number"
+      },
+      "networkConditions": {
+        "description": "Network preset: 'offline', 'slow-3g', 'fast-3g', 'none'",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

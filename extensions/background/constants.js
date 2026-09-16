@@ -7,6 +7,8 @@ export const attachedTabs = new Set();
 export const devtoolsBuffers = new Map(); // tabId -> { console: [], network: Map, performance: {} }
 export const agentControlledTabs = new Set(); // Track tabs opened or controlled by AI Agent
 export const tabLockStates = new Map(); // tabId -> { manualLock: boolean, autoCount: number, unlockTimer: any, currentAction: string, sessionActive: boolean, sessionName: string }
+export const activeDialogs = new Map(); // tabId -> { type, message, defaultPrompt, url, timestamp }
+export const activeTracingSessions = new Map(); // tabId -> { buffer: [], categories: string, startTime: number }
 
 // Chrome Native Tab Group styling constants
 export const AGENT_GROUP_TITLE = "🤖 Agent Pilot";

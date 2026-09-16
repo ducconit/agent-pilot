@@ -1,0 +1,36 @@
+{
+  "description": "Get the full response body (JSON/Text) and details for a specific captured network request ID via CDP Network.getResponseBody.",
+  "inputSchema": {
+    "properties": {
+      "requestId": {
+        "description": "The unique request ID obtained from browser_list_network_requests or devtools data",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "requestId"
+    ],
+    "type": "object"
+  },
+  "name": "browser_get_network_request",
+  "parameters": {
+    "properties": {
+      "requestId": {
+        "description": "The unique request ID obtained from browser_list_network_requests or devtools data",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "requestId"
+    ],
+    "type": "object"
+  }
+}

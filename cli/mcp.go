@@ -306,6 +306,187 @@ var mcpTools = []ToolInfo{
 			"required": []string{"expression"},
 		},
 	},
+	{
+		Name:        "browser_upload_file",
+		Description: "Upload local files into a file input element (<input type='file'>) using Chrome DevTools Protocol DOM.setFileInputFiles.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"selector": map[string]interface{}{"type": "string", "description": "CSS selector or @ref of the file input element"},
+				"files": map[string]interface{}{
+					"type":        "array",
+					"items":       map[string]interface{}{"type": "string"},
+					"description": "Array of absolute local file paths to upload",
+				},
+				"tabId": map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+			"required": []string{"selector", "files"},
+		},
+	},
+	{
+		Name:        "browser_handle_dialog",
+		Description: "Handle a pending or incoming JavaScript dialog (alert, confirm, prompt) with accept/dismiss and optional prompt text.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"accept":     map[string]interface{}{"type": "boolean", "description": "Whether to accept (true) or dismiss/cancel (false) the dialog (default: true)"},
+				"promptText": map[string]interface{}{"type": "string", "description": "Optional text to enter into a prompt() dialog"},
+				"tabId":      map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+		},
+	},
+	{
+		Name:        "browser_hover",
+		Description: "Simulate human-like virtual mouse hover over an element (triggering mouseenter, mouseover, mousemove).",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"selector": map[string]interface{}{"type": "string", "description": "CSS selector or @ref to hover over"},
+				"tabId":    map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+			"required": []string{"selector"},
+		},
+	},
+	{
+		Name:        "browser_drag",
+		Description: "Simulate virtual drag and drop from a source element (@ref or CSS selector) to a target element.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"from":  map[string]interface{}{"type": "string", "description": "Source element selector or @ref"},
+				"to":    map[string]interface{}{"type": "string", "description": "Target element selector or @ref"},
+				"steps": map[string]interface{}{"type": "integer", "description": "Number of interpolation animation steps (default: 8)"},
+				"tabId": map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+			"required": []string{"from", "to"},
+		},
+	},
+	{
+		Name:        "browser_press_key",
+		Description: "Dispatch keyboard key event or combination (Enter, Tab, Escape, Control+A, Control+Shift+R...) to active element or selector.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"key":      map[string]interface{}{"type": "string", "description": "Key name or combination (e.g., 'Enter', 'Tab', 'Escape', 'Control+A')"},
+				"selector": map[string]interface{}{"type": "string", "description": "Optional target element selector or @ref"},
+				"tabId":    map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+			"required": []string{"key"},
+		},
+	},
+	{
+		Name:        "browser_wait_for",
+		Description: "Smart wait until a selector or text appears, disappears, or meets state condition with timeout.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"selector":  map[string]interface{}{"type": "string", "description": "Optional CSS selector or @ref to wait for"},
+				"text":      map[string]interface{}{"type": "string", "description": "Optional text to wait for on the page"},
+				"state":     map[string]interface{}{"type": "string", "enum": []string{"visible", "attached", "hidden"}, "description": "Desired state (default: visible)"},
+				"timeoutMs": map[string]interface{}{"type": "integer", "description": "Timeout in milliseconds (default: 10000)"},
+				"tabId":     map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+		},
+	},
+	{
+		Name:        "browser_emulate",
+		Description: "Emulate environment conditions: CPU throttling (rate 1/4/6), network conditions (offline, slow-3g, fast-3g, none), dark/light theme.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"cpuThrottlingRate": map[string]interface{}{"type": "number", "description": "CPU throttling rate (1 = normal, 4 = 4x slowdown, 6 = 6x slowdown)"},
+				"networkConditions": map[string]interface{}{"type": "string", "description": "Network preset: 'offline', 'slow-3g', 'fast-3g', 'none'"},
+				"colorScheme":       map[string]interface{}{"type": "string", "enum": []string{"dark", "light", "default"}, "description": "Color scheme preference"},
+				"tabId":             map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+		},
+	},
+	{
+		Name:        "browser_resize_page",
+		Description: "Resize browser page viewport metrics (width, height, deviceScaleFactor, mobile) for responsive testing.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"width":             map[string]interface{}{"type": "integer", "description": "Viewport width in pixels"},
+				"height":            map[string]interface{}{"type": "integer", "description": "Viewport height in pixels"},
+				"deviceScaleFactor": map[string]interface{}{"type": "number", "description": "Device pixel ratio (default: 1)"},
+				"mobile":            map[string]interface{}{"type": "boolean", "description": "Whether to emulate mobile screen"},
+				"tabId":             map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+			"required": []string{"width", "height"},
+		},
+	},
+	{
+		Name:        "browser_list_network_requests",
+		Description: "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"filterUrl":    map[string]interface{}{"type": "string", "description": "Filter requests matching URL substring"},
+				"method":       map[string]interface{}{"type": "string", "description": "Filter by HTTP method (GET, POST, PUT, DELETE...)"},
+				"resourceType": map[string]interface{}{"type": "string", "description": "Filter by resource type (Fetch, XHR, Document, Script...)"},
+				"limit":        map[string]interface{}{"type": "integer", "description": "Max requests to return (default: 100)"},
+				"tabId":        map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+		},
+	},
+	{
+		Name:        "browser_get_network_request",
+		Description: "Get the full response body (JSON/Text) and details for a specific captured network request ID via CDP Network.getResponseBody.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"requestId": map[string]interface{}{"type": "string", "description": "The unique request ID obtained from browser_list_network_requests or devtools data"},
+				"tabId":     map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+			"required": []string{"requestId"},
+		},
+	},
+	{
+		Name:        "browser_performance_trace",
+		Description: "Start or stop DevTools Performance tracing session (Tracing.start/end) to analyze browser timeline and runtime performance.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"action":     map[string]interface{}{"type": "string", "enum": []string{"start", "stop"}, "description": "Action: 'start' to begin recording, 'stop' to end and retrieve metrics"},
+				"categories": map[string]interface{}{"type": "string", "description": "Optional trace categories string"},
+				"tabId":      map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+		},
+	},
+	{
+		Name:        "browser_performance_metrics",
+		Description: "Retrieve live runtime performance metrics from Chrome DevTools Protocol (JSHeapUsedSize, JSHeapTotalSize, LayoutCount, Nodes...).",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"tabId": map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+		},
+	},
+	{
+		Name:        "browser_take_heapsnapshot",
+		Description: "Capture a heap memory snapshot or trigger garbage collection via CDP HeapProfiler.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"collectGarbage": map[string]interface{}{"type": "boolean", "description": "Set to true to trigger V8 Garbage Collection before or instead of snapshot"},
+				"tabId":          map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+			},
+		},
+	},
+	{
+		Name:        "browser_manage_extensions",
+		Description: "List installed browser extensions or enable/disable specific extensions via chrome.management.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"action":      map[string]interface{}{"type": "string", "enum": []string{"list", "setEnabled"}, "description": "Action: 'list' all extensions or 'setEnabled' to toggle"},
+				"extensionId": map[string]interface{}{"type": "string", "description": "Extension ID to enable or disable"},
+				"enabled":     map[string]interface{}{"type": "boolean", "description": "Target enabled state for setEnabled action"},
+			},
+		},
+	},
 }
 
 func RunMCPServer() {
@@ -488,6 +669,66 @@ func executeToolCall(name string, args map[string]interface{}) (string, bool) {
 
 	case "browser_evaluate":
 		res, err := DispatchCommand("page.evaluate", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_upload_file":
+		res, err := DispatchCommand("page.uploadFile", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_handle_dialog":
+		res, err := DispatchCommand("page.handleDialog", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_hover":
+		res, err := DispatchCommand("page.hover", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_drag":
+		res, err := DispatchCommand("page.drag", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_press_key":
+		res, err := DispatchCommand("page.pressKey", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_wait_for":
+		res, err := DispatchCommand("page.waitFor", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_emulate":
+		res, err := DispatchCommand("emulation.set", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_resize_page":
+		res, err := DispatchCommand("emulation.resize", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_list_network_requests":
+		res, err := DispatchCommand("network.listRequests", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_get_network_request":
+		res, err := DispatchCommand("network.getResponseBody", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_performance_trace":
+		res, err := DispatchCommand("performance.trace", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_performance_metrics":
+		res, err := DispatchCommand("performance.metrics", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_take_heapsnapshot":
+		if cg, ok := args["collectGarbage"].(bool); ok && cg {
+			res, err := DispatchCommand("memory.collectGarbage", args, DefaultPort)
+			return formatToolResult(res, err)
+		}
+		res, err := DispatchCommand("memory.heapSnapshot", args, DefaultPort)
+		return formatToolResult(res, err)
+
+	case "browser_manage_extensions":
+		res, err := DispatchCommand("extensions.manage", args, DefaultPort)
 		return formatToolResult(res, err)
 
 	default:

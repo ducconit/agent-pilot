@@ -1,0 +1,38 @@
+{
+  "description": "Handle a pending or incoming JavaScript dialog (alert, confirm, prompt) with accept/dismiss and optional prompt text.",
+  "inputSchema": {
+    "properties": {
+      "accept": {
+        "description": "Whether to accept (true) or dismiss/cancel (false) the dialog (default: true)",
+        "type": "boolean"
+      },
+      "promptText": {
+        "description": "Optional text to enter into a prompt() dialog",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_handle_dialog",
+  "parameters": {
+    "properties": {
+      "accept": {
+        "description": "Whether to accept (true) or dismiss/cancel (false) the dialog (default: true)",
+        "type": "boolean"
+      },
+      "promptText": {
+        "description": "Optional text to enter into a prompt() dialog",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

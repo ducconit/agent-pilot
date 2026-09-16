@@ -1,0 +1,52 @@
+{
+  "description": "Upload local files into a file input element (\u003cinput type='file'\u003e) using Chrome DevTools Protocol DOM.setFileInputFiles.",
+  "inputSchema": {
+    "properties": {
+      "files": {
+        "description": "Array of absolute local file paths to upload",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "selector": {
+        "description": "CSS selector or @ref of the file input element",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "selector",
+      "files"
+    ],
+    "type": "object"
+  },
+  "name": "browser_upload_file",
+  "parameters": {
+    "properties": {
+      "files": {
+        "description": "Array of absolute local file paths to upload",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "selector": {
+        "description": "CSS selector or @ref of the file input element",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "selector",
+      "files"
+    ],
+    "type": "object"
+  }
+}

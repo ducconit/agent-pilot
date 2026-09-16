@@ -405,7 +405,7 @@
   }
 
   /**
-   * Dispatch keyboard event
+   * Dispatch keyboard event with support for modifiers (Control+A, Shift+Tab, etc.)
    */
   function dispatchKey(key = "Enter", code = null, keyCode = null, selector = null) {
     let target = selector ? resolveElement(selector) : null;
@@ -414,21 +414,46 @@
     }
     try {
       setDispatching(true);
-      const keyCodeMap = { Enter: 13, Escape: 27, Tab: 9, Backspace: 8, ArrowDown: 40, ArrowUp: 38, ArrowLeft: 37, ArrowRight: 39 };
-      const finalCode = code || key;
-      const finalKeyCode = keyCode || keyCodeMap[key] || 0;
-      const eventInit = { key, code: finalCode, keyCode: finalKeyCode, which: finalKeyCode, bubbles: true, cancelable: true };
+      let ctrlKey = false, shiftKey = false, altKey = false, metaKey = false;
+      let actualKey = key;
+      if (typeof key === "string" && key.includes("+")) {
+        const parts = key.split("+");
+        actualKey = parts.pop().trim();
+        for (const part of parts) {
+          const p = part.trim().toLowerCase();
+          if (p === "control" || p === "ctrl") ctrlKey = true;
+          else if (p === "shift") shiftKey = true;
+          else if (p === "alt") altKey = true;
+          else if (p === "meta" || p === "cmd" || p === "command") metaKey = true;
+        }
+      }
+
+      const keyCodeMap = { Enter: 13, Escape: 27, Tab: 9, Backspace: 8, ArrowDown: 40, ArrowUp: 38, ArrowLeft: 37, ArrowRight: 39, Space: 32 };
+      const finalCode = code || (actualKey.length === 1 ? `Key${actualKey.toUpperCase()}` : actualKey);
+      const finalKeyCode = keyCode || keyCodeMap[actualKey] || (actualKey.length === 1 ? actualKey.toUpperCase().charCodeAt(0) : 0);
+      const eventInit = {
+        key: actualKey,
+        code: finalCode,
+        keyCode: finalKeyCode,
+        which: finalKeyCode,
+        ctrlKey,
+        shiftKey,
+        altKey,
+        metaKey,
+        bubbles: true,
+        cancelable: true
+      };
       target.dispatchEvent(new KeyboardEvent("keydown", eventInit));
       target.dispatchEvent(new KeyboardEvent("keypress", eventInit));
       target.dispatchEvent(new KeyboardEvent("keyup", eventInit));
-      if (key === "Enter" && target.form && typeof target.form.requestSubmit === "function") {
+      if (actualKey === "Enter" && target.form && typeof target.form.requestSubmit === "function") {
         try {
           target.form.requestSubmit();
         } catch (keySubmitErr) {
           console.debug("[AgentPilot] target.form.requestSubmit failed:", keySubmitErr);
         }
       }
-      return { success: true, key };
+      return { success: true, key: actualKey, modifiers: { ctrlKey, shiftKey, altKey, metaKey } };
     } finally {
       setDispatching(false);
     }
@@ -529,12 +554,187 @@
     };
   }
 
+  /**
+   * Virtual Hover on element
+   */
+  async function virtualHover(selector) {
+    const el = resolveElement(selector);
+    if (!el) {
+      return { success: false, error: "Element not found for selector: " + selector };
+    }
+    if (el.scrollIntoViewIfNeeded) {
+      el.scrollIntoViewIfNeeded();
+    } else if (el.scrollIntoView) {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+    const center = getElementCenter(selector);
+    activateCursor();
+    await moveVirtualMouse(center.x, center.y, CONFIG.DEFAULT_MOVE_DURATION);
+
+    const eventInit = {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: center.x,
+      clientY: center.y,
+      screenX: center.x + window.screenX,
+      screenY: center.y + window.screenY
+    };
+
+    try {
+      setDispatching(true);
+      el.dispatchEvent(new MouseEvent("mouseenter", { ...eventInit, bubbles: false }));
+      el.dispatchEvent(new MouseEvent("mouseover", eventInit));
+      el.dispatchEvent(new MouseEvent("mousemove", eventInit));
+    } finally {
+      setDispatching(false);
+    }
+
+    return { success: true, selector, x: center.x, y: center.y };
+  }
+
+  /**
+   * Virtual Drag & Drop from one element/ref to another
+   */
+  async function virtualDrag(fromSelector, toSelector, steps = 8) {
+    const fromEl = resolveElement(fromSelector);
+    if (!fromEl) return { success: false, error: "Source element not found: " + fromSelector };
+    const toEl = resolveElement(toSelector);
+    if (!toEl) return { success: false, error: "Target element not found: " + toSelector };
+
+    const fromCenter = getElementCenter(fromSelector);
+    const toCenter = getElementCenter(toSelector);
+
+    activateCursor();
+    await moveVirtualMouse(fromCenter.x, fromCenter.y, CONFIG.CLICK_DELAY);
+
+    const baseInit = {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: fromCenter.x,
+      clientY: fromCenter.y,
+      screenX: fromCenter.x + window.screenX,
+      screenY: fromCenter.y + window.screenY,
+      button: 0
+    };
+
+    let dataTransfer = null;
+    if (typeof DataTransfer !== "undefined") {
+      try {
+        dataTransfer = new DataTransfer();
+      } catch (dtErr) {
+        console.debug("[AgentPilot] DataTransfer constructor fallback:", dtErr);
+      }
+    }
+
+    try {
+      setDispatching(true);
+      fromEl.dispatchEvent(new MouseEvent("mousedown", baseInit));
+      if (fromEl.draggable) {
+        fromEl.dispatchEvent(new DragEvent("dragstart", { ...baseInit, dataTransfer }));
+      }
+
+      const totalSteps = Math.max(3, steps);
+      for (let i = 1; i <= totalSteps; i++) {
+        const progress = i / totalSteps;
+        const curX = Math.round(fromCenter.x + (toCenter.x - fromCenter.x) * progress);
+        const curY = Math.round(fromCenter.y + (toCenter.y - fromCenter.y) * progress);
+
+        currentMouseX = curX;
+        currentMouseY = curY;
+        updateCursorTransform(curX, curY);
+
+        const moveInit = { ...baseInit, clientX: curX, clientY: curY };
+        window.dispatchEvent(new MouseEvent("mousemove", moveInit));
+        if (fromEl.draggable) {
+          toEl.dispatchEvent(new DragEvent("dragover", { ...moveInit, dataTransfer }));
+        }
+        await new Promise((r) => setTimeout(r, 25));
+      }
+
+      const dropInit = { ...baseInit, clientX: toCenter.x, clientY: toCenter.y };
+      if (fromEl.draggable) {
+        toEl.dispatchEvent(new DragEvent("dragenter", { ...dropInit, dataTransfer }));
+        toEl.dispatchEvent(new DragEvent("dragover", { ...dropInit, dataTransfer }));
+        toEl.dispatchEvent(new DragEvent("drop", { ...dropInit, dataTransfer }));
+        fromEl.dispatchEvent(new DragEvent("dragend", { ...dropInit, dataTransfer }));
+      }
+      toEl.dispatchEvent(new MouseEvent("mouseup", dropInit));
+    } finally {
+      setDispatching(false);
+    }
+
+    return { success: true, from: fromCenter, to: toCenter };
+  }
+
+  /**
+   * Smart polling wait for selector, text, or condition
+   */
+  async function waitFor(options = {}) {
+    let { selector, text, state = "visible", timeoutMs = 10000, pollIntervalMs = 100 } = options;
+    if (selector && !text && typeof selector === "string" && !selector.startsWith("@")) {
+      try {
+        document.createDocumentFragment().querySelector(selector);
+      } catch (selErr) {
+        console.debug("[AgentPilot] Selector syntax error, falling back to text search:", selErr);
+        text = selector;
+        selector = "";
+      }
+    }
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeoutMs) {
+      let conditionMet = true;
+
+      if (selector) {
+        const el = resolveElement(selector);
+        if (state === "hidden") {
+          const isHidden = !el || el.offsetParent === null || (el.offsetWidth === 0 && el.offsetHeight === 0);
+          if (!isHidden) conditionMet = false;
+        } else if (state === "attached") {
+          if (!el) conditionMet = false;
+        } else { // "visible"
+          const isVisible = el && (el.offsetWidth > 0 || el.offsetHeight > 0 || (el.getClientRects && el.getClientRects().length > 0));
+          if (!isVisible) conditionMet = false;
+        }
+      }
+
+      if (conditionMet && text) {
+        const bodyText = document.body ? document.body.innerText : "";
+        if (!bodyText.includes(text)) {
+          conditionMet = false;
+        }
+      }
+
+      if (conditionMet && (selector || text)) {
+        return {
+          success: true,
+          waitedMs: Date.now() - startTime,
+          selector,
+          text,
+          state
+        };
+      }
+
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+    }
+
+    return {
+      success: false,
+      error: `Timed out waiting after ${timeoutMs}ms for ${selector || text || "condition"}`
+    };
+  }
+
   window.__AP_INTERNAL__.cursor = {
     moveVirtualMouse,
     virtualClick,
     virtualType,
     virtualScroll,
     virtualFillForm,
+    virtualHover,
+    virtualDrag,
+    waitFor,
     dispatchKey,
     resolveElement,
     activateCursor,

@@ -1,0 +1,30 @@
+{
+  "description": "Capture a heap memory snapshot or trigger garbage collection via CDP HeapProfiler.",
+  "inputSchema": {
+    "properties": {
+      "collectGarbage": {
+        "description": "Set to true to trigger V8 Garbage Collection before or instead of snapshot",
+        "type": "boolean"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_take_heapsnapshot",
+  "parameters": {
+    "properties": {
+      "collectGarbage": {
+        "description": "Set to true to trigger V8 Garbage Collection before or instead of snapshot",
+        "type": "boolean"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "description": "Simulate virtual drag and drop from a source element (@ref or CSS selector) to a target element.",
+  "inputSchema": {
+    "properties": {
+      "from": {
+        "description": "Source element selector or @ref",
+        "type": "string"
+      },
+      "steps": {
+        "description": "Number of interpolation animation steps (default: 8)",
+        "type": "integer"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "to": {
+        "description": "Target element selector or @ref",
+        "type": "string"
+      }
+    },
+    "required": [
+      "from",
+      "to"
+    ],
+    "type": "object"
+  },
+  "name": "browser_drag",
+  "parameters": {
+    "properties": {
+      "from": {
+        "description": "Source element selector or @ref",
+        "type": "string"
+      },
+      "steps": {
+        "description": "Number of interpolation animation steps (default: 8)",
+        "type": "integer"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "to": {
+        "description": "Target element selector or @ref",
+        "type": "string"
+      }
+    },
+    "required": [
+      "from",
+      "to"
+    ],
+    "type": "object"
+  }
+}

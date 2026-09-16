@@ -350,3 +350,263 @@ func ExecFillForm(fields []map[string]interface{}, submitSelector string, pressE
 	}
 	return nil
 }
+
+func ExecHover(selector string, tabID interface{}) error {
+	params := map[string]interface{}{
+		"selector": selector,
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("page.hover", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✅ Hovered on %s: %v\n", selector, res)
+	return nil
+}
+
+func ExecDrag(fromSelector, toSelector string, steps int, tabID interface{}) error {
+	params := map[string]interface{}{
+		"from":  fromSelector,
+		"to":    toSelector,
+		"steps": steps,
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("page.drag", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✅ Dragged %s -> %s: %v\n", fromSelector, toSelector, res)
+	return nil
+}
+
+func ExecPressKey(key, selector string, tabID interface{}) error {
+	params := map[string]interface{}{
+		"key": key,
+	}
+	if selector != "" {
+		params["selector"] = selector
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("page.pressKey", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✅ Key dispatched (%s): %v\n", key, res)
+	return nil
+}
+
+func ExecWaitFor(selector, text, state string, timeoutMs int, tabID interface{}) error {
+	params := map[string]interface{}{}
+	if selector != "" {
+		params["selector"] = selector
+	}
+	if text != "" {
+		params["text"] = text
+	}
+	if state != "" {
+		params["state"] = state
+	}
+	if timeoutMs > 0 {
+		params["timeoutMs"] = timeoutMs
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("page.waitFor", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	if resMap, ok := res.(map[string]interface{}); ok {
+		if success, ok := resMap["success"].(bool); ok && !success {
+			return fmt.Errorf("%v", resMap["error"])
+		}
+	}
+	fmt.Printf("✅ Wait successful: %v\n", res)
+	return nil
+}
+
+func ExecUploadFile(selector string, files []string, tabID interface{}) error {
+	params := map[string]interface{}{
+		"selector": selector,
+		"files":    files,
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("page.uploadFile", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✅ Files uploaded to %s: %v\n", selector, res)
+	return nil
+}
+
+func ExecHandleDialog(accept bool, promptText string, tabID interface{}) error {
+	params := map[string]interface{}{
+		"accept": accept,
+	}
+	if promptText != "" {
+		params["promptText"] = promptText
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("page.handleDialog", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✅ Dialog handled (accept=%v): %v\n", accept, res)
+	return nil
+}
+
+func ExecEmulate(network, cpu, theme string, tabID interface{}) error {
+	params := map[string]interface{}{}
+	if network != "" {
+		params["networkConditions"] = network
+	}
+	if cpu != "" {
+		params["cpuThrottlingRate"] = cpu
+	}
+	if theme != "" {
+		params["colorScheme"] = theme
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("emulation.set", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✅ Emulation configured: %v\n", res)
+	return nil
+}
+
+func ExecResizePage(width, height int, tabID interface{}) error {
+	params := map[string]interface{}{
+		"width":  width,
+		"height": height,
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("emulation.resize", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✅ Viewport resized to %dx%d: %v\n", width, height, res)
+	return nil
+}
+
+func ExecListNetworkRequests(filterUrl, method, resType string, limit int, tabID interface{}) error {
+	params := map[string]interface{}{}
+	if filterUrl != "" {
+		params["filterUrl"] = filterUrl
+	}
+	if method != "" {
+		params["method"] = method
+	}
+	if resType != "" {
+		params["resourceType"] = resType
+	}
+	if limit > 0 {
+		params["limit"] = limit
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("network.listRequests", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	jsonB, _ := json.MarshalIndent(res, "", "  ")
+	fmt.Println(string(jsonB))
+	return nil
+}
+
+func ExecGetNetworkResponseBody(requestId string, tabID interface{}) error {
+	params := map[string]interface{}{
+		"requestId": requestId,
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("network.getResponseBody", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	jsonB, _ := json.MarshalIndent(res, "", "  ")
+	fmt.Println(string(jsonB))
+	return nil
+}
+
+func ExecPerformanceTrace(action, categories string, tabID interface{}) error {
+	params := map[string]interface{}{
+		"action": action,
+	}
+	if categories != "" {
+		params["categories"] = categories
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("performance.trace", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	jsonB, _ := json.MarshalIndent(res, "", "  ")
+	fmt.Println(string(jsonB))
+	return nil
+}
+
+func ExecPerformanceMetrics(tabID interface{}) error {
+	params := map[string]interface{}{}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("performance.metrics", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	jsonB, _ := json.MarshalIndent(res, "", "  ")
+	fmt.Println(string(jsonB))
+	return nil
+}
+
+func ExecTakeHeapSnapshot(tabID interface{}) error {
+	params := map[string]interface{}{}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("memory.heapSnapshot", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	jsonB, _ := json.MarshalIndent(res, "", "  ")
+	fmt.Println(string(jsonB))
+	return nil
+}
+
+func ExecManageExtensions(action, extensionID string, enabled *bool) error {
+	params := map[string]interface{}{
+		"action": action,
+	}
+	if extensionID != "" {
+		params["extensionId"] = extensionID
+	}
+	if enabled != nil {
+		params["enabled"] = *enabled
+	}
+	res, err := DispatchCommand("extensions.manage", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	jsonB, _ := json.MarshalIndent(res, "", "  ")
+	fmt.Println(string(jsonB))
+	return nil
+}

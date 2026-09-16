@@ -11,7 +11,7 @@ import {
   getBuffer,
   logDebug
 } from "./constants.js";
-import { attachDebugger, sendCdpCommand } from "./cdp-manager.js";
+import { attachDebugger, sendCdpCommand, uploadFileInput, handleJavaScriptDialog } from "./cdp-manager.js";
 import {
   getActiveTabId,
   getTargetTabId,
@@ -279,8 +279,100 @@ export async function executeBatchActions(params, bridgeClient = null) {
           break;
         }
 
+        case "hover":
+        case "page.hover": {
+          const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
+          if (!targetTabId) throw new Error("No active tab for hover");
+          await ensureContentScript(targetTabId);
+          const res = await sendTabMessageWithRetry(targetTabId, {
+            action: "virtual_hover",
+            selector: act.selector
+          });
+          if (!res || !res.success) throw new Error(res?.error || "Hover failed");
+          stepResult.success = true;
+          stepResult.hover = res;
+          break;
+        }
+
+        case "drag":
+        case "page.drag": {
+          const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
+          if (!targetTabId) throw new Error("No active tab for drag");
+          await ensureContentScript(targetTabId);
+          const res = await sendTabMessageWithRetry(targetTabId, {
+            action: "virtual_drag",
+            fromSelector: act.from || act.fromSelector,
+            toSelector: act.to || act.toSelector,
+            steps: act.steps || 8
+          });
+          if (!res || !res.success) throw new Error(res?.error || "Drag failed");
+          stepResult.success = true;
+          stepResult.drag = res;
+          break;
+        }
+
+        case "wait_for": {
+          const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
+          if (!targetTabId) throw new Error("No active tab for wait_for");
+          await ensureContentScript(targetTabId);
+          const res = await sendTabMessageWithRetry(targetTabId, {
+            action: "wait_for",
+            selector: act.selector,
+            text: act.text,
+            state: act.state || "visible",
+            timeoutMs: act.timeoutMs || act.timeout || 10000
+          });
+          if (!res || !res.success) throw new Error(res?.error || "Wait timed out");
+          stepResult.success = true;
+          stepResult.waited = res;
+          break;
+        }
+
+        case "upload":
+        case "upload_file": {
+          const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
+          if (!targetTabId) throw new Error("No active tab for upload");
+          if (!attachedTabs.has(targetTabId)) {
+            await attachDebugger(targetTabId);
+          }
+          const files = Array.isArray(act.files) ? act.files : (act.filePath ? [act.filePath] : (act.file ? [act.file] : []));
+          const res = await uploadFileInput(targetTabId, act.selector, files);
+          stepResult.success = true;
+          stepResult.upload = res;
+          break;
+        }
+
+        case "dialog":
+        case "handle_dialog": {
+          const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
+          if (!targetTabId) throw new Error("No active tab for dialog");
+          if (!attachedTabs.has(targetTabId)) {
+            await attachDebugger(targetTabId);
+          }
+          const res = await handleJavaScriptDialog(targetTabId, act.accept !== false, act.promptText || "");
+          stepResult.success = true;
+          stepResult.dialog = res;
+          break;
+        }
+
         case "sleep":
         case "wait": {
+          if (act.selector || act.text) {
+            const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
+            if (!targetTabId) throw new Error("No active tab for wait");
+            await ensureContentScript(targetTabId);
+            const res = await sendTabMessageWithRetry(targetTabId, {
+              action: "wait_for",
+              selector: act.selector,
+              text: act.text,
+              state: act.state || "visible",
+              timeoutMs: act.timeoutMs || act.timeout || 10000
+            });
+            if (!res || !res.success) throw new Error(res?.error || "Wait timed out");
+            stepResult.success = true;
+            stepResult.waited = res;
+            break;
+          }
           const ms = Number(act.ms || act.duration || 1000);
           await new Promise(r => setTimeout(r, ms));
           stepResult.success = true;

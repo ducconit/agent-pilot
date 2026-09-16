@@ -1,0 +1,46 @@
+{
+  "description": "List installed browser extensions or enable/disable specific extensions via chrome.management.",
+  "inputSchema": {
+    "properties": {
+      "action": {
+        "description": "Action: 'list' all extensions or 'setEnabled' to toggle",
+        "enum": [
+          "list",
+          "setEnabled"
+        ],
+        "type": "string"
+      },
+      "enabled": {
+        "description": "Target enabled state for setEnabled action",
+        "type": "boolean"
+      },
+      "extensionId": {
+        "description": "Extension ID to enable or disable",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_manage_extensions",
+  "parameters": {
+    "properties": {
+      "action": {
+        "description": "Action: 'list' all extensions or 'setEnabled' to toggle",
+        "enum": [
+          "list",
+          "setEnabled"
+        ],
+        "type": "string"
+      },
+      "enabled": {
+        "description": "Target enabled state for setEnabled action",
+        "type": "boolean"
+      },
+      "extensionId": {
+        "description": "Extension ID to enable or disable",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}

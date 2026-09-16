@@ -1,0 +1,54 @@
+{
+  "description": "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType.",
+  "inputSchema": {
+    "properties": {
+      "filterUrl": {
+        "description": "Filter requests matching URL substring",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Max requests to return (default: 100)",
+        "type": "integer"
+      },
+      "method": {
+        "description": "Filter by HTTP method (GET, POST, PUT, DELETE...)",
+        "type": "string"
+      },
+      "resourceType": {
+        "description": "Filter by resource type (Fetch, XHR, Document, Script...)",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_list_network_requests",
+  "parameters": {
+    "properties": {
+      "filterUrl": {
+        "description": "Filter requests matching URL substring",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Max requests to return (default: 100)",
+        "type": "integer"
+      },
+      "method": {
+        "description": "Filter by HTTP method (GET, POST, PUT, DELETE...)",
+        "type": "string"
+      },
+      "resourceType": {
+        "description": "Filter by resource type (Fetch, XHR, Document, Script...)",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

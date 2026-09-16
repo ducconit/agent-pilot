@@ -16,7 +16,21 @@ import {
   logDebug
 } from "./constants.js";
 import { sanitizeData } from "./secret-sanitizer.js";
-import { attachDebugger, detachDebugger, sendCdpCommand } from "./cdp-manager.js";
+import {
+  attachDebugger,
+  detachDebugger,
+  sendCdpCommand,
+  uploadFileInput,
+  handleJavaScriptDialog,
+  getActiveDialog,
+  setEmulation,
+  getNetworkResponseBody,
+  startPerformanceTrace,
+  stopPerformanceTrace,
+  getPerformanceMetrics,
+  takeHeapSnapshot,
+  collectGarbage
+} from "./cdp-manager.js";
 import {
   getActiveTabId,
   getTargetTabId,
@@ -585,6 +599,104 @@ export class AgentBridgeClient {
           break;
         }
 
+        case "page.hover": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          this.runWithTabLock(tabId, "page.hover", () =>
+            this.sendTabMessageWithRetry(tabId, {
+              action: "virtual_hover",
+              selector: params.selector
+            })
+          )
+            .then(res => respond(res || { success: true }))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "page.drag": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          this.runWithTabLock(tabId, "page.drag", () =>
+            this.sendTabMessageWithRetry(tabId, {
+              action: "virtual_drag",
+              fromSelector: params.from || params.fromSelector,
+              toSelector: params.to || params.toSelector,
+              steps: params.steps || 8
+            })
+          )
+            .then(res => respond(res || { success: true }))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "page.pressKey":
+        case "page.key": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          this.runWithTabLock(tabId, "page.pressKey", () =>
+            this.sendTabMessageWithRetry(tabId, {
+              action: "press_key",
+              key: params.key || "Enter",
+              code: params.code,
+              keyCode: params.keyCode,
+              selector: params.selector
+            })
+          )
+            .then(res => respond(res || { success: true }))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "page.waitFor":
+        case "page.wait": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          this.sendTabMessageWithRetry(tabId, {
+            action: "wait_for",
+            selector: params.selector,
+            text: params.text,
+            state: params.state || "visible",
+            timeoutMs: params.timeoutMs || params.timeout || 10000
+          })
+            .then(res => respond(res || { success: true }))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "page.uploadFile":
+        case "page.upload": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, this.broadcastFn);
+          }
+          const files = Array.isArray(params.files) ? params.files : (params.filePath ? [params.filePath] : (params.file ? [params.file] : []));
+          uploadFileInput(tabId, params.selector, files)
+            .then(res => respond(res))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "page.handleDialog":
+        case "dialog.handle": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, this.broadcastFn);
+          }
+          handleJavaScriptDialog(tabId, params.accept !== false, params.promptText || "")
+            .then(res => respond(res))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "dialog.getActive": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          respond({ dialog: getActiveDialog(tabId) });
+          break;
+        }
+
         case "page.setBusy":
         case "agent.setBusy": {
           const tabId = await this.getTargetTabId(params.tabId);
@@ -819,6 +931,162 @@ export class AgentBridgeClient {
           if (performanceData !== undefined) responsePayload.performance = performanceData;
 
           respond(responsePayload);
+          break;
+        }
+
+        case "emulation.set": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, this.broadcastFn);
+          }
+          setEmulation(tabId, params)
+            .then(res => respond(res))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "emulation.resize": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          const width = Number(params.width);
+          const height = Number(params.height);
+          if (isNaN(width) || width <= 0 || isNaN(height) || height <= 0) {
+            return respond(null, new Error(`Invalid dimensions: width and height must be positive numbers (got width=${params.width}, height=${params.height})`));
+          }
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, this.broadcastFn);
+          }
+          const scale = Number(params.deviceScaleFactor);
+          setEmulation(tabId, {
+            viewport: {
+              width: Math.floor(width),
+              height: Math.floor(height),
+              deviceScaleFactor: !isNaN(scale) && scale > 0 ? scale : 1,
+              mobile: !!params.mobile
+            }
+          })
+            .then(res => respond(res))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "network.listRequests": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          const buffer = getBuffer(tabId);
+          let requests = Array.from(buffer.network.values());
+          if (params.filterUrl) {
+            requests = requests.filter(r => r.url && r.url.includes(params.filterUrl));
+          }
+          if (params.method) {
+            requests = requests.filter(r => r.method && r.method.toUpperCase() === params.method.toUpperCase());
+          }
+          if (params.resourceType) {
+            requests = requests.filter(r => r.type && r.type.toLowerCase() === params.resourceType.toLowerCase());
+          }
+          const rawLimit = Number(params.limit);
+          const limit = (!isNaN(rawLimit) && rawLimit > 0) ? Math.max(1, Math.min(Math.floor(rawLimit), 1000)) : 100;
+          respond({
+            tabId,
+            totalCaptured: buffer.network.size,
+            matchingCount: requests.length,
+            requests: requests.slice(-limit)
+          });
+          break;
+        }
+
+        case "network.getResponseBody": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, this.broadcastFn);
+          }
+          getNetworkResponseBody(tabId, params.requestId)
+            .then(res => respond(res))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "performance.trace": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, this.broadcastFn);
+          }
+          const action = (params.action || "start").toLowerCase();
+          if (action === "stop" || action === "end") {
+            stopPerformanceTrace(tabId).then(res => respond(res)).catch(err => respond(null, err));
+          } else {
+            startPerformanceTrace(tabId, params.categories).then(res => respond(res)).catch(err => respond(null, err));
+          }
+          break;
+        }
+
+        case "performance.metrics": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, this.broadcastFn);
+          }
+          getPerformanceMetrics(tabId)
+            .then(res => respond(res))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "memory.heapSnapshot": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, this.broadcastFn);
+          }
+          takeHeapSnapshot(tabId)
+            .then(res => respond(res))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "memory.collectGarbage": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, this.broadcastFn);
+          }
+          collectGarbage(tabId)
+            .then(res => respond(res))
+            .catch(err => respond(null, err));
+          break;
+        }
+
+        case "extensions.manage": {
+          if (!chrome.management) {
+            return respond(null, new Error("chrome.management API is not available"));
+          }
+          const action = params.action || "list";
+          if (action === "list") {
+            chrome.management.getAll((extList) => {
+              if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
+              const list = (extList || []).map(e => ({
+                id: e.id,
+                name: e.name,
+                version: e.version,
+                enabled: e.enabled,
+                type: e.type,
+                installType: e.installType
+              }));
+              respond({ total: list.length, extensions: list });
+            });
+          } else if (action === "setEnabled" || action === "toggle") {
+            if (!params.extensionId) return respond(null, new Error("extensionId is required"));
+            const enabled = params.enabled !== false;
+            chrome.management.setEnabled(params.extensionId, enabled, () => {
+              if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
+              respond({ success: true, extensionId: params.extensionId, enabled });
+            });
+          } else {
+            respond(null, new Error(`Unsupported extension action: ${action}`));
+          }
           break;
         }
 

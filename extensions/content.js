@@ -78,6 +78,10 @@
     },
     snapshot: (maxElements, format) => inspector.getInteractiveSnapshot(maxElements, format),
     fillForm: (fields, submitSelector, pressEnter) => cursor.virtualFillForm(fields, submitSelector, pressEnter),
+    hover: (selector) => cursor.virtualHover(selector),
+    drag: (fromSelector, toSelector, steps) => cursor.virtualDrag(fromSelector, toSelector, steps),
+    waitFor: (options) => cursor.waitFor(options),
+    pressKey: (key, code, keyCode, selector) => cursor.dispatchKey(key, code, keyCode, selector),
     startRegionCrop: () => inspector.startRegionCrop(),
     startElementSnap: () => inspector.startElementSnap(),
     stopElementSnap: () => inspector.stopElementSnap(),
@@ -237,6 +241,21 @@
 
     if (req.action === "press_key" || req.action === "dispatch_key") {
       sendResponse(cursor.dispatchKey(req.key, req.code, req.keyCode, req.selector));
+      return true;
+    }
+
+    if (req.action === "virtual_hover" || req.action === "hover") {
+      cursor.virtualHover(req.selector).then(sendResponse);
+      return true;
+    }
+
+    if (req.action === "virtual_drag" || req.action === "drag") {
+      cursor.virtualDrag(req.fromSelector || req.from, req.toSelector || req.to, req.steps).then(sendResponse);
+      return true;
+    }
+
+    if (req.action === "wait_for") {
+      cursor.waitFor(req).then(sendResponse);
       return true;
     }
 
