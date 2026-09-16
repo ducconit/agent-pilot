@@ -82,7 +82,7 @@ export async function executeBatchActions(params, bridgeClient = null) {
                 }
               };
 
-              const timeout = setTimeout(finish, Number(act.loadTimeout || DEFAULT_LOAD_TIMEOUT_MS));
+              const timeout = setTimeout(finish, Number(act.loadTimeout || act.timeoutMs || act.timeout || DEFAULT_LOAD_TIMEOUT_MS));
 
               const onUpdated = (tId, changeInfo) => {
                 if (tId === tab.id && changeInfo.status === "complete") {
@@ -125,7 +125,7 @@ export async function executeBatchActions(params, bridgeClient = null) {
                 resolve();
               };
 
-              const timeout = setTimeout(done, Number(act.loadTimeout || DEFAULT_LOAD_TIMEOUT_MS));
+              const timeout = setTimeout(done, Number(act.loadTimeout || act.timeoutMs || act.timeout || DEFAULT_LOAD_TIMEOUT_MS));
 
               const onUpdated = (tId, changeInfo) => {
                 if (tId === targetTabId && changeInfo.status === "complete") {
