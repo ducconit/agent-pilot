@@ -414,10 +414,10 @@ func TestDeriveCommandTimeout(t *testing.T) {
 		t.Errorf("expected 5000, got %d", to)
 	}
 
-	// 3. batch.run minimum 45000
+	// 3. batch.run base minimum 300,000ms (5 minutes)
 	to = DeriveCommandTimeout("batch.run", nil, 10000)
-	if to != 45000 {
-		t.Errorf("expected 45000, got %d", to)
+	if to != 300000 {
+		t.Errorf("expected 300000, got %d", to)
 	}
 
 	// 4. page.waitFor with explicit timeoutMs (int)
@@ -430,5 +430,23 @@ func TestDeriveCommandTimeout(t *testing.T) {
 	to = DeriveCommandTimeout("page.waitFor", map[string]interface{}{"timeoutMs": float64(12000)}, 15000)
 	if to != 17000 {
 		t.Errorf("expected 17000, got %d", to)
+	}
+
+	// 6. page.waitFor with timeout alias (int)
+	to = DeriveCommandTimeout("page.waitFor", map[string]interface{}{"timeout": 60000}, 0)
+	if to != 65000 {
+		t.Errorf("expected 65000, got %d", to)
+	}
+
+	// 7. batch.run dynamically scaled based on actions
+	longBatch := map[string]interface{}{
+		"actions": []interface{}{
+			map[string]interface{}{"type": "wait", "ms": 200000},
+			map[string]interface{}{"type": "sleep", "duration": 200000},
+		},
+	}
+	to = DeriveCommandTimeout("batch.run", longBatch, 0)
+	if to != 460000 {
+		t.Errorf("expected 460000, got %d", to)
 	}
 }

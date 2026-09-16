@@ -627,21 +627,102 @@ func handleFeedbackWaitEndpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 // ForwardCommandToActiveServer sends HTTP POST /api to the running master bridge
+func getIntOrFloat(m map[string]interface{}, key string) (int, bool) {
+	if m == nil {
+		return 0, false
+	}
+	if v, ok := m[key]; ok && v != nil {
+		switch n := v.(type) {
+		case int:
+			return n, true
+		case int64:
+			return int(n), true
+		case float64:
+			return int(n), true
+		case float32:
+			return int(n), true
+		case string:
+			if parsed, err := strconv.Atoi(strings.TrimSpace(n)); err == nil {
+				return parsed, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func deriveBatchTimeout(params map[string]interface{}, defaultTimeoutMs int) int {
+	minBatch := 300000 // 5 minutes base timeout for batches
+	if defaultTimeoutMs > minBatch {
+		minBatch = defaultTimeoutMs
+	}
+
+	estDuration := 0
+	if params != nil {
+		if t, ok := getIntOrFloat(params, "timeoutMs"); ok && t > 0 {
+			estDuration = t
+		} else if t, ok := getIntOrFloat(params, "timeout"); ok && t > 0 {
+			estDuration = t
+		}
+
+		if acts, ok := params["actions"].([]interface{}); ok && len(acts) > 0 {
+			actsSum := 0
+			for _, item := range acts {
+				act, ok := item.(map[string]interface{})
+				if !ok {
+					actsSum += 5000
+					continue
+				}
+				actType := strings.ToLower(fmt.Sprintf("%v", act["type"]))
+				if actType == "" || actType == "<nil>" {
+					actType = strings.ToLower(fmt.Sprintf("%v", act["action"]))
+				}
+				switch actType {
+				case "wait", "sleep":
+					if ms, ok := getIntOrFloat(act, "ms"); ok && ms > 0 {
+						actsSum += ms
+					} else if ms, ok := getIntOrFloat(act, "duration"); ok && ms > 0 {
+						actsSum += ms
+					} else {
+						actsSum += 5000
+					}
+				case "wait_for", "waitfor":
+					if ms, ok := getIntOrFloat(act, "timeoutMs"); ok && ms > 0 {
+						actsSum += ms
+					} else if ms, ok := getIntOrFloat(act, "timeout"); ok && ms > 0 {
+						actsSum += ms
+					} else {
+						actsSum += 15000
+					}
+				case "open", "open_tab", "navigate", "load":
+					actsSum += 30000
+				default:
+					actsSum += 5000
+				}
+			}
+			if actsSum+30000 > estDuration {
+				estDuration = actsSum + 30000
+			}
+		}
+	}
+
+	if estDuration > minBatch {
+		return estDuration + 30000
+	}
+	return minBatch
+}
+
 // DeriveCommandTimeout derives the appropriate RPC/HTTP timeout in ms based on command type and params
 func DeriveCommandTimeout(method string, params map[string]interface{}, defaultTimeoutMs int) int {
 	if method == "batch.run" {
-		if defaultTimeoutMs < 45000 {
-			return 45000
-		}
-		return defaultTimeoutMs
+		return deriveBatchTimeout(params, defaultTimeoutMs)
 	}
 	if method == "page.waitFor" || method == "page.wait" {
 		waitMs := 30000
 		if params != nil {
-			if t, ok := params["timeoutMs"].(int); ok && t > 0 {
+			if t, ok := getIntOrFloat(params, "timeoutMs"); ok && t > 0 {
 				waitMs = t
-			} else if tFloat, ok := params["timeoutMs"].(float64); ok && tFloat > 0 {
-				waitMs = int(tFloat)
+			} else if t, ok := getIntOrFloat(params, "timeout"); ok && t > 0 {
+				waitMs = t
 			}
 		}
 		effective := waitMs + 5000
