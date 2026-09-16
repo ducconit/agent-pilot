@@ -683,7 +683,10 @@ export class AgentBridgeClient {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
           let timeoutMs = 10000;
-          const candidate = params.timeoutMs !== undefined ? params.timeoutMs : params.timeout;
+          let candidate = params.timeoutMs;
+          if (candidate === undefined || candidate === null || candidate === "") {
+            candidate = params.timeout;
+          }
           if (candidate !== undefined && candidate !== null && candidate !== "") {
             const num = Number(candidate);
             if (!Number.isFinite(num) || num <= 0 || num > 2147483647) {

@@ -88,7 +88,8 @@ export async function executeBatchActions(params, bridgeClient = null) {
 
           // Wait for tab load completion if requested (default true)
           if (act.waitUntil !== false) {
-            await new Promise(async (resolve) => {
+            const loadTimeout = getPositiveNumber(act.loadTimeout, act.timeoutMs, act.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
+            await new Promise((resolve) => {
               let done = false;
               const finish = () => {
                 if (!done) {
@@ -99,7 +100,6 @@ export async function executeBatchActions(params, bridgeClient = null) {
                 }
               };
 
-              const loadTimeout = getPositiveNumber(act.loadTimeout, act.timeoutMs, act.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
               const timeout = setTimeout(finish, loadTimeout);
 
               const onUpdated = (tId, changeInfo) => {
@@ -109,14 +109,11 @@ export async function executeBatchActions(params, bridgeClient = null) {
               };
               chrome.tabs.onUpdated.addListener(onUpdated);
 
-              try {
-                const cur = await chrome.tabs.get(tab.id);
-                if (cur && cur.status === "complete") {
+              chrome.tabs.get(tab.id, (cur) => {
+                if (!chrome.runtime.lastError && cur && cur.status === "complete") {
                   finish();
                 }
-              } catch (err) {
-                logDebug("batch create tab status check failed", err);
-              }
+              });
             });
           }
 
@@ -133,7 +130,8 @@ export async function executeBatchActions(params, bridgeClient = null) {
           const url = normalizeUrl(act.url);
 
           if (act.waitUntil !== false) {
-            await new Promise(async (resolve, reject) => {
+            const loadTimeout = getPositiveNumber(act.loadTimeout, act.timeoutMs, act.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
+            await new Promise((resolve, reject) => {
               let resolved = false;
               const done = () => {
                 if (resolved) return;
@@ -143,7 +141,6 @@ export async function executeBatchActions(params, bridgeClient = null) {
                 resolve();
               };
 
-              const loadTimeout = getPositiveNumber(act.loadTimeout, act.timeoutMs, act.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
               const timeout = setTimeout(done, loadTimeout);
 
               const onUpdated = (tId, changeInfo) => {
@@ -153,16 +150,16 @@ export async function executeBatchActions(params, bridgeClient = null) {
               };
               chrome.tabs.onUpdated.addListener(onUpdated);
 
-              try {
-                const t = await chrome.tabs.update(targetTabId, { url });
+              chrome.tabs.update(targetTabId, { url }, (t) => {
+                if (chrome.runtime.lastError) {
+                  clearTimeout(timeout);
+                  chrome.tabs.onUpdated.removeListener(onUpdated);
+                  return reject(new Error(chrome.runtime.lastError.message));
+                }
                 if (t && t.status === "complete") {
                   done();
                 }
-              } catch (err) {
-                clearTimeout(timeout);
-                chrome.tabs.onUpdated.removeListener(onUpdated);
-                return reject(err);
-              }
+              });
             });
           } else {
             await new Promise((resolve, reject) => {
