@@ -706,6 +706,8 @@
    */
   async function waitFor(options = {}) {
     let { selector, text, state = "visible", timeoutMs = 10000, pollIntervalMs = 100 } = options;
+    const parsedTimeout = Number(timeoutMs);
+    timeoutMs = (Number.isFinite(parsedTimeout) && parsedTimeout > 0) ? Math.min(parsedTimeout, 2147483647) : 10000;
     if (selector && !text && typeof selector === "string" && !selector.startsWith("@")) {
       try {
         document.createDocumentFragment().querySelector(selector);

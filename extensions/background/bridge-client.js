@@ -682,12 +682,21 @@ export class AgentBridgeClient {
         case "page.wait": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
+          let timeoutMs = 10000;
+          const candidate = params.timeoutMs !== undefined ? params.timeoutMs : params.timeout;
+          if (candidate !== undefined && candidate !== null && candidate !== "") {
+            const num = Number(candidate);
+            if (!Number.isFinite(num) || num <= 0 || num > 2147483647) {
+              return respond(null, new Error(`Invalid timeout '${candidate}': must be a positive finite number <= 2147483647ms`));
+            }
+            timeoutMs = num;
+          }
           this.sendTabMessageWithRetry(tabId, {
             action: "wait_for",
             selector: params.selector,
             text: params.text,
             state: params.state || "visible",
-            timeoutMs: params.timeoutMs || params.timeout || 10000
+            timeoutMs
           })
             .then(res => respond(res || { success: true }))
             .catch(err => respond(null, err));

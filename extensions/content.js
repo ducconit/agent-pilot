@@ -122,6 +122,11 @@
             const waitDur = (data && (data.timeout || data.timeoutMs)) ? Number(data.timeout || data.timeoutMs) : 10000;
             timeoutMs = waitDur + 3000;
           }
+          if (!Number.isFinite(timeoutMs) || timeoutMs > 2147483647) {
+            timeoutMs = 2147483647;
+          } else if (timeoutMs <= 0) {
+            timeoutMs = 5000;
+          }
           return new Promise((resolve) => {
             const reqId = "ap_" + Math.random().toString(36).substr(2, 9);
             const timer = setTimeout(() => {

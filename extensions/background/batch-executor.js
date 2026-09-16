@@ -21,13 +21,18 @@ import {
 } from "./tab-manager.js";
 import { captureTabScreenshot } from "./screenshot-service.js";
 
+// Maximum 32-bit signed integer supported by browser timers (setTimeout).
+// Delays exceeding this value or Infinity wrap/overflow in V8/Chrome and clamp to 1ms.
+const MAX_TIMER_DELAY_MS = 2147483647;
+
 function getPositiveNumber(...candidates) {
   for (const c of candidates) {
     if (c !== undefined && c !== null && c !== "") {
       const num = Number(c);
-      if (!isNaN(num) && num > 0) {
-        return num;
+      if (!Number.isFinite(num) || num <= 0 || num > MAX_TIMER_DELAY_MS) {
+        throw new Error(`Timeout value '${c}' is invalid: must be a positive finite number <= ${MAX_TIMER_DELAY_MS}ms`);
       }
+      return num;
     }
   }
   return null;
