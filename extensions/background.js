@@ -11,6 +11,7 @@ import {
   normalizeUrl,
   getBuffer,
   DEFAULT_AGENT_PORT,
+  BRIDGE,
   getSecretFilterEnabled,
   setSecretFilterEnabled
 } from "./background/constants.js";
@@ -178,9 +179,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   }
 });
 
-// Periodic keepalive alarm (0.5 min = 30s, the minimum period Chrome allows) to wake up service worker
+// Periodic keepalive alarm (see BRIDGE.KEEPALIVE_PERIOD_MINUTES; Chrome clamps below 0.5 min)
 if (chrome.alarms) {
-  chrome.alarms.create("agent_pilot_bridge_keepalive", { periodInMinutes: 0.5 });
+  chrome.alarms.create("agent_pilot_bridge_keepalive", { periodInMinutes: BRIDGE.KEEPALIVE_PERIOD_MINUTES });
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "agent_pilot_bridge_keepalive") {
       if (agentBridge) {
