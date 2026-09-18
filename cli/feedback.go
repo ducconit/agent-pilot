@@ -49,6 +49,8 @@ var (
 	pendingWaiters []*FeedbackWaiter
 )
 
+const maxFeedbackWaiters = 32
+
 func GetFeedbackStorageDir() string {
 	customHome := os.Getenv("AGENT_PILOT_HOME")
 	if customHome != "" {
@@ -92,7 +94,7 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 		sessionDir = filepath.Join(storageDir, ts)
 	}
 
-	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+	if err := os.MkdirAll(sessionDir, 0700); err != nil {
 		return nil, err
 	}
 
@@ -102,6 +104,7 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 	}
 
 	savedItems := make([]FeedbackItem, 0, len(rawItems))
+	imageErrors := 0
 
 	for i, raw := range rawItems {
 		itemMap, ok := raw.(map[string]interface{})
@@ -147,7 +150,15 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 				imageFileName = fmt.Sprintf("item_%d.%s", itemNum, ext)
 				imageAbsolutePath = filepath.Join(sessionDir, imageFileName)
 				if imgBytes, err := base64.StdEncoding.DecodeString(parts[1]); err == nil {
-					_ = os.WriteFile(imageAbsolutePath, imgBytes, 0644)
+					if writeErr := os.WriteFile(imageAbsolutePath, imgBytes, 0600); writeErr != nil {
+						imageErrors++
+						imageFileName = ""
+						imageAbsolutePath = ""
+					}
+				} else {
+					imageErrors++
+					imageFileName = ""
+					imageAbsolutePath = ""
 				}
 			}
 		}
@@ -178,8 +189,13 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 		Items:     savedItems,
 	}
 
-	metaBytes, _ := json.MarshalIndent(meta, "", "  ")
-	_ = os.WriteFile(filepath.Join(sessionDir, "session.json"), metaBytes, 0644)
+	metaBytes, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize feedback session: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(sessionDir, "session.json"), metaBytes, 0600); err != nil {
+		return nil, fmt.Errorf("failed to write feedback session: %w", err)
+	}
 
 	// Format prompt.md
 	promptMD, _ := payload["prompt"].(string)
@@ -240,13 +256,18 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 		promptMD = sb.String()
 	}
 
-	_ = os.WriteFile(filepath.Join(sessionDir, "prompt.md"), []byte(promptMD), 0644)
+	if err := os.WriteFile(filepath.Join(sessionDir, "prompt.md"), []byte(promptMD), 0600); err != nil {
+		return nil, fmt.Errorf("failed to write feedback prompt: %w", err)
+	}
 
 	res := map[string]interface{}{
 		"sessionId":  ts,
 		"sessionDir": sessionDir,
 		"promptMd":   promptMD,
 		"count":      len(savedItems),
+	}
+	if imageErrors > 0 {
+		res["imageErrors"] = imageErrors
 	}
 
 	CheckAndNotifyFeedbackWaiters(res)
@@ -316,7 +337,7 @@ func GetPendingFeedback(limit int, sessionID string, clear bool) (map[string]int
 		sessions = append(sessions, meta)
 
 		if clear {
-			_ = os.MkdirAll(archiveDir, 0755)
+			_ = os.MkdirAll(archiveDir, 0700)
 			_ = os.Rename(sDir, filepath.Join(archiveDir, id))
 		}
 	}
@@ -347,6 +368,13 @@ func WaitForFeedbackWithContext(ctx context.Context, timeoutSec int, tabID inter
 	}
 
 	waitersLock.Lock()
+	if len(pendingWaiters) >= maxFeedbackWaiters {
+		waitersLock.Unlock()
+		return map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Too many concurrent feedback waiters (max %d); try again later", maxFeedbackWaiters),
+		}
+	}
 	pendingWaiters = append(pendingWaiters, waiter)
 	waitersLock.Unlock()
 
@@ -377,6 +405,13 @@ func WaitForFeedbackWithContext(ctx context.Context, timeoutSec int, tabID inter
 		}
 	case <-timer.C:
 		removeWaiter()
+		// Drain a payload delivered at the same instant the timer fired so a
+		// successful delivery is never reported as a timeout.
+		select {
+		case res := <-ch:
+			return res
+		default:
+		}
 		return map[string]interface{}{
 			"success": false,
 			"timeout": true,

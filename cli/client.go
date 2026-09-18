@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -27,11 +28,21 @@ func DispatchCommand(method string, params map[string]interface{}, port int) (in
 
 	// Master bridge is NOT running -> start embedded bridge in background
 	go func() {
-		_ = StartBridgeServer(port)
+		if err := StartBridgeServer(port); err != nil {
+			log.Printf("[AgentPilot Go] Embedded bridge server error: %v", err)
+		}
 	}()
 
-	// Wait up to 1 second for server to bind
-	time.Sleep(300 * time.Millisecond)
+	// Poll until the embedded server is accepting connections (up to ~1s)
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		probe, dialErr := net.DialTimeout("tcp", addr, 100*time.Millisecond)
+		if dialErr == nil {
+			_ = probe.Close()
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 
 	// Now try dispatching
 	return SendCommandToExtension(method, params, DeriveCommandTimeout(method, params, 15000))

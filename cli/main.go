@@ -493,6 +493,17 @@ func parseWaitArgs(args []string) (string, string, string, int, interface{}, err
 	return selector, text, state, timeout, tab, nil
 }
 
+// DefaultBridgePort resolves the bridge port, honoring the AGENT_PILOT_PORT
+// environment variable and falling back to the built-in default.
+func DefaultBridgePort() int {
+	if env := strings.TrimSpace(os.Getenv("AGENT_PILOT_PORT")); env != "" {
+		if p, err := strconv.Atoi(env); err == nil && p > 0 && p < 65536 {
+			return p
+		}
+	}
+	return DefaultPort
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		// If running without arguments, default to MCP Server for AI Agent stdio pipes
@@ -514,7 +525,7 @@ func main() {
 
 	case "server":
 		serverFlags := flag.NewFlagSet("server", flag.ExitOnError)
-		port := serverFlags.Int("port", DefaultPort, "Port to listen on")
+		port := serverFlags.Int("port", DefaultBridgePort(), "Port to listen on")
 		if err := serverFlags.Parse(os.Args[2:]); err != nil {
 			os.Exit(1)
 		}
@@ -761,7 +772,7 @@ func main() {
 			}
 		}
 
-		res, err := DispatchCommand("batch.run", payload, DefaultPort)
+		res, err := DispatchCommand("batch.run", payload, DefaultBridgePort())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Thực thi batch thất bại: %v\n", err)
 			os.Exit(1)

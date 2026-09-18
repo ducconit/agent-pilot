@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,6 +18,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+)
+
+const (
+	wsReadTimeout   = 90 * time.Second
+	wsPingInterval  = 30 * time.Second
+	maxAPIBodyBytes = 5 * 1024 * 1024
+	maxForwardBody  = 16 * 1024 * 1024
 )
 
 type ClientConnection struct {
@@ -43,6 +51,7 @@ var (
 	pendingReqLock  sync.Mutex
 	pendingRequests = make(map[int64]*PendingRequest)
 	requestCounter  int64
+	clientCounter   int64
 	secretFilterOn  int32 = 1 // default true
 )
 
@@ -119,18 +128,23 @@ func SendCommandToExtension(method string, params map[string]interface{}, timeou
 	}
 
 	timeoutMs = DeriveCommandTimeout(method, params, timeoutMs)
+	timer := time.NewTimer(time.Duration(timeoutMs) * time.Millisecond)
+	defer timer.Stop()
 
 	select {
 	case res := <-resChan:
 		filterEnabled := atomic.LoadInt32(&secretFilterOn) == 1
 		if errMsg, ok := res["error"].(string); ok && errMsg != "" {
+			if sanitizedErr, ok := SanitizeData(errMsg, filterEnabled).(string); ok && sanitizedErr != "" {
+				errMsg = sanitizedErr
+			}
 			return nil, fmt.Errorf("%s", errMsg)
 		}
 		resultData := res["result"]
 		sanitized := SanitizeData(resultData, filterEnabled)
 		return sanitized, nil
 
-	case <-time.After(time.Duration(timeoutMs) * time.Millisecond):
+	case <-timer.C:
 		pendingReqLock.Lock()
 		delete(pendingRequests, reqID)
 		pendingReqLock.Unlock()
@@ -145,8 +159,13 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	conn.SetReadLimit(50 * 1024 * 1024)
+	_ = conn.SetReadDeadline(time.Now().Add(wsReadTimeout))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(wsReadTimeout))
+	})
 
-	clientID := fmt.Sprintf("browser_%d", time.Now().UnixNano()%1000000)
+	clientSeq := atomic.AddInt64(&clientCounter, 1)
+	clientID := fmt.Sprintf("browser_%d_%d", time.Now().UnixNano(), clientSeq)
 	client := &ClientConnection{
 		ID:          clientID,
 		WS:          conn,
@@ -155,7 +174,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		LastActive:  time.Now(),
 		Details: map[string]interface{}{
 			"browser": "Chromium",
-			"os":      "linux",
+			"os":      runtime.GOOS,
 		},
 	}
 
@@ -164,11 +183,32 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	if activeClientID == "" {
 		activeClientID = clientID
 	}
+	activeCount := len(clients)
 	clientsLock.Unlock()
 
-	log.Printf("[BridgeServer] 🔌 Extension connected [%s] from %s. Active clients: %d", clientID, r.RemoteAddr, len(clients))
+	log.Printf("[BridgeServer] 🔌 Extension connected [%s] from %s. Active clients: %d", clientID, r.RemoteAddr, activeCount)
+
+	pingDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(wsPingInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				client.WriteMu.Lock()
+				err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second))
+				client.WriteMu.Unlock()
+				if err != nil {
+					return
+				}
+			case <-pingDone:
+				return
+			}
+		}
+	}()
 
 	defer func() {
+		close(pingDone)
 		clientsLock.Lock()
 		delete(clients, clientID)
 		if activeClientID == clientID {
@@ -188,13 +228,16 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			break
 		}
+		_ = conn.SetReadDeadline(time.Now().Add(wsReadTimeout))
 
 		var msg map[string]interface{}
 		if err := json.Unmarshal(raw, &msg); err != nil {
 			continue
 		}
 
+		clientsLock.Lock()
 		client.LastActive = time.Now()
+		clientsLock.Unlock()
 
 		if idVal, ok := msg["id"]; ok {
 			var id int64
@@ -222,7 +265,9 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			switch t {
 			case "HANDSHAKE":
 				if details, ok := msg["details"].(map[string]interface{}); ok {
+					clientsLock.Lock()
 					client.Details = details
+					clientsLock.Unlock()
 				}
 			case "WINDOW_FOCUS":
 				clientsLock.Lock()
@@ -236,16 +281,22 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 				clientsLock.Unlock()
 			case "FEEDBACK_PUSH_AGENT", "FEEDBACK_SUBMISSION", "FEEDBACK_SAVE":
 				if payload, ok := msg["payload"].(map[string]interface{}); ok {
-					saved, _ := SaveFeedbackSession(payload)
+					saved, saveErr := SaveFeedbackSession(payload)
+					if saveErr != nil {
+						log.Printf("[BridgeServer] Failed to save feedback session: %v", saveErr)
+					}
 					if idVal, hasID := msg["id"]; hasID {
+						result := map[string]interface{}{"success": true, "sessionId": saved["sessionId"]}
+						if saveErr != nil {
+							result = map[string]interface{}{"success": false, "error": saveErr.Error()}
+						}
 						client.WriteMu.Lock()
-						_ = client.WS.WriteJSON(map[string]interface{}{
-							"id": idVal,
-							"result": map[string]interface{}{
-								"success":   true,
-								"sessionId": saved["sessionId"],
-							},
-						})
+						if err := client.WS.WriteJSON(map[string]interface{}{
+							"id":     idVal,
+							"result": result,
+						}); err != nil {
+							log.Printf("[BridgeServer] Failed to write feedback response to client %s: %v", clientID, err)
+						}
 						client.WriteMu.Unlock()
 					}
 				}
@@ -271,7 +322,7 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, 50*1024*1024))
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxAPIBodyBytes))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read request body"})
@@ -326,8 +377,10 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 	case "config.getSecretFilter":
 		res, err := SendCommandToExtension("config.getSecretFilter", params, 2000)
 		if err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": true,
+				"success": false,
+				"error":   err.Error(),
 				"result":  map[string]interface{}{"enabled": atomic.LoadInt32(&secretFilterOn) == 1},
 			})
 			return
@@ -345,8 +398,10 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		res, err := SendCommandToExtension("config.setSecretFilter", params, 2000)
 		if err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": true,
+				"success": false,
+				"error":   err.Error(),
 				"result":  map[string]interface{}{"enabled": atomic.LoadInt32(&secretFilterOn) == 1},
 			})
 			return
@@ -369,13 +424,7 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 		})
 		clientList := make([]map[string]interface{}, 0, len(conns))
 		for _, c := range conns {
-			clientList = append(clientList, map[string]interface{}{
-				"instanceId":  c.ID,
-				"browser":     "Chromium",
-				"os":          "linux",
-				"isActive":    c.ID == activeClientID,
-				"connectedAt": c.ConnectedAt.UnixMilli(),
-			})
+			clientList = append(clientList, describeClientConnection(c, activeClientID))
 		}
 		clientsLock.RUnlock()
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": clientList})
@@ -397,7 +446,10 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Instance not found"})
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "activeInstanceId": activeClientID})
+		clientsLock.RLock()
+		activeID := activeClientID
+		clientsLock.RUnlock()
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "activeInstanceId": activeID})
 		return
 	}
 
@@ -412,6 +464,37 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": res})
 }
 
+// describeClientConnection builds the public instance descriptor using handshake details.
+// Callers must hold at least a read lock on clientsLock.
+func describeClientConnection(c *ClientConnection, activeID string) map[string]interface{} {
+	browserName := "Chromium"
+	osName := runtime.GOOS
+	tabTitle := ""
+	if c.Details != nil {
+		if v, ok := c.Details["browser"].(string); ok && v != "" {
+			browserName = v
+		}
+		if v, ok := c.Details["os"].(string); ok && v != "" {
+			osName = v
+		}
+		if v, ok := c.Details["activeTabTitle"].(string); ok {
+			tabTitle = v
+		}
+	}
+	entry := map[string]interface{}{
+		"instanceId":  c.ID,
+		"browser":     browserName,
+		"os":          osName,
+		"isActive":    c.ID == activeID,
+		"connectedAt": c.ConnectedAt.UnixMilli(),
+		"lastActive":  c.LastActive.UnixMilli(),
+	}
+	if tabTitle != "" {
+		entry["activeTabTitle"] = tabTitle
+	}
+	return entry
+}
+
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	clientsLock.RLock()
 	conns := make([]*ClientConnection, 0, len(clients))
@@ -423,13 +506,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	})
 	clientList := make([]map[string]interface{}, 0, len(conns))
 	for _, c := range conns {
-		clientList = append(clientList, map[string]interface{}{
-			"instanceId":  c.ID,
-			"browser":     "Chromium",
-			"os":          "linux",
-			"isActive":    c.ID == activeClientID,
-			"connectedAt": c.ConnectedAt.UnixMilli(),
-		})
+		clientList = append(clientList, describeClientConnection(c, activeClientID))
 	}
 	extConnected := len(clientList) > 0
 	clientsLock.RUnlock()
@@ -476,7 +553,14 @@ func StartBridgeServer(port int) error {
 	mux.HandleFunc("/api/feedback/wait", handleFeedbackWaitEndpoint)
 
 	log.Printf("[AgentPilot Go] 🚀 Bridge Server listening on http://%s (WebSocket: ws://%s)", addr, addr)
-	return http.Serve(listener, mux)
+	server := &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	return server.Serve(listener)
 }
 
 func handleFeedbackSaveEndpoint(w http.ResponseWriter, r *http.Request) {
@@ -554,7 +638,9 @@ func handleFeedbackPendingEndpoint(w http.ResponseWriter, r *http.Request) {
 			limit = l
 		}
 	}
-	clear := q.Get("clear") == "true"
+	// State-changing "clear" is only honored from a POST body to avoid
+	// cross-origin GET requests (e.g. <img src>) wiping the feedback inbox.
+	clear := false
 
 	if r.Method == "POST" {
 		body, err := io.ReadAll(io.LimitReader(r.Body, 5*1024*1024))
@@ -802,7 +888,7 @@ func ForwardCommandToActiveServer(method string, params map[string]interface{}, 
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxForwardBody))
 	if err != nil {
 		return nil, err
 	}

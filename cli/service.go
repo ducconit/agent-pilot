@@ -217,8 +217,10 @@ func (m *LinuxServiceManager) Install() error {
 		return fmt.Errorf("failed to create systemd user directory: %w", err)
 	}
 
-	// Escape quotes and wrap path in quotes to handle paths with spaces safely
-	escapedExec := strings.ReplaceAll(m.execPath, "\"", "\\\"")
+	// Escape special characters and wrap path in quotes to handle paths with spaces safely
+	escapedExec := strings.ReplaceAll(m.execPath, "\\", "\\\\")
+	escapedExec = strings.ReplaceAll(escapedExec, "\"", "\\\"")
+	escapedExec = strings.ReplaceAll(escapedExec, "%", "%%")
 	unitContent := fmt.Sprintf(`[Unit]
 Description=Agent Pilot Browser Control Bridge (User Mode)
 Documentation=https://github.com/ducconit/agent-pilot-extension

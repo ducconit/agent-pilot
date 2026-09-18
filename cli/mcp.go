@@ -2,13 +2,20 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 )
+
+const maxMCPLineBytes = 8 * 1024 * 1024
+
+var mcpWriteMu sync.Mutex
 
 type JSONRPCRequest struct {
 	JSONRPC string                 `json:"jsonrpc"`
@@ -498,13 +505,15 @@ var mcpTools = []ToolInfo{
 func RunMCPServer() {
 	// Automatically ensure bridge server is listening on port 58765 in background
 	go func() {
-		_ = StartBridgeServer(DefaultPort)
+		if err := StartBridgeServer(DefaultPort); err != nil {
+			log.Printf("[MCP] Embedded bridge server error: %v", err)
+		}
 	}()
 
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReaderSize(os.Stdin, 64*1024)
 
 	for {
-		line, err := reader.ReadBytes('\n')
+		line, dropped, err := readMCPLine(reader)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -512,21 +521,113 @@ func RunMCPServer() {
 			log.Printf("[MCP] Read error: %v", err)
 			break
 		}
+		if dropped {
+			log.Printf("[MCP] Dropped oversized JSON-RPC message (max %d bytes)", maxMCPLineBytes)
+			continue
+		}
 
-		if len(line) == 0 || line[0] == '\n' || line[0] == '\r' {
+		trimmed := bytes.TrimSpace(line)
+		if len(trimmed) == 0 {
 			continue
 		}
 
 		var req JSONRPCRequest
-		if err := json.Unmarshal(line, &req); err != nil {
+		if err := json.Unmarshal(trimmed, &req); err != nil {
+			var idHolder struct {
+				ID interface{} `json:"id"`
+			}
+			_ = json.Unmarshal(trimmed, &idHolder)
+			sendMCPResponse(idHolder.ID, nil, map[string]interface{}{
+				"code":    -32700,
+				"message": "Parse error: invalid JSON",
+			})
 			continue
 		}
 
-		handleMCPRequest(&req)
+		if req.JSONRPC != "" && req.JSONRPC != "2.0" {
+			if req.ID != nil {
+				sendMCPResponse(req.ID, nil, map[string]interface{}{
+					"code":    -32600,
+					"message": `Invalid Request: jsonrpc must be "2.0"`,
+				})
+			}
+			continue
+		}
+
+		reqCopy := req
+		go handleMCPRequest(&reqCopy)
 	}
 }
 
+// readMCPLine reads one newline-delimited JSON-RPC message, capping the size.
+// Returns (line, dropped, err); dropped is true when the message exceeded maxMCPLineBytes.
+func readMCPLine(reader *bufio.Reader) ([]byte, bool, error) {
+	var buf []byte
+	overlong := false
+	for {
+		chunk, err := reader.ReadSlice('\n')
+		if !overlong {
+			buf = append(buf, chunk...)
+			if len(buf) > maxMCPLineBytes {
+				overlong = true
+				buf = nil
+			}
+		}
+		if err == bufio.ErrBufferFull {
+			continue
+		}
+		if err != nil {
+			if len(buf) > 0 && !overlong {
+				return buf, false, nil
+			}
+			return nil, overlong, err
+		}
+		if overlong {
+			return nil, true, nil
+		}
+		return buf, false, nil
+	}
+}
+
+func findTool(name string) *ToolInfo {
+	for i := range mcpTools {
+		if mcpTools[i].Name == name {
+			return &mcpTools[i]
+		}
+	}
+	return nil
+}
+
+func validateToolArguments(name string, args map[string]interface{}) error {
+	tool := findTool(name)
+	if tool == nil {
+		return fmt.Errorf("unknown tool: %s", name)
+	}
+	var required []string
+	switch r := tool.InputSchema["required"].(type) {
+	case []string:
+		required = r
+	case []interface{}:
+		for _, item := range r {
+			if s, ok := item.(string); ok {
+				required = append(required, s)
+			}
+		}
+	}
+	for _, key := range required {
+		if _, present := args[key]; !present {
+			return fmt.Errorf("missing required parameter %q for tool %q", key, name)
+		}
+	}
+	return nil
+}
+
 func handleMCPRequest(req *JSONRPCRequest) {
+	// Notifications must never receive a response
+	if req.ID == nil && strings.HasPrefix(req.Method, "notifications/") {
+		return
+	}
+
 	switch req.Method {
 	case "initialize":
 		sendMCPResponse(req.ID, map[string]interface{}{
@@ -555,6 +656,19 @@ func handleMCPRequest(req *JSONRPCRequest) {
 			args = make(map[string]interface{})
 		}
 
+		if err := validateToolArguments(toolName, args); err != nil {
+			sendMCPResponse(req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": fmt.Sprintf("Error: %v", err),
+					},
+				},
+				"isError": true,
+			}, nil)
+			return
+		}
+
 		resText, isErr := executeToolCall(toolName, args)
 		sendMCPResponse(req.ID, map[string]interface{}{
 			"content": []map[string]interface{}{
@@ -567,6 +681,10 @@ func handleMCPRequest(req *JSONRPCRequest) {
 		}, nil)
 
 	default:
+		if req.ID == nil {
+			// Unknown notification: ignore silently
+			return
+		}
 		sendMCPResponse(req.ID, nil, map[string]interface{}{
 			"code":    -32601,
 			"message": fmt.Sprintf("Method not found: %s", req.Method),
@@ -760,9 +878,20 @@ func sendMCPResponse(id interface{}, result interface{}, rpcErr interface{}) {
 		Result:  result,
 		Error:   rpcErr,
 	}
-	bytes, _ := json.Marshal(resp)
-	os.Stdout.Write(bytes)
-	os.Stdout.Write([]byte("\n"))
+	data, err := json.Marshal(resp)
+	if err != nil {
+		log.Printf("[MCP] Failed to marshal JSON-RPC response: %v", err)
+		return
+	}
+	mcpWriteMu.Lock()
+	defer mcpWriteMu.Unlock()
+	if _, err := os.Stdout.Write(data); err != nil {
+		log.Printf("[MCP] Failed to write JSON-RPC response: %v", err)
+		return
+	}
+	if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+		log.Printf("[MCP] Failed to write JSON-RPC terminator: %v", err)
+	}
 }
 
 // ExportMCPSchemas writes each MCP tool schema to a JSON file in the target directory

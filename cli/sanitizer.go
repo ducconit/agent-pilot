@@ -15,8 +15,8 @@ type secretPattern struct {
 	replacer func(string) string
 }
 
-var sensitivePropRegex = regexp.MustCompile(`(?i)^(?:password|passwd|secret|api_?key|access_?token|auth_?token|private_?key|client_?secret)$`)
-var sensitiveKvRegex = regexp.MustCompile(`(?i)(["']?(?:password|passwd|secret|client_?secret|access_?token|auth_?token|api_?key)["']?\s*[:=]\s*["'])([^"'\\,\s]{6,})(["'])`)
+var sensitivePropRegex = regexp.MustCompile(`(?i)^(?:password|passwd|secret|api_?key|x-api-key|access_?token|auth_?token|private_?key|client_?secret|authorization|proxy-authorization|cookie|set-cookie|credentials|token)$`)
+var sensitiveKvRegex = regexp.MustCompile(`(?i)(["']?(?:password|passwd|secret|client_?secret|access_?token|auth_?token|api_?key|authorization|proxy-authorization|cookie|set-cookie|x-api-key|credentials|token)["']?\s*[:=]\s*["'])([^"'\\,]{4,}?)(["'])`)
 
 var secretPatterns = []secretPattern{
 
@@ -181,7 +181,7 @@ var secretPatterns = []secretPattern{
 
 // MaskString inspects a single string and masks any secret patterns found.
 func MaskString(text string) (string, bool, []string) {
-	if len(text) < 6 || strings.Contains(text, "[MASKED_SECRET") {
+	if len(text) == 0 || strings.Contains(text, "[MASKED_SECRET") {
 		return text, false, nil
 	}
 
@@ -222,7 +222,7 @@ func SanitizeData(data interface{}, isEnabled bool) interface{} {
 			if strings.Contains(v, "[MASKED_SECRET") {
 				return v
 			}
-			if keyContext != "" && sensitivePropRegex.MatchString(keyContext) && len(v) >= 4 {
+			if keyContext != "" && sensitivePropRegex.MatchString(keyContext) && len(v) >= 1 {
 				totalMasked++
 				allTypes["Field:"+keyContext] = true
 				prefix := v

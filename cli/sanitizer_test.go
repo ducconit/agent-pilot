@@ -155,3 +155,55 @@ func TestMaskStringPreservesValidJSON(t *testing.T) {
 		t.Fatalf("expected username to remain intact")
 	}
 }
+
+func TestSanitizeDataHeaderKeysAndShortValues(t *testing.T) {
+	data := map[string]interface{}{
+		"headers": map[string]interface{}{
+			"Authorization": "Basic dXNlcjpwYXNzd29yZA==",
+			"Cookie":        "session=abc",
+			"x-api-key":     "zz",
+			"set-cookie":    "token=xyz",
+		},
+		"password": "abc",
+	}
+
+	res, ok := SanitizeData(data, true).(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected sanitized map result")
+	}
+	headers, _ := res["headers"].(map[string]interface{})
+	for _, key := range []string{"Authorization", "Cookie", "x-api-key", "set-cookie"} {
+		value, _ := headers[key].(string)
+		if !strings.Contains(value, "[MASKED_SECRET") {
+			t.Fatalf("expected header %q to be masked, got %q", key, value)
+		}
+	}
+	password, _ := res["password"].(string)
+	if !strings.Contains(password, "[MASKED_SECRET") {
+		t.Fatalf("expected short password value to be masked, got %q", password)
+	}
+}
+
+func TestMaskStringQuotedValueWithSpaces(t *testing.T) {
+	input := `const payload = { "password": "my secret pw" };`
+	masked, changed, _ := MaskString(input)
+	if !changed {
+		t.Fatalf("expected quoted secret with spaces to be masked")
+	}
+	if strings.Contains(masked, "my secret pw") {
+		t.Fatalf("secret value leaked: %s", masked)
+	}
+	if !strings.Contains(masked, "[MASKED_SECRET: Sensitive Field]") {
+		t.Fatalf("expected masked marker in output: %s", masked)
+	}
+}
+
+func TestSanitizeDataErrorStrings(t *testing.T) {
+	masked, ok := SanitizeData("authorization failed with sk-proj-1234567890abcdefghijklmnop", true).(string)
+	if !ok {
+		t.Fatalf("expected string result")
+	}
+	if strings.Contains(masked, "sk-proj-1234567890abcdefghijklmnop") {
+		t.Fatalf("error string leaked the secret: %s", masked)
+	}
+}
