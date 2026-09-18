@@ -11,7 +11,7 @@ import (
 )
 
 func printUsage() {
-	fmt.Println(`Agent Pilot CLI (v1.0.7-beta) - Universal AI Agent Browser Controller
+	fmt.Println(`Agent Pilot CLI (v1.0.8-beta) - Universal AI Agent Browser Controller
 Mã nguồn & Tài liệu: https://github.com/ducconit/agent-pilot-extension
 
 SỬ DỤNG:
@@ -21,6 +21,7 @@ CÁC LỆNH HỖ TRỢ:
   mcp                           Khởi chạy MCP Server (stdio JSON-RPC) cho AI Agent (Mặc định)
   server [--port 58765]         Khởi chạy Bridge Server nền lắng nghe kết nối từ Extension
   service <action>              Quản lý service chạy ngầm (install, uninstall, start, stop, restart, status)
+  skill install [tùy chọn]      Cài skill agent-pilot vào thư mục skills (~/.agents/skills)
 
 THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT / AGENT):
   snapshot [tùy chọn]           Trích xuất bản đồ phần tử tương tác (@1, @2...) cực nhẹ cho Agent
@@ -58,6 +59,9 @@ TÙY CHỌN BỔ SUNG:
   --output, -o <file.png>       Đường dẫn lưu file ảnh screenshot
   --mode <visible|full|region>  Chế độ chụp màn hình
   --via <synthetic|cdp|auto>    Backend input cho click/drag (mặc định: synthetic; cdp = trusted, dùng cho iframe/canvas)
+  --path <dir>                  Thư mục gốc cài skill (mặc định: ~/.agents/skills)
+  --agy, --antigravity          Cài skill vào ~/.gemini/config/skills (Antigravity)
+  --force, -f                   Ghi đè skill nếu đã tồn tại
   --clear                       Xóa nội dung input trước khi gõ
   --enter                       Bấm Enter sau khi gõ xong
   -f, --file <path>             Đường dẫn file script JS cho lệnh eval
@@ -77,6 +81,9 @@ VÍ DỤ NHANH:
   agent-pilot click -x 733 -y 668 --via cdp --tab 1734672950
   agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --via cdp --tab 1734672950
   agent-pilot cdp status --tab 1734672950
+  agent-pilot skill install
+  agent-pilot skill install --agy --force
+  agent-pilot skill install --path ~/my-skills
   agent-pilot batch test_flow.json`)
 }
 
@@ -1148,6 +1155,31 @@ func main() {
 		}
 		gc := cmdArgs.Bool("gc")
 		if err := ExecTakeHeapSnapshot(gc, tabID); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+
+	case "skill", "skills":
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "path", Aliases: []string{"p"}},
+			{Name: "force", Aliases: []string{"f"}, IsBool: true},
+			{Name: "agy", IsBool: true},
+			{Name: "antigravity", IsBool: true},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+		sub := "install"
+		if len(cmdArgs.Positional) > 0 {
+			sub = strings.ToLower(cmdArgs.Positional[0])
+		}
+		if sub != "install" && sub != "add" {
+			fmt.Println("Sử dụng: agent-pilot skill install [--path <dir>] [--agy|--antigravity] [--force]")
+			os.Exit(1)
+		}
+		antigravity := cmdArgs.Bool("agy") || cmdArgs.Bool("antigravity")
+		if err := ExecSkillInstall(cmdArgs.String("path", ""), antigravity, cmdArgs.Bool("force")); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}

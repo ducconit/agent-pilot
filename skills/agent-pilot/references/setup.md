@@ -10,6 +10,23 @@ Agent Pilot consists of two core components:
 1. **Chrome Extension (Manifest V3)**: Injected into the browser to control DOM, mouse cursor, screenshots, and DevTools via CDP.
 2. **Standalone Go CLI & MCP Server (`agent-pilot`)**: High-performance local bridge running as a user background service on port `58765`.
 
+### 1.1 Agent Skills Installation
+
+The `agent-pilot` skill (SKILL.md + references + examples) is embedded in the standalone binary. Install it without cloning the repo:
+
+```bash
+agent-pilot skill install                # ~/.agents/skills/agent-pilot (default)
+agent-pilot skill install --agy          # ~/.gemini/config/skills/agent-pilot (Antigravity)
+agent-pilot skill install --path <dir>   # custom skills root
+agent-pilot skill install --force        # overwrite if it already exists
+```
+
+Verify the installation:
+
+```bash
+ls ~/.agents/skills/agent-pilot/SKILL.md
+```
+
 ---
 
 ## 2. Chrome Extension Installation
@@ -125,7 +142,7 @@ In Cursor Settings -> Features -> MCP Servers -> Add New MCP Server:
   Verify port 58765 is active:
   ```bash
   curl http://127.0.0.1:58765/health
-  # Expected: {"status":"ok","clients":1,"version":"1.0.7-beta"}
+  # Expected: {"status":"ok","clients":1,"version":"1.0.8-beta"}
   ```
 
 ### Issue 2: Extension Shows "Mất kết nối Bridge" (Disconnected)

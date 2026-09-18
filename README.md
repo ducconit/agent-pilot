@@ -151,7 +151,7 @@ flowchart LR
 ### 1. Cài Đặt Chrome Extension
 
 #### Cách A: Cài đặt từ Bản Phát Hành (Khuyên dùng)
-1. Tải gói tiện ích mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (tệp `agent-pilot-v1.0.7-beta.zip` hoặc trong thư mục `dist/`).
+1. Tải gói tiện ích mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (tệp `agent-pilot-v1.0.8-beta.zip` hoặc trong thư mục `dist/`).
 2. Giải nén tệp `.zip` vào một thư mục cố định trên máy.
 3. Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
 4. Gạt bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải.
@@ -330,6 +330,11 @@ agent-pilot feedback list
 agent-pilot cdp status --tab 12345
 agent-pilot click -x 733 -y 668 --via cdp --tab 12345
 agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --hold 800 --via cdp --tab 12345
+
+# 9. Cài Agent Skill trực tiếp từ binary (không cần clone repo / Node.js)
+agent-pilot skill install              # ~/.agents/skills/agent-pilot
+agent-pilot skill install --agy        # ~/.gemini/config/skills/agent-pilot (Antigravity)
+agent-pilot skill install --path ~/my-skills --force
 ```
 
 ---

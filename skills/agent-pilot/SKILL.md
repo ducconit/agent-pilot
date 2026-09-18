@@ -24,6 +24,17 @@ npx skills add https://github.com/ducconit/agent-pilot-extension
 npx skills add https://github.com/ducconit/agent-pilot-extension -g --all
 ```
 
+### Or install with the Agent Pilot CLI (no Node.js / repo clone required)
+
+The skill files are embedded in the standalone binary:
+
+```bash
+agent-pilot skill install                # ~/.agents/skills/agent-pilot
+agent-pilot skill install --agy          # ~/.gemini/config/skills/agent-pilot (Antigravity)
+agent-pilot skill install --path <dir>   # custom skills root
+agent-pilot skill install --force        # overwrite an existing installation
+```
+
 ---
 
 ## 🏗️ Architecture & Communication Flow

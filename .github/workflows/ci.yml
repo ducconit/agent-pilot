@@ -33,6 +33,9 @@ jobs:
       - name: Run Syntax & Lint Checks
         run: npm run lint
 
+      - name: Verify Embedded Skill Assets Up To Date
+        run: npm run check:skills
+
       - name: Run Go Unit Tests
         run: npm run test:cli
 

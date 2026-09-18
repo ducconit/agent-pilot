@@ -36,7 +36,7 @@ type PendingRequest struct {
 var (
 	DefaultPort     = 58765
 	DefaultHost     = "127.0.0.1"
-	ServerVersion   = "1.0.7-beta"
+	ServerVersion   = "1.0.8-beta"
 	clientsLock     sync.RWMutex
 	clients         = make(map[string]*ClientConnection)
 	activeClientID  string

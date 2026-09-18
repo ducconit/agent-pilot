@@ -255,6 +255,39 @@ agent-pilot server [--port 58765]
 # Start MCP server over stdio for AI Agents
 agent-pilot mcp
 
-# Export all 19 MCP JSON tool schemas to target directory
+# Export all MCP JSON tool schemas to target directory
 agent-pilot export-mcp ./mcp/agent-pilot
 ```
+
+---
+
+## 11. Skill Installation (`skill install`)
+
+Install this `agent-pilot` skill directly from the standalone binary (the skill files are embedded at build time — no repository clone or Node.js required):
+
+```bash
+# Default: install to ~/.agents/skills/agent-pilot
+agent-pilot skill install
+
+# Install into the Antigravity skills root ~/.gemini/config/skills/agent-pilot
+agent-pilot skill install --agy
+agent-pilot skill install --antigravity
+
+# Custom skills root (the skill folder is created inside it)
+agent-pilot skill install --path ~/my-skills
+
+# Overwrite an existing installation
+agent-pilot skill install --force
+```
+
+| Flag | Description |
+| :--- | :--- |
+| `--path <dir>` | Skills root directory (default `~/.agents/skills`; `~` is expanded) |
+| `--agy`, `--antigravity` | Use `~/.gemini/config/skills` as the skills root |
+| `--force`, `-f` | Overwrite the existing `agent-pilot` skill folder |
+
+Notes:
+- Without `--force`, an existing `agent-pilot` folder is left untouched and the command exits with an error.
+- Running `agent-pilot skill` (no subcommand) is treated as `agent-pilot skill install`.
+- The installed folder mirrors `skills/agent-pilot/` (`SKILL.md`, `references/`, `examples/`).
+
