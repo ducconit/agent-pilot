@@ -2,11 +2,32 @@ import http from "node:http";
 import puppeteer from "puppeteer-core";
 import path from "node:path";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { resolveChromiumBin, getChromiumLaunchArgs } from "./browser_resolver.mjs";
 
 const PORT = 8769;
-const PROJECT_DIR = path.resolve(".");
+const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const EXT_DIR = path.join(PROJECT_DIR, "extensions");
+
+let browser;
+let server;
+
+async function cleanup() {
+  if (browser) {
+    try {
+      await browser.close();
+    } catch (_) {
+      // Ignore cleanup failures so the original error is preserved.
+    }
+  }
+  if (server) {
+    try {
+      server.close();
+    } catch (_) {
+      // Ignore cleanup failures so the original error is preserved.
+    }
+  }
+}
 
 function startHttpServer() {
   return new Promise((resolve) => {
@@ -38,13 +59,13 @@ async function main() {
   console.log("🎯 TEST PINNED REGION BOXES & MULTI-REGION VISUAL FEEDBACK");
   console.log("==================================================================\n");
 
-  const server = await startHttpServer();
+  server = await startHttpServer();
   const executablePath = resolveChromiumBin();
   if (!executablePath) {
     throw new Error("Chromium browser executable not found");
   }
 
-  const browser = await puppeteer.launch({
+  browser = await puppeteer.launch({
     headless: false,
     executablePath,
     args: getChromiumLaunchArgs(EXT_DIR)
@@ -297,15 +318,20 @@ async function main() {
   });
   console.log("- Final cleanup state:", finalCleanupState);
 
-  await browser.close();
-  server.close();
-
   console.log("\n==================================================================");
   console.log("🎉 ALL TESTS PASSED! PINNED REGION BOXES VERIFIED WITH SCREENSHOTS");
   console.log("==================================================================");
 }
 
-main().catch(err => {
-  console.error("❌ Test failed:", err);
-  process.exit(1);
-});
+async function run() {
+  try {
+    await main();
+  } catch (err) {
+    console.error("❌ Test failed:", err);
+    process.exitCode = 1;
+  } finally {
+    await cleanup();
+  }
+}
+
+run();

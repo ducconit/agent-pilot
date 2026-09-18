@@ -32,6 +32,20 @@ Chúng tôi cung cấp các bản vá bảo mật cho các phiên bản sau:
 
 ---
 
+## 🌉 Mô Hình Tin Cậy Của Bridge (Bridge Trust Model)
+
+Máy chủ cầu nối (Bridge Server) chỉ lắng nghe trên giao diện cục bộ `127.0.0.1:58765` và kiểm tra nguồn gốc kết nối (`verifyClient`) theo danh sách cho phép: `localhost`, `127.0.0.1` và các nguồn `chrome-extension://`. Tuy nhiên cần lưu ý:
+
+- **Không có token xác thực**: Bridge không yêu cầu khóa hay token để xác thực lệnh.
+- **Hệ quả**: Bất kỳ tiến trình cục bộ (local process) nào trên cùng máy đều có thể kết nối tới cổng `58765` và điều khiển trình duyệt của bạn.
+
+**Khuyến nghị an toàn**:
+- Chỉ chạy phần mềm cục bộ đáng tin cậy trên máy đã cài Agent Pilot.
+- **Không** công khai (expose) cổng `58765` ra mạng ngoài hoặc qua proxy/tunnel.
+- Cân nhắc dừng service (`agent-pilot service stop`) khi không còn sử dụng.
+
+---
+
 ## 🚨 Báo Cáo Lỗ Hổng An Ninh (Reporting a Vulnerability)
 
 Nếu bạn phát hiện bất kỳ lỗ hổng bảo mật hoặc rủi ro an ninh nào liên quan đến Agent Pilot:

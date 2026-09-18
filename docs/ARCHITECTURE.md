@@ -190,3 +190,5 @@ sequenceDiagram
    - Giao tiếp với Extension thông qua các sự kiện tùy biến `CustomEvent` (`__AGENT_PILOT_REQ__` và `__AGENT_PILOT_RES__`).
 4. **Bảo Vệ Độc Quyền Theo Tab (Tab-Level Mutex Lock)**:
    - `runWithTabLock` ngăn chặn hai hành động của Agent hoặc một hành động của Agent và thao tác gõ/click của người dùng xung đột với nhau trên cùng một tab.
+5. **Mô Hình Tin Cậy Của Bridge (Bridge Trust Model)**:
+   - Bridge chỉ mở trên `127.0.0.1:58765`, allowlist nguồn gốc WebSocket gồm `localhost`, `127.0.0.1` và `chrome-extension://`, nhưng **không có token xác thực** — vì vậy bất kỳ tiến trình cục bộ nào cũng có thể điều khiển trình duyệt. Chỉ chạy phần mềm cục bộ đáng tin cậy và không công khai cổng này ra mạng ngoài.

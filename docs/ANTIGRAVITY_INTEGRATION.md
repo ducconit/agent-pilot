@@ -93,7 +93,7 @@ Antigravity có thể tạo ra các chuỗi lệnh JSON có cấu trúc để n�
 | `mouse_drag` | `from`/`to` (selector) hoặc `fromX/fromY/toX/toY`, `steps?`, `holdMs?`, `via?` | Kéo thả; dùng tọa độ + `via: "cdp"` cho game canvas (slingshot/aim) |
 | `type` | `selector` (string), `text` (string) | Di chuyển đến ô nhập liệu, kích hoạt focus và tự động gõ ký tự từng bước |
 | `scroll` | `deltaX`, `deltaY` (px) | Cuộn trang mượt mà theo trục X/Y |
-| `screenshot` | `mode` ("visible" \| "element" \| "region") | Kích hoạt bộ chụp màn hình |
+| `screenshot` | `mode` ("visible" \| "element" \| "region" \| "full") | Kích hoạt bộ chụp màn hình |
 
 ---
 
@@ -114,7 +114,7 @@ AGENT_PILOT_PORT=58765 agent-pilot server
 ```
 
 ### 3.2. Cấu hình Antigravity MCP Server:
-Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/config/mcp_config.json` hoặc cấu hình MCP dự án) để AI Agent tự động sở hữu toàn bộ 16 công cụ điều khiển trình duyệt:
+Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/config/mcp_config.json` hoặc cấu hình MCP dự án) để AI Agent tự động sở hữu toàn bộ 35 công cụ điều khiển trình duyệt:
 ```json
 {
   "mcpServers": {
@@ -134,7 +134,7 @@ Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/c
 4. `browser_click(x, y, selector, via)`: Di chuyển chuột ảo mượt mà và click vào tọa độ (X, Y) hoặc selector CSS. Thêm `via: "cdp"` để phát **trusted CDP input** — bắt buộc khi click bên trong cross-origin iframe hoặc canvas/WebGL; `via: "auto"` tự fallback synthetic.
 4b. `browser_drag(from, to, fromX, fromY, toX, toY, steps, holdMs, via)`: Kéo thả phần tử hoặc kéo giữa tọa độ; `via: "cdp"` + `holdMs` cho cơ chế kéo slingshot trong game.
    *(Tiền kiểm tra CDP: `browser_run_actions` với action `cdp` gọi `cdp.status`, hoặc CLI `agent-pilot cdp status --tab <id>`.)*
-5. `browser_type(selector, text, delay, clear, pressEnter)`: Tự động gõ phím human-like vào ô nhập liệu.
+5. `browser_type(selector, text, clear, pressEnter)`: Tự động gõ phím human-like vào ô nhập liệu.
 6. `browser_scroll(deltaX, deltaY)`: Cuộn trang web mượt mà theo trục X hoặc Y.
 7. `browser_get_element(selector)`: Trích xuất Bounding Box, kích thước, CSS selector và XPath của phần tử DOM.
 8. `browser_screenshot(mode, tabId)`: Chụp ảnh màn hình (hỗ trợ chụp cả tab ngầm trong background mà không cần focus màn hình).
@@ -146,6 +146,8 @@ Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/c
 14. `browser_run_actions(actions, tabId, stopOnError)`: Bộ máy gom cụm thực thi hàng loạt hành động trong 1 lệnh duy nhất (Batch Execution Engine), giảm 80%+ độ trễ và số token tiêu thụ.
 15. `browser_get_pending_feedback(limit, sessionId, clear)`: Truy vấn danh sách phiên phản hồi UI do người dùng tạo từ Feedback Studio lưu trong hộp thư máy chủ cục bộ.
 16. `browser_wait_for_feedback(timeout, tabId)`: Chế độ chờ phản hồi trực tiếp (Channel A Reactive Long-Polling), phản hồi ngay khi người dùng nhấn 'Gửi Agent'.
+
+> 📝 *Ghi chú: Danh sách trên là trích lược một số công cụ tiêu biểu — xem thư mục `mcp/agent-pilot/` để có đủ bộ 35 công cụ.*
 
 ---
 

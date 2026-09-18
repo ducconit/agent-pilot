@@ -41,7 +41,7 @@ async function run() {
 
   const browser = await puppeteer.launch({
     executablePath: chromePath,
-    headless: "new",
+    headless: true,
     args: launchArgs
   });
 

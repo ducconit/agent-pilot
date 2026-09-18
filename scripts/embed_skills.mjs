@@ -59,8 +59,10 @@ function generate() {
 function formatGo(content) {
   try {
     return execFileSync("gofmt", { input: content, encoding: "utf8" });
-  } catch {
-    return content.endsWith("\n") ? content : content + "\n";
+  } catch (_) {
+    console.error("❌ gofmt not found. The Go toolchain is required to embed skills.");
+    console.error("   Install Go (https://go.dev/dl/) so that 'gofmt' is available on PATH, then retry.");
+    process.exit(1);
   }
 }
 

@@ -41,7 +41,7 @@ Các method nhận input có hỗ trợ chọn engine (`via`) và toạ độ ch
 
 | Method | Tham số | CDP? | Mô tả |
 | :--- | :--- | :--- | :--- |
-| `page.click` | `selector?`, `x?`, `y?`, `via?: "synthetic" \| "cdp" \| "auto"`, `button?`, `clickCount?`, `tabId?` | ⚙️ Tùy chọn | `via: "cdp"` phát trusted click (cross-origin iframe/canvas); `"auto"` tự fallback synthetic |
+| `page.click` | `selector?`, `x?`, `y?`, `via?: "synthetic" \| "cdp" \| "auto"`, `tabId?` | ⚙️ Tùy chọn | `via: "cdp"` phát trusted click (cross-origin iframe/canvas); `"auto"` tự fallback synthetic |
 | `page.drag` | `from`/`to` (selector) **hoặc** `fromX/fromY/toX/toY`, `steps?`, `holdMs?`, `via?`, `tabId?` | ⚙️ Tùy chọn | Drag trusted cho slingshot/aim; `holdMs` giữ trước khi thả |
 | `page.hover` | `selector`, `tabId?` | ⚙️ Tự động | Ưu tiên CDP `Input.dispatchMouseEvent`, fallback synthetic |
 | `page.pressKey` | `key`, `selector?`, `tabId?` | ⚙️ Tự động | Ưu tiên CDP `Input.dispatchKeyEvent`, fallback synthetic |
@@ -50,6 +50,7 @@ Các method nhận input có hỗ trợ chọn engine (`via`) và toạ độ ch
 
 > Các method **bắt buộc CDP**: `page.screenshot` (tab ngầm), `page.uploadFile`, `page.handleDialog`, `emulation.*`, `network.*`, `performance.*`, `memory.*`, `devtools.getData`.
 > Synthetic event **không vượt được cross-origin iframe** và không điều khiển được canvas/WebGL.
+> Lưu ý: `memory.heapSnapshot` hiện chỉ trả về **kích thước snapshot (byte)** để kiểm tra nhanh mức tiêu thụ RAM, không trả nội dung snapshot đầy đủ.
 
 ---
 
@@ -96,6 +97,8 @@ Service Worker và Content Script phát sóng các sự kiện sau tới Side Pa
 
 Được tích hợp sẵn trong Content Script để phục vụ việc lập trình tự động hóa:
 
+> ⚠️ **Ngữ nghĩa lỗi (Error Semantics)**: Các phương thức trả về `Promise` sẽ **reject kèm một `Error`** khi thao tác thất bại (trước đây resolve `null`). Riêng trường hợp **hết thời gian chờ (timeout)** vẫn resolve `null`.
+
 ```typescript
 interface AgentPilotBridge {
   version: string;
@@ -109,5 +112,13 @@ interface AgentPilotBridge {
   startRegionCrop(): void;
   pickColor(): Promise<{ hex: string, rgb: string, rgba: string, hsl: string, oklch: string } | null>;
   getCursorPosition(): { x: number, y: number };
+  // Trạng thái tương tác & phiên Agent
+  isBusy(): Promise<boolean>;
+  setBusy(busy: boolean, action?: string): Promise<{ success: boolean, isAgentBusy: boolean }>;
+  isAgentTab(): Promise<boolean>;
+  setAgentTab(enabled: boolean): Promise<boolean>;
+  // Kênh xuất Feedback (Channel B — Shared Inbox, Channel A — Live Push)
+  saveFeedbackToInbox(): Promise<any>;
+  pushFeedbackToAgent(): Promise<any>;
 }
 ```

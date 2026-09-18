@@ -1,12 +1,33 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 import { resolveChromiumBin, getChromiumLaunchArgs } from "./browser_resolver.mjs";
 
 const PORT = 8781;
-const PROJECT_DIR = path.resolve(".");
+const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const EXT_DIR = path.join(PROJECT_DIR, "extensions");
+
+let browser;
+let server;
+
+async function cleanup() {
+  if (browser) {
+    try {
+      await browser.close();
+    } catch (_) {
+      // Ignore cleanup failures so the original error is preserved.
+    }
+  }
+  if (server) {
+    try {
+      server.close();
+    } catch (_) {
+      // Ignore cleanup failures so the original error is preserved.
+    }
+  }
+}
 
 function startHttpServer() {
   return new Promise((resolve) => {
@@ -32,11 +53,11 @@ async function run() {
   console.log("🎯 TEST FEEDBACK ITEM EDIT & DELETE (IN-PAGE & SIDE PANEL)");
   console.log("==================================================================");
 
-  const server = await startHttpServer();
+  server = await startHttpServer();
   const chromePath = resolveChromiumBin();
   const launchArgs = getChromiumLaunchArgs(EXT_DIR);
 
-  const browser = await puppeteer.launch({
+  browser = await puppeteer.launch({
     executablePath: chromePath,
     headless: false,
     args: launchArgs
@@ -233,14 +254,20 @@ async function run() {
     console.warn("Screenshot warning (non-fatal):", e.message);
   }
 
-  await browser.close();
-  server.close();
   console.log("==================================================================");
   console.log("🎉 ALL FEEDBACK EDIT & DELETE TESTS PASSED (100%)!");
   console.log("==================================================================");
 }
 
-run().catch(err => {
-  console.error("❌ Test failed:", err);
-  process.exit(1);
-});
+async function main() {
+  try {
+    await run();
+  } catch (err) {
+    console.error("❌ Test failed:", err);
+    process.exitCode = 1;
+  } finally {
+    await cleanup();
+  }
+}
+
+main();

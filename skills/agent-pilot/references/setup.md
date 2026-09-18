@@ -142,7 +142,8 @@ In Cursor Settings -> Features -> MCP Servers -> Add New MCP Server:
   Verify port 58765 is active:
   ```bash
   curl http://127.0.0.1:58765/health
-  # Expected: {"status":"ok","clients":1,"version":"1.0.8-beta"}
+  # Expected: {"status":"ok","name":"Agent Pilot Go Bridge Server","port":58765,"extensionConnected":true,"clientCount":1,"version":"1.0.8-beta","clients":[{"instanceId":"<id>","browser":"Chromium","os":"linux","isActive":true,"connectedAt":1789295000000}]}
+  # NOTE: `clients` is an ARRAY of connected extension client objects (may be empty).
   ```
 
 ### Issue 2: Extension Shows "Mất kết nối Bridge" (Disconnected)

@@ -7,6 +7,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { execFileSync } from "node:child_process";
+
+// Resolve a command name to its absolute path via the OS PATH (which/where).
+function which(cmd) {
+  try {
+    const finder = process.platform === "win32" ? "where" : "which";
+    const out = execFileSync(finder, [cmd], { encoding: "utf8" });
+    return out.split(/\r?\n/).map((line) => line.trim()).find(Boolean) || null;
+  } catch (_) {
+    return null;
+  }
+}
 
 /**
  * Resolve the path to a Chrome / Chromium executable
@@ -18,6 +30,20 @@ export function resolveChromiumBin() {
   }
   if (process.env.CHROMIUM_BIN && fs.existsSync(process.env.CHROMIUM_BIN)) {
     return process.env.CHROMIUM_BIN;
+  }
+
+  // Prefer well-known browser command names found on PATH.
+  const commandCandidates = [
+    "google-chrome",
+    "google-chrome-stable",
+    "chromium",
+    "chromium-browser",
+    "microsoft-edge",
+    "brave-browser"
+  ];
+  for (const cmd of commandCandidates) {
+    const resolved = which(cmd);
+    if (resolved) return resolved;
   }
 
   const platform = process.platform;
@@ -55,8 +81,6 @@ export function resolveChromiumBin() {
   } else {
     // Linux
     candidates.push(
-      // Common Puppeteer/test cache locations
-      "/tmp/browsers/chromium/linux-1696738/chrome-linux/chrome",
       // System packages
       "/usr/bin/google-chrome",
       "/usr/bin/google-chrome-stable",
@@ -64,7 +88,14 @@ export function resolveChromiumBin() {
       "/usr/bin/chromium-browser",
       "/snap/bin/chromium",
       "/usr/bin/microsoft-edge",
-      "/usr/bin/brave-browser"
+      "/usr/bin/brave-browser",
+      // Vendor install locations
+      "/opt/google/chrome/chrome",
+      "/usr/lib/chromium/chromium",
+      "/usr/lib/chromium-browser/chromium-browser",
+      // Flatpak exports
+      "/var/lib/flatpak/exports/bin/com.google.Chrome",
+      "/var/lib/flatpak/exports/bin/org.chromium.Chromium"
     );
   }
 
@@ -74,14 +105,10 @@ export function resolveChromiumBin() {
     }
   }
 
-  // Fallback if none found
-  if (platform === "win32") {
-    return path.join(process.env["PROGRAMFILES"] || "C:\\Program Files", "Google", "Chrome", "Application", "chrome.exe");
-  } else if (platform === "darwin") {
-    return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-  } else {
-    return "/tmp/browsers/chromium/linux-1696738/chrome-linux/chrome";
-  }
+  throw new Error(
+    "Could not locate a Chrome/Chromium/Edge/Brave executable. " +
+    "Set the CHROME_BIN or CHROMIUM_BIN environment variable to the browser binary path."
+  );
 }
 
 /**
@@ -100,6 +127,11 @@ export function getChromiumLaunchArgs(extDir) {
   // Only apply X11 ozone platform on Linux when running with an X11 display
   if (process.platform === "linux" && (process.env.DISPLAY || process.env.XVFB_DISPLAY)) {
     args.push("--ozone-platform=x11");
+  }
+
+  // Containers/CI usually mount a tiny /dev/shm; Chrome crashes without this flag.
+  if (process.env.CI) {
+    args.push("--disable-dev-shm-usage");
   }
 
   return args;

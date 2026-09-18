@@ -58,4 +58,8 @@ const result = spawnSync(cmd, args, {
   env: process.env
 });
 
-process.exit(result.status ?? 0);
+if (result.error) {
+  console.error(`❌ Failed to run test command: ${result.error.message}`);
+  process.exit(1);
+}
+process.exit(result.status ?? 1);

@@ -7,6 +7,7 @@
 import {
   maskString,
   sanitizeData,
+  sanitizeDataWithMeta,
   AGENT_SECURITY_NOTICE
 } from "../extensions/background/secret-sanitizer.js";
 const sanitizeServerData = (data, isEnabled = true) => sanitizeData(data, isEnabled);
@@ -291,6 +292,94 @@ try {
     "19. Server-Side Dynamic Toggle Respect",
     isServerBypassRespected,
     "Server honors user/extension toggle state without split-brain"
+  );
+
+  // 20. Sensitive HTTP Header Keys (Authorization / Cookie / X-Api-Key)
+  const headerPayload = {
+    headers: {
+      Authorization: "Basic dXNlcjpwYXNzd29yZA==",
+      Cookie: "session=abc123",
+      "x-api-key": "zzz",
+      "set-cookie": "token=xyz"
+    }
+  };
+  const sanitizedHeaders = sanitizeData(headerPayload, true);
+  const isHeaderMasked =
+    sanitizedHeaders.headers.Authorization.includes("*****") &&
+    sanitizedHeaders.headers.Cookie.includes("*****") &&
+    sanitizedHeaders.headers["x-api-key"].includes("*****") &&
+    sanitizedHeaders.headers["set-cookie"].includes("*****");
+  record(
+    "20. HTTP Header Credential Masking (Authorization/Cookie/X-Api-Key)",
+    isHeaderMasked,
+    "Header keys are treated as sensitive credentials"
+  );
+
+  // 21. Quoted key-value with spaces in the secret value
+  const spacedSecret = 'const payload = { "password": "my secret pw" };';
+  const maskedSpaced = maskString(spacedSecret);
+  record(
+    "21. Quoted Key-Value Secret With Spaces",
+    maskedSpaced.masked && !maskedSpaced.text.includes("my secret pw") && maskedSpaced.text.includes("*****"),
+    "Values containing whitespace are now masked"
+  );
+
+  // 22. Short secret values are masked via key context
+  const shortSecret = sanitizeData({ password: "abc" }, true);
+  record(
+    "22. Short Secret Value Masking",
+    shortSecret.password.includes("*****") && !shortSecret.password.includes("abc"),
+    "Values shorter than 4 characters are no longer bypassed"
+  );
+
+  // 23. sanitizeDataWithMeta returns masking metadata for arrays (envelope transport)
+  const metaResult = sanitizeDataWithMeta([{ token: "ghp_1234567890abcdefghijklmnopqrstuvwxyz" }], true);
+  const hasArrayMeta =
+    Array.isArray(metaResult.data) &&
+    metaResult.maskedCount > 0 &&
+    metaResult.types.length > 0;
+  record(
+    "23. Masking Metadata Returned for Arrays",
+    hasArrayMeta,
+    `maskedCount=${metaResult.maskedCount}, types=${metaResult.types.join(", ")}`
+  );
+
+  // 24. Shared (non-cyclic) object references survive sanitization
+  const sharedChild = { password: "shared-secret-value" };
+  const dagData = { first: sharedChild, second: sharedChild };
+  const dagSanitized = sanitizeData(dagData, true);
+  const dagPreserved =
+    dagSanitized.first.password.includes("*****") &&
+    dagSanitized.second !== "[Circular]" &&
+    dagSanitized.second.password.includes("*****");
+  record(
+    "24. Shared Reference (DAG) Preservation",
+    dagPreserved,
+    "Non-cyclic shared references are sanitized in place, not collapsed"
+  );
+
+  // 25. Console broadcast payload shape (DEVTOOLS_CONSOLE_EVENT) is masked
+  const broadcastPayload = {
+    type: "DEVTOOLS_CONSOLE_EVENT",
+    tabId: 1,
+    entry: { type: "log", text: "authorization: Bearer sk-proj-1234567890abcdef1234567890" }
+  };
+  const sanitizedBroadcast = sanitizeData(broadcastPayload, true);
+  record(
+    "25. Broadcast Payload Masking (DEVTOOLS_CONSOLE_EVENT)",
+    !sanitizedBroadcast.entry.text.includes("sk-proj-1234567890") &&
+    sanitizedBroadcast.entry.text.includes("*****"),
+    "Agent-bound broadcast payloads are sanitized before transport"
+  );
+
+  // 26. Re-masking a masked string must not clobber the original marker type
+  const preMaskedOnce = maskString('{"apiKey": "sk-proj-1234567890abcdef1234567890"}');
+  const preMaskedTwice = maskString(preMaskedOnce.text);
+  record(
+    "26. Mask Markers Preserved on Re-masking",
+    preMaskedTwice.text.includes("[MASKED_SECRET: OpenAI API Key]") &&
+    !preMaskedTwice.text.includes("[MASKED_SECRET: Sensitive Field]"),
+    "Idempotent masking keeps the specific secret type marker"
   );
 
   console.log("\n==================================================================");

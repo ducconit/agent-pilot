@@ -134,7 +134,7 @@ async function run() {
 
     // 7. Test Element Inspector (Selector, XPath, Bounding Rect & Auto Turn-off)
     const inspectRes = await page.evaluate(async () => {
-      const elDetails = await window.__AGENT_PILOT__.getElement("#inspector-special-box");
+      const elDetails = await window.__AGENT_PILOT__.getElement("#inspector-special-box", true);
       await window.__AGENT_PILOT__.toggleInspector(true);
       const wasActive = await window.__AGENT_PILOT__.isInspectorActive();
       const boxEl = document.getElementById("inspector-special-box");
@@ -590,6 +590,32 @@ async function run() {
         const hasComment = prompt && prompt.includes("Nút này cần đổi màu nền thành cyan");
         const hasSelector = prompt && prompt.includes("#submit-btn");
 
+        // Security regression: crafted item must not inject markup or smuggle a remote image URL.
+        // DOM is shared between the isolated and main worlds, so the marker is observable here.
+        const maliciousItem = {
+          id: '"><img src=x onerror="document.documentElement.setAttribute(\'data-ap-xss\',\'1\')">',
+          mode: '</span><img src=x onerror="document.documentElement.setAttribute(\'data-ap-xss\',\'2\')">',
+          title: '<img src=x onerror="document.documentElement.setAttribute(\'data-ap-xss\',\'3\')">',
+          comment: '<img src=x onerror="document.documentElement.setAttribute(\'data-ap-xss\',\'4\')">',
+          screenshotDataUrl: "https://evil.example/xss.png",
+          extraEvilKey: { nested: true }
+        };
+        await window.__AGENT_PILOT__.addFeedbackItem(maliciousItem);
+        const listButton = document.getElementById("ap-hud-btn-list");
+        if (listButton) listButton.click();
+        await new Promise(r => setTimeout(r, 150));
+        const xssTriggered = document.documentElement.getAttribute("data-ap-xss") !== null;
+        const storedMalicious = (await window.__AGENT_PILOT__.getFeedbackItems())
+          .find((it) => typeof it.title === "string" && it.title.includes("data-ap-xss"));
+        const maliciousSanitized = Boolean(storedMalicious) &&
+          storedMalicious.mode === "element" &&
+          storedMalicious.screenshotDataUrl === undefined &&
+          !storedMalicious.id.includes("<") &&
+          !storedMalicious.id.includes('"') &&
+          storedMalicious.extraEvilKey === undefined;
+        await window.__AGENT_PILOT__.clearFeedbackItems();
+        if (listButton) document.getElementById("ap-list-btn-close")?.click();
+
         // Test HUD stays active until explicitly stopped
         const stillActive = await window.__AGENT_PILOT__.isFeedbackStudioActive();
         await window.__AGENT_PILOT__.stopFeedbackStudio();
@@ -604,6 +630,8 @@ async function run() {
           hasComponent: Boolean(hasComponent),
           hasComment: Boolean(hasComment),
           hasSelector: Boolean(hasSelector),
+          xssTriggered,
+          maliciousSanitized,
           stillActive,
           stoppedActive: !stoppedActive && hudHidden
         };
@@ -619,13 +647,15 @@ async function run() {
                          feedbackTest.hasComponent &&
                          feedbackTest.hasComment &&
                          feedbackTest.hasSelector &&
+                         feedbackTest.xssTriggered === false &&
+                         feedbackTest.maliciousSanitized === true &&
                          feedbackTest.stillActive &&
                          feedbackTest.stoppedActive;
 
       record(
-        "15. Visual UI Feedback Studio & Channel C Prompt (In-Page HUD, Multi-Mode, Source Detection & Prompt Export)",
+        "15. Visual UI Feedback Studio & Channel C Prompt (In-Page HUD, Multi-Mode, Source Detection & XSS-Safe Prompt Export)",
         feedbackOk,
-        `HUD: ${feedbackTest.hudVisible}, Modes: [${feedbackTest.modeBtns?.join(",")}], Component: ${feedbackTest.hasComponent}, Prompt: ${feedbackTest.hasComment}, Persistent: ${feedbackTest.stillActive}`
+        `HUD: ${feedbackTest.hudVisible}, Modes: [${feedbackTest.modeBtns?.join(",")}], Component: ${feedbackTest.hasComponent}, Prompt: ${feedbackTest.hasComment}, XSS Blocked: ${feedbackTest.xssTriggered === false && feedbackTest.maliciousSanitized === true}, Persistent: ${feedbackTest.stillActive}`
       );
 
       await sidepanelPage.close();

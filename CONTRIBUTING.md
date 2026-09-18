@@ -46,10 +46,10 @@ Dự án trang bị hệ thống kiểm thử tự động toàn diện trên tr
 # 1. Kiểm tra cú pháp (Syntax & Lint Check trên toàn bộ 25+ tệp mã nguồn)
 npm run lint
 
-# 2. Chạy bộ kiểm thử 14 tính năng cốt lõi của Extension (DOM, Chuột ảo, CDP, Inspector, Eyedropper, Screenshot)
+# 2. Chạy bộ kiểm thử 15 tính năng cốt lõi của Extension (DOM, Chuột ảo, CDP, Inspector, Eyedropper, Screenshot)
 npm test
 
-# 3. Chạy bộ kiểm thử kết nối AI Agent & 27 kịch bản điều khiển qua cổng 58765
+# 3. Chạy bộ kiểm thử kết nối AI Agent & 29 kịch bản điều khiển qua cổng 58765
 npm run test:agent
 
 # 4. Kiểm thử độc lập lớp lọc Secret & API Key Redaction
@@ -69,7 +69,7 @@ Dự án được phân tách theo mô hình module hóa sạch (Clean Modular A
 - **`extensions/background/`**: Dịch vụ nền Manifest V3 (Service Worker). Chứa các module chuyên biệt: `cdp-manager.js`, `tab-manager.js`, `secret-sanitizer.js`, `screenshot-service.js`, `batch-executor.js`, `bridge-client.js`.
 - **`extensions/content/`**: Tương tác DOM trực tiếp: `toast.js`, `lock-shield.js`, `cursor-simulator.js`, `dom-inspector.js`, `eyedropper.js`.
 - **`extensions/sidepanel/`**: Giao diện người dùng Side Panel: `ui-helpers.js`, `agent-monitor.js`, `inspector-panel.js`, `screenshot-panel.js`.
-- **`mcp/agent-pilot/`**: Nguồn chân lý duy nhất (Single Source of Truth - SSOT) định nghĩa 16 công cụ Model Context Protocol. Nếu bạn thêm hoặc chỉnh sửa công cụ MCP, hãy cập nhật trong `cli/mcp.go` rồi chạy `npm run export:mcp` để tự động đồng bộ.
+- **`mcp/agent-pilot/`**: Nguồn chân lý duy nhất (Single Source of Truth - SSOT) định nghĩa 35 công cụ Model Context Protocol. Nếu bạn thêm hoặc chỉnh sửa công cụ MCP, hãy cập nhật trong `cli/mcp.go` rồi chạy `npm run export:mcp` để tự động đồng bộ.
 
 ---
 

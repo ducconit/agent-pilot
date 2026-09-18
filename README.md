@@ -36,7 +36,7 @@
 | **Giám sát DevTools (CDP)** | ⚡ | Kết nối cấp thấp qua Chrome DevTools Protocol để bắt trọn `console.log/error`, `Network traffic` và `Performance RAM/DOM`. |
 | **Soi & Lấy vị trí DOM** | 🎯 | Bắt dính phần tử khi hover, hiển thị kích thước `W × H`, tọa độ `(X, Y)`, trích xuất **CSS Selector** và **XPath**. |
 | **Trích xuất Mã màu** | 🎨 | Kính lúp pixel nhặt màu chính xác 5 định dạng (HEX, RGB, RGBA, HSL, OKLCH), 1-click copy từng định dạng và lưu khay lịch sử màu sắc. |
-| **Bộ Chụp Màn Hình** | 📸 | Hỗ trợ 3 chế độ: Chụp toàn khung nhìn, Kéo chọn vùng cắt tùy ý (Crop), và Chụp riêng phần tử DOM đã khóa. |
+| **Bộ Chụp Màn Hình** | 📸 | Hỗ trợ 4 chế độ (`visible`, `region`, `element`, `full`): Chụp toàn khung nhìn, Kéo chọn vùng cắt tùy ý (Crop), Chụp riêng phần tử DOM đã khóa, và Chụp toàn trang cuộn (Full Page). |
 | **Chú Thích & Chỉ Điểm UI** | ✏️ | Khoanh vùng, chỉ điểm phần tử/component nguồn (React/Vue/Astro:line), ghim ghi chú lỗi để giao việc cho AI Agent sửa code (hỗ trợ 3 kênh Live Push, Persistent Inbox, Clipboard Prompt). |
 | **Tương thích Antigravity** | 🤖 | Tích hợp sẵn bộ chạy kịch bản **JSON Action**, cầu nối `window.__AGENT_PILOT__` và 35 công cụ MCP Tools. |
 
@@ -64,9 +64,12 @@ agent-pilot-extension/
 │   ├── main.go                         # Điểm khởi đầu & phân luồng subcommands (mcp, server, click, type,...)
 │   ├── bridge.go                       # WebSocket Server 58765 & HTTP REST API nhúng
 │   ├── client.go                       # Trình điều khiển trực tiếp qua CLI cho Tester/QC
-│   ├── mcp.go                          # Máy chủ MCP chuẩn 16 công cụ qua giao thức stdio
+│   ├── mcp.go                          # Máy chủ MCP chuẩn 35 công cụ qua giao thức stdio
 │   ├── sanitizer.go                    # Lớp che giấu Secret/API Key bảo mật
 │   ├── feedback.go                     # Quản lý Hộp thư Feedback Inbox & Waiter
+│   ├── service.go                      # Quản lý service chạy ngầm (systemd / launchd / Task Scheduler)
+│   ├── skill_install.go                # Cài Agent Skill trực tiếp từ binary (không cần clone repo)
+│   ├── skill_assets.go                 # Kỹ năng nhúng sẵn dạng base64 (sinh bởi scripts/embed_skills.mjs)
 │   └── README.md                       # Hướng dẫn sử dụng & biên dịch Go binary
 
 ├── extensions/                         # Toàn bộ mã nguồn Chrome Extension (Manifest V3)
@@ -113,23 +116,26 @@ agent-pilot-extension/
 │   ├── popup.js                        # Xử lý sự kiện popup
 │   ├── popup.css
 │   └── icons/                          # Bộ icon nhận diện chuẩn các kích thước
-├── cli/                                # Công cụ Golang Standalone CLI & MCP Server
-│   ├── main.go                         # Điểm vào CLI & bộ định tuyến subcommand
-│   ├── mcp.go                          # Máy chủ MCP Stdio JSON-RPC & trích xuất Schema
-│   ├── bridge.go                       # WebSocket Bridge & HTTP REST API Gateway
-│   ├── commands.go                     # Xử lý lệnh trực tiếp click, type, screenshot, v.v.
-│   └── feedback.go                     # Quản lý lưu trữ & reactive wait feedback
-├── mcp/agent-pilot/                    # 16 tệp lược đồ chuẩn Single Source of Truth (SSOT)
+├── mcp/agent-pilot/                    # 35 tệp lược đồ chuẩn Single Source of Truth (SSOT)
 ├── scripts/                            # Bộ công cụ build, test, pack & sync cross-platform
 │   ├── browser_resolver.mjs            # Tự động tìm kiếm Chrome/Chromium/Edge/Brave đa nền tảng
-│   ├── export_mcp_schemas.mjs          # Trích xuất schema MCP tự động
-│   ├── pack_extension.mjs              # Đóng gói tiện ích ra file ZIP release
+│   ├── embed_skills.mjs                # Nhúng kỹ năng vào CLI Go dạng base64 (cli/skill_assets.go)
+│   ├── export_mcp_schemas.mjs          # Trích xuất schema MCP tự động (SSOT)
+│   ├── pack_extension.mjs              # Đóng gói tiện ích ra ZIP release (có kiểm tra manifest)
 │   ├── run_test.mjs                    # Bộ chạy test tự động Windows/macOS/Linux
 │   ├── sync_agk.mjs                    # Đồng bộ sang plugin AGK Antigravity
 │   ├── verify_all_features.mjs         # Bộ kiểm thử 15 tính năng cốt lõi trên trình duyệt thật
 │   ├── verify_agent_connection.mjs     # Bộ kiểm thử 29 tính năng kết nối & điều khiển Agent
+│   ├── verify_annotator_tools.mjs      # Bộ kiểm thử chuyển đổi công cụ Annotator & kéo khung
 │   ├── verify_feedback_system.mjs      # Bộ kiểm thử hệ thống Feedback Channel B & Channel A
-│   └── verify_secret_sanitizer.mjs     # Bộ kiểm thử 19 kịch bản lọc che giấu Secret/API Key
+│   ├── verify_feedback_edit_delete.mjs # Bộ kiểm thử sửa & xóa feedback (in-page + Side Panel)
+│   ├── verify_feedback_item_xss.mjs    # Bộ kiểm thử kháng XSS cho nội dung feedback
+│   ├── verify_pinned_regions.mjs       # Bộ kiểm thử ghim vùng chọn & đa vùng trực quan
+│   ├── verify_secret_sanitizer.mjs     # Bộ kiểm thử 19 kịch bản lọc che giấu Secret/API Key
+│   ├── verify_session_lifecycle.mjs    # Bộ kiểm thử vòng đời phiên điều khiển của Agent
+│   ├── agent-pilot.service             # Unit systemd --user mẫu (Linux)
+│   ├── com.agentpilot.bridge.plist     # Cấu hình launchd User Agent mẫu (macOS)
+│   └── install_windows_service.ps1     # Script đăng ký Task Scheduler mẫu (Windows)
 ├── test-page.html                      # Trang web tương tác phục vụ kiểm thử tức thì
 └── README.md                           # Tài liệu giới thiệu dự án
 ```
@@ -171,7 +177,7 @@ Sau đó nạp thư mục `extensions/` trực tiếp vào `chrome://extensions`
 
 ### 2. Cài Đặt Standalone Go CLI & MCP Server (`agent-pilot`)
 
-Bản binary độc lập viết bằng **Golang** tích hợp sẵn máy chủ **WebSocket/REST Bridge Server (cổng 58765)**, **MCP Server (stdio)** và **bộ lệnh CLI** điều khiển trình duyệt trực tiếp (khởi động `<5ms`, RAM `~12MB`, đóng gói tĩnh pure static `CGO_ENABLED=0`, không phụ thuộc Node.js hay thư viện hệ thống).
+Bản binary độc lập viết bằng **Golang** tích hợp sẵn máy chủ **WebSocket/REST Bridge Server (cổng 58765)**, **MCP Server (stdio)** và **bộ lệnh CLI** điều khiển trình duyệt trực tiếp (khởi động `<5ms`, RAM `~12MB` — số liệu tham khảo, có thể thay đổi theo nền tảng, đóng gói tĩnh pure static `CGO_ENABLED=0`, không phụ thuộc Node.js hay thư viện hệ thống).
 
 #### Cách A: Tải Binary Biên Dịch Sẵn (GitHub Releases)
 Tải binary tương ứng với hệ điều hành và kiến trúc máy tính của bạn:
@@ -343,7 +349,7 @@ agent-pilot skill install --path ~/my-skills --force
 
 Dự án có sẵn tệp `test-page.html` được thiết kế đặc biệt để bạn kiểm nghiệm toàn bộ các tính năng ngay lập tức mà không cần internet:
 
-1. Kéo thả tệp `test-page.html` vào trình duyệt Chrome (hoặc mở bằng URL `file:///home/ubuntu/workspace/projects/browser-control/test-page.html`).
+1. Kéo thả tệp `test-page.html` vào trình duyệt Chrome (hoặc mở bằng URL `file:///path/to/browser-control/test-page.html`).
 2. Mở **Agent Pilot Side Panel**:
    - Thử nghiệm **Chuột ảo**: Di chuyển chuột đến nút *"🎯 Click vào đây!"* và nhấp click.
    - Thử nghiệm **Tự động gõ chữ**: Điền nội dung vào ô `#test-search-input`.
