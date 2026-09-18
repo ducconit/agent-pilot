@@ -239,4 +239,3 @@ func TestWaitForFeedbackContextCancellation(t *testing.T) {
 		t.Fatalf("WaitForFeedbackWithContext did not abort on context cancellation")
 	}
 }
-

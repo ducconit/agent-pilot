@@ -1,7 +1,13 @@
+// feedback.go handles feedback persistence: where sessions are stored, how an
+// incoming payload is turned into an on-disk session directory (session.json +
+// prompt.md + per-item PNG/JPEG images) and how pending sessions are listed or
+// archived.
+//
+// The reactive long-poll side (Channel A) lives in feedback_waiter.go.
+
 package main
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,22 +16,21 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
 type FeedbackItem struct {
-	ID                 string                 `json:"id"`
-	Mode               string                 `json:"mode"`
-	Title              string                 `json:"title"`
-	Comment            string                 `json:"comment"`
-	DOM                map[string]interface{} `json:"dom,omitempty"`
-	Component          map[string]interface{} `json:"component,omitempty"`
-	Clip               map[string]interface{} `json:"clip,omitempty"`
-	Annotations        []interface{}          `json:"annotations,omitempty"`
-	ScreenshotDataURL  string                 `json:"screenshotDataUrl,omitempty"`
-	ImageFile          string                 `json:"imageFile,omitempty"`
-	ImagePath          string                 `json:"imagePath,omitempty"`
+	ID                string                 `json:"id"`
+	Mode              string                 `json:"mode"`
+	Title             string                 `json:"title"`
+	Comment           string                 `json:"comment"`
+	DOM               map[string]interface{} `json:"dom,omitempty"`
+	Component         map[string]interface{} `json:"component,omitempty"`
+	Clip              map[string]interface{} `json:"clip,omitempty"`
+	Annotations       []interface{}          `json:"annotations,omitempty"`
+	ScreenshotDataURL string                 `json:"screenshotDataUrl,omitempty"`
+	ImageFile         string                 `json:"imageFile,omitempty"`
+	ImagePath         string                 `json:"imagePath,omitempty"`
 }
 
 type FeedbackSession struct {
@@ -37,30 +42,19 @@ type FeedbackSession struct {
 	Items     []FeedbackItem `json:"items"`
 }
 
-type FeedbackWaiter struct {
-	ID      string
-	TabID   interface{}
-	Channel chan map[string]interface{}
-	Timer   *time.Timer
-}
-
-var (
-	waitersLock    sync.Mutex
-	pendingWaiters []*FeedbackWaiter
-)
-
-const maxFeedbackWaiters = 32
-
+// GetFeedbackStorageDir resolves the feedback inbox directory. AGENT_PILOT_HOME
+// overrides the root (used by tests and custom installs); otherwise the default
+// ~/.agent-pilot/inbox/feedback is used.
 func GetFeedbackStorageDir() string {
-	customHome := os.Getenv("AGENT_PILOT_HOME")
+	customHome := os.Getenv(feedbackHomeEnvVar)
 	if customHome != "" {
-		return filepath.Join(customHome, "inbox", "feedback")
+		return filepath.Join(customHome, feedbackInboxDirName, feedbackDirName)
 	}
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		userHome = "."
 	}
-	return filepath.Join(userHome, ".agent-pilot", "inbox", "feedback")
+	return filepath.Join(userHome, feedbackDefaultDirName, feedbackInboxDirName, feedbackDirName)
 }
 
 func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}, error) {
@@ -94,7 +88,7 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 		sessionDir = filepath.Join(storageDir, ts)
 	}
 
-	if err := os.MkdirAll(sessionDir, 0700); err != nil {
+	if err := os.MkdirAll(sessionDir, feedbackDirPerm); err != nil {
 		return nil, err
 	}
 
@@ -150,7 +144,7 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 				imageFileName = fmt.Sprintf("item_%d.%s", itemNum, ext)
 				imageAbsolutePath = filepath.Join(sessionDir, imageFileName)
 				if imgBytes, err := base64.StdEncoding.DecodeString(parts[1]); err == nil {
-					if writeErr := os.WriteFile(imageAbsolutePath, imgBytes, 0600); writeErr != nil {
+					if writeErr := os.WriteFile(imageAbsolutePath, imgBytes, feedbackFilePerm); writeErr != nil {
 						imageErrors++
 						imageFileName = ""
 						imageAbsolutePath = ""
@@ -193,7 +187,7 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize feedback session: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(sessionDir, "session.json"), metaBytes, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(sessionDir, "session.json"), metaBytes, feedbackFilePerm); err != nil {
 		return nil, fmt.Errorf("failed to write feedback session: %w", err)
 	}
 
@@ -256,7 +250,7 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 		promptMD = sb.String()
 	}
 
-	if err := os.WriteFile(filepath.Join(sessionDir, "prompt.md"), []byte(promptMD), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(sessionDir, "prompt.md"), []byte(promptMD), feedbackFilePerm); err != nil {
 		return nil, fmt.Errorf("failed to write feedback prompt: %w", err)
 	}
 
@@ -302,7 +296,7 @@ func GetPendingFeedback(limit int, sessionID string, clear bool) (map[string]int
 	})
 
 	if limit <= 0 {
-		limit = 10
+		limit = defaultFeedbackListLimit
 	}
 
 	var targetIDs []string
@@ -317,7 +311,7 @@ func GetPendingFeedback(limit int, sessionID string, clear bool) (map[string]int
 	}
 
 	sessions := make([]map[string]interface{}, 0)
-	archiveDir := filepath.Join(filepath.Dir(storageDir), "feedback_archive")
+	archiveDir := filepath.Join(filepath.Dir(storageDir), feedbackArchiveDirName)
 
 	for _, id := range targetIDs {
 		sDir := filepath.Join(storageDir, id)
@@ -337,7 +331,7 @@ func GetPendingFeedback(limit int, sessionID string, clear bool) (map[string]int
 		sessions = append(sessions, meta)
 
 		if clear {
-			_ = os.MkdirAll(archiveDir, 0700)
+			_ = os.MkdirAll(archiveDir, feedbackDirPerm)
 			_ = os.Rename(sDir, filepath.Join(archiveDir, id))
 		}
 	}
@@ -348,96 +342,4 @@ func GetPendingFeedback(limit int, sessionID string, clear bool) (map[string]int
 		"sessions":      sessions,
 		"feedbackDir":   storageDir,
 	}, nil
-}
-
-func WaitForFeedbackWithContext(ctx context.Context, timeoutSec int, tabID interface{}) map[string]interface{} {
-	if timeoutSec <= 0 {
-		timeoutSec = 120
-	}
-	waiterID := fmt.Sprintf("wait_%d", time.Now().UnixNano())
-	ch := make(chan map[string]interface{}, 1)
-
-	timer := time.NewTimer(time.Duration(timeoutSec) * time.Second)
-	defer timer.Stop()
-
-	waiter := &FeedbackWaiter{
-		ID:      waiterID,
-		TabID:   tabID,
-		Channel: ch,
-		Timer:   timer,
-	}
-
-	waitersLock.Lock()
-	if len(pendingWaiters) >= maxFeedbackWaiters {
-		waitersLock.Unlock()
-		return map[string]interface{}{
-			"success": false,
-			"error":   fmt.Sprintf("Too many concurrent feedback waiters (max %d); try again later", maxFeedbackWaiters),
-		}
-	}
-	pendingWaiters = append(pendingWaiters, waiter)
-	waitersLock.Unlock()
-
-	removeWaiter := func() {
-		waitersLock.Lock()
-		var rem []*FeedbackWaiter
-		for _, w := range pendingWaiters {
-			if w.ID != waiterID {
-				rem = append(rem, w)
-			}
-		}
-		pendingWaiters = rem
-		waitersLock.Unlock()
-	}
-
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	select {
-	case res := <-ch:
-		return res
-	case <-ctx.Done():
-		removeWaiter()
-		return map[string]interface{}{
-			"success": false,
-			"error":   "Request canceled by client",
-		}
-	case <-timer.C:
-		removeWaiter()
-		// Drain a payload delivered at the same instant the timer fired so a
-		// successful delivery is never reported as a timeout.
-		select {
-		case res := <-ch:
-			return res
-		default:
-		}
-		return map[string]interface{}{
-			"success": false,
-			"timeout": true,
-			"message": fmt.Sprintf("Timed out waiting for feedback after %ds", timeoutSec),
-		}
-	}
-}
-
-func WaitForFeedback(timeoutSec int, tabID interface{}) map[string]interface{} {
-	return WaitForFeedbackWithContext(context.Background(), timeoutSec, tabID)
-}
-
-func CheckAndNotifyFeedbackWaiters(data map[string]interface{}) {
-	waitersLock.Lock()
-	defer waitersLock.Unlock()
-
-	for _, w := range pendingWaiters {
-		w.Timer.Stop()
-		payload := make(map[string]interface{}, len(data)+2)
-		for k, v := range data {
-			payload[k] = v
-		}
-		payload["success"] = true
-		payload["delivered"] = true
-		payload["channel"] = "reactive_channel_a"
-		w.Channel <- payload
-	}
-	pendingWaiters = nil
 }

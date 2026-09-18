@@ -10,12 +10,8 @@ import (
 	"strings"
 )
 
-const (
-	serverSubcommand = "server"
-	serviceNameLinux = "agent-pilot.service"
-	plistNameDarwin  = "com.agentpilot.bridge.plist"
-	taskNameWindows  = "AgentPilotBridge"
-)
+// The service identifiers (serverSubcommand, serviceNameLinux, plistNameDarwin,
+// taskNameWindows) are defined in config.go alongside the other shared constants.
 
 // CommandRunner abstracts command execution for testability
 type CommandRunner func(name string, args ...string) (string, error)
