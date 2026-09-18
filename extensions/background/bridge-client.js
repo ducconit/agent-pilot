@@ -15,7 +15,7 @@ import {
   setSecretFilterEnabled,
   logDebug
 } from "./constants.js";
-import { sanitizeData } from "./secret-sanitizer.js";
+import { sanitizeData, sanitizeDataWithMeta, AGENT_SECURITY_NOTICE } from "./secret-sanitizer.js";
 import {
   attachDebugger,
   detachDebugger,
@@ -65,6 +65,8 @@ export class AgentBridgeClient {
     this.enabled = true;
     this.lastAgentTabId = null;
     this.broadcastFn = broadcastFn;
+    this.outboundQueue = [];
+    this.maxQueueSize = 100;
 
     // Listen for window focus changes to update active target in multi-window setups
     if (chrome.windows && chrome.windows.onFocusChanged) {
@@ -113,6 +115,7 @@ export class AgentBridgeClient {
     const p = Number(newPort);
     if (p > 0 && p < 65536) {
       this.port = p;
+      this.reconnectDelay = 2000;
       if (chrome.storage && chrome.storage.local) {
         chrome.storage.local.set({ agent_port: this.port });
       }
@@ -189,6 +192,8 @@ export class AgentBridgeClient {
             }
           });
         }
+
+        this.flushOutboundQueue();
       };
 
       ws.onmessage = async (event) => {
@@ -235,11 +240,23 @@ export class AgentBridgeClient {
 
   scheduleReconnect() {
     if (!this.enabled || this.reconnectTimer) return;
+    const jitter = Math.floor(this.reconnectDelay * 0.2 * Math.random());
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, this.maxReconnectDelay);
       this.connect();
-    }, this.reconnectDelay);
+    }, this.reconnectDelay + jitter);
+  }
+
+  /**
+   * Reconnect request coming from tab lifecycle events: respects any pending
+   * backoff timer instead of cancelling it, so tab activity cannot storm the bridge.
+   */
+  requestReconnect() {
+    if (!this.enabled || this.connected) return;
+    if (this.ws && this.ws.readyState === WebSocket.CONNECTING) return;
+    if (this.reconnectTimer) return;
+    this.connect();
   }
 
   clearReconnect() {
@@ -256,6 +273,24 @@ export class AgentBridgeClient {
       } catch (e) {
         console.warn("[AgentPilot] Failed to send over websocket:", e);
       }
+      return;
+    }
+
+    // Socket not ready: keep a bounded queue so async responses are not silently lost
+    if (!this.enabled) return;
+    if (this.outboundQueue.length >= this.maxQueueSize) {
+      this.outboundQueue.shift();
+      console.warn("[AgentPilot] Outbound queue full; dropped oldest message");
+    }
+    this.outboundQueue.push(data);
+  }
+
+  flushOutboundQueue() {
+    if (!this.outboundQueue.length) return;
+    const queued = this.outboundQueue;
+    this.outboundQueue = [];
+    for (const item of queued) {
+      this.send(item);
     }
   }
 
@@ -356,15 +391,35 @@ export class AgentBridgeClient {
     const respond = (result, error = null) => {
       if (!id) return;
       const isFilterActive = getSecretFilterEnabled();
-      const sanitizedResult = (error || result === undefined || result === null)
-        ? result
-        : sanitizeData(result, isFilterActive);
+      let sanitizedResult = result;
+      let maskedCount = 0;
+      let maskedTypes = [];
+
+      if (result !== undefined && result !== null) {
+        const sanitized = sanitizeDataWithMeta(result, isFilterActive);
+        sanitizedResult = sanitized.data;
+        maskedCount = sanitized.maskedCount;
+        maskedTypes = sanitized.types;
+      }
+
+      let sanitizedError = error ? (error.message || String(error)) : null;
+      if (sanitizedError && isFilterActive) {
+        const sanitizedErr = sanitizeDataWithMeta(sanitizedError, true);
+        if (typeof sanitizedErr.data === "string") {
+          sanitizedError = sanitizedErr.data;
+        }
+      }
 
       this.send({
         id,
         result: error ? undefined : sanitizedResult,
-        error: error ? (error.message || String(error)) : null,
-        secretFilterEnabled: isFilterActive
+        error: sanitizedError,
+        secretFilterEnabled: isFilterActive,
+        ...(maskedCount > 0 ? {
+          securityNotice: AGENT_SECURITY_NOTICE,
+          maskedCount,
+          maskedTypes
+        } : {})
       });
 
       if (typeof this.broadcastFn === "function") {
@@ -1015,7 +1070,7 @@ export class AgentBridgeClient {
 
           // Auto attach debugger if not attached
           if (!attachedTabs.has(tabId)) {
-            await attachDebugger(tabId, this.broadcast).catch((err) => {
+            await attachDebugger(tabId, this.broadcastFn).catch((err) => {
               console.warn("[AgentPilot] Auto attach debugger failed:", err);
             });
           }
@@ -1341,12 +1396,24 @@ export class AgentBridgeClient {
       }
       throw new Error(data?.error || "Bridge server returned failure");
     } catch (err) {
-      // Fallback to chrome.storage.local
+      // Fallback to chrome.storage.local (sanitized, bounded to 10 most recent sessions)
       const timestamp = String(payload?.timestamp || Date.now());
       const key = `ap_feedback_${timestamp}`;
+      const sanitizedPayload = sanitizeData(payload, getSecretFilterEnabled());
       await new Promise((resolve) => {
         if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-          chrome.storage.local.set({ [key]: payload }, resolve);
+          chrome.storage.local.set({ [key]: sanitizedPayload }, () => {
+            chrome.storage.local.get(null, (all) => {
+              const feedbackKeys = Object.keys(all || {}).filter((k) => k.startsWith("ap_feedback_"));
+              if (feedbackKeys.length > 10) {
+                feedbackKeys.sort();
+                const excess = feedbackKeys.slice(0, feedbackKeys.length - 10);
+                chrome.storage.local.remove(excess, () => resolve());
+              } else {
+                resolve();
+              }
+            });
+          });
         } else {
           resolve();
         }

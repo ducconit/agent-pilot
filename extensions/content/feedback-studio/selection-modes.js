@@ -6,8 +6,13 @@
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
   window.__AP_INTERNAL__.feedbackStudio = window.__AP_INTERNAL__.feedbackStudio || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.fsSelection) return;
+  window.__AP_INTERNAL__.__guards.fsSelection = true;
+
   const constants = window.__AP_INTERNAL__.feedbackStudio.constants || {};
   const showToast = constants.showToast || (() => {});
+  const escapeHtml = constants.escapeHtml || ((s) => s);
 
   // =========================================================================
   // DOM Elements Setup (Highlighter, Tooltip, Crop Overlay)
@@ -179,7 +184,7 @@
       }
     } catch (err) {
       if (pinned?.hideDraftBox) pinned.hideDraftBox();
-      showToast("❌ Lỗi chụp ảnh: " + err.message);
+      showToast("❌ Lỗi chụp ảnh: " + escapeHtml(err.message));
     }
   }
 
@@ -288,7 +293,7 @@
       }
     } catch (err) {
       if (pinned?.hideDraftBox) pinned.hideDraftBox();
-      showToast("❌ Lỗi chụp vùng chọn: " + err.message);
+      showToast("❌ Lỗi chụp vùng chọn: " + escapeHtml(err.message));
     }
   }
 
@@ -306,7 +311,7 @@
         modals.openAnnotatorModal("screen", "Toàn màn hình (Viewport)", shot);
       }
     } catch (err) {
-      showToast("❌ Lỗi chụp màn hình: " + err.message);
+      showToast("❌ Lỗi chụp màn hình: " + escapeHtml(err.message));
     }
   }
 
@@ -320,7 +325,7 @@
         modals.openAnnotatorModal("fullpage", "Toàn bộ trang web (Full Page)", shot);
       }
     } catch (err) {
-      showToast("❌ Lỗi chụp toàn trang: " + err.message);
+      showToast("❌ Lỗi chụp toàn trang: " + escapeHtml(err.message));
     }
   }
 

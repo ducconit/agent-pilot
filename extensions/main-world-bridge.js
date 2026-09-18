@@ -16,7 +16,7 @@
     } else if (timeoutMs <= 0) {
       timeoutMs = 5000;
     }
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const reqId = "ap_" + Math.random().toString(36).substr(2, 9);
       const timer = setTimeout(() => {
         window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
@@ -26,7 +26,11 @@
         if (e.detail && e.detail.reqId === reqId) {
           clearTimeout(timer);
           window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
-          resolve(e.detail.result);
+          if (e.detail.error) {
+            reject(new Error(String(e.detail.error)));
+          } else {
+            resolve(e.detail.result);
+          }
         }
       }
       window.addEventListener("__AGENT_PILOT_RESP__", onResponse);
@@ -41,7 +45,7 @@
     : "1.0.1-beta";
 
   window.__AGENT_PILOT__ = window.__AGENT_PILOT__ || {};
-  Object.assign(window.__AGENT_PILOT__, {
+  const pageApi = {
     version: EXTENSION_VERSION,
     moveMouse: (x, y, duration) => sendBridgeRequest("virtual_mouse_move", { x, y, duration }),
     click: (x, y) => sendBridgeRequest("virtual_mouse_click", { x, y }),
@@ -59,10 +63,16 @@
     startElementSnap: () => sendBridgeRequest("start_element_snap", {}),
     stopElementSnap: () => sendBridgeRequest("stop_element_snap", {}),
     isElementSnapActive: () => sendBridgeRequest("is_element_snap_active", {}),
+    startRegionCrop: () => sendBridgeRequest("start_region_crop", {}),
+    getLockedElement: () => sendBridgeRequest("get_locked_element", {}),
     pickColor: (x, y) => sendBridgeRequest("pick_color", { x, y }),
     stopEyedropper: () => sendBridgeRequest("stop_eyedropper", {}),
     isEyedropperActive: () => sendBridgeRequest("is_eyedropper_active", {}),
     getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {}),
+    isBusy: () => sendBridgeRequest("is_busy", {}),
+    isAgentTab: () => sendBridgeRequest("is_agent_tab", {}),
+    setAgentTab: (enabled) => sendBridgeRequest("set_agent_tab", { enabled }),
+    setBusy: (busy, action) => sendBridgeRequest("set_busy", { busy, action }),
     startFeedbackStudio: () => sendBridgeRequest("start_feedback_studio", {}),
     stopFeedbackStudio: () => sendBridgeRequest("stop_feedback_studio", {}),
     isFeedbackStudioActive: () => sendBridgeRequest("is_feedback_studio_active", {}),
@@ -70,8 +80,16 @@
     addFeedbackItem: (item) => sendBridgeRequest("add_feedback_item", { item }),
     clearFeedbackItems: () => sendBridgeRequest("clear_feedback_items", {}),
     copyFeedbackPrompt: () => sendBridgeRequest("copy_feedback_prompt", {}),
-    generateFeedbackPrompt: (items) => sendBridgeRequest("generate_feedback_prompt", { items })
-  });
+    generateFeedbackPrompt: (items) => sendBridgeRequest("generate_feedback_prompt", { items }),
+    saveFeedbackToInbox: () => sendBridgeRequest("save_feedback_inbox", {}),
+    pushFeedbackToAgent: () => sendBridgeRequest("push_feedback_agent", {})
+  };
+
+  for (const [name, fn] of Object.entries(pageApi)) {
+    if (typeof window.__AGENT_PILOT__[name] === "undefined") {
+      window.__AGENT_PILOT__[name] = fn;
+    }
+  }
 
   // =========================================================================
   // Framework Component Source Introspection (React, Vue, Astro, Svelte)

@@ -15,34 +15,123 @@ import {
   logDebug
 } from "./constants.js";
 
+function cleanupDebuggerState(tabId) {
+  attachedTabs.delete(tabId);
+  devtoolsBuffers.delete(tabId);
+  activeTracingSessions.delete(tabId);
+  activeDialogs.delete(tabId);
+}
+
+async function enableCdpDomains(tabId) {
+  try {
+    await Promise.all([
+      sendCdpCommand(tabId, "Console.enable", {}, 2500).catch((e) => logDebug("Console.enable", e)),
+      sendCdpCommand(tabId, "Runtime.enable", {}, 2500).catch((e) => logDebug("Runtime.enable", e)),
+      sendCdpCommand(tabId, "Network.enable", {}, 2500).catch((e) => logDebug("Network.enable", e)),
+      sendCdpCommand(tabId, "Performance.enable", {}, 2500).catch((e) => logDebug("Performance.enable", e)),
+      sendCdpCommand(tabId, "Page.enable", {}, 2500).catch((e) => logDebug("Page.enable", e)),
+      sendCdpCommand(tabId, "DOM.enable", {}, 2500).catch((e) => logDebug("DOM.enable", e))
+    ]);
+  } catch (err) {
+    console.warn("[AgentPilot] Error enabling CDP domains:", err);
+  }
+}
+
+// Raw probe that bypasses the attachedTabs bookkeeping: returns true when THIS
+// extension still owns a live debugger session for the tab.
+function probeOwnedDebuggerSession(tabId, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (owned) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(owned);
+    };
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    try {
+      chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", { expression: "1", returnByValue: true }, () => {
+        finish(!chrome.runtime.lastError);
+      });
+    } catch (_) {
+      finish(false);
+    }
+  });
+}
+
+let reconcilePromise = null;
+
+/**
+ * Reconcile in-memory CDP bookkeeping with the browser after a service-worker restart.
+ * Attached sessions survive SW eviction, but our maps do not, which previously made
+ * re-attach fail with "Another debugger is already attached" indefinitely.
+ */
+export async function reconcileDebuggerState() {
+  if (reconcilePromise) return reconcilePromise;
+  reconcilePromise = (async () => {
+    try {
+      const targets = await new Promise((resolve) => {
+        try {
+          chrome.debugger.getTargets((result) => resolve(Array.isArray(result) ? result : []));
+        } catch (_) {
+          resolve([]);
+        }
+      });
+      for (const target of targets) {
+        if (!target || !target.attached) continue;
+        if (target.tabId === undefined || target.tabId === null || target.tabId < 0) continue;
+        if (attachedTabs.has(target.tabId)) continue;
+        const owned = await probeOwnedDebuggerSession(target.tabId);
+        if (owned) {
+          attachedTabs.add(target.tabId);
+          getBuffer(target.tabId);
+          await enableCdpDomains(target.tabId);
+          logDebug("reconcileDebuggerState adopted tab", target.tabId);
+        }
+      }
+    } catch (err) {
+      logDebug("reconcileDebuggerState", err);
+    }
+  })();
+  return reconcilePromise;
+}
+
 /**
  * Attach Chrome DevTools Protocol (CDP) to a tab
  */
 export async function attachDebugger(tabId, broadcastFn = null) {
   if (attachedTabs.has(tabId)) return { success: true, message: "Already attached" };
 
+  await reconcileDebuggerState();
+  if (attachedTabs.has(tabId)) {
+    return { success: true, message: "Reconciled existing session", reconciled: true };
+  }
+
   return new Promise((resolve) => {
     chrome.debugger.attach({ tabId }, CDP_PROTOCOL_VERSION, async () => {
       if (chrome.runtime.lastError) {
-        resolve({ success: false, error: chrome.runtime.lastError.message });
+        const errorMessage = chrome.runtime.lastError.message || "Failed to attach debugger";
+        if (/already attached/i.test(errorMessage)) {
+          // Might be our own session surviving a service-worker restart
+          const owned = await probeOwnedDebuggerSession(tabId);
+          if (owned) {
+            attachedTabs.add(tabId);
+            getBuffer(tabId);
+            await enableCdpDomains(tabId);
+            if (typeof broadcastFn === "function") {
+              broadcastFn({ type: "DEBUGGER_STATUS_CHANGED", tabId, attached: true, reconciled: true });
+            }
+            resolve({ success: true, tabId, reconciled: true });
+            return;
+          }
+        }
+        resolve({ success: false, error: errorMessage });
         return;
       }
+
       attachedTabs.add(tabId);
       getBuffer(tabId);
-
-      // Enable CDP domains concurrently
-      try {
-        await Promise.all([
-          sendCdpCommand(tabId, "Console.enable", {}, 2500).catch((e) => logDebug("Console.enable", e)),
-          sendCdpCommand(tabId, "Runtime.enable", {}, 2500).catch((e) => logDebug("Runtime.enable", e)),
-          sendCdpCommand(tabId, "Network.enable", {}, 2500).catch((e) => logDebug("Network.enable", e)),
-          sendCdpCommand(tabId, "Performance.enable", {}, 2500).catch((e) => logDebug("Performance.enable", e)),
-          sendCdpCommand(tabId, "Page.enable", {}, 2500).catch((e) => logDebug("Page.enable", e)),
-          sendCdpCommand(tabId, "DOM.enable", {}, 2500).catch((e) => logDebug("DOM.enable", e))
-        ]);
-      } catch (err) {
-        console.warn("[AgentPilot] Error enabling CDP domains:", err);
-      }
+      await enableCdpDomains(tabId);
 
       if (typeof broadcastFn === "function") {
         broadcastFn({
@@ -64,10 +153,14 @@ export async function detachDebugger(tabId, broadcastFn = null) {
   if (!attachedTabs.has(tabId)) return { success: true };
   return new Promise((resolve) => {
     chrome.debugger.detach({ tabId }, () => {
-      attachedTabs.delete(tabId);
-      devtoolsBuffers.delete(tabId);
-      activeTracingSessions.delete(tabId);
-      activeDialogs.delete(tabId);
+      if (chrome.runtime.lastError) {
+        const errorMessage = chrome.runtime.lastError.message || "Failed to detach debugger";
+        if (!/not attached|no debugger/i.test(errorMessage)) {
+          resolve({ success: false, error: errorMessage });
+          return;
+        }
+      }
+      cleanupDebuggerState(tabId);
       if (typeof broadcastFn === "function") {
         broadcastFn({
           type: "DEBUGGER_STATUS_CHANGED",

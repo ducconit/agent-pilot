@@ -6,6 +6,10 @@
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
   window.__AP_INTERNAL__.feedbackStudio = window.__AP_INTERNAL__.feedbackStudio || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.fsHud) return;
+  window.__AP_INTERNAL__.__guards.fsHud = true;
+
   // 1. Create Floating HUD Toolbar DOM Element
   const hud = document.createElement("div");
   hud.id = "agent-pilot-feedback-hud";

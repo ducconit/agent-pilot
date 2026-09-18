@@ -40,6 +40,7 @@
         "content/dom-inspector.js",
         "content/eyedropper.js",
         "content/feedback-studio/constants.js",
+        "content/feedback-studio/item-schema.js",
         "content/feedback-studio/state.js",
         "content/feedback-studio/capture-service.js",
         "content/feedback-studio/pinned-overlay.js",
@@ -73,6 +74,14 @@
     "clipboardWrite",
     "management"
   ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+P",
+        "mac": "Command+Shift+P"
+      }
+    }
+  },
   "host_permissions": [
     "<all_urls>"
   ]

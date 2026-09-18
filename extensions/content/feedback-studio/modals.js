@@ -6,6 +6,10 @@
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
   window.__AP_INTERNAL__.feedbackStudio = window.__AP_INTERNAL__.feedbackStudio || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.fsModals) return;
+  window.__AP_INTERNAL__.__guards.fsModals = true;
+
   const constants = window.__AP_INTERNAL__.feedbackStudio.constants || {};
   const escapeHtml = constants.escapeHtml || ((s) => s);
 
@@ -253,12 +257,14 @@
     renderPinsList();
 
     annotatorModal.classList.remove("hidden");
+    attachAnnotatorDragListeners();
     setTimeout(syncSvgDimensions, 60);
   }
 
   function closeAnnotatorModal() {
     annotatorCaptureData = null;
     annotatorModal.classList.add("hidden");
+    detachAnnotatorDragListeners();
     const selection = window.__AP_INTERNAL__.feedbackStudio.selection;
     if (selection) selection.setMode("element");
   }
@@ -402,13 +408,22 @@
       return;
     }
 
+    const itemSchema = window.__AP_INTERNAL__.feedbackStudio.itemSchema;
+
     container.innerHTML = items.map((item, idx) => {
       const palette = PIN_COLORS[idx % PIN_COLORS.length] || { color: "#38bdf8" };
+      const safeId = escapeHtml(item.id);
+      const mode = (itemSchema && itemSchema.MODES.includes(item.mode)) ? item.mode : "element";
+      const safeMode = escapeHtml(mode);
+      const safeThumb = (itemSchema && itemSchema.isValidDataUrl(item.screenshotDataUrl)) ? item.screenshotDataUrl : "";
+      const thumbMarkup = safeThumb
+        ? `<img src="${safeThumb}" class="ap-card-thumb" alt="Item ${idx + 1}">`
+        : `<div class="ap-card-thumb ap-card-thumb-empty" aria-hidden="true">🖼️</div>`;
       return `
-      <div class="ap-item-card" data-id="${item.id}">
+      <div class="ap-item-card" data-id="${safeId}">
         <div class="ap-card-thumb-col">
-          <img src="${item.screenshotDataUrl}" class="ap-card-thumb" alt="Item ${idx + 1}">
-          <span class="ap-card-badge mode-${item.mode}">${item.mode.toUpperCase()}</span>
+          ${thumbMarkup}
+          <span class="ap-card-badge mode-${safeMode}">${safeMode.toUpperCase()}</span>
         </div>
         <div class="ap-card-content-col">
           <div class="ap-card-header">
@@ -417,8 +432,8 @@
               ${escapeHtml(item.title)}
             </span>
             <div class="ap-card-actions">
-              <button class="ap-card-action-btn btn-edit" data-id="${item.id}" title="Sửa ghi chú">✏️</button>
-              <button class="ap-card-action-btn btn-delete" data-id="${item.id}" title="Xóa mục này">🗑️</button>
+              <button class="ap-card-action-btn btn-edit" data-id="${safeId}" title="Sửa ghi chú">✏️</button>
+              <button class="ap-card-action-btn btn-delete" data-id="${safeId}" title="Xóa mục này">🗑️</button>
             </div>
           </div>
           ${item.component ? `
@@ -431,12 +446,12 @@
             <div class="ap-card-selector"><code>${escapeHtml(item.dom.selector)}</code></div>
           ` : ""}
           <div class="ap-card-comment-wrap">
-            <div class="ap-card-comment-text" id="comment-text-${item.id}">${escapeHtml(item.comment || "Không có ghi chú")}</div>
-            <div class="ap-card-comment-edit hidden" id="comment-edit-${item.id}">
+            <div class="ap-card-comment-text" id="comment-text-${safeId}">${escapeHtml(item.comment || "Không có ghi chú")}</div>
+            <div class="ap-card-comment-edit hidden" id="comment-edit-${safeId}">
               <textarea class="ap-card-edit-textarea">${escapeHtml(item.comment || "")}</textarea>
               <div style="display:flex;gap:6px;margin-top:6px;">
-                <button class="ap-popover-btn ap-btn-submit btn-save-edit" data-id="${item.id}">Lưu</button>
-                <button class="ap-popover-btn ap-btn-cancel btn-cancel-edit" data-id="${item.id}">Hủy</button>
+                <button class="ap-popover-btn ap-btn-submit btn-save-edit" data-id="${safeId}">Lưu</button>
+                <button class="ap-popover-btn ap-btn-cancel btn-cancel-edit" data-id="${safeId}">Hủy</button>
               </div>
             </div>
           </div>
@@ -555,7 +570,7 @@
     boxDragState.currentRect = { x: startX, y: startY, width: 0, height: 0 };
   });
 
-  window.addEventListener("mousemove", (e) => {
+  function handleAnnotatorBoxMouseMove(e) {
     if (!boxDragState.dragging || activeTool !== "box") return;
     const img = document.getElementById("ap-annotator-img");
     if (!img) return;
@@ -571,9 +586,9 @@
 
     boxDragState.currentRect = { x, y, width, height };
     renderSvgAnnotations();
-  });
+  }
 
-  window.addEventListener("mouseup", () => {
+  function handleAnnotatorBoxMouseUp() {
     if (!boxDragState.dragging || activeTool !== "box") return;
     boxDragState.dragging = false;
     const rect = boxDragState.currentRect;
@@ -591,7 +606,20 @@
       renderPinsList();
     }
     renderSvgAnnotations();
-  });
+  }
+
+  // Global listeners are attached only while the annotator modal is open
+  function attachAnnotatorDragListeners() {
+    window.removeEventListener("mousemove", handleAnnotatorBoxMouseMove);
+    window.removeEventListener("mouseup", handleAnnotatorBoxMouseUp);
+    window.addEventListener("mousemove", handleAnnotatorBoxMouseMove);
+    window.addEventListener("mouseup", handleAnnotatorBoxMouseUp);
+  }
+
+  function detachAnnotatorDragListeners() {
+    window.removeEventListener("mousemove", handleAnnotatorBoxMouseMove);
+    window.removeEventListener("mouseup", handleAnnotatorBoxMouseUp);
+  }
 
   canvasWrapper.addEventListener("click", (e) => {
     if (activeTool !== "pin") return;

@@ -5,6 +5,10 @@
 (function () {
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.lockShield) return;
+  window.__AP_INTERNAL__.__guards.lockShield = true;
+
   let isAgentBusy = false;
   let isSessionActive = false;
   let sessionName = "";

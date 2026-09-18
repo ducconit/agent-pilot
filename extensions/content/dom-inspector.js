@@ -5,6 +5,10 @@
 (function () {
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.inspector) return;
+  window.__AP_INTERNAL__.__guards.inspector = true;
+
   function escapeHtml(str) {
     if (!str) return "";
     return String(str)
@@ -38,26 +42,54 @@
   inspectorTooltip.id = "agent-pilot-inspector-tooltip";
   document.documentElement.appendChild(inspectorTooltip);
 
+  function escapeSelectorToken(token) {
+    return (typeof CSS !== "undefined" && CSS.escape) ? CSS.escape(token) : String(token);
+  }
+
+  function buildStructuralPath(el) {
+    const segments = [];
+    let node = el;
+    while (node && node.nodeType === Node.ELEMENT_NODE && node !== document.body) {
+      let segment = node.nodeName.toLowerCase();
+      if (node.parentElement) {
+        const sameTag = Array.from(node.parentElement.children).filter((c) => c.nodeName === node.nodeName);
+        if (sameTag.length > 1) segment += `:nth-of-type(${sameTag.indexOf(node) + 1})`;
+      }
+      segments.unshift(segment);
+      node = node.parentElement;
+    }
+    return segments.join(" > ");
+  }
+
   function getElementSelector(el) {
     if (!el || el === document.body || el === document.documentElement) return el ? el.tagName.toLowerCase() : "";
-    if (el.id) return `#${el.id}`;
-
-    let path = [];
-    while (el && el.nodeType === Node.ELEMENT_NODE && el !== document.body) {
-      let selector = el.nodeName.toLowerCase();
-      if (el.className && typeof el.className === "string") {
-        const classes = el.className.trim().split(/\s+/).filter(c => !c.startsWith("agent-pilot"));
-        if (classes.length) selector += "." + classes.slice(0, 2).join(".");
+    try {
+      if (el.id) {
+        const idSelector = `#${escapeSelectorToken(el.id)}`;
+        if (document.querySelectorAll(idSelector).length === 1) return idSelector;
       }
-      path.unshift(selector);
-      el = el.parentElement;
-    }
-    return path.join(" > ");
+
+      const path = [];
+      let node = el;
+      while (node && node.nodeType === Node.ELEMENT_NODE && node !== document.body) {
+        let selector = node.nodeName.toLowerCase();
+        if (node.className && typeof node.className === "string") {
+          const classes = node.className.trim().split(/\s+/).filter((c) => c && !c.startsWith("agent-pilot"));
+          if (classes.length) selector += "." + classes.slice(0, 2).map(escapeSelectorToken).join(".");
+        }
+        path.unshift(selector);
+        node = node.parentElement;
+      }
+
+      const selector = path.join(" > ");
+      if (selector && document.querySelectorAll(selector).length === 1) return selector;
+    } catch (_) {}
+    return buildStructuralPath(el);
   }
 
   function getXPath(el) {
     if (!el) return "";
-    if (el.id) return `//*[@id="${el.id}"]`;
+    if (el.id && !el.id.includes('"')) return `//*[@id="${el.id}"]`;
     if (el === document.body) return "/html/body";
 
     let ix = 0;
@@ -203,13 +235,17 @@
     ].join(", ");
 
     const rawNodes = Array.from(document.querySelectorAll(selectorQuery));
+    const seenNodes = new Set(rawNodes);
 
     // Also include elements with direct onclick
     const allDivsSpans = document.querySelectorAll("div, span, li, tr");
     for (let i = 0; i < allDivsSpans.length && rawNodes.length < 500; i++) {
       const node = allDivsSpans[i];
       if (node.onclick || node.getAttribute("onclick")) {
-        if (!rawNodes.includes(node)) rawNodes.push(node);
+        if (!seenNodes.has(node)) {
+          seenNodes.add(node);
+          rawNodes.push(node);
+        }
       }
     }
 
@@ -447,6 +483,7 @@
       if (!highlightTimer) {
         inspectorBox.style.display = "none";
       }
+      window.__AP_INTERNAL__.snapshotElements = [null];
       if (showToastNotice) showToast("🎯 Chế độ soi phần tử: Đã TẮT.");
     }
   }
@@ -591,6 +628,7 @@
     if (!highlightTimer) {
       inspectorBox.style.display = "none";
     }
+    window.__AP_INTERNAL__.snapshotElements = [null];
     if (showToastNotice) showToast("Đã hủy chụp phần tử.");
   }
 

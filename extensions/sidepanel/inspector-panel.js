@@ -150,7 +150,7 @@ export class InspectorPanel {
     // Color Eyedropper Format Rows Click-to-Copy (HEX, RGB, RGBA, HSL, OKLCH)
     const colorRows = [this.colorHex, this.colorRgb, this.colorRgba, this.colorHsl, this.colorOklch].filter(Boolean);
     colorRows.forEach((row) => {
-      row.addEventListener("click", () => {
+      const copyColorValue = () => {
         const type = row.getAttribute("data-type") || "màu";
         const val = row.getAttribute("data-value") || row.querySelector(".color-format-val")?.textContent?.trim() || "";
         if (val) {
@@ -162,6 +162,13 @@ export class InspectorPanel {
               console.warn(`[AgentPilot Inspector] Không thể sao chép ${type}:`, err);
               showToast(`Không thể sao chép vào clipboard (${type})`);
             });
+        }
+      };
+      row.addEventListener("click", copyColorValue);
+      row.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          copyColorValue();
         }
       });
     });
@@ -295,7 +302,7 @@ export class InspectorPanel {
       }
 
       this.inspectorResultBox.innerHTML = rows.map((r) => `
-        <div class="detail-row clickable" data-copy="${escapeHtml(r.copyText)}" data-label="${escapeHtml(r.label)}" title="Click để sao chép ${escapeHtml(r.label)}">
+        <div class="detail-row clickable" role="button" tabindex="0" data-copy="${escapeHtml(r.copyText)}" data-label="${escapeHtml(r.label)}" title="Click để sao chép ${escapeHtml(r.label)}">
           <span class="detail-key">${escapeHtml(r.key)}:</span>
           <span class="detail-val" style="${r.color ? `color:${r.color};` : ""}${r.weight ? `font-weight:${r.weight};` : ""}" ${r.id ? `id="${r.id}"` : ""}>${escapeHtml(r.val)}</span>
           <span class="copy-hint" title="Sao chép">📋</span>
@@ -305,12 +312,19 @@ export class InspectorPanel {
       // Add click listeners to all clickable rows in Overview
       const clickableRows = this.inspectorResultBox.querySelectorAll(".detail-row.clickable");
       clickableRows.forEach((row) => {
-        row.onclick = () => {
+        const copyRowValue = () => {
           const copyText = row.getAttribute("data-copy");
           const label = row.getAttribute("data-label");
           if (copyText) {
-            navigator.clipboard.writeText(copyText);
+            navigator.clipboard.writeText(copyText).catch(() => showToast("Không thể sao chép vào clipboard"));
             showToast(`Đã sao chép ${label}!`);
+          }
+        };
+        row.onclick = copyRowValue;
+        row.onkeydown = (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            copyRowValue();
           }
         };
       });
@@ -337,7 +351,7 @@ export class InspectorPanel {
     if (d.value !== undefined && d.value !== "") lines.push(`Giá trị: ${d.value}`);
 
     const fullOverview = lines.join("\n");
-    navigator.clipboard.writeText(fullOverview);
+    navigator.clipboard.writeText(fullOverview).catch(() => showToast("Không thể sao chép vào clipboard"));
     showToast("Đã sao chép toàn bộ thông tin phần tử vào clipboard!");
   }
 
@@ -390,9 +404,10 @@ export class InspectorPanel {
           if (!query || prop.toLowerCase().includes(query) || String(val).toLowerCase().includes(query)) {
             matchCount++;
             const isColor = prop.includes("color") || (typeof val === "string" && (val.startsWith("#") || val.startsWith("rgb") || val.startsWith("hsl")));
-            const colorPreview = isColor ? `<span class="css-color-preview" style="background:${escapeHtml(val)};"></span>` : "";
+            const safeColor = String(val).replace(/[^a-zA-Z0-9#(),.%\s/-]/g, "");
+            const colorPreview = isColor ? `<span class="css-color-preview" style="background:${escapeHtml(safeColor)};"></span>` : "";
             groupRows += `
-              <div class="css-prop-row" data-prop="${escapeHtml(prop)}" data-val="${escapeHtml(val)}" title="Click để copy: ${escapeHtml(prop)}: ${escapeHtml(val)};">
+              <div class="css-prop-row" role="button" tabindex="0" data-prop="${escapeHtml(prop)}" data-val="${escapeHtml(val)}" title="Click để copy: ${escapeHtml(prop)}: ${escapeHtml(val)};">
                 <span class="css-prop-name">${escapeHtml(prop)}:</span>
                 <div class="css-prop-val-wrap">
                   ${colorPreview}
@@ -422,12 +437,19 @@ export class InspectorPanel {
     // Add click listeners to copy CSS property
     const rows = this.inspectorCssBox.querySelectorAll(".css-prop-row");
     rows.forEach((row) => {
-      row.onclick = () => {
+      const copyCssProp = () => {
         const prop = row.getAttribute("data-prop");
         const val = row.getAttribute("data-val");
         const text = `${prop}: ${val};`;
-        navigator.clipboard.writeText(text);
+        navigator.clipboard.writeText(text).catch(() => showToast("Không thể sao chép vào clipboard"));
         showToast(`Đã sao chép: ${text}`);
+      };
+      row.onclick = copyCssProp;
+      row.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          copyCssProp();
+        }
       };
     });
   }
@@ -449,7 +471,7 @@ export class InspectorPanel {
     }
     lines.push(`}`);
     const fullCss = lines.join("\n");
-    navigator.clipboard.writeText(fullCss);
+    navigator.clipboard.writeText(fullCss).catch(() => showToast("Không thể sao chép vào clipboard"));
     showToast("Đã sao chép toàn bộ khai báo CSS vào clipboard!");
   }
 

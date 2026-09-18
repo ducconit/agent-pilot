@@ -1,6 +1,7 @@
 /**
  * Agent Pilot - Color Conversion & Normalization Utilities
  * NOTE: Mathematical algorithms must be kept in sync with extensions/content/eyedropper.js
+ * (rgbToHex output is UPPERCASE in both modules to stay aligned).
  */
 
 export function srgbToLinear(c) {
@@ -38,16 +39,17 @@ export function rgbToOklch(r, g, b) {
 
 export function hexToRgbNums(hex) {
   if (!hex || typeof hex !== "string") return { r: 0, g: 0, b: 0 };
-  let clean = hex.replace("#", "").trim();
-  if (clean.length === 3) {
-    clean = clean.split("").map((c) => c + c).join("");
+  const clean = hex.replace("#", "").trim();
+  if (![3, 4, 6, 8].includes(clean.length) || !/^[0-9a-f]+$/i.test(clean)) {
+    return { r: 0, g: 0, b: 0 };
   }
-  const bigint = parseInt(clean, 16);
-  if (Number.isNaN(bigint)) return { r: 0, g: 0, b: 0 };
+  const expanded = (clean.length === 3 || clean.length === 4)
+    ? clean.split("").map((c) => c + c).join("")
+    : clean;
   return {
-    r: (bigint >> 16) & 255,
-    g: (bigint >> 8) & 255,
-    b: bigint & 255
+    r: parseInt(expanded.slice(0, 2), 16),
+    g: parseInt(expanded.slice(2, 4), 16),
+    b: parseInt(expanded.slice(4, 6), 16)
   };
 }
 
@@ -55,7 +57,7 @@ export function rgbToHex(r, g, b) {
   return "#" + [r, g, b].map((x) => {
     const h = Math.max(0, Math.min(255, Math.round(x))).toString(16);
     return h.length === 1 ? "0" + h : h;
-  }).join("").toLowerCase();
+  }).join("").toUpperCase();
 }
 
 export function rgbToHsl(r, g, b) {
@@ -90,10 +92,15 @@ export function normalizeColorData(colorObj) {
 
   // Fast path: if colorObj already contains all 5 pre-calculated formats from eyedropper IPC, use directly
   if (colorObj.hex && colorObj.rgb && colorObj.rgba && colorObj.hsl && colorObj.oklch) {
+    let { r, g, b } = colorObj;
+    if (typeof r !== "number" || typeof g !== "number" || typeof b !== "number") {
+      const nums = hexToRgbNums(colorObj.hex);
+      r = nums.r; g = nums.g; b = nums.b;
+    }
     return {
-      r: typeof colorObj.r === "number" ? colorObj.r : 0,
-      g: typeof colorObj.g === "number" ? colorObj.g : 0,
-      b: typeof colorObj.b === "number" ? colorObj.b : 0,
+      r,
+      g,
+      b,
       hex: colorObj.hex,
       rgb: colorObj.rgb,
       rgba: colorObj.rgba,

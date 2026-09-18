@@ -6,6 +6,10 @@
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
   window.__AP_INTERNAL__.feedbackStudio = window.__AP_INTERNAL__.feedbackStudio || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.fsState) return;
+  window.__AP_INTERNAL__.__guards.fsState = true;
+
   // Internal Session State
   let isFeedbackActive = false;
   let currentMode = "element"; // "element" | "region" | "screen" | "fullpage"
@@ -30,11 +34,11 @@
     getItem: (id) => feedbackItems.find((it) => it.id === id) || null,
 
     addItem: (item) => {
-      const newItem = {
-        id: "fb_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
-        ...item,
-        timestamp: Date.now()
-      };
+      const schema = window.__AP_INTERNAL__.feedbackStudio.itemSchema;
+      const newItem = schema
+        ? schema.validateFeedbackItem(item)
+        : { id: "fb_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5), ...item };
+      newItem.timestamp = Date.now();
       feedbackItems.push(newItem);
       return newItem;
     },

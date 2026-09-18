@@ -80,6 +80,19 @@ body {
   user-select: none;
 }
 
+/* Allow text selection inside log, code and detail content (HUD chrome stays non-selectable) */
+.agent-activity-item,
+.agent-activity-detail,
+.detail-row,
+.css-prop-row,
+.code-editor,
+.script-output,
+textarea,
+pre,
+code {
+  user-select: text;
+}
+
 /* ==========================================================================
    1. Header
    ========================================================================== */

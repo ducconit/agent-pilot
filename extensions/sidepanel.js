@@ -12,6 +12,7 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
 (function () {
   let activeTabId = null;
   let isCdpAttached = false;
+  let activeTabRequestSeq = 0;
 
   // Header DOM Elements
   const cdpStatusDot = document.getElementById("cdp-status-dot");
@@ -66,11 +67,17 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
   });
 
   async function updateActiveTab() {
+    const seq = ++activeTabRequestSeq;
     chrome.runtime.sendMessage({ action: "get_active_tab" }, (res) => {
+      if (chrome.runtime.lastError) {
+        console.warn("[AgentPilot] get_active_tab error:", chrome.runtime.lastError.message);
+        return;
+      }
+      if (seq !== activeTabRequestSeq) return;
       if (res && res.tab) {
         activeTabId = res.tab.id;
         agentMonitor.updateTargetTabDisplay(res.tab);
-        feedbackPanel.refreshState();
+        feedbackPanel.refreshState({ silent: true });
         checkCdpStatus();
       }
     });
@@ -91,6 +98,10 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
   function checkCdpStatus() {
     if (!activeTabId) return;
     chrome.runtime.sendMessage({ action: "get_debugger_status", tabId: activeTabId }, (res) => {
+      if (chrome.runtime.lastError) {
+        console.warn("[AgentPilot] get_debugger_status error:", chrome.runtime.lastError.message);
+        return;
+      }
       setCdpState(res && res.attached);
     });
   }
@@ -119,11 +130,19 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
       if (!activeTabId) return;
       if (isCdpAttached) {
         chrome.runtime.sendMessage({ action: "detach_debugger", tabId: activeTabId }, () => {
+          if (chrome.runtime.lastError) {
+            showToast("Lỗi ngắt CDP: " + chrome.runtime.lastError.message);
+            return;
+          }
           setCdpState(false);
           showToast("Đã ngắt kết nối CDP.");
         });
       } else {
         chrome.runtime.sendMessage({ action: "attach_debugger", tabId: activeTabId }, (res) => {
+          if (chrome.runtime.lastError) {
+            showToast("Lỗi gắn CDP: " + chrome.runtime.lastError.message);
+            return;
+          }
           if (res && res.success) {
             setCdpState(true);
             showToast("Đã gắn kết nối CDP (Sẵn sàng điều khiển qua Agent)!");
@@ -235,6 +254,10 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
 
   updateActiveTab();
   chrome.runtime.sendMessage({ action: "get_agent_bridge_status" }, (res) => {
+    if (chrome.runtime.lastError) {
+      console.warn("[AgentPilot] get_agent_bridge_status error:", chrome.runtime.lastError.message);
+      return;
+    }
     if (res) agentMonitor.updateBridgeUI(res);
   });
 })();

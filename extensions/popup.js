@@ -13,6 +13,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   let activeTab = null;
 
   chrome.runtime.sendMessage({ action: "get_active_tab" }, (res) => {
+    if (chrome.runtime.lastError) {
+      console.warn("[AgentPilot Popup] get_active_tab error:", chrome.runtime.lastError.message);
+      return;
+    }
     if (res && res.tab) {
       activeTab = res.tab;
       popupTabTitle.textContent = activeTab.title || activeTab.url || "Active Tab";
@@ -37,12 +41,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   btnQuickScreenshot.onclick = () => {
     chrome.runtime.sendMessage({ action: "capture_screenshot", mode: "visible" }, (res) => {
-      if (res && res.dataUrl) {
+      if (chrome.runtime.lastError) {
+        console.warn("[AgentPilot Popup] capture_screenshot error:", chrome.runtime.lastError.message);
+        return;
+      }
+      if (res && res.success && res.dataUrl) {
         const a = document.createElement("a");
         a.href = res.dataUrl;
         a.download = `agent-pilot-quick-${Date.now()}.png`;
         a.click();
         window.close();
+      } else {
+        console.warn("[AgentPilot Popup] capture_screenshot failed:", res && res.error);
+        alert("Không thể chụp ảnh màn hình.");
       }
     });
   };
@@ -50,6 +61,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   btnQuickInspect.onclick = () => {
     if (activeTab && activeTab.id) {
       chrome.tabs.sendMessage(activeTab.id, { action: "toggle_inspector", enabled: true }, () => {
+        if (chrome.runtime.lastError) {
+          console.warn("[AgentPilot Popup] toggle_inspector error:", chrome.runtime.lastError.message);
+          return;
+        }
         window.close();
       });
     }
@@ -58,6 +73,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   btnQuickColor.onclick = () => {
     if (activeTab && activeTab.id) {
       chrome.tabs.sendMessage(activeTab.id, { action: "pick_color" }, () => {
+        if (chrome.runtime.lastError) {
+          console.warn("[AgentPilot Popup] pick_color error:", chrome.runtime.lastError.message);
+          return;
+        }
         window.close();
       });
     }
@@ -65,6 +84,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   btnQuickNewtab.onclick = () => {
     chrome.runtime.sendMessage({ action: "new_tab", url: "https://google.com" }, () => {
+      if (chrome.runtime.lastError) {
+        console.warn("[AgentPilot Popup] new_tab error:", chrome.runtime.lastError.message);
+        return;
+      }
       window.close();
     });
   };

@@ -129,11 +129,23 @@ export async function markTabAsAgentControlled(tabId) {
   await assignTabToAgentGroup(tabId).catch((err) => logDebug("markTabAsAgentControlled assignTabToAgentGroup error", err));
 }
 
+const contentScriptEnsures = new Map();
+
 /**
  * Ensure content script is injected into the tab
  */
-export async function ensureContentScript(tabId) {
-  if (!tabId) return false;
+export function ensureContentScript(tabId) {
+  if (!tabId) return Promise.resolve(false);
+  const existing = contentScriptEnsures.get(tabId);
+  if (existing) return existing;
+  const task = ensureContentScriptInner(tabId).finally(() => {
+    contentScriptEnsures.delete(tabId);
+  });
+  contentScriptEnsures.set(tabId, task);
+  return task;
+}
+
+async function ensureContentScriptInner(tabId) {
   try {
     const tab = await chrome.tabs.get(tabId).catch((err) => {
       logDebug(`probe tab ${tabId}`, err);
@@ -161,6 +173,7 @@ export async function ensureContentScript(tabId) {
         "content/dom-inspector.js",
         "content/eyedropper.js",
         "content/feedback-studio/constants.js",
+        "content/feedback-studio/item-schema.js",
         "content/feedback-studio/state.js",
         "content/feedback-studio/capture-service.js",
         "content/feedback-studio/pinned-overlay.js",
@@ -178,12 +191,15 @@ export async function ensureContentScript(tabId) {
           logDebug(`insertCSS on tab ${tabId}`, err);
         });
       }
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        files: contentFiles
-      }).catch((err) => {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: contentFiles
+        });
+      } catch (err) {
         logDebug(`dynamic script injection on tab ${tabId}`, err);
-      });
+        return false;
+      }
       await new Promise(r => setTimeout(r, 80));
     }
     return true;

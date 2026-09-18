@@ -6,6 +6,10 @@
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
   const studio = window.__AP_INTERNAL__.feedbackStudio || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.fsIndex) return;
+  window.__AP_INTERNAL__.__guards.fsIndex = true;
+
   const constants = studio.constants || {};
   const state = studio.state;
   const hud = studio.hud;
@@ -105,9 +109,10 @@
 
   // =========================================================================
   // Global Keyboard Shortcuts (Escape Key Handling)
+  // Attached only while the feedback session is active
   // =========================================================================
 
-  document.addEventListener("keydown", (e) => {
+  function handleStudioEscapeKey(e) {
     if (e.key === "Escape" && state?.isActive()) {
       if (!modals.commentPopover.classList.contains("hidden")) {
         modals.closeCommentPopover();
@@ -117,7 +122,16 @@
         modals.closeListModal();
       }
     }
-  });
+  }
+
+  function attachStudioKeyboardListener() {
+    document.removeEventListener("keydown", handleStudioEscapeKey);
+    document.addEventListener("keydown", handleStudioEscapeKey);
+  }
+
+  function detachStudioKeyboardListener() {
+    document.removeEventListener("keydown", handleStudioEscapeKey);
+  }
 
   // =========================================================================
   // Feedback Studio Session Lifecycle (Start & Stop)
@@ -136,6 +150,7 @@
     pinned.renderPinnedBoxes();
     selection.setMode("element");
     selection.attachSelectionListeners();
+    attachStudioKeyboardListener();
 
     showToast("✏️ Đã bật chế độ Chú thích & Chỉ điểm UI! Nhấp vào phần tử cần sửa.");
     chrome.runtime.sendMessage({ action: "FEEDBACK_MODE_CHANGED", active: true }).catch(() => {});
@@ -152,6 +167,7 @@
     pinned.hideDraftBox();
     pinned.renderPinnedBoxes();
     selection.detachSelectionListeners();
+    detachStudioKeyboardListener();
 
     showToast("✓ Đã thoát chế độ Chú thích UI.");
     chrome.runtime.sendMessage({ action: "FEEDBACK_MODE_CHANGED", active: false }).catch(() => {});

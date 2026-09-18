@@ -46,8 +46,16 @@ function normalizeVia(step) {
 async function resolvePoint(targetTabId, x, y, selector, label) {
   const hasX = x !== undefined && x !== null && x !== "";
   const hasY = y !== undefined && y !== null && y !== "";
+  if (hasX !== hasY) {
+    throw new Error(`Invalid ${label} coordinates: both x and y are required together`);
+  }
   if (hasX && hasY) {
-    return { x: Number(x), y: Number(y) };
+    const numX = Number(x);
+    const numY = Number(y);
+    if (!Number.isFinite(numX) || !Number.isFinite(numY)) {
+      throw new Error(`Invalid ${label} coordinates: x='${x}', y='${y}' must be finite numbers`);
+    }
+    return { x: numX, y: numY };
   }
   if (!selector) {
     throw new Error(`Cannot resolve ${label}: provide coordinates or a selector`);
@@ -567,7 +575,7 @@ export async function executeBatchActions(params, bridgeClient = null) {
             });
           }
           const buffer = getBuffer(targetTabId);
-          const devType = act.devtoolsType || (["all", "console", "network", "performance"].includes(act.type) ? act.type : "all");
+          const devType = act.devtoolsType || (["all", "console", "network", "performance"].includes(act.source) ? act.source : "all");
           const limit = Math.min(Math.max(Number(act.limit) || 50, 1), 200);
 
           let consoleData = undefined;

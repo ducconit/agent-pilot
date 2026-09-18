@@ -108,22 +108,24 @@ export const SECRET_PATTERNS = [
   // 12. JSON / Key-Value Sensitive Properties ("password": "...", "client_secret": "...")
   {
     name: "Sensitive Key-Value",
-    regex: /(["']?(?:password|passwd|secret|client_?secret|access_?token|auth_?token|api_?key)["']?\s*[:=]\s*["'])([^"'\\,\s]{6,})(["'])/gi,
+    regex: /(["']?(?:password|passwd|secret|client_?secret|access_?token|auth_?token|api_?key|authorization|proxy-authorization|cookie|set-cookie|x-api-key|credentials|token)["']?\s*[:=]\s*["'])([^"'\\,]{4,}?)(["'])/gi,
     replacer: (match, prefix, secretVal, suffix) => {
+      // Never re-mask an already masked value, or the inner marker type is lost
+      if (secretVal.includes("[MASKED_SECRET")) return match;
       const p = secretVal.slice(0, 2);
       return `${prefix}${p}******************** [MASKED_SECRET: Sensitive Field]${suffix}`;
     }
   }
 ];
 
-const SENSITIVE_KEY_REGEX = /^(?:password|passwd|secret|api_?key|access_?token|auth_?token|private_?key|client_?secret)$/i;
+const SENSITIVE_KEY_REGEX = /^(?:password|passwd|secret|api_?key|x-api-key|access_?token|auth_?token|private_?key|client_?secret|authorization|proxy-authorization|cookie|set-cookie|credentials|token)$/i;
 
 /**
  * Mask a single string by checking all secret patterns.
  * Returns { text: string, masked: boolean, types: string[] }
  */
 export function maskString(text) {
-  if (typeof text !== "string" || text.length < 6) {
+  if (typeof text !== "string" || text.length === 0) {
     return { text, masked: false, types: [] };
   }
 
@@ -149,24 +151,23 @@ export function maskString(text) {
 
 /**
  * Recursively sanitize deep objects, arrays, and primitive data.
- * When secrets are found and isEnabled is true, masks values with '*'
- * and attaches _securityNotice and metadata.
+ * Returns { data, maskedCount, types } so callers can surface masking metadata
+ * in transport envelopes (arrays lose attached properties during JSON.stringify).
  */
-export function sanitizeData(data, isEnabled = true) {
+export function sanitizeDataWithMeta(data, isEnabled = true) {
   if (!isEnabled || data === null || data === undefined) {
-    return data;
+    return { data, maskedCount: 0, types: [] };
   }
 
   let totalMaskedCount = 0;
   const allMaskedTypes = new Set();
-  const seen = new WeakSet();
 
-  function walk(val, keyContext = "") {
+  function walk(val, keyContext = "", ancestors = new WeakSet()) {
     if (val === null || val === undefined) return val;
 
     if (typeof val === "string") {
-      // First check if property key context is sensitive and value is long enough
-      if (keyContext && SENSITIVE_KEY_REGEX.test(keyContext) && val.length >= 4 && !val.includes("[MASKED_SECRET")) {
+      // First check if property key context is sensitive
+      if (keyContext && SENSITIVE_KEY_REGEX.test(keyContext) && val.length >= 1 && !val.includes("[MASKED_SECRET")) {
         totalMaskedCount++;
         allMaskedTypes.add(`Field:${keyContext}`);
         const prefix = val.slice(0, 2);
@@ -183,24 +184,35 @@ export function sanitizeData(data, isEnabled = true) {
       return val;
     }
 
-    if (typeof val === "number" || typeof val === "boolean" || typeof val === "symbol") {
+    if (typeof val === "number" || typeof val === "boolean" || typeof val === "symbol" || typeof val === "bigint") {
       return val;
     }
 
     if (Array.isArray(val)) {
-      if (seen.has(val)) return "[Circular]";
-      seen.add(val);
-      return val.map((item) => walk(item, keyContext));
+      if (ancestors.has(val)) return "[Circular]";
+      ancestors.add(val);
+      const copy = val.map((item) => walk(item, keyContext, ancestors));
+      ancestors.delete(val);
+      return copy;
     }
 
     if (typeof val === "object") {
-      if (seen.has(val)) return "[Circular]";
-      seen.add(val);
+      if (ancestors.has(val)) return "[Circular]";
+      ancestors.add(val);
+
+      let entries;
+      try {
+        entries = Object.entries(val);
+      } catch (_) {
+        ancestors.delete(val);
+        return "[Unreadable]";
+      }
 
       const copy = {};
-      for (const [k, v] of Object.entries(val)) {
-        copy[k] = walk(v, k);
+      for (const [k, v] of entries) {
+        copy[k] = walk(v, k, ancestors);
       }
+      ancestors.delete(val);
       return copy;
     }
 
@@ -208,18 +220,26 @@ export function sanitizeData(data, isEnabled = true) {
   }
 
   const sanitized = walk(data);
+  const meta = { maskedCount: totalMaskedCount, types: Array.from(allMaskedTypes) };
 
-  // If secrets were masked, attach notice for objects, arrays, and strings
+  // If secrets were masked, attach notice for objects and strings
   if (totalMaskedCount > 0) {
     if (typeof sanitized === "string") {
-      return `${sanitized}\n\n${AGENT_SECURITY_NOTICE}`;
+      return { data: `${sanitized}\n\n${AGENT_SECURITY_NOTICE}`, ...meta };
     }
     if (sanitized && typeof sanitized === "object") {
       sanitized._securityNotice = AGENT_SECURITY_NOTICE;
       sanitized._maskedCount = totalMaskedCount;
-      sanitized._maskedTypes = Array.from(allMaskedTypes);
+      sanitized._maskedTypes = meta.types;
     }
   }
 
-  return sanitized;
+  return { data: sanitized, ...meta };
+}
+
+/**
+ * Backward-compatible wrapper returning only the sanitized data.
+ */
+export function sanitizeData(data, isEnabled = true) {
+  return sanitizeDataWithMeta(data, isEnabled).data;
 }

@@ -177,27 +177,27 @@
           <div class="color-preview-box" id="latest-color-box">
             <div class="color-swatch" id="color-swatch-current" style="background: #38bdf8;"></div>
             <div class="color-values">
-              <div class="color-val clickable" id="color-hex" data-type="HEX" data-value="#38bdf8" title="Click để sao chép mã HEX">
+              <div class="color-val clickable" role="button" tabindex="0" id="color-hex" data-type="HEX" data-value="#38bdf8" title="Click để sao chép mã HEX">
                 <span class="color-format-label">HEX:</span>
                 <span class="color-format-val" id="val-hex">#38bdf8</span>
                 <button class="color-copy-btn" title="Sao chép HEX" aria-label="Sao chép HEX">📋</button>
               </div>
-              <div class="color-val clickable" id="color-rgb" data-type="RGB" data-value="rgb(56, 189, 248)" title="Click để sao chép mã RGB">
+              <div class="color-val clickable" role="button" tabindex="0" id="color-rgb" data-type="RGB" data-value="rgb(56, 189, 248)" title="Click để sao chép mã RGB">
                 <span class="color-format-label">RGB:</span>
                 <span class="color-format-val" id="val-rgb">rgb(56, 189, 248)</span>
                 <button class="color-copy-btn" title="Sao chép RGB" aria-label="Sao chép RGB">📋</button>
               </div>
-              <div class="color-val clickable" id="color-rgba" data-type="RGBA" data-value="rgba(56, 189, 248, 1)" title="Click để sao chép mã RGBA">
+              <div class="color-val clickable" role="button" tabindex="0" id="color-rgba" data-type="RGBA" data-value="rgba(56, 189, 248, 1)" title="Click để sao chép mã RGBA">
                 <span class="color-format-label">RGBA:</span>
                 <span class="color-format-val" id="val-rgba">rgba(56, 189, 248, 1)</span>
                 <button class="color-copy-btn" title="Sao chép RGBA" aria-label="Sao chép RGBA">📋</button>
               </div>
-              <div class="color-val clickable" id="color-hsl" data-type="HSL" data-value="hsl(198, 93%, 60%)" title="Click để sao chép mã HSL">
+              <div class="color-val clickable" role="button" tabindex="0" id="color-hsl" data-type="HSL" data-value="hsl(198, 93%, 60%)" title="Click để sao chép mã HSL">
                 <span class="color-format-label">HSL:</span>
                 <span class="color-format-val" id="val-hsl">hsl(198, 93%, 60%)</span>
                 <button class="color-copy-btn" title="Sao chép HSL" aria-label="Sao chép HSL">📋</button>
               </div>
-              <div class="color-val clickable" id="color-oklch" data-type="OKLCH" data-value="oklch(75.4% 0.139 232.7)" title="Click để sao chép mã OKLCH">
+              <div class="color-val clickable" role="button" tabindex="0" id="color-oklch" data-type="OKLCH" data-value="oklch(75.4% 0.139 232.7)" title="Click để sao chép mã OKLCH">
                 <span class="color-format-label">OKLCH:</span>
                 <span class="color-format-val" id="val-oklch">oklch(75.4% 0.139 232.7)</span>
                 <button class="color-copy-btn" title="Sao chép OKLCH" aria-label="Sao chép OKLCH">📋</button>
@@ -335,10 +335,10 @@
   <div class="toast-popup" id="sidepanel-toast"></div>
 
   <!-- Modal Cảnh báo khi Tắt Lọc Secret -->
-  <div class="modal-backdrop" id="secret-warning-modal" style="display: none;">
+  <div class="modal-backdrop" id="secret-warning-modal" role="dialog" aria-modal="true" aria-labelledby="secret-warning-modal-title" style="display: none;">
     <div class="modal-card">
       <div class="modal-header">
-        <span class="modal-title">⚠️ Cảnh báo Rủi ro Bảo mật Nghiêm trọng</span>
+        <span class="modal-title" id="secret-warning-modal-title">⚠️ Cảnh báo Rủi ro Bảo mật Nghiêm trọng</span>
       </div>
       <div class="modal-body">
         <p class="warning-highlight">

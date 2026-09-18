@@ -5,6 +5,10 @@
 (function () {
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.eyedropper) return;
+  window.__AP_INTERNAL__.__guards.eyedropper = true;
+
   function showToast(msg) {
     if (window.__AP_INTERNAL__.showToast) {
       window.__AP_INTERNAL__.showToast(msg);
@@ -445,9 +449,18 @@
     window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("scroll", onScroll, true);
 
+    if (scrollDebounce) {
+      clearTimeout(scrollDebounce);
+      scrollDebounce = null;
+    }
+
     if (loupeEl) {
       loupeEl.style.display = "none";
     }
+    loupeEl = null;
+    snapshotCanvas = null;
+    snapshotCtx = null;
+    isSnapshotReady = false;
     document.documentElement.classList.remove("agent-pilot-eyedropper-active");
 
     if (activeResolve) {

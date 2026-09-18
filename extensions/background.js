@@ -30,12 +30,30 @@ import {
 
 import { captureTabScreenshot } from "./background/screenshot-service.js";
 import { AgentBridgeClient } from "./background/bridge-client.js";
+import { sanitizeData } from "./background/secret-sanitizer.js";
+// Side-effect import: exposes globalThis.__AP_FEEDBACK_ITEM_SCHEMA__ for payload validation
+import "./content/feedback-studio/item-schema.js";
+
+const feedbackItemSchema = globalThis.__AP_FEEDBACK_ITEM_SCHEMA__;
+
+function validateFeedbackRequest(sender, payload) {
+  if (!sender || sender.id !== chrome.runtime.id) {
+    return { ok: false, error: "Rejected: untrusted sender" };
+  }
+  if (!sender.tab) {
+    return { ok: false, error: "Rejected: feedback actions must originate from a content script" };
+  }
+  if (!feedbackItemSchema) {
+    return { ok: false, error: "Rejected: feedback validation module unavailable" };
+  }
+  return { ok: true, payload: feedbackItemSchema.sanitizeFeedbackPayload(payload) };
+}
 
 // Broadcast helper for extension views and agent bridge
 export function broadcastToExtension(message) {
   chrome.runtime.sendMessage(message).catch(() => {});
   if (typeof agentBridge !== "undefined" && agentBridge && agentBridge.connected) {
-    agentBridge.send(message);
+    agentBridge.send(sanitizeData(message, getSecretFilterEnabled()));
   }
 }
 
@@ -124,7 +142,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 if (chrome.tabs && chrome.tabs.onActivated) {
   chrome.tabs.onActivated.addListener(() => {
     if (agentBridge && !agentBridge.connected && agentBridge.enabled) {
-      agentBridge.connect();
+      agentBridge.requestReconnect();
     }
   });
 }
@@ -134,7 +152,7 @@ if (chrome.runtime && chrome.runtime.onConnect) {
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name === "agent-pilot-keepalive") {
       if (agentBridge && !agentBridge.connected && agentBridge.enabled) {
-        agentBridge.connect();
+        agentBridge.requestReconnect();
       }
       port.onDisconnect.addListener(() => {});
     }
@@ -144,7 +162,7 @@ if (chrome.runtime && chrome.runtime.onConnect) {
 // Re-notify agent tabs and restore lock state when navigation completes
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (agentBridge && !agentBridge.connected && agentBridge.enabled) {
-    agentBridge.connect();
+    agentBridge.requestReconnect();
   }
   if (changeInfo.status === "complete") {
     const lockState = tabLockStates.get(tabId);
@@ -160,14 +178,14 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   }
 });
 
-// Periodic keepalive alarm (every ~24s = 0.4 min) to wake up service worker
+// Periodic keepalive alarm (0.5 min = 30s, the minimum period Chrome allows) to wake up service worker
 if (chrome.alarms) {
-  chrome.alarms.create("agent_pilot_bridge_keepalive", { periodInMinutes: 0.4 });
+  chrome.alarms.create("agent_pilot_bridge_keepalive", { periodInMinutes: 0.5 });
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "agent_pilot_bridge_keepalive") {
       if (agentBridge) {
         if (!agentBridge.connected && agentBridge.enabled) {
-          agentBridge.connect();
+          agentBridge.requestReconnect();
         } else if (agentBridge.connected) {
           agentBridge.send({ type: "HEARTBEAT", timestamp: Date.now() });
         }
@@ -431,9 +449,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // 8. Visual Feedback Actions (Channel B & A)
   if (action === "save_feedback_inbox") {
+    const check = validateFeedbackRequest(sender, request.payload);
+    if (!check.ok) {
+      sendResponse({ success: false, error: check.error });
+      return true;
+    }
     (async () => {
       try {
-        const res = await agentBridge.saveFeedbackInbox(request.payload);
+        const res = await agentBridge.saveFeedbackInbox(check.payload);
         sendResponse(res);
       } catch (err) {
         sendResponse({ success: false, error: err.message });
@@ -443,9 +466,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (action === "push_feedback_live") {
+    const check = validateFeedbackRequest(sender, request.payload);
+    if (!check.ok) {
+      sendResponse({ success: false, error: check.error });
+      return true;
+    }
     (async () => {
       try {
-        const res = await agentBridge.pushFeedbackLive(request.payload);
+        const res = await agentBridge.pushFeedbackLive(check.payload);
         sendResponse(res);
       } catch (err) {
         sendResponse({ success: false, error: err.message });
@@ -453,5 +481,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     })();
     return true;
   }
+
+  sendResponse({ success: false, error: `Unknown action: ${action || type || "unnamed"}` });
+  return true;
 });
 

@@ -6,6 +6,10 @@
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
   window.__AP_INTERNAL__.feedbackStudio = window.__AP_INTERNAL__.feedbackStudio || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.fsCapture) return;
+  window.__AP_INTERNAL__.__guards.fsCapture = true;
+
   /**
    * Query React / Vue / Astro component source information via CustomEvent bridge
    */
@@ -43,17 +47,17 @@
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        const dpr = clip.devicePixelRatio || (img.naturalWidth / (clip.pageWidth || window.innerWidth)) || window.devicePixelRatio || 1;
+        const scale = (clip.pageWidth ? img.naturalWidth / clip.pageWidth : null) || (img.naturalWidth / window.innerWidth) || clip.devicePixelRatio || 1;
         const padding = 10; // Extra context margin around element
         const rawX = Math.max(0, clip.x - padding);
         const rawY = Math.max(0, clip.y - padding);
         const rawW = clip.width + (padding * 2);
         const rawH = clip.height + (padding * 2);
 
-        const sx = Math.max(0, Math.min(img.naturalWidth, Math.round(rawX * dpr)));
-        const sy = Math.max(0, Math.min(img.naturalHeight, Math.round(rawY * dpr)));
-        const sw = Math.min(img.naturalWidth - sx, Math.round(rawW * dpr));
-        const sh = Math.min(img.naturalHeight - sy, Math.round(rawH * dpr));
+        const sx = Math.max(0, Math.min(img.naturalWidth, Math.round(rawX * scale)));
+        const sy = Math.max(0, Math.min(img.naturalHeight, Math.round(rawY * scale)));
+        const sw = Math.min(img.naturalWidth - sx, Math.round(rawW * scale));
+        const sh = Math.min(img.naturalHeight - sy, Math.round(rawH * scale));
 
         if (sw <= 0 || sh <= 0) {
           return resolve(fullDataUrl);
@@ -67,12 +71,12 @@
 
         // Subtle highlight frame on cropped element
         ctx.strokeStyle = "rgba(56, 189, 248, 0.85)";
-        ctx.lineWidth = Math.max(2, Math.round(2 * dpr));
+        ctx.lineWidth = Math.max(2, Math.round(2 * scale));
         ctx.strokeRect(
-          Math.round(padding * dpr),
-          Math.round(padding * dpr),
-          Math.round(clip.width * dpr),
-          Math.round(clip.height * dpr)
+          Math.round(padding * scale),
+          Math.round(padding * scale),
+          Math.round(clip.width * scale),
+          Math.round(clip.height * scale)
         );
 
         resolve(canvas.toDataURL("image/png"));

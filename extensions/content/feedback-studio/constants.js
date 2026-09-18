@@ -5,6 +5,10 @@
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
   window.__AP_INTERNAL__.feedbackStudio = window.__AP_INTERNAL__.feedbackStudio || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.fsConstants) return;
+  window.__AP_INTERNAL__.__guards.fsConstants = true;
+
   function escapeHtml(str) {
     if (!str) return "";
     return String(str)

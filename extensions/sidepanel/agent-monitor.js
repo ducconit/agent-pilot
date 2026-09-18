@@ -152,11 +152,26 @@ export class AgentMonitor {
   }
 
   showSecretWarningModal() {
-    if (this.secretWarningModal) this.secretWarningModal.style.display = "flex";
+    if (!this.secretWarningModal) return;
+    this.secretWarningModal.style.display = "flex";
+    if (this.btnCancelSecretDisable) this.btnCancelSecretDisable.focus();
+    if (!this._secretModalKeyHandler) {
+      this._secretModalKeyHandler = (e) => {
+        if (e.key === "Escape" && this.secretWarningModal && this.secretWarningModal.style.display === "flex") {
+          e.preventDefault();
+          this.hideSecretWarningModal();
+          if (this.toggleSecretFilter) this.toggleSecretFilter.checked = true;
+        }
+      };
+    }
+    document.addEventListener("keydown", this._secretModalKeyHandler);
   }
 
   hideSecretWarningModal() {
     if (this.secretWarningModal) this.secretWarningModal.style.display = "none";
+    if (this._secretModalKeyHandler) {
+      document.removeEventListener("keydown", this._secretModalKeyHandler);
+    }
   }
 
   setSecretFilter(enabled) {
@@ -224,9 +239,6 @@ export class AgentMonitor {
     this.rawLogs.unshift(item);
     if (this.rawLogs.length > 500) this.rawLogs.pop();
 
-    this.agentActivityTotal++;
-    if (this.agentActivityCount) this.agentActivityCount.textContent = this.agentActivityTotal;
-
     const row = document.createElement("div");
     row.className = "agent-activity-item";
 
@@ -268,6 +280,12 @@ export class AgentMonitor {
     }
 
     this.agentActivityLog.prepend(row);
+
+    while (this.agentActivityLog.children.length > 500) {
+      this.agentActivityLog.removeChild(this.agentActivityLog.lastChild);
+    }
+    this.agentActivityTotal = this.rawLogs.length;
+    if (this.agentActivityCount) this.agentActivityCount.textContent = this.agentActivityTotal;
   }
 
   async runSelfTest() {

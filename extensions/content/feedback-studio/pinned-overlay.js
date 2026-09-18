@@ -6,6 +6,10 @@
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
   window.__AP_INTERNAL__.feedbackStudio = window.__AP_INTERNAL__.feedbackStudio || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.fsPinned) return;
+  window.__AP_INTERNAL__.__guards.fsPinned = true;
+
   // Setup DOM Elements
   const pinnedLayer = document.createElement("div");
   pinnedLayer.id = "agent-pilot-feedback-pinned-layer";

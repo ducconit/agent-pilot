@@ -225,6 +225,10 @@ export class ScreenshotPanel {
   }
 
   cropImageViaCanvas(fullDataUrl, clip) {
+    if (!clip) {
+      showToast("Lỗi cắt ảnh: Thiếu thông tin vùng chọn!");
+      return;
+    }
     const img = new Image();
     img.onload = () => {
       // Determine the exact scaling ratio between screenshot bitmap pixels and CSS pixels of the web page
@@ -276,6 +280,9 @@ export class ScreenshotPanel {
         this.shotDimensions.textContent = `Kích thước: ${img.naturalWidth} × ${img.naturalHeight} px`;
       }
     };
+    img.onerror = () => {
+      if (this.shotDimensions) this.shotDimensions.textContent = "Không thể đọc kích thước ảnh";
+    };
     img.src = dataUrl;
 
     // Switch to screenshot tab
@@ -290,6 +297,8 @@ export class ScreenshotPanel {
         } else if (customSuccessToast) {
           showToast(customSuccessToast);
         }
+      }).catch((err) => {
+        console.warn("[AgentPilot] Auto-copy screenshot note:", err);
       });
     } else if (customSuccessToast) {
       showToast(customSuccessToast);

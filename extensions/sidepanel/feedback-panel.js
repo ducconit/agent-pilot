@@ -110,10 +110,10 @@ export class FeedbackPanel {
     return null;
   }
 
-  async sendTabMessage(msg) {
+  async sendTabMessage(msg, { silent = false } = {}) {
     const tabId = await this.getActiveTabId();
     if (!tabId) {
-      this.ui.showToast("Không tìm thấy tab web đang hoạt động!", "warning");
+      if (!silent) this.ui.showToast("Không tìm thấy tab web đang hoạt động!", "warning");
       return null;
     }
     try {
@@ -124,8 +124,8 @@ export class FeedbackPanel {
     }
   }
 
-  async refreshState() {
-    const res = await this.sendTabMessage({ action: "get_feedback_studio_state" });
+  async refreshState({ silent = false } = {}) {
+    const res = await this.sendTabMessage({ action: "get_feedback_studio_state" }, { silent });
     if (res && res.success) {
       this.updateActiveState(res.active);
       this.items = res.items || [];
@@ -307,16 +307,19 @@ export class FeedbackPanel {
     if (this.emptyState) this.emptyState.style.display = "none";
     if (this.itemsList) {
       this.itemsList.style.display = "flex";
-      this.itemsList.innerHTML = this.items.map((item, idx) => `
-        <div class="feedback-card" data-id="${item.id}">
+      this.itemsList.innerHTML = this.items.map((item, idx) => {
+        const safeId = this.escapeHtml(item.id);
+        const mode = ["element", "region", "screen", "fullpage"].includes(item.mode) ? item.mode : "element";
+        return `
+        <div class="feedback-card" data-id="${safeId}">
           <div class="feedback-card-header">
             <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;">
-              <span class="badge-mini mode-${item.mode}">${item.mode.toUpperCase()}</span>
+              <span class="badge-mini mode-${mode}">${mode.toUpperCase()}</span>
               <span class="feedback-card-title">#${idx + 1}. ${this.escapeHtml(item.title || "")}</span>
             </div>
             <div class="feedback-card-actions">
-              <button class="btn btn-icon btn-xs btn-edit-item" data-id="${item.id}" title="Sửa ghi chú">✏️</button>
-              <button class="btn btn-icon btn-xs btn-del-item" data-id="${item.id}" title="Xóa">🗑️</button>
+              <button class="btn btn-icon btn-xs btn-edit-item" data-id="${safeId}" title="Sửa ghi chú">✏️</button>
+              <button class="btn btn-icon btn-xs btn-del-item" data-id="${safeId}" title="Xóa">🗑️</button>
             </div>
           </div>
           ${item.component ? `
@@ -326,19 +329,20 @@ export class FeedbackPanel {
             </div>
           ` : ""}
           <div class="feedback-comment-container">
-            <div class="feedback-comment-preview" id="side-comment-view-${item.id}" data-id="${item.id}" title="Bấm để sửa ghi chú">
+            <div class="feedback-comment-preview" id="side-comment-view-${safeId}" data-id="${safeId}" title="Bấm để sửa ghi chú">
               "${this.escapeHtml(item.comment || "Không có ghi chú")}"
             </div>
-            <div class="feedback-comment-edit hidden" id="side-comment-edit-${item.id}">
+            <div class="feedback-comment-edit hidden" id="side-comment-edit-${safeId}">
               <textarea class="side-comment-textarea" rows="2" placeholder="Nhập ghi chú cần sửa...">${this.escapeHtml(item.comment || "")}</textarea>
               <div class="side-comment-actions">
-                <button class="btn btn-primary btn-xs btn-save-comment" data-id="${item.id}">✓ Lưu</button>
-                <button class="btn btn-outline btn-xs btn-cancel-comment" data-id="${item.id}">Hủy</button>
+                <button class="btn btn-primary btn-xs btn-save-comment" data-id="${safeId}">✓ Lưu</button>
+                <button class="btn btn-outline btn-xs btn-cancel-comment" data-id="${safeId}">Hủy</button>
               </div>
             </div>
           </div>
         </div>
-      `).join("");
+      `;
+      }).join("");
 
       this.itemsList.querySelectorAll(".btn-del-item").forEach(btn => {
         btn.onclick = (e) => {

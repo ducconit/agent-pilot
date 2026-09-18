@@ -4,6 +4,10 @@
 (function () {
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.toast) return;
+  window.__AP_INTERNAL__.__guards.toast = true;
+
   const TOAST_DURATION = 3200;
 
   function showToast(htmlMessage) {

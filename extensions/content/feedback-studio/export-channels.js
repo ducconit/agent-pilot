@@ -6,6 +6,10 @@
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
   window.__AP_INTERNAL__.feedbackStudio = window.__AP_INTERNAL__.feedbackStudio || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.fsChannels) return;
+  window.__AP_INTERNAL__.__guards.fsChannels = true;
+
   const constants = window.__AP_INTERNAL__.feedbackStudio.constants || {};
   const showToast = constants.showToast || (() => {});
 

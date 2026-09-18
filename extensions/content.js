@@ -113,7 +113,6 @@
     const bridgeScript = document.createElement("script");
     bridgeScript.textContent = `
       (() => {
-        if (window.__AGENT_PILOT__) return;
         function sendBridgeRequest(action, data = {}, customTimeout = null) {
           let timeoutMs = 5000;
           if (customTimeout && Number(customTimeout) > 0) {
@@ -127,7 +126,7 @@
           } else if (timeoutMs <= 0) {
             timeoutMs = 5000;
           }
-          return new Promise((resolve) => {
+          return new Promise((resolve, reject) => {
             const reqId = "ap_" + Math.random().toString(36).substr(2, 9);
             const timer = setTimeout(() => {
               window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
@@ -137,7 +136,11 @@
               if (e.detail && e.detail.reqId === reqId) {
                 clearTimeout(timer);
                 window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
-                resolve(e.detail.result);
+                if (e.detail.error) {
+                  reject(new Error(String(e.detail.error)));
+                } else {
+                  resolve(e.detail.result);
+                }
               }
             }
             window.addEventListener("__AGENT_PILOT_RESP__", onResponse);
@@ -147,8 +150,7 @@
           });
         }
 
-        window.__AGENT_PILOT__ = window.__AGENT_PILOT__ || {};
-        Object.assign(window.__AGENT_PILOT__, {
+        const pageApi = {
           version: "${EXTENSION_VERSION}",
           moveMouse: (x, y, duration) => sendBridgeRequest("virtual_mouse_move", { x, y, duration }),
           click: (x, y) => sendBridgeRequest("virtual_mouse_click", { x, y }),
@@ -165,12 +167,15 @@
           startElementSnap: () => sendBridgeRequest("start_element_snap", {}),
           stopElementSnap: () => sendBridgeRequest("stop_element_snap", {}),
           isElementSnapActive: () => sendBridgeRequest("is_element_snap_active", {}),
+          startRegionCrop: () => sendBridgeRequest("start_region_crop", {}),
+          getLockedElement: () => sendBridgeRequest("get_locked_element", {}),
           pickColor: (x, y) => sendBridgeRequest("pick_color", { x, y }),
           stopEyedropper: () => sendBridgeRequest("stop_eyedropper", {}),
           isEyedropperActive: () => sendBridgeRequest("is_eyedropper_active", {}),
           getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {}),
           isBusy: () => sendBridgeRequest("is_busy", {}),
           isAgentTab: () => sendBridgeRequest("is_agent_tab", {}),
+          setAgentTab: (enabled) => sendBridgeRequest("set_agent_tab", { enabled }),
           setBusy: (busy, action) => sendBridgeRequest("set_busy", { busy, action }),
           startFeedbackStudio: () => sendBridgeRequest("start_feedback_studio", {}),
           stopFeedbackStudio: () => sendBridgeRequest("stop_feedback_studio", {}),
@@ -182,7 +187,14 @@
           generateFeedbackPrompt: (items) => sendBridgeRequest("generate_feedback_prompt", { items }),
           saveFeedbackToInbox: () => sendBridgeRequest("save_feedback_inbox", {}),
           pushFeedbackToAgent: () => sendBridgeRequest("push_feedback_agent", {})
-        });
+        };
+
+        window.__AGENT_PILOT__ = window.__AGENT_PILOT__ || {};
+        for (const [name, fn] of Object.entries(pageApi)) {
+          if (typeof window.__AGENT_PILOT__[name] === "undefined") {
+            window.__AGENT_PILOT__[name] = fn;
+          }
+        }
       })();
     `;
     (document.head || document.documentElement).appendChild(bridgeScript);
@@ -210,17 +222,20 @@
         const el = cursor.resolveElement ? cursor.resolveElement(data.selector) : document.querySelector(data.selector);
         result = inspector.getDetailedElementInfo(el, Boolean(data.includeStyles));
       }
+      else if (action === "get_locked_element") result = inspector.getLockedElement();
       else if (action === "get_snapshot") result = inspector.getInteractiveSnapshot(data.maxElements, data.format);
       else if (action === "fill_form") result = await cursor.virtualFillForm(data.fields, data.submitSelector, data.pressEnter);
       else if (action === "start_element_snap") { inspector.startElementSnap(); result = { success: true }; }
       else if (action === "stop_element_snap") { inspector.stopElementSnap(); result = { success: true }; }
       else if (action === "is_element_snap_active") result = inspector.isElementSnapActive();
+      else if (action === "start_region_crop") { inspector.startRegionCrop(); result = { success: true }; }
       else if (action === "pick_color") result = await eyedropper.pickColor(data.x, data.y);
       else if (action === "stop_eyedropper") { eyedropper.stopEyedropper(); result = { success: true }; }
       else if (action === "is_eyedropper_active") result = eyedropper.isEyedropperActive();
       else if (action === "get_cursor_pos") result = cursor.getCursorPosition();
       else if (action === "is_busy") result = shield.isBusy();
       else if (action === "is_agent_tab") result = isAgentTab;
+      else if (action === "set_agent_tab") { isAgentTab = Boolean(data.enabled); result = isAgentTab; }
       else if (action === "set_busy") { shield.setAgentBusyState(data.busy, data.action); result = { success: true, isAgentBusy: shield.isBusy() }; }
       else if (action === "start_feedback_studio") { feedback.start(); result = { success: true, active: feedback.isActive() }; }
       else if (action === "stop_feedback_studio") { feedback.stop(); result = { success: true, active: feedback.isActive() }; }
@@ -245,17 +260,17 @@
   // Listen for messages from Background & Side Panel
   chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
     if (req.action === "virtual_mouse_move" || req.action === "move_cursor") {
-      cursor.moveVirtualMouse(req.x, req.y, req.duration || 300).then(sendResponse);
+      cursor.moveVirtualMouse(req.x, req.y, req.duration || 300).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 
     if (req.action === "virtual_mouse_click" || req.action === "click_cursor") {
-      cursor.virtualClick(req.x, req.y, req.selector).then(sendResponse);
+      cursor.virtualClick(req.x, req.y, req.selector).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 
     if (req.action === "virtual_type" || req.action === "type_text") {
-      cursor.virtualType(req.selector, req.text, req.clear, req.pressEnter).then(sendResponse);
+      cursor.virtualType(req.selector, req.text, req.clear, req.pressEnter).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 
@@ -265,17 +280,17 @@
     }
 
     if (req.action === "virtual_hover" || req.action === "hover") {
-      cursor.virtualHover(req.selector, { dispatchSynthetic: req.dispatchSynthetic }).then(sendResponse);
+      cursor.virtualHover(req.selector, { dispatchSynthetic: req.dispatchSynthetic }).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 
     if (req.action === "virtual_drag" || req.action === "drag") {
-      cursor.virtualDrag(req.fromSelector || req.from, req.toSelector || req.to, req.steps).then(sendResponse);
+      cursor.virtualDrag(req.fromSelector || req.from, req.toSelector || req.to, req.steps).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 
     if (req.action === "wait_for") {
-      cursor.waitFor(req).then(sendResponse);
+      cursor.waitFor(req).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 
@@ -377,7 +392,7 @@
     }
 
     if (req.action === "fill_form") {
-      cursor.virtualFillForm(req.fields, req.submitSelector, req.pressEnter).then(sendResponse);
+      cursor.virtualFillForm(req.fields, req.submitSelector, req.pressEnter).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 
@@ -414,7 +429,7 @@
             new ClipboardItem({ "image/png": blob })
           ]);
           if (req.showInPageToast) {
-            toast.showToast("📋 Đã sao chép ảnh vào clipboard!");
+            window.__AP_INTERNAL__.showToast?.("📋 Đã sao chép ảnh vào clipboard!");
           }
           sendResponse({ success: true });
         } catch (e) {
@@ -490,12 +505,12 @@
     }
 
     if (req.action === "save_feedback_inbox_tab") {
-      feedback.saveToInbox().then(sendResponse);
+      feedback.saveToInbox().then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 
     if (req.action === "push_feedback_agent_tab") {
-      feedback.pushToAgent().then(sendResponse);
+      feedback.pushToAgent().then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 
@@ -537,6 +552,9 @@
       });
       return true;
     }
+
+    sendResponse({ success: false, error: `Unknown action: ${req.action || req.type || "unnamed"}` });
+    return true;
   });
 
   // Keep background service worker alive and connected to Agent Pilot bridge

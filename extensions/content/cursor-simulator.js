@@ -5,6 +5,10 @@
 (function () {
   window.__AP_INTERNAL__ = window.__AP_INTERNAL__ || {};
 
+  window.__AP_INTERNAL__.__guards = window.__AP_INTERNAL__.__guards || {};
+  if (window.__AP_INTERNAL__.__guards.cursor) return;
+  window.__AP_INTERNAL__.__guards.cursor = true;
+
   const CONFIG = {
     DEFAULT_MOVE_DURATION: 350,
     CLICK_DELAY: 150,

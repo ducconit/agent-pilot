@@ -2,18 +2,22 @@
  * Agent Pilot - Side Panel UI Helpers
  */
 
+let toastTimer = null;
+
 export function showToast(message) {
   const sidepanelToast = document.getElementById("sidepanel-toast");
   if (!sidepanelToast) return;
   sidepanelToast.textContent = message;
   sidepanelToast.classList.add("visible");
-  setTimeout(() => {
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
     sidepanelToast.classList.remove("visible");
+    toastTimer = null;
   }, 2800);
 }
 
 export function escapeHtml(str) {
-  if (!str) return "";
+  if (str === null || str === undefined) return "";
   return String(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -24,8 +28,20 @@ export function escapeHtml(str) {
 
 export function formatParams(params) {
   if (!params) return "";
-  if (typeof params !== "object") return String(params);
-  const keys = Object.keys(params);
-  if (keys.length === 0) return "";
-  return keys.map((k) => `${k}: ${JSON.stringify(params[k])}`).join(", ");
+  try {
+    if (typeof params !== "object") return String(params);
+    const keys = Object.keys(params);
+    if (keys.length === 0) return "";
+    return keys.map((k) => {
+      let val;
+      try {
+        val = JSON.stringify(params[k]);
+      } catch (_) {
+        val = String(params[k]);
+      }
+      return `${k}: ${val}`;
+    }).join(", ");
+  } catch (_) {
+    return String(params);
+  }
 }
