@@ -89,6 +89,13 @@
   }
 
   // Eyedropper & Loupe Geometry Constants
+  //
+  // Grid -> canvas mapping: we sample an 11x11 block of source pixels centred on the
+  // cursor (GRID_RADIUS = 5 => offsets -5..+5) and blow every single source pixel up to
+  // a PIXEL_ZOOM x PIXEL_ZOOM square on the loupe canvas. Hence the canvas side is
+  // GRID_COUNT * PIXEL_ZOOM = 11 * 12 = 132px, and the centre (targeted) pixel occupies
+  // the cell starting at GRID_RADIUS * PIXEL_ZOOM = 60px — that is what RETICLE_CENTER
+  // below frames with the crosshair reticle.
   const GRID_RADIUS = 5; // 11x11 grid (-5 to +5)
   const GRID_COUNT = 11;
   const PIXEL_ZOOM = 12; // Each screen pixel enlarged to 12x12px
@@ -100,6 +107,10 @@
   const OFFSET_Y_BOTTOM = 24;
   const EDGE_MARGIN = 12;
   const RETICLE_CENTER = 60; // Center pixel starts at 60px (5 * 12)
+
+  // Shared config with local fallbacks (see content/config.js).
+  const T = (window.__AP_CONFIG__ && window.__AP_CONFIG__.timeouts) || {};
+  const SNAPSHOT_REFRESH_DEBOUNCE_MS = T.snapshotRefreshDebounceMs || 120;
 
   // State Management
   let isActive = false;
@@ -325,8 +336,11 @@
       loupeCtx.stroke();
     }
 
-    // 4. Center reticle/target box over the exact targeted pixel
-    // Dark outer border for contrast on light pixels
+    // 4. Center reticle/target box over the exact targeted pixel.
+    // RETICLE_CENTER (=60) is the top-left corner, in canvas px, of the centre source
+    // cell (GRID_RADIUS * PIXEL_ZOOM). A PIXEL_ZOOM-sized box there frames the sampled
+    // pixel exactly. A dark border is drawn slightly outside it for contrast on light
+    // pixels, and a cyan border just inside for contrast on dark pixels.
     loupeCtx.strokeStyle = "rgba(0, 0, 0, 0.85)";
     loupeCtx.lineWidth = 2.5;
     loupeCtx.strokeRect(RETICLE_CENTER - 0.5, RETICLE_CENTER - 0.5, PIXEL_ZOOM + 1, PIXEL_ZOOM + 1);
@@ -381,6 +395,8 @@
   function onScroll() {
     if (!isActive) return;
     clearTimeout(scrollDebounce);
+    // Re-grab the screenshot only after the user stops scrolling, otherwise we would
+    // request a full-screen capture on every scroll tick.
     scrollDebounce = setTimeout(() => {
       if (isActive) {
         refreshSnapshot().then(() => {
@@ -390,7 +406,7 @@
           }
         });
       }
-    }, 120);
+    }, SNAPSHOT_REFRESH_DEBOUNCE_MS);
   }
 
   function selectAndFinish(sample) {

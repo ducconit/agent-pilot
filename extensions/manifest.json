@@ -34,9 +34,13 @@
     {
       "matches": ["<all_urls>"],
       "js": [
+        "content/config.js",
         "content/toast.js",
         "content/lock-shield.js",
         "content/cursor-simulator.js",
+        "content/cursor-form.js",
+        "content/cursor-wait.js",
+        "content/selector-utils.js",
         "content/dom-inspector.js",
         "content/eyedropper.js",
         "content/feedback-studio/constants.js",

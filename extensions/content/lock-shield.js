@@ -144,6 +144,10 @@
   function attachInputBlockers() {
     if (areBlockersAttached) return;
     areBlockersAttached = true;
+    // Capture phase + passive:false on purpose: we must run BEFORE the page's own
+    // listeners (capture phase) and we must be allowed to preventDefault() the event.
+    // Passive listeners cannot call preventDefault (wheel/touch would be ignored), and
+    // a bubble-phase listener could be stopped by a page handler first.
     BLOCKED_INPUT_EVENTS.forEach((evtName) => {
       window.addEventListener(evtName, handleCaptureInput, { capture: true, passive: false });
     });

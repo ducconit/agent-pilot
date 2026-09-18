@@ -167,9 +167,13 @@ async function ensureContentScriptInner(tabId) {
       const manifest = (typeof chrome !== "undefined" && chrome.runtime?.getManifest) ? chrome.runtime.getManifest() : null;
       const isolatedEntry = manifest?.content_scripts?.find(cs => cs.js && (!cs.world || cs.world === "ISOLATED"));
       const contentFiles = isolatedEntry?.js || [
+        "content/config.js",
         "content/toast.js",
         "content/lock-shield.js",
         "content/cursor-simulator.js",
+        "content/cursor-form.js",
+        "content/cursor-wait.js",
+        "content/selector-utils.js",
         "content/dom-inspector.js",
         "content/eyedropper.js",
         "content/feedback-studio/constants.js",

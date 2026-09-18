@@ -55,6 +55,18 @@
     generateMarkdownPrompt: () => null
   };
 
+  // Shared config with local fallbacks (see content/config.js).
+  const T = (window.__AP_CONFIG__ && window.__AP_CONFIG__.timeouts) || {};
+  const IDS = (window.__AP_CONFIG__ && window.__AP_CONFIG__.ids) || {};
+  const BRIDGE_REQUEST_MS = T.bridgeRequestMs || 5000;
+  const BRIDGE_MAX_DELAY_MS = T.bridgeMaxDelayMs || 2147483647;
+  const WAIT_FOR_EXTRA_MS = T.waitForExtraMs || 3000;
+  const WAIT_FOR_SELECTOR_DEFAULT_MS = T.waitForSelectorDefaultMs || 5000;
+  const MOUSE_MOVE_DEFAULT_MS = T.mouseMoveDefaultMs || 300;
+  const CURSOR_BUSY_MS = T.cursorBusyMs || 3000;
+  const KEEPALIVE_RECONNECT_MS = T.keepAliveReconnectMs || 1500;
+  const UNIQUE_ID_SALT_LEN = IDS.uniqueIdSaltLen || 9;
+
   let isAgentTab = false;
 
   const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
@@ -114,20 +126,20 @@
     bridgeScript.textContent = `
       (() => {
         function sendBridgeRequest(action, data = {}, customTimeout = null) {
-          let timeoutMs = 5000;
+          let timeoutMs = ${BRIDGE_REQUEST_MS};
           if (customTimeout && Number(customTimeout) > 0) {
             timeoutMs = Number(customTimeout);
           } else if (action === "wait_for") {
             const waitDur = (data && (data.timeout || data.timeoutMs)) ? Number(data.timeout || data.timeoutMs) : 10000;
-            timeoutMs = waitDur + 3000;
+            timeoutMs = waitDur + ${WAIT_FOR_EXTRA_MS};
           }
-          if (!Number.isFinite(timeoutMs) || timeoutMs > 2147483647) {
-            timeoutMs = 2147483647;
+          if (!Number.isFinite(timeoutMs) || timeoutMs > ${BRIDGE_MAX_DELAY_MS}) {
+            timeoutMs = ${BRIDGE_MAX_DELAY_MS};
           } else if (timeoutMs <= 0) {
-            timeoutMs = 5000;
+            timeoutMs = ${BRIDGE_REQUEST_MS};
           }
           return new Promise((resolve, reject) => {
-            const reqId = "ap_" + Math.random().toString(36).substr(2, 9);
+            const reqId = "ap_" + Math.random().toString(36).substr(2, ${UNIQUE_ID_SALT_LEN});
             const timer = setTimeout(() => {
               window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
               resolve(null);
@@ -260,7 +272,7 @@
   // Listen for messages from Background & Side Panel
   chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
     if (req.action === "virtual_mouse_move" || req.action === "move_cursor") {
-      cursor.moveVirtualMouse(req.x, req.y, req.duration || 300).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
+      cursor.moveVirtualMouse(req.x, req.y, req.duration || MOUSE_MOVE_DEFAULT_MS).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 
@@ -318,7 +330,7 @@
         const fileInput = target.querySelector ? target.querySelector("input[type=file]") : null;
         if (fileInput) target = fileInput;
       }
-      const marker = "ap-upload-" + Math.random().toString(36).slice(2, 9);
+      const marker = "ap-upload-" + Math.random().toString(36).slice(2, UNIQUE_ID_SALT_LEN);
       target.setAttribute("data-agent-pilot-upload", marker);
       sendResponse({ success: true, marker });
       return true;
@@ -352,7 +364,7 @@
 
     if (req.action === "wait_for_selector") {
       const selector = req.selector;
-      const timeoutMs = Number(req.timeoutMs || req.timeout || 5000);
+      const timeoutMs = Number(req.timeoutMs || req.timeout || WAIT_FOR_SELECTOR_DEFAULT_MS);
       const startTime = Date.now();
       const checkInterval = 100;
 
@@ -536,7 +548,7 @@
     if (req.action === "set_agent_busy") {
       shield.setAgentBusyState(req.busy, req.currentAction || "");
       if (req.busy) {
-        cursor.activateCursor(3000);
+        cursor.activateCursor(CURSOR_BUSY_MS);
       }
       sendResponse({ success: true, isAgentBusy: shield.isBusy(), isSessionActive: shield.isSessionActive() });
       return true;
@@ -568,7 +580,7 @@
           try {
             setupServiceWorkerKeepAlive();
           } catch (_) {}
-        }, 1500);
+        }, KEEPALIVE_RECONNECT_MS);
       });
     } catch (_) {}
   }

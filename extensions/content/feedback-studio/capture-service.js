@@ -10,6 +10,12 @@
   if (window.__AP_INTERNAL__.__guards.fsCapture) return;
   window.__AP_INTERNAL__.__guards.fsCapture = true;
 
+  // Shared config with local fallbacks (see content/config.js).
+  const T = (window.__AP_CONFIG__ && window.__AP_CONFIG__.timeouts) || {};
+  const IDS = (window.__AP_CONFIG__ && window.__AP_CONFIG__.ids) || {};
+  const FRAMEWORK_PROBE_MS = T.frameworkProbeMs || 250;
+  const UNIQUE_ID_SALT_LEN = IDS.uniqueIdSaltLen || 9;
+
   /**
    * Query React / Vue / Astro component source information via CustomEvent bridge
    */
@@ -18,14 +24,16 @@
       if (!element || !(element instanceof Element)) {
         return resolve(null);
       }
-      const reqId = "req_" + Math.random().toString(36).substr(2, 9);
+      const reqId = "req_" + Math.random().toString(36).substr(2, UNIQUE_ID_SALT_LEN);
       element.setAttribute("data-ap-inspect-target", reqId);
 
+      // The main-world bridge answers synchronously; if it never replies within this
+      // window we resolve(null) instead of leaking the pending promise.
       const timeout = setTimeout(() => {
         window.removeEventListener("__AP_INSPECT_SOURCE_RESP__", onResp);
         element.removeAttribute("data-ap-inspect-target");
         resolve(null);
-      }, 250);
+      }, FRAMEWORK_PROBE_MS);
 
       function onResp(e) {
         if (e.detail && e.detail.reqId === reqId) {
@@ -47,6 +55,11 @@
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
+        // Measured scale, not dpr: the capture can be taken at a different device pixel
+        // ratio than the page reports (Chrome may render/scale the screenshot itself),
+        // so we derive the real ratio from the returned image width vs. the recorded
+        // viewport width instead of trusting clip.devicePixelRatio. Only if neither
+        // width is known do we fall back to the reported dpr, then finally to 1.
         const scale = (clip.pageWidth ? img.naturalWidth / clip.pageWidth : null) || (img.naturalWidth / window.innerWidth) || clip.devicePixelRatio || 1;
         const padding = 10; // Extra context margin around element
         const rawX = Math.max(0, clip.x - padding);

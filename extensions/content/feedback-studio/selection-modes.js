@@ -129,6 +129,10 @@
     hideHighlighter();
 
     const rect = target.getBoundingClientRect();
+    // getBoundingClientRect() is viewport-relative, but the capture is cropped in the
+    // full-page screenshot space. We therefore record BOTH: x/y (viewport px, used to
+    // crop the visible screenshot) and pageX/pageY (viewport + current scroll, used to
+    // place the pinned overlay so it stays glued to the element after scrolling).
     const clip = {
       x: Math.round(rect.left),
       y: Math.round(rect.top),

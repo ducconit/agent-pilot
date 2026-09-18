@@ -9,6 +9,16 @@
   if (window.__AP_INTERNAL__.__guards.inspector) return;
   window.__AP_INTERNAL__.__guards.inspector = true;
 
+  // Shared config with local fallbacks (see content/config.js).
+  const T = (window.__AP_CONFIG__ && window.__AP_CONFIG__.timeouts) || {};
+  const L = (window.__AP_CONFIG__ && window.__AP_CONFIG__.limits) || {};
+  const SNAPSHOT_DEFAULT_ELEMENTS = L.snapshotDefaultElements || 80;
+  const SNAPSHOT_MIN_ELEMENTS = L.snapshotMinElements || 10;
+  const SNAPSHOT_MAX_FROM_CALLER = L.snapshotMaxFromCaller || 300;
+  const SNAPSHOT_MAX_ELEMENTS = L.snapshotMaxElements || 500;
+  const HIGHLIGHT_FLASH_MS = T.highlightFlashMs || 1200;
+  const SNAP_FLASH_MS = T.snapFlashMs || 1000;
+
   function escapeHtml(str) {
     if (!str) return "";
     return String(str)
@@ -42,11 +52,17 @@
   inspectorTooltip.id = "agent-pilot-inspector-tooltip";
   document.documentElement.appendChild(inspectorTooltip);
 
-  function escapeSelectorToken(token) {
+  // ---------------------------------------------------------------------------
+  // Selector / XPath helpers live in content/selector-utils.js, injected just
+  // before this module. We delegate to it when present and keep a local fallback
+  // copy ONLY for the case where that module is missing (partial injection / older
+  // manifest ordering). This keeps the public inspector API byte-compatible.
+  // ---------------------------------------------------------------------------
+  function escapeSelectorTokenFallback(token) {
     return (typeof CSS !== "undefined" && CSS.escape) ? CSS.escape(token) : String(token);
   }
 
-  function buildStructuralPath(el) {
+  function buildStructuralPathFallback(el) {
     const segments = [];
     let node = el;
     while (node && node.nodeType === Node.ELEMENT_NODE && node !== document.body) {
@@ -61,11 +77,11 @@
     return segments.join(" > ");
   }
 
-  function getElementSelector(el) {
+  function getElementSelectorFallback(el) {
     if (!el || el === document.body || el === document.documentElement) return el ? el.tagName.toLowerCase() : "";
     try {
       if (el.id) {
-        const idSelector = `#${escapeSelectorToken(el.id)}`;
+        const idSelector = `#${escapeSelectorTokenFallback(el.id)}`;
         if (document.querySelectorAll(idSelector).length === 1) return idSelector;
       }
 
@@ -75,7 +91,7 @@
         let selector = node.nodeName.toLowerCase();
         if (node.className && typeof node.className === "string") {
           const classes = node.className.trim().split(/\s+/).filter((c) => c && !c.startsWith("agent-pilot"));
-          if (classes.length) selector += "." + classes.slice(0, 2).map(escapeSelectorToken).join(".");
+          if (classes.length) selector += "." + classes.slice(0, 2).map(escapeSelectorTokenFallback).join(".");
         }
         path.unshift(selector);
         node = node.parentElement;
@@ -84,10 +100,10 @@
       const selector = path.join(" > ");
       if (selector && document.querySelectorAll(selector).length === 1) return selector;
     } catch (_) {}
-    return buildStructuralPath(el);
+    return buildStructuralPathFallback(el);
   }
 
-  function getXPath(el) {
+  function getXPathFallback(el) {
     if (!el) return "";
     if (el.id && !el.id.includes('"')) return `//*[@id="${el.id}"]`;
     if (el === document.body) return "/html/body";
@@ -97,7 +113,7 @@
     for (let i = 0; i < siblings.length; i++) {
       const sibling = siblings[i];
       if (sibling === el) {
-        return getXPath(el.parentNode) + "/" + el.tagName.toLowerCase() + "[" + (ix + 1) + "]";
+        return getXPathFallback(el.parentNode) + "/" + el.tagName.toLowerCase() + "[" + (ix + 1) + "]";
       }
       if (sibling.nodeType === 1 && sibling.tagName === el.tagName) {
         ix++;
@@ -105,6 +121,10 @@
     }
     return "";
   }
+
+  const selectorUtils = window.__AP_INTERNAL__.selectorUtils || null;
+  const getElementSelector = selectorUtils ? selectorUtils.getElementSelector : getElementSelectorFallback;
+  const getXPath = selectorUtils ? selectorUtils.getXPath : getXPathFallback;
 
   function getDetailedElementInfo(el, includeStyles = false) {
     if (!el) return null;
@@ -210,8 +230,8 @@
     return info;
   }
 
-  function getInteractiveSnapshot(maxElements = 80, format = "text") {
-    maxElements = Math.min(Math.max(Number(maxElements) || 80, 10), 300);
+  function getInteractiveSnapshot(maxElements = SNAPSHOT_DEFAULT_ELEMENTS, format = "text") {
+    maxElements = Math.min(Math.max(Number(maxElements) || SNAPSHOT_DEFAULT_ELEMENTS, SNAPSHOT_MIN_ELEMENTS), SNAPSHOT_MAX_FROM_CALLER);
     const selectorQuery = [
       "a[href]",
       "button",
@@ -239,7 +259,7 @@
 
     // Also include elements with direct onclick
     const allDivsSpans = document.querySelectorAll("div, span, li, tr");
-    for (let i = 0; i < allDivsSpans.length && rawNodes.length < 500; i++) {
+    for (let i = 0; i < allDivsSpans.length && rawNodes.length < SNAPSHOT_MAX_ELEMENTS; i++) {
       const node = allDivsSpans[i];
       if (node.onclick || node.getAttribute("onclick")) {
         if (!seenNodes.has(node)) {
@@ -436,7 +456,7 @@
     highlightTimer = setTimeout(() => {
       inspectorBox.style.display = "none";
       highlightTimer = null;
-    }, 1200);
+    }, HIGHLIGHT_FLASH_MS);
 
     // Gửi thông tin phần tử đã chọn sang Side Panel
     chrome.runtime.sendMessage({
@@ -577,7 +597,7 @@
     highlightTimer = setTimeout(() => {
       inspectorBox.style.display = "none";
       highlightTimer = null;
-    }, 1000);
+    }, SNAP_FLASH_MS);
 
     // Gửi yêu cầu chụp phần tử đến Side Panel / Background
     chrome.runtime.sendMessage({

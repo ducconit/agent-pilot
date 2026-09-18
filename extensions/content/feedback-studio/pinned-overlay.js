@@ -36,6 +36,9 @@
     draftBox.style.height = `${clip.height}px`;
 
     const viewportY = (clip.y !== undefined) ? clip.y : (pageY - window.scrollY);
+    // Flip-badge: the numbered badge normally sits just above the box. When the box is
+    // near the top of the viewport (< 28px) there is no room, so we add a class that
+    // moves the badge inside the box instead of letting it overflow off-screen.
     draftBox.classList.toggle("flip-badge-inside", viewportY < 28);
     const badgeEl = draftBox.querySelector("#ap-draft-badge");
     if (badgeEl) {
@@ -101,6 +104,8 @@
       box.style.width = `${item.clip.width}px`;
       box.style.height = `${item.clip.height}px`;
 
+      // Same flip-badge rule as the draft box: keep the badge visible when the box
+      // hugs the top edge of the viewport.
       const viewportY = (item.clip.y !== undefined) ? item.clip.y : (pageY - window.scrollY);
       if (viewportY < 28) {
         box.classList.add("flip-badge-inside");

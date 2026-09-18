@@ -204,7 +204,11 @@
   `;
   document.documentElement.appendChild(annotatorModal);
 
-  const MIN_BOX_SIZE = 10;
+  // Shared config with local fallbacks (see content/config.js).
+  const T = (window.__AP_CONFIG__ && window.__AP_CONFIG__.timeouts) || {};
+  const L = (window.__AP_CONFIG__ && window.__AP_CONFIG__.limits) || {};
+  const MODAL_INIT_DELAY_MS = T.modalInitDelayMs || 60;
+  const MIN_BOX_SIZE = L.annotationMinBoxPx || 10;
   const BADGE_BASE_WIDTH = 24;
   const BADGE_CHAR_WIDTH = 7;
   const BADGE_HEIGHT = 18;
@@ -258,7 +262,9 @@
 
     annotatorModal.classList.remove("hidden");
     attachAnnotatorDragListeners();
-    setTimeout(syncSvgDimensions, 60);
+    // The <img> may not have laid out yet right after being shown; re-sync SVG dims
+    // once the browser has had a frame to compute the image's rendered size.
+    setTimeout(syncSvgDimensions, MODAL_INIT_DELAY_MS);
   }
 
   function closeAnnotatorModal() {

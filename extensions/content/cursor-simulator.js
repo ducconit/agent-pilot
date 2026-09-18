@@ -9,11 +9,18 @@
   if (window.__AP_INTERNAL__.__guards.cursor) return;
   window.__AP_INTERNAL__.__guards.cursor = true;
 
+  // Shared config with local fallbacks (see content/config.js).
+  const T = (window.__AP_CONFIG__ && window.__AP_CONFIG__.timeouts) || {};
+
   const CONFIG = {
-    DEFAULT_MOVE_DURATION: 350,
-    CLICK_DELAY: 150,
-    TYPING_INTERVAL: 40,
-    SCROLL_AMOUNT: 300
+    DEFAULT_MOVE_DURATION: T.defaultMoveMs || 350,
+    CLICK_DELAY: T.clickDelayMs || 150,
+    TYPING_INTERVAL: T.typingIntervalMs || 40,
+    SCROLL_AMOUNT: T.scrollAmountPx || 300,
+    CURSOR_ACTIVATE_MS: T.cursorActivateMs || 2500,
+    FIELD_FOCUS_MOVE_MS: T.fieldFocusMoveMs || 250,
+    CLICK_RIPPLE_MS: T.clickRippleMs || 550,
+    DRAG_STEP_DELAY_MS: T.dragStepDelayMs || 25
   };
 
   let currentMouseX = 100;
@@ -39,7 +46,7 @@
   cursorLayer.appendChild(virtualCursor);
   updateCursorTransform(currentMouseX, currentMouseY);
 
-  function activateCursor(timeoutMs = 2500) {
+  function activateCursor(timeoutMs = CONFIG.CURSOR_ACTIVATE_MS) {
     if (document.hidden) return;
     if (cursorHideTimeout) {
       clearTimeout(cursorHideTimeout);
@@ -96,12 +103,18 @@
   }
 
   /**
-   * Animate Virtual Mouse to (targetX, targetY) with smooth trajectory
+   * Animate Virtual Mouse to (targetX, targetY) with a smooth trajectory.
+   *
+   * Animation path: this drives a requestAnimationFrame loop that interpolates the
+   * cursor position with an ease-out-cubic curve (fast start, soft landing) so the
+   * synthetic motion looks human rather than teleporting.
    */
   function moveVirtualMouse(targetX, targetY, duration = CONFIG.DEFAULT_MOVE_DURATION) {
     activateCursor();
-    // Chromium pauses requestAnimationFrame in background tabs (document.hidden = true).
-    // In background mode, immediately update coordinates without waiting for rAF.
+    // Background-tab workaround: Chromium suspends requestAnimationFrame for hidden
+    // tabs (document.hidden === true), so the rAF loop below would never tick and the
+    // returned promise would hang forever. When hidden, snap straight to the target
+    // and resolve immediately instead of waiting on a frame that will not arrive.
     if (document.hidden) {
       updateCursorTransform(targetX, targetY);
       return Promise.resolve({ success: true, x: targetX, y: targetY });
@@ -221,7 +234,7 @@
       ripple.style.width = "48px";
       ripple.style.height = "48px";
       cursorLayer.appendChild(ripple);
-      setTimeout(() => ripple.remove(), 550);
+      setTimeout(() => ripple.remove(), CONFIG.CLICK_RIPPLE_MS);
     }
 
     // Find element under pointer if selector was not specified
@@ -312,10 +325,15 @@
     if (!el) return { success: false, error: "Target element not found" };
 
     const rect = el.getBoundingClientRect();
-    await moveVirtualMouse(rect.left + rect.width / 2, rect.top + rect.height / 2, 250);
+    await moveVirtualMouse(rect.left + rect.width / 2, rect.top + rect.height / 2, CONFIG.FIELD_FOCUS_MOVE_MS);
     await virtualClick(rect.left + rect.width / 2, rect.top + rect.height / 2);
 
     el.focus();
+    // React/Vue native-setter fallback: frameworks patch the `value` property on the
+    // DOM element instance and track state through their own listener. Assigning
+    // `el.value = ...` directly can be swallowed; calling the ORIGINAL descriptor setter
+    // from the prototype (HTMLInputElement/HTMLTextAreaElement) bypasses the patch and
+    // reliably notifies the framework's value tracker.
     const proto = (el instanceof HTMLTextAreaElement) ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
     const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
 
@@ -479,98 +497,14 @@
   }
 
   /**
-   * Fast batch fill for forms with React/Vue/Angular/HTML5 compatibility
+   * Thin delegating wrapper — the implementation moved to content/cursor-form.js
+   * (injected right after this file). Kept on the public cursor API so every existing
+   * caller (content.js routing, form-fill bridge actions, ...) keeps working unchanged.
    */
-  async function virtualFillForm(fields = [], submitSelector = null, pressEnter = false) {
-    if (!Array.isArray(fields) || fields.length === 0) {
-      return { success: false, error: "Fields array must not be empty" };
-    }
-
-    activateCursor();
-    let filledCount = 0;
-    let lastTargetEl = null;
-
-    for (const field of fields) {
-      const selector = field.selector || field.name || field.id;
-      if (!selector) continue;
-      const el = resolveElement(selector);
-      if (!el) {
-        console.warn("[AgentPilot] virtualFillForm: element not found for", selector);
-        continue;
-      }
-
-      // Scroll into view if needed
-      const r = el.getBoundingClientRect();
-      const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
-      if (!inView && el.scrollIntoView) {
-        el.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
-      }
-
-      el.focus();
-      lastTargetEl = el;
-
-      const tag = el.tagName.toLowerCase();
-      const type = (el.getAttribute("type") || "").toLowerCase();
-      const val = field.value !== undefined ? field.value : "";
-
-      try {
-        setDispatching(true);
-
-        if (tag === "select") {
-          el.value = String(val);
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-          el.dispatchEvent(new Event("change", { bubbles: true }));
-          filledCount++;
-        } else if (type === "checkbox" || type === "radio") {
-          const shouldCheck = typeof val === "boolean" ? val : (val === "true" || val === "1" || val === "checked");
-          if (el.checked !== shouldCheck) {
-            el.checked = shouldCheck;
-            el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-            el.dispatchEvent(new Event("change", { bubbles: true }));
-          }
-          filledCount++;
-        } else if (el.isContentEditable) {
-          el.textContent = String(val);
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-          filledCount++;
-        } else {
-          // Input or Textarea
-          const proto = (el instanceof HTMLTextAreaElement) ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
-          const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
-
-          if (field.clear !== false) {
-            if (nativeSetter) nativeSetter.call(el, ""); else el.value = "";
-            el.dispatchEvent(new Event("input", { bubbles: true }));
-          }
-
-          if (nativeSetter) nativeSetter.call(el, String(val)); else el.value = String(val);
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-          el.dispatchEvent(new Event("change", { bubbles: true }));
-          filledCount++;
-        }
-      } finally {
-        setDispatching(false);
-      }
-
-      // Microtask delay for UI framework state propagation
-      await new Promise(r => setTimeout(r, 25));
-    }
-
-    let submitted = false;
-    if (submitSelector) {
-      const subRes = await virtualClick(undefined, undefined, submitSelector);
-      submitted = subRes?.success || false;
-    } else if (pressEnter && lastTargetEl) {
-      dispatchKey("Enter", "Enter", 13, null);
-      submitted = true;
-    }
-
-    return {
-      success: filledCount > 0,
-      filledCount,
-      totalFields: fields.length,
-      submitted
-    };
+  function virtualFillForm(fields, submitSelector, pressEnter) {
+    const impl = window.__AP_INTERNAL__.cursorForm && window.__AP_INTERNAL__.cursorForm.virtualFillForm;
+    if (impl) return impl(fields, submitSelector, pressEnter);
+    return Promise.resolve({ success: false, error: "cursorForm module unavailable" });
   }
 
   /**
@@ -684,7 +618,7 @@
         if (fromEl.draggable) {
           toEl.dispatchEvent(new DragEvent("dragover", { ...moveInit, dataTransfer }));
         }
-        await new Promise((r) => setTimeout(r, 25));
+        await new Promise((r) => setTimeout(r, CONFIG.DRAG_STEP_DELAY_MS));
       }
 
       const dropInit = { ...baseInit, clientX: toCenter.x, clientY: toCenter.y, buttons: 0 };
@@ -706,65 +640,14 @@
   }
 
   /**
-   * Smart polling wait for selector, text, or condition
+   * Thin delegating wrapper — the implementation moved to content/cursor-wait.js
+   * (injected right after this file). Kept on the public cursor API so every existing
+   * caller (content.js routing, wait_for bridge actions, ...) keeps working unchanged.
    */
-  async function waitFor(options = {}) {
-    let { selector, text, state = "visible", timeoutMs = 10000, pollIntervalMs = 100 } = options;
-    const parsedTimeout = Number(timeoutMs);
-    timeoutMs = (Number.isFinite(parsedTimeout) && parsedTimeout > 0) ? Math.min(parsedTimeout, 2147483647) : 10000;
-    if (selector && !text && typeof selector === "string" && !selector.startsWith("@")) {
-      try {
-        document.createDocumentFragment().querySelector(selector);
-      } catch (selErr) {
-        console.debug("[AgentPilot] Selector syntax error, falling back to text search:", selErr);
-        text = selector;
-        selector = "";
-      }
-    }
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < timeoutMs) {
-      let conditionMet = true;
-
-      if (selector) {
-        const el = resolveElement(selector);
-        const attached = !!(el && document.contains(el));
-        if (state === "attached") {
-          if (!attached) conditionMet = false;
-        } else if (state === "hidden") {
-          if (attached && isElementVisible(el)) conditionMet = false;
-        } else { // "visible"
-          if (!attached || !isElementVisible(el)) conditionMet = false;
-        }
-      }
-
-      if (conditionMet && text) {
-        const bodyText = document.body ? (document.body.innerText || "") : "";
-        const containsText = bodyText.includes(text);
-        if (state === "hidden") {
-          if (containsText) conditionMet = false;
-        } else {
-          if (!containsText) conditionMet = false;
-        }
-      }
-
-      if (conditionMet && (selector || text)) {
-        return {
-          success: true,
-          waitedMs: Date.now() - startTime,
-          selector,
-          text,
-          state
-        };
-      }
-
-      await new Promise((r) => setTimeout(r, pollIntervalMs));
-    }
-
-    return {
-      success: false,
-      error: `Timed out waiting after ${timeoutMs}ms for ${selector || text || "condition"}`
-    };
+  function waitFor(options) {
+    const impl = window.__AP_INTERNAL__.cursorWait && window.__AP_INTERNAL__.cursorWait.waitFor;
+    if (impl) return impl(options);
+    return Promise.resolve({ success: false, error: "cursorWait module unavailable" });
   }
 
   window.__AP_INTERNAL__.cursor = {
@@ -785,6 +668,8 @@
     updateCursorTransform,
     getCursorPosition: () => ({ x: currentMouseX, y: currentMouseY }),
     getCursorLayer: () => cursorLayer,
-    getElementCenter
+    getElementCenter,
+    // Exposed for cursor-wait.js (waitFor polls element visibility).
+    isElementVisible
   };
 })();
