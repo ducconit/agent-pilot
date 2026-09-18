@@ -6,19 +6,21 @@
  */
 
 import "../extensions/content/feedback-studio/item-schema.js";
+import { SEPARATOR } from "./lib/config.mjs";
+import { createRecorder } from "./lib/harness.mjs";
 
 const schema = globalThis.__AP_FEEDBACK_ITEM_SCHEMA__;
 
-console.log("==================================================================");
+console.log(SEPARATOR);
 console.log("🧪 KIỂM THỬ ĐƠN VỊ: SCHEMA FEEDBACK ITEM & CHỐNG XSS ISOLATED WORLD");
-console.log("==================================================================\n");
+console.log(`${SEPARATOR}\n`);
 
-const testResults = [];
-function record(feature, passed, details = "") {
-  testResults.push({ feature, passed, details });
-  const mark = passed ? "✅ PASS" : "❌ FAIL";
-  console.log(`${mark}: ${feature} ${details ? `-> ${details}` : ""}`);
-}
+const recorder = createRecorder({
+  summaryStyle: "compact",
+  successMessage: "\n🎉 XÁC MINH THÀNH CÔNG: SCHEMA FEEDBACK ITEM CHỐNG XSS ISOLATED WORLD!",
+  failureMessage: "\n❌ Có kiểm thử chưa vượt qua!"
+});
+const record = recorder.record;
 
 const ALLOWED_KEYS = ["id", "mode", "comment", "timestamp", "title", "screenshotDataUrl", "dom", "component", "clip", "annotations"];
 
@@ -130,17 +132,8 @@ try {
     "Only base64 raster images pass"
   );
 
-  console.log("\n==================================================================");
-  const passedCount = testResults.filter((t) => t.passed).length;
-  console.log(`📊 TỔNG SỐ KIỂM TRA: ${testResults.length} | THÀNH CÔNG: ${passedCount}/${testResults.length}`);
-  console.log("==================================================================");
-
-  if (passedCount === testResults.length) {
-    console.log("\n🎉 XÁC MINH THÀNH CÔNG: SCHEMA FEEDBACK ITEM CHỐNG XSS ISOLATED WORLD!");
-  } else {
-    console.error("\n❌ Có kiểm thử chưa vượt qua!");
-    process.exitCode = 1;
-  }
+  recorder.summarize();
+  recorder.exitIfFailed();
 } catch (err) {
   console.error("❌ Exception during test:", err);
   process.exitCode = 1;

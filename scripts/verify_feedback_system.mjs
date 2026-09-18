@@ -8,25 +8,25 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { ROOT_DIR, SEPARATOR } from "./lib/config.mjs";
+import { createRecorder } from "./lib/harness.mjs";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PROJECT_DIR = path.resolve(__dirname, "..");
-const CLI_DIR = path.join(PROJECT_DIR, "cli");
-const MCP_DIR = path.join(PROJECT_DIR, "mcp", "agent-pilot");
+const CLI_DIR = path.join(ROOT_DIR, "cli");
+const MCP_DIR = path.join(ROOT_DIR, "mcp", "agent-pilot");
 
-const testResults = [];
-function record(name, passed, details = "") {
-  testResults.push({ name, passed, details });
-  const mark = passed ? "✅ PASS" : "❌ FAIL";
-  console.log(`${mark}: ${name} ${details ? `-> ${details}` : ""}`);
-}
+const recorder = createRecorder({
+  title: "📊 KẾT QUẢ KIỂM THỬ:",
+  itemKey: "name",
+  summaryStyle: "passed",
+  successMessage: null,
+  failureMessage: null
+});
+const record = recorder.record;
 
 async function run() {
-  console.log("==================================================================");
+  console.log(SEPARATOR);
   console.log("🎯 KIỂM THỬ HỆ THỐNG VISUAL UI FEEDBACK (CHANNEL B & CHANNEL A - GO ENGINE)");
-  console.log("==================================================================\n");
+  console.log(`${SEPARATOR}\n`);
 
   try {
     // 1. Run Go Unit Test Suite for Feedback System
@@ -52,15 +52,8 @@ async function run() {
     const hasWaitTool = fs.existsSync(path.join(MCP_DIR, "browser_wait_for_feedback.json"));
     record("8. MCP Tools Registration", hasGetPendingTool && hasWaitTool, "Registered browser_get_pending_feedback & browser_wait_for_feedback in SSOT");
 
-    console.log("\n==================================================================");
-    console.log("📊 KẾT QUẢ KIỂM THỬ:");
-    const passed = testResults.filter(t => t.passed).length;
-    console.log(`Passed: ${passed} / ${testResults.length} (100%)`);
-    console.log("==================================================================");
-
-    if (passed !== testResults.length) {
-      process.exitCode = 1;
-    }
+    recorder.summarize();
+    recorder.exitIfFailed();
   } catch (err) {
     console.error("❌ Test execution failed:", err.message);
     process.exitCode = 1;

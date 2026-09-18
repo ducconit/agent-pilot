@@ -11,17 +11,19 @@ import {
   rgbToOklch,
   normalizeColorData
 } from "../extensions/sidepanel/color-utils.js";
+import { SEPARATOR } from "./lib/config.mjs";
+import { createRecorder } from "./lib/harness.mjs";
 
-console.log("==================================================================");
+console.log(SEPARATOR);
 console.log("🎨 KIỂM THỬ ĐƠN VỊ: TIỆN ÍCH CHUYỂN ĐỔI & CHUẨN HÓA MÀU SẮC");
-console.log("==================================================================\n");
+console.log(`${SEPARATOR}\n`);
 
-const testResults = [];
-function record(feature, passed, details = "") {
-  testResults.push({ feature, passed, details });
-  const mark = passed ? "✅ PASS" : "❌ FAIL";
-  console.log(`${mark}: ${feature} ${details ? `-> ${details}` : ""}`);
-}
+const recorder = createRecorder({
+  title: "📊 BẢNG TỔNG KẾT KẾT QUẢ KIỂM THỬ TIỆN ÍCH MÀU SẮC:",
+  successMessage: "\n🎉 HOÀN TOÀN XÁC MINH: TIỆN ÍCH MÀU SẮC HOẠT ĐỘNG HOÀN HẢO!",
+  failureMessage: "\n❌ Có kiểm thử chưa vượt qua!"
+});
+const record = recorder.record;
 
 try {
   // 1. 3-digit hex expands by doubling each nibble
@@ -133,19 +135,8 @@ try {
     `hex=${normString && normString.hex}`
   );
 
-  console.log("\n==================================================================");
-  console.log("📊 BẢNG TỔNG KẾT KẾT QUẢ KIỂM THỬ TIỆN ÍCH MÀU SẮC:");
-  const passedCount = testResults.filter(t => t.passed).length;
-  console.log(`TỔNG SỐ TÍNH NĂNG KIỂM TRA: ${testResults.length}`);
-  console.log(`THÀNH CÔNG: ${passedCount} / ${testResults.length} (100%)`);
-  console.log("==================================================================");
-
-  if (passedCount === testResults.length) {
-    console.log("\n🎉 HOÀN TOÀN XÁC MINH: TIỆN ÍCH MÀU SẮC HOẠT ĐỘNG HOÀN HẢO!");
-  } else {
-    console.error("\n❌ Có kiểm thử chưa vượt qua!");
-    process.exitCode = 1;
-  }
+  recorder.summarize();
+  recorder.exitIfFailed();
 
 } catch (err) {
   console.error("❌ Exception during test:", err);

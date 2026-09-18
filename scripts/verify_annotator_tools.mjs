@@ -1,55 +1,23 @@
 /**
  * Test Suite: Verify Annotator Tool Switching (Pin & Box) and Box Dragging
  */
-import http from "node:http";
-import fs from "node:fs";
-import puppeteer from "puppeteer-core";
 import path from "node:path";
-import { resolveChromiumBin, getChromiumLaunchArgs } from "./browser_resolver.mjs";
-
-const PORT = 8772;
-const PROJECT_DIR = path.resolve(".");
-const EXT_DIR = path.join(PROJECT_DIR, "extensions");
-
-function startHttpServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      const sanitizedUrl = path.normalize(req.url === "/" ? "/test-page.html" : req.url.split("?")[0]).replace(/^(\.\.[\/\\])+/, "");
-      let filePath = path.join(PROJECT_DIR, sanitizedUrl);
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        const ext = path.extname(filePath);
-        const contentType = ext === ".html" ? "text/html" : ext === ".css" ? "text/css" : ext === ".js" ? "application/javascript" : "text/plain";
-        res.writeHead(200, { "Content-Type": contentType });
-        fs.createReadStream(filePath).pipe(res);
-      } else {
-        res.writeHead(404);
-        res.end("Not Found");
-      }
-    });
-    server.listen(PORT, "127.0.0.1", () => resolve(server));
-  });
-}
+import { ANNOTATOR_HTTP_PORT, ROOT_DIR, ASSETS_DIR, NAV_WAIT_UNTIL, TIMEOUTS, SEPARATOR } from "./lib/config.mjs";
+import { startStaticServer, launchExtensionBrowser, sleep } from "./lib/harness.mjs";
 
 async function run() {
-  console.log("==================================================================");
+  console.log(SEPARATOR);
   console.log("🎯 TEST ANNOTATOR TOOL SWITCHING & BOX DRAGGING");
-  console.log("==================================================================");
+  console.log(SEPARATOR);
 
-  const server = await startHttpServer();
-  const chromePath = resolveChromiumBin();
-  const launchArgs = getChromiumLaunchArgs(EXT_DIR);
-
-  const browser = await puppeteer.launch({
-    executablePath: chromePath,
-    headless: true,
-    args: launchArgs
-  });
+  const server = await startStaticServer(ANNOTATOR_HTTP_PORT, ROOT_DIR);
+  const { browser, close } = await launchExtensionBrowser({ headless: true });
 
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
-    await page.goto(`http://127.0.0.1:${PORT}/test-page.html`, { waitUntil: "networkidle0" });
-    await new Promise((r) => setTimeout(r, 800));
+    await page.goto(`http://127.0.0.1:${ANNOTATOR_HTTP_PORT}/test-page.html`, { waitUntil: NAV_WAIT_UNTIL });
+    await sleep(TIMEOUTS.PAGE_SETTLE_MS);
 
     // 1. Start Feedback Studio
     console.log("1. Starting Feedback Studio...");
@@ -179,7 +147,7 @@ async function run() {
     });
 
     // Take screenshot of Annotator modal with both Box and Pin
-    const shotPath = path.join(PROJECT_DIR, "assets", "test_annotator_box_and_pin.png");
+    const shotPath = path.join(ASSETS_DIR, "test_annotator_box_and_pin.png");
     await page.screenshot({ path: shotPath });
     console.log(`- Saved annotator verification screenshot to ${shotPath}`);
 
@@ -201,16 +169,17 @@ async function run() {
       throw new Error("Prompt does not format both Box and Pin correctly");
     }
 
-    console.log("==================================================================");
+    console.log(SEPARATOR);
     console.log("🎉 ALL ANNOTATOR TOOL SWITCHING & BOX TESTS PASSED (100%)!");
-    console.log("==================================================================");
+    console.log(SEPARATOR);
   } finally {
-    await browser.close();
+    // Always close the browser and server, then report via exitCode.
+    await close();
     server.close();
   }
 }
 
 run().catch((err) => {
   console.error("❌ Test failed:", err);
-  process.exit(1);
+  process.exitCode = 1;
 });

@@ -7,65 +7,23 @@
  * 4. Ending the session smoothly dismisses both the cursor and the lock shield.
  */
 
-import http from "node:http";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import puppeteer from "puppeteer-core";
-import { resolveChromiumBin } from "./browser_resolver.mjs";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ROOT_DIR = path.resolve(__dirname, "..");
-const EXTENSION_PATH = path.join(ROOT_DIR, "extensions");
-
-const TEST_PORT = 8766;
-let httpServer = null;
-
-function startStaticServer() {
-  return new Promise((resolve) => {
-    httpServer = http.createServer((req, res) => {
-      const filePath = path.join(ROOT_DIR, req.url === "/" ? "test-page.html" : req.url);
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end(fs.readFileSync(filePath));
-      } else {
-        res.writeHead(404);
-        res.end("Not found");
-      }
-    });
-    httpServer.listen(TEST_PORT, "127.0.0.1", () => {
-      console.log(`[HTTP Server] Listening on http://127.0.0.1:${TEST_PORT}`);
-      resolve();
-    });
-  });
-}
+import { SESSION_HTTP_PORT, ROOT_DIR, NAV_WAIT_UNTIL, TIMEOUTS } from "./lib/config.mjs";
+import { startStaticServer, launchExtensionBrowser, waitForServiceWorker, sleep } from "./lib/harness.mjs";
 
 async function runSessionTest() {
-  await startStaticServer();
-  const browserPath = resolveChromiumBin();
+  const server = await startStaticServer(SESSION_HTTP_PORT, ROOT_DIR);
+  console.log(`[HTTP Server] Listening on http://127.0.0.1:${SESSION_HTTP_PORT}`);
 
-  const browser = await puppeteer.launch({
-    executablePath: browserPath,
-    headless: false,
-    args: [
-      `--disable-extensions-except=${EXTENSION_PATH}`,
-      `--load-extension=${EXTENSION_PATH}`,
-      "--no-sandbox",
-      "--disable-gpu"
-    ]
-  });
+  const { browser, close } = await launchExtensionBrowser();
 
   try {
     const page = await browser.newPage();
-    await page.goto(`http://127.0.0.1:${TEST_PORT}/test-page.html`, { waitUntil: "networkidle0" });
-    await new Promise((r) => setTimeout(r, 800));
+    await page.goto(`http://127.0.0.1:${SESSION_HTTP_PORT}/test-page.html`, { waitUntil: NAV_WAIT_UNTIL });
+    await sleep(TIMEOUTS.PAGE_SETTLE_MS);
 
     // Wait for background service worker
-    const workerTarget = await browser.waitForTarget(
-      (t) => t.type() === "service_worker" && t.url().includes("background.js"),
-      { timeout: 8000 }
-    );
+    const workerTarget = await waitForServiceWorker(browser, { timeoutMs: TIMEOUTS.SERVICE_WORKER_SLOW_MS });
+    if (!workerTarget) throw new Error("Timed out waiting for the extension service worker");
     const worker = await workerTarget.worker();
 
     // Get the target tab ID
@@ -117,7 +75,7 @@ async function runSessionTest() {
 
     // Step 3: Wait 3.2 seconds (exceeds default 2.5s hide timeout)
     console.log("3. Waiting 3200ms to verify no auto-hide occurs during active session...");
-    await new Promise((r) => setTimeout(r, 3200));
+    await sleep(3200);
 
     const persistentState = await page.evaluate(() => {
       const cursor = document.querySelector(".agent-pilot-virtual-cursor");
@@ -144,7 +102,7 @@ async function runSessionTest() {
     }, targetTabId);
 
     // Wait 1.5s after click (longer than the 1.2s action auto-unlock)
-    await new Promise((r) => setTimeout(r, 1500));
+    await sleep(1500);
 
     const postActionState = await page.evaluate(() => {
       const cursor = document.querySelector(".agent-pilot-virtual-cursor");
@@ -187,14 +145,14 @@ async function runSessionTest() {
 
     console.log("🎉 ALL TESTS PASSED: Continuous session lifecycle works flawlessly!");
   } finally {
-    await browser.close().catch(() => {});
-    if (httpServer) httpServer.close();
+    // Always release the browser and server; exitCode (not process.exit) keeps the
+    // numeric semantics while still letting this cleanup run.
+    await close();
+    server.close();
   }
 }
 
-runSessionTest()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error("❌ Test Failed:", err);
-    process.exit(1);
-  });
+runSessionTest().catch((err) => {
+  console.error("❌ Test Failed:", err);
+  process.exitCode = 1;
+});
