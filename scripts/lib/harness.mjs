@@ -62,16 +62,18 @@ export function createRecorder({
   function summarize() {
     const total = results.length;
     const passed = passedCount();
+    // Real percentage (the previous hardcoded "(100%)" misreported partial runs)
+    const percent = total === 0 ? 100 : Math.round((passed / total) * 100);
     console.log(`\n${SEPARATOR}`);
     if (summaryStyle === "compact") {
       console.log(`📊 TỔNG SỐ KIỂM TRA: ${total} | THÀNH CÔNG: ${passed}/${total}`);
     } else {
       console.log(title);
       if (summaryStyle === "passed") {
-        console.log(`Passed: ${passed} / ${total} (100%)`);
+        console.log(`Passed: ${passed} / ${total} (${percent}%)`);
       } else {
         console.log(`TỔNG SỐ TÍNH NĂNG KIỂM TRA: ${total}`);
-        console.log(`THÀNH CÔNG: ${passed} / ${total} (100%)`);
+        console.log(`THÀNH CÔNG: ${passed} / ${total} (${percent}%)`);
       }
     }
     console.log(SEPARATOR);

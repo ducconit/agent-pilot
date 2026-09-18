@@ -11,7 +11,12 @@
 
 package main
 
-import "time"
+import (
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
 
 const (
 	// --- Server identity & defaults -----------------------------------------
@@ -91,3 +96,16 @@ const (
 	plistNameDarwin  = "com.agentpilot.bridge.plist"
 	taskNameWindows  = "AgentPilotBridge"
 )
+
+// DefaultBridgePort resolves the bridge port, honoring the AGENT_PILOT_PORT
+// environment variable and falling back to DefaultPort. A malformed, non-numeric
+// or out-of-range override is ignored rather than fatal, so a bad env value
+// degrades to the built-in default.
+func DefaultBridgePort() int {
+	if env := strings.TrimSpace(os.Getenv("AGENT_PILOT_PORT")); env != "" {
+		if p, err := strconv.Atoi(env); err == nil && p > 0 && p < 65536 {
+			return p
+		}
+	}
+	return DefaultPort
+}
