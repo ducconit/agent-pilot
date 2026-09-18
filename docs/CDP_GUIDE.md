@@ -72,24 +72,55 @@ const res = await sendCdpCommand(tabId, "Performance.getMetrics");
 ```
 
 ### 2.4 Domain Input (Mô Phỏng Chuột & Bàn Phím Cấp Hệ Thống)
-Bên cạnh việc kích hoạt synthetic DOM events trong Content Script, Agent Pilot hỗ trợ phát sự kiện trực tiếp vào engine qua CDP Input Domain:
+Bên cạnh việc kích hoạt synthetic DOM events trong Content Script, Agent Pilot hỗ trợ phát sự kiện trực tiếp vào engine qua CDP Input Domain. Input qua CDP là **trusted event** (`isTrusted: true`) nên có thể điều khiển được **cross-origin iframe, `<canvas>` và ứng dụng WebGL** (Unity, game Playables…) — nơi synthetic event bất lực.
+
+Hai helper chuẩn trong `extensions/background/cdp-manager.js`:
 
 ```javascript
-// Phát sự kiện click chuột cấp thấp:
+// Click trusted: move -> press -> release
+await dispatchCdpMouseClick(tabId, x, y, { button: "left", clickCount: 1 });
+
+// Drag trusted: press -> nội suy nhiều bước -> giữ (hold) -> release
+// Dùng cho cơ chế kéo slingshot/ngắm trong game canvas
+await dispatchCdpMouseDrag(tabId, fromX, fromY, toX, toY, { steps: 10, holdMs: 800 });
+```
+
+Ví dụ thô với `Input.dispatchMouseEvent`:
+
+```javascript
+await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
+  type: "mouseMoved",
+  x: 250,
+  y: 180
+});
 await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
   type: "mousePressed",
   x: 250,
   y: 180,
   button: "left",
+  buttons: 1,
   clickCount: 1
 });
 await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
   type: "mouseReleased",
   x: 250,
   y: 180,
-  button: "left"
+  button: "left",
+  buttons: 0,
+  clickCount: 1
 });
 ```
+
+> [!IMPORTANT]
+> **Khi nào BẮT BUỘC dùng CDP Input?** Trang thường (DOM) có thể dùng synthetic mặc định. Với **cross-origin iframe / canvas / WebGL**, synthetic event không vượt được ranh giới origin nên phải dùng CDP Input.
+> - CLI: `agent-pilot click -x 733 -y 668 --via cdp --tab <id>` và `agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --hold 800 --via cdp --tab <id>`
+> - `--via synthetic` (mặc định, giữ nguyên hành vi cũ) · `--via cdp` (trusted, không fallback) · `--via auto` (thử CDP, tự động fallback synthetic).
+> - Kiểm tra trước khi chạy: `agent-pilot cdp status --tab <id>`.
+>
+> **Xử lý lỗi gắn kết**: `ensureCdpAttached()` kiểm tra kết quả `chrome.debugger.attach` và ném lỗi rõ ràng `CDP_UNAVAILABLE: <reason>` (DevTools đang mở trên tab, quyền/policy bị chặn) thay vì treo hoặc fallback âm thầm.
+
+> [!NOTE]
+> **Hiệu ứng hình ảnh**: con trỏ neon và hiệu ứng ripple chỉ do **synthetic engine** vẽ. Input qua CDP là input thật cấp hệ thống nên **không** hiển thị con trỏ ảo.
 
 ### 2.5 Domain Page (Chụp Ảnh Chuẩn Xác Từng Pixel)
 Cho phép chụp ảnh màn hình tab kèm khung cắt (crop box) chính xác theo tọa độ viewport:

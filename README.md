@@ -31,13 +31,14 @@
 | :--- | :---: | :--- |
 | **Điều khiển Trình duyệt** | 🌐 | Mở tab mới, điều hướng URL, reload, chuyển đổi và đóng tab linh hoạt. |
 | **Mô phỏng Chuột ảo** | 🖱️ | Con trỏ đồ họa neon bay mượt mà trên màn hình, phát sóng click ripple và chuỗi sự kiện DOM hoàn chỉnh. |
+| **Trusted CDP Input (tùy chọn)** | 🛡️ | `--via cdp` phát input thật (`Input.dispatchMouseEvent`) điều khiển được cross-origin iframe, `<canvas>` và WebGL/Unity game; `--via auto` tự fallback synthetic. Tiền kiểm tra bằng `agent-pilot cdp status --tab <id>`. |
 | **Tự động Gõ chữ** | ⌨️ | Focus vào ô nhập liệu và gõ văn bản từng ký tự theo thời gian thực (Human-like Typing). |
 | **Giám sát DevTools (CDP)** | ⚡ | Kết nối cấp thấp qua Chrome DevTools Protocol để bắt trọn `console.log/error`, `Network traffic` và `Performance RAM/DOM`. |
 | **Soi & Lấy vị trí DOM** | 🎯 | Bắt dính phần tử khi hover, hiển thị kích thước `W × H`, tọa độ `(X, Y)`, trích xuất **CSS Selector** và **XPath**. |
 | **Trích xuất Mã màu** | 🎨 | Kính lúp pixel nhặt màu chính xác 5 định dạng (HEX, RGB, RGBA, HSL, OKLCH), 1-click copy từng định dạng và lưu khay lịch sử màu sắc. |
 | **Bộ Chụp Màn Hình** | 📸 | Hỗ trợ 3 chế độ: Chụp toàn khung nhìn, Kéo chọn vùng cắt tùy ý (Crop), và Chụp riêng phần tử DOM đã khóa. |
 | **Chú Thích & Chỉ Điểm UI** | ✏️ | Khoanh vùng, chỉ điểm phần tử/component nguồn (React/Vue/Astro:line), ghim ghi chú lỗi để giao việc cho AI Agent sửa code (hỗ trợ 3 kênh Live Push, Persistent Inbox, Clipboard Prompt). |
-| **Tương thích Antigravity** | 🤖 | Tích hợp sẵn bộ chạy kịch bản **JSON Action**, cầu nối `window.__AGENT_PILOT__` và 16 công cụ Antigravity MCP Tools. |
+| **Tương thích Antigravity** | 🤖 | Tích hợp sẵn bộ chạy kịch bản **JSON Action**, cầu nối `window.__AGENT_PILOT__` và 35 công cụ MCP Tools. |
 
 ---
 
@@ -284,10 +285,10 @@ agent-pilot server
 ```
 Khi chạy đa tác vụ hoặc nhiều cửa sổ IDE, Agent Pilot tự động chuyển sang chế độ **Forwarder**, chuyển tiếp lệnh qua HTTP REST API `http://127.0.0.1:58765/api` mà không bao giờ gặp lỗi xung đột cổng `EADDRINUSE`.
 
-#### 16 Công Cụ MCP Điều Khiển Trình Duyệt:
+#### Bộ Công Cụ MCP Điều Khiển Trình Duyệt (35 Tools):
 - `browser_run_actions`: Động cơ thực thi chuỗi kịch bản hàng loạt (Batch Engine), tiết kiệm >80% token.
 - `browser_open_tab`, `browser_list_tabs`, `browser_navigate`: Quản lý và điều hướng các tab trình duyệt (mặc định mở ngầm không cướp focus).
-- `browser_click`, `browser_type`, `browser_scroll`: Mô phỏng chuột ảo neon với sóng click ripple, tự động gõ chữ và cuộn trang.
+- `browser_click`, `browser_drag`, `browser_type`, `browser_scroll`: Mô phỏng chuột ảo neon với sóng click ripple. `browser_click`/`browser_drag` hỗ trợ `via: "cdp"` (trusted input cho cross-origin iframe/canvas/WebGL) và drag theo tọa độ `fromX/fromY/toX/toY` + `holdMs` cho game.
 - `browser_get_element`, `browser_pick_color`, `browser_screenshot`: Đọc DOM, trích xuất mã màu pixel, chụp ảnh màn hình ngầm qua CDP.
 - `browser_get_devtools_data`: Bắt log Console, Network requests và Performance RAM/DOM.
 - `browser_list_instances`, `browser_select_instance`: Quản lý đa trình duyệt Chrome đồng thời.
@@ -324,6 +325,11 @@ agent-pilot batch flow_test.json
 
 # 7. Quản lý phản hồi UI
 agent-pilot feedback list
+
+# 8. Trusted CDP input cho cross-origin iframe / canvas / WebGL game (tùy chọn)
+agent-pilot cdp status --tab 12345
+agent-pilot click -x 733 -y 668 --via cdp --tab 12345
+agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --hold 800 --via cdp --tab 12345
 ```
 
 ---

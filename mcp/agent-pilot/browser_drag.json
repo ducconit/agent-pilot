@@ -1,13 +1,25 @@
 {
-  "description": "Simulate virtual drag and drop from a source element (@ref or CSS selector) to a target element.",
+  "description": "Drag from a source to a target element, or between coordinates (fromX/fromY/toX/toY) for canvas/game aiming. Set via:'cdp' for trusted CDP input; via:'auto' falls back to synthetic.",
   "inputSchema": {
     "properties": {
       "from": {
         "description": "Source element selector or @ref",
         "type": "string"
       },
+      "fromX": {
+        "description": "Source X coordinate (canvas/game)",
+        "type": "number"
+      },
+      "fromY": {
+        "description": "Source Y coordinate (canvas/game)",
+        "type": "number"
+      },
+      "holdMs": {
+        "description": "Hold at destination before release in ms (slingshot pull)",
+        "type": "integer"
+      },
       "steps": {
-        "description": "Number of interpolation animation steps (default: 8)",
+        "description": "Number of interpolation steps (default: 8)",
         "type": "integer"
       },
       "tabId": {
@@ -17,12 +29,20 @@
       "to": {
         "description": "Target element selector or @ref",
         "type": "string"
+      },
+      "toX": {
+        "description": "Target X coordinate (canvas/game)",
+        "type": "number"
+      },
+      "toY": {
+        "description": "Target Y coordinate (canvas/game)",
+        "type": "number"
+      },
+      "via": {
+        "description": "Input backend: synthetic (default), cdp (trusted), auto (cdp with synthetic fallback)",
+        "type": "string"
       }
     },
-    "required": [
-      "from",
-      "to"
-    ],
     "type": "object"
   },
   "name": "browser_drag",
@@ -32,8 +52,20 @@
         "description": "Source element selector or @ref",
         "type": "string"
       },
+      "fromX": {
+        "description": "Source X coordinate (canvas/game)",
+        "type": "number"
+      },
+      "fromY": {
+        "description": "Source Y coordinate (canvas/game)",
+        "type": "number"
+      },
+      "holdMs": {
+        "description": "Hold at destination before release in ms (slingshot pull)",
+        "type": "integer"
+      },
       "steps": {
-        "description": "Number of interpolation animation steps (default: 8)",
+        "description": "Number of interpolation steps (default: 8)",
         "type": "integer"
       },
       "tabId": {
@@ -43,12 +75,20 @@
       "to": {
         "description": "Target element selector or @ref",
         "type": "string"
+      },
+      "toX": {
+        "description": "Target X coordinate (canvas/game)",
+        "type": "number"
+      },
+      "toY": {
+        "description": "Target Y coordinate (canvas/game)",
+        "type": "number"
+      },
+      "via": {
+        "description": "Input backend: synthetic (default), cdp (trusted), auto (cdp with synthetic fallback)",
+        "type": "string"
       }
     },
-    "required": [
-      "from",
-      "to"
-    ],
     "type": "object"
   }
 }

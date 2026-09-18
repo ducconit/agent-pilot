@@ -35,6 +35,22 @@ Các lệnh được gửi qua `chrome.runtime.sendMessage({ action: "...", ... 
 | `capture_screenshot` | `mode: "visible"` | `{ success: true, dataUrl: string }` | Chụp toàn bộ khung nhìn hiển thị |
 | `capture_screenshot` | `mode: "element" \| "region", tabId, clip: {x, y, width, height}` | `{ success: true, dataUrl, requiresCrop?: boolean, clip }` | Chụp và cắt ảnh theo tọa độ chữ nhật |
 
+### 1.4 Phương Thức RPC Qua Bridge (WebSocket / HTTP `/api`)
+
+Các method nhận input có hỗ trợ chọn engine (`via`) và toạ độ cho canvas/game. Mặc định vẫn là synthetic để không phá vỡ hành vi cũ.
+
+| Method | Tham số | CDP? | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `page.click` | `selector?`, `x?`, `y?`, `via?: "synthetic" \| "cdp" \| "auto"`, `button?`, `clickCount?`, `tabId?` | ⚙️ Tùy chọn | `via: "cdp"` phát trusted click (cross-origin iframe/canvas); `"auto"` tự fallback synthetic |
+| `page.drag` | `from`/`to` (selector) **hoặc** `fromX/fromY/toX/toY`, `steps?`, `holdMs?`, `via?`, `tabId?` | ⚙️ Tùy chọn | Drag trusted cho slingshot/aim; `holdMs` giữ trước khi thả |
+| `page.hover` | `selector`, `tabId?` | ⚙️ Tự động | Ưu tiên CDP `Input.dispatchMouseEvent`, fallback synthetic |
+| `page.pressKey` | `key`, `selector?`, `tabId?` | ⚙️ Tự động | Ưu tiên CDP `Input.dispatchKeyEvent`, fallback synthetic |
+| `cdp.status` | `tabId?` | ✅ | Trả `{ attached: boolean, error?, hint? }` để kiểm tra debugger trước khi dùng `via: "cdp"` |
+| `cdp.send` | `cdpMethod`, `cdpParams`, `tabId?` | ✅ | Gửi lệnh CDP thô; lỗi attach trả `CDP_UNAVAILABLE` rõ ràng |
+
+> Các method **bắt buộc CDP**: `page.screenshot` (tab ngầm), `page.uploadFile`, `page.handleDialog`, `emulation.*`, `network.*`, `performance.*`, `memory.*`, `devtools.getData`.
+> Synthetic event **không vượt được cross-origin iframe** và không điều khiển được canvas/WebGL.
+
 ---
 
 ## 2. Tin Nhắn Gửi Tới Content Script (Web Page Context)

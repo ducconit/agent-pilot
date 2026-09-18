@@ -71,6 +71,31 @@ The Go Bridge daemon provides a high-speed HTTP REST API on port `58765`:
 | `GET` | `/api/feedback/pending` | Channel B: Read pending sessions | `?limit=10&clear=false` | `{"success":true,"sessions":[...]}` |
 | `POST` | `/api/feedback/wait` | Channel A: Long-poll for human input | `{"timeout":120}` | `{"success":true,"session":{...}}` |
 
+### CDP-dependent methods (debugger attach required)
+
+Any `method` forwarded through `POST /api` runs with one of two engines. These methods require an attached debugger (`chrome.debugger`) and fail with a clear error when attach is impossible (DevTools already open, permission/policy blocked):
+
+- `page.screenshot` (required for background tabs; active tab can fall back)
+- `page.uploadFile`, `page.handleDialog`
+- `emulation.set`, `emulation.resize`
+- `network.listRequests`, `network.getResponseBody`
+- `performance.trace`, `performance.metrics`
+- `memory.heapSnapshot`, `memory.collectGarbage`
+- `devtools.getData`
+- `cdp.attach` / `cdp.detach` / `cdp.send` / `cdp.status`
+
+Optional CDP (synthetic by default, opt-in via `via:"cdp"` | `"auto"`): `page.click`, `page.drag`.
+CDP-first with automatic synthetic fallback: `page.hover`, `page.pressKey`.
+Everything else (`page.snapshot`, `page.getElement`, `page.type`, `page.scroll`, `page.fillForm`, `page.waitFor`, `page.pickColor`, `tabs.*`, `page.evaluate`) does not require CDP.
+
+Pre-flight check:
+
+```bash
+curl -s -X POST http://127.0.0.1:58765/api -H 'Content-Type: application/json' \
+  -d '{"method":"cdp.status","params":{"tabId":123}}'
+# {"success":true,"result":{"attached":true,"tabId":123}} or {"attached":false,"error":"...","hint":"..."}
+```
+
 ---
 
 ## 4. WebSocket Bridge Protocol

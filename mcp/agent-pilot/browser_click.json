@@ -1,5 +1,5 @@
 {
-  "description": "Simulate human-like virtual mouse click with visual neon cursor and ripple effects.",
+  "description": "Click with the virtual mouse (visual cursor). Set via:'cdp' for trusted CDP input that works on cross-origin iframes, canvas and WebGL apps; via:'auto' falls back to synthetic.",
   "inputSchema": {
     "properties": {
       "selector": {
@@ -9,6 +9,10 @@
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "via": {
+        "description": "Input backend: synthetic (default), cdp (trusted), auto (cdp with synthetic fallback)",
+        "type": "string"
       },
       "x": {
         "description": "X coordinate",
@@ -31,6 +35,10 @@
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "via": {
+        "description": "Input backend: synthetic (default), cdp (trusted), auto (cdp with synthetic fallback)",
+        "type": "string"
       },
       "x": {
         "description": "X coordinate",

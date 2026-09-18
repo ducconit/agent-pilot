@@ -758,3 +758,111 @@ export async function dispatchCdpMouseMove(tabId, x, y) {
   });
   return { success: true, x: Math.round(x), y: Math.round(y) };
 }
+
+/**
+ * Ensure the debugger is attached, throwing a clear CDP_UNAVAILABLE error otherwise.
+ * attachDebugger resolves (never rejects) with { success:false, error } on failure.
+ */
+export async function ensureCdpAttached(tabId, broadcastFn = null) {
+  const res = await attachDebugger(tabId, broadcastFn);
+  if (!res || res.success === false) {
+    const reason = res && res.error ? res.error : "cannot attach debugger";
+    const err = new Error(
+      `CDP_UNAVAILABLE: ${reason}. Hint: close DevTools, allow the debugger permission, or retry with --via auto/synthetic.`
+    );
+    err.code = "CDP_UNAVAILABLE";
+    throw err;
+  }
+  return res;
+}
+
+/**
+ * Dispatch a real, trusted mouse click (move -> press -> release) via CDP.
+ * Works on cross-origin iframes, canvas and WebGL apps where synthetic DOM events fail.
+ */
+export async function dispatchCdpMouseClick(tabId, x, y, options = {}) {
+  const px = Math.round(x);
+  const py = Math.round(y);
+  const button = options.button || "left";
+  const clickCount = options.clickCount || 1;
+
+  await sendCdpCommand(tabId, "Input.dispatchMouseEvent", { type: "mouseMoved", x: px, y: py });
+  await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
+    type: "mousePressed",
+    x: px,
+    y: py,
+    button,
+    buttons: 1,
+    clickCount
+  });
+  await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    x: px,
+    y: py,
+    button,
+    buttons: 0,
+    clickCount
+  });
+
+  return { success: true, via: "cdp", trusted: true, x: px, y: py, button, clickCount };
+}
+
+/**
+ * Dispatch a real, trusted mouse drag (press -> interpolated moves -> optional hold -> release) via CDP.
+ * Useful for slingshot/aim mechanics in canvas games.
+ */
+export async function dispatchCdpMouseDrag(tabId, fromX, fromY, toX, toY, options = {}) {
+  const x1 = Math.round(Number(fromX));
+  const y1 = Math.round(Number(fromY));
+  const x2 = Math.round(Number(toX));
+  const y2 = Math.round(Number(toY));
+  const button = options.button || "left";
+  const steps = Math.max(2, Math.min(120, parseInt(options.steps, 10) || 10));
+  const holdMs = Math.max(0, Math.min(10000, parseInt(options.holdMs, 10) || 0));
+
+  await sendCdpCommand(tabId, "Input.dispatchMouseEvent", { type: "mouseMoved", x: x1, y: y1 });
+  await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
+    type: "mousePressed",
+    x: x1,
+    y: y1,
+    button,
+    buttons: 1,
+    clickCount: 1
+  });
+
+  for (let i = 1; i <= steps; i++) {
+    const x = Math.round(x1 + ((x2 - x1) * i) / steps);
+    const y = Math.round(y1 + ((y2 - y1) * i) / steps);
+    await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x,
+      y,
+      button,
+      buttons: 1
+    });
+    await new Promise((resolve) => setTimeout(resolve, 16));
+  }
+
+  if (holdMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, holdMs));
+  }
+
+  await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    x: x2,
+    y: y2,
+    button,
+    buttons: 0,
+    clickCount: 1
+  });
+
+  return {
+    success: true,
+    via: "cdp",
+    trusted: true,
+    from: { x: x1, y: y1 },
+    to: { x: x2, y: y2 },
+    steps,
+    holdMs
+  };
+}

@@ -25,10 +25,10 @@ CÁC LỆNH HỖ TRỢ:
 THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT / AGENT):
   snapshot [tùy chọn]           Trích xuất bản đồ phần tử tương tác (@1, @2...) cực nhẹ cho Agent
   fill <fields.json> [tùy chọn] Điền toàn bộ form và tự động submit chỉ trong 1 thao tác
-  click <selector>              Click chuột ảo vào phần tử DOM (hỗ trợ ref @1 hoặc CSS selector)
+  click <selector>              Click chuột ảo (dùng --x/--y cho tọa độ; --via cdp cho trusted CDP)
   type <selector> <text>        Gõ phím vào ô nhập liệu (hỗ trợ ref @1 hoặc CSS selector)
   hover <selector>              Di chuột ảo vào phần tử DOM (hỗ trợ ref @1 hoặc CSS selector)
-  drag <from> <to>              Kéo thả phần tử từ nguồn sang đích bằng chuột ảo
+  drag <from> <to>              Kéo thả phần tử, hoặc dùng --from-x/--from-y/--to-x/--to-y cho canvas/game
   key <keyName>                 Gửi phím đơn hoặc tổ hợp phím (Enter, Tab, Control+A...)
   upload <sel> <file1...>       Tải file từ máy lên ô nhập liệu file input qua CDP
   dialog <accept|dismiss>       Tự động xử lý hộp thoại alert, confirm, prompt
@@ -44,6 +44,7 @@ THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT / A
   navigate <url>                Điều hướng tab hiện tại đến URL
   screenshot [tùy chọn]         Chụp ảnh màn hình (Lưu ra file PNG)
   inspect <selector>            Soi và trích xuất thông số phần tử DOM
+  cdp status                    Kiểm tra CDP/debugger đã attach (dùng cho --via cdp)
   session [start|end|status]    Bắt đầu/kết thúc phiên làm việc (Giữ chuột ảo và viền neon liên tục)
   busy [on|off]                 Bật/tắt viền phát sáng và chỉ báo trạng thái AI Agent trên tab
   evaluate <script>             Thực thi mã JavaScript (-f <file>, stdin, hoặc string; Alias: eval)
@@ -56,6 +57,7 @@ TÙY CHỌN BỔ SUNG:
   --port <58765>                Cổng kết nối bridge server (Mặc định: 58765)
   --output, -o <file.png>       Đường dẫn lưu file ảnh screenshot
   --mode <visible|full|region>  Chế độ chụp màn hình
+  --via <synthetic|cdp|auto>    Backend input cho click/drag (mặc định: synthetic; cdp = trusted, dùng cho iframe/canvas)
   --clear                       Xóa nội dung input trước khi gõ
   --enter                       Bấm Enter sau khi gõ xong
   -f, --file <path>             Đường dẫn file script JS cho lệnh eval
@@ -72,6 +74,9 @@ VÍ DỤ NHANH:
   agent-pilot eval -f script.js --tab 1734672950
   cat script.js | agent-pilot eval --tab 1734672950
   agent-pilot screenshot -o homepage.png --mode full
+  agent-pilot click -x 733 -y 668 --via cdp --tab 1734672950
+  agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --via cdp --tab 1734672950
+  agent-pilot cdp status --tab 1734672950
   agent-pilot batch test_flow.json`)
 }
 
@@ -405,6 +410,18 @@ func (a FlexibleCmdArgs) Int(flagName string, defaultVal int) (int, error) {
 	return v, nil
 }
 
+func (a FlexibleCmdArgs) Float(flagName string, defaultVal float64) (float64, error) {
+	val, ok := a.Flags[flagName]
+	if !ok {
+		return defaultVal, nil
+	}
+	v, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return defaultVal, fmt.Errorf("giá trị %s không hợp lệ: %s", flagName, val)
+	}
+	return v, nil
+}
+
 func (a FlexibleCmdArgs) String(flagName string, defaultVal string) string {
 	if val, ok := a.Flags[flagName]; ok {
 		return val
@@ -506,24 +523,36 @@ func main() {
 		}
 
 	case "click":
-		clickFlags := flag.NewFlagSet("click", flag.ExitOnError)
-		tabID := clickFlags.Int("tab", 0, "Target tab ID")
-		x := clickFlags.Float64("x", 0, "X coordinate")
-		y := clickFlags.Float64("y", 0, "Y coordinate")
-		if err := clickFlags.Parse(os.Args[2:]); err != nil {
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "tab", Aliases: []string{"t"}},
+			{Name: "x"},
+			{Name: "y"},
+			{Name: "via"},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-
-		args := clickFlags.Args()
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+		x, err := cmdArgs.Float("x", 0)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+		y, err := cmdArgs.Float("y", 0)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
 		selector := ""
-		if len(args) > 0 {
-			selector = args[0]
+		if len(cmdArgs.Positional) > 0 {
+			selector = cmdArgs.Positional[0]
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
-		}
-		if err := ExecClick(selector, *x, *y, t); err != nil {
+		if err := ExecClick(selector, x, y, cmdArgs.String("via", "synthetic"), tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -795,8 +824,14 @@ func main() {
 
 	case "drag":
 		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
-			{Name: "steps", Aliases: []string{"s"}},
 			{Name: "tab", Aliases: []string{"t"}},
+			{Name: "steps", Aliases: []string{"s"}},
+			{Name: "hold"},
+			{Name: "via"},
+			{Name: "from-x"},
+			{Name: "from-y"},
+			{Name: "to-x"},
+			{Name: "to-y"},
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -808,15 +843,68 @@ func main() {
 			os.Exit(1)
 		}
 		steps, err := cmdArgs.Int("steps", 8)
-		if err != nil || steps <= 0 {
-			fmt.Fprintf(os.Stderr, "❌ Error: Số bước (steps) phải là số nguyên dương: %v\n", cmdArgs.Flags["steps"])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		if len(cmdArgs.Positional) < 2 {
-			fmt.Println("Sử dụng: agent-pilot drag <fromSelector> <toSelector> [--steps <n>] [--tab <id>]")
+		hold, err := cmdArgs.Int("hold", 0)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}
-		if err := ExecDrag(cmdArgs.Positional[0], cmdArgs.Positional[1], steps, tabID); err != nil {
+		fromX, err := cmdArgs.Float("from-x", -1)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+		fromY, err := cmdArgs.Float("from-y", -1)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+		toX, err := cmdArgs.Float("to-x", -1)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+		toY, err := cmdArgs.Float("to-y", -1)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+		fromSelector, toSelector := "", ""
+		if len(cmdArgs.Positional) >= 2 {
+			fromSelector, toSelector = cmdArgs.Positional[0], cmdArgs.Positional[1]
+		}
+		params, err := BuildDragParams(fromSelector, toSelector, fromX, fromY, toX, toY, steps, hold, cmdArgs.String("via", "synthetic"))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			fmt.Println("Sử dụng: agent-pilot drag <fromSelector> <toSelector> | --from-x <x> --from-y <y> --to-x <x> --to-y <y> [--steps <n>] [--hold <ms>] [--via synthetic|cdp|auto] [--tab <id>]")
+			os.Exit(1)
+		}
+		if err := ExecDrag(params, tabID); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+
+	case "cdp":
+		cmdArgs, err := parseCmdArgs(os.Args[2:], []FlagDef{
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+		if len(cmdArgs.Positional) < 1 || strings.ToLower(cmdArgs.Positional[0]) != "status" {
+			fmt.Println("Sử dụng: agent-pilot cdp status [--tab <id>]")
+			os.Exit(1)
+		}
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			os.Exit(1)
+		}
+		if err := ExecCdpStatus(tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			os.Exit(1)
 		}

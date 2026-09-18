@@ -726,7 +726,12 @@ agent-pilot service uninstall</div>
 agent-pilot click "#login-button"
 agent-pilot type "#user" "admin" --enter
 agent-pilot screenshot -o page.png
-agent-pilot batch flow.json</div>
+agent-pilot batch flow.json
+
+# Trusted CDP input (iframe khác origin / canvas / game WebGL)
+agent-pilot cdp status --tab 12345
+agent-pilot click -x 733 -y 668 --via cdp --tab 12345
+agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --hold 800 --via cdp --tab 12345</div>
         </div>
       </div>
 
@@ -763,8 +768,13 @@ agent-pilot batch flow.json</div>
             </tr>
             <tr>
               <td><span class="tag-mono">browser_click</span></td>
-              <td>Mô phỏng click chuột người thật kèm hiệu ứng gợn sóng và tọa độ</td>
-              <td><code>x</code>, <code>y</code>, <code>selector</code>, <code>tabId</code></td>
+              <td>Click chuột ảo kèm hiệu ứng gợn sóng. Thêm <code>via: "cdp"</code> để phát trusted input cho cross-origin iframe/canvas/WebGL</td>
+              <td><code>x</code>, <code>y</code>, <code>selector</code>, <code>via</code>, <code>tabId</code></td>
+            </tr>
+            <tr>
+              <td><span class="tag-mono">browser_drag</span></td>
+              <td>Kéo thả phần tử hoặc kéo giữa tọa độ; <code>via: "cdp"</code> + <code>holdMs</code> cho cơ chế slingshot trong game</td>
+              <td><code>from</code>, <code>to</code>, <code>fromX/Y</code>, <code>toX/Y</code>, <code>holdMs</code>, <code>via</code>, <code>tabId</code></td>
             </tr>
             <tr>
               <td><span class="tag-mono">browser_type</span></td>

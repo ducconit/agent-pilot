@@ -69,6 +69,11 @@ Agent Pilot provides an all-in-one compiled Go binary (`cli/agent-pilot`) for ul
   agent-pilot tabs
   agent-pilot batch flow.json
   agent-pilot feedback list
+
+  # Trusted CDP input (opt-in) for cross-origin iframes / canvas / WebGL games
+  agent-pilot cdp status --tab 123
+  agent-pilot click -x 733 -y 668 --via cdp --tab 123
+  agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --hold 800 --via cdp --tab 123
   ```
 - **Multi-Agent Multitasking**: Install the background service (`agent-pilot service install`) so port 58765 is persistently available. Agents operating concurrently should always retain and pass `tabId` across tool calls to operate on dedicated background tabs without collision.
 
@@ -87,7 +92,7 @@ When the `agent-pilot` MCP server or skill is active, agents have direct access 
 | `browser_upload_file` | `{ selector: string, files: string[], tabId?: number }` | **Local File Uploader**: Uploads local files to `<input type="file">` via CDP `DOM.setFileInputFiles`. Supports `@ref` or CSS selector. |
 | `browser_handle_dialog` | `{ accept?: boolean, promptText?: string, tabId?: number }` | **JavaScript Dialog Handler**: Automatically accepts or dismisses `alert`, `confirm`, or `prompt` browser dialogs with optional text. |
 | `browser_hover` | `{ selector: string, tabId?: number }` | **Virtual Mouse Hover**: Simulates hovering over an element (triggering `mouseenter`, `mouseover`, `mousemove`) to open tooltips and dropdowns. |
-| `browser_drag` | `{ from: string, to: string, steps?: number, tabId?: number }` | **Virtual Drag & Drop**: Drags an element from source to target with animated cursor path and HTML5 drag events. |
+| `browser_drag` | `{ from?: string, to?: string, fromX?: number, fromY?: number, toX?: number, toY?: number, steps?: number, holdMs?: number, via?: "synthetic"\|"cdp"\|"auto", tabId?: number }` | **Virtual Drag & Drop**: Drags an element or between coordinates. `via:"cdp"` uses trusted CDP input (required for cross-origin iframes, canvas/WebGL games); `holdMs` holds before release (slingshot pull). |
 | `browser_press_key` | `{ key: string, selector?: string, tabId?: number }` | **Virtual Keyboard Shortcuts**: Dispatches key presses and keyboard combinations (`Enter`, `Tab`, `Escape`, `Control+A`, `Control+Shift+R`...). |
 | `browser_wait_for` | `{ selector?: string, text?: string, state?: "visible" \| "attached" \| "hidden", timeoutMs?: number, tabId?: number }` | **Smart Waiter**: Polling wait until an element or text appears/disappears or meets state condition with customizable timeout. |
 | `browser_emulate` | `{ cpuThrottlingRate?: number, networkConditions?: string, colorScheme?: "dark" \| "light", tabId?: number }` | **Environment Emulation**: Emulates CPU throttling (slowdown 1x/4x/6x), network conditions (`offline`, `slow-3g`, `fast-3g`), and dark/light mode. |
@@ -104,7 +109,7 @@ When the `agent-pilot` MCP server or skill is active, agents have direct access 
 | `browser_open_tab` | `{ url: string, active?: boolean }` | Opens a new browser tab with the specified URL. Defaults to `active: false` (background mode) to never interrupt or steal focus from the user's active window. |
 | `browser_list_tabs` | `{}` | Lists all open tabs with IDs, titles, URLs, active state, and agent ownership indicators. |
 | `browser_navigate` | `{ url: string, tabId?: number }` | Navigates the specified or active tab to a URL. |
-| `browser_click` | `{ x?: number, y?: number, selector?: string, tabId?: number }` | Smoothly moves virtual mouse cursor and triggers a synthetic click with visual ripple and coordinate badge. Supports CSS selector or snapshot ref (`@1`). |
+| `browser_click` | `{ x?: number, y?: number, selector?: string, via?: "synthetic"\|"cdp"\|"auto", tabId?: number }` | Moves virtual mouse cursor and clicks. `via:"cdp"` (opt-in) uses trusted CDP `Input.dispatchMouseEvent` which works on cross-origin iframes, canvas & WebGL apps; `via:"auto"` falls back to synthetic. Default remains synthetic. |
 | `browser_type` | `{ text: string, selector: string, clear?: boolean, delay?: number, pressEnter?: boolean, tabId?: number }` | Simulates human typing into inputs with realistic keystroke delays. Supports CSS selector or snapshot ref (`@1`). |
 | `browser_scroll` | `{ deltaX?: number, deltaY?: number, tabId?: number }` | Smoothly scrolls the page viewport by relative pixel offsets. |
 | `browser_get_element` | `{ selector: string, includeStyles?: boolean, tabId?: number }` | Inspects DOM elements, returning tag name, coordinates, bounding box dimensions, text, and value. Pass `includeStyles: true` only when styling details are needed (omitted by default to save tokens). |
@@ -116,6 +121,54 @@ When the `agent-pilot` MCP server or skill is active, agents have direct access 
 | `browser_set_busy` | `{ busy?: boolean, action?: string, session?: boolean, tabId?: number }` | Displays a subtle glowing neon border and compact floating pill with action label and emergency unlock button (`Escape`) on the target page during agent workflows. |
 | `browser_get_pending_feedback` | `{ sessionId?: string, limit?: number, clear?: boolean }` | **Channel B Feedback Reader**: Retrieves pending human visual UI feedback sessions saved in `~/.agent-pilot/inbox/feedback/<timestamp>/*`. |
 | `browser_wait_for_feedback` | `{ timeout?: number, tabId?: number }` | **Channel A Reactive Long-Polling**: Reactively halts agent execution until a human submits visual feedback via Feedback Studio in the browser. |
+
+---
+
+## 🔌 Which Features Require CDP? (Mandatory vs Optional)
+
+Agent Pilot has two automation engines:
+- **Synthetic DOM engine** (content script, no debugger): produces `isTrusted: false` DOM events. Fine for regular pages, but **cannot cross cross-origin iframes** and cannot drive canvas/WebGL apps.
+- **CDP engine** (`chrome.debugger` + `Input.*` / `Page.*`): produces **trusted input** and works on cross-origin iframes, canvas and WebGL apps (Unity, Playables, games).
+
+### Requirement matrix
+
+| Feature (MCP tool / CLI) | Engine | CDP required? |
+| :--- | :--- | :--- |
+| `browser_snapshot` / `snapshot` | DOM (content script) | ❌ No |
+| `browser_get_element` / `inspect` | DOM | ❌ No |
+| `browser_type` / `type` | Synthetic DOM | ❌ No |
+| `browser_scroll` / `scroll` | Synthetic DOM | ❌ No |
+| `browser_fill_form` / `fill` | Synthetic DOM | ❌ No |
+| `browser_wait_for` / `wait` | DOM | ❌ No |
+| `browser_pick_color` | DOM sampling | ❌ No |
+| `browser_list_tabs`, `browser_open_tab`, `browser_navigate` | `chrome.tabs` API | ❌ No |
+| `browser_evaluate` / `evaluate` | MAIN-world scripting (CDP only as fallback) | ❌ No |
+| `browser_click` / `click` | Synthetic by default | ⚙️ Optional — `via:"cdp"` for cross-origin iframe / canvas / WebGL |
+| `browser_drag` / `drag` | Synthetic by default | ⚙️ Optional — `via:"cdp"` + coordinates (fromX/fromY/toX/toY) for canvas games |
+| `browser_hover` / `hover` | CDP first, synthetic fallback | ⚙️ Optional (automatic, no flag) |
+| `browser_press_key` / `key` | CDP first, synthetic fallback | ⚙️ Optional (automatic, no flag) |
+| `browser_screenshot` / `screenshot` | CDP `Page.captureScreenshot` | ✅ Yes for background tabs (active tab falls back to `captureVisibleTab`) |
+| `browser_upload_file` / `upload` | CDP `DOM.setFileInputFiles` | ✅ Yes |
+| `browser_handle_dialog` / `dialog` | CDP dialog handling | ✅ Yes |
+| `browser_emulate` / `emulate` | CDP `Emulation.set*` | ✅ Yes |
+| `browser_resize_page` / `resize` | CDP `Emulation.setDeviceMetricsOverride` | ✅ Yes |
+| `browser_list_network_requests`, `browser_get_network_request` / `network` | CDP Network domain | ✅ Yes |
+| `browser_performance_trace` / `trace` | CDP Tracing | ✅ Yes |
+| `browser_performance_metrics` / `metrics` | CDP Performance domain | ✅ Yes |
+| `browser_take_heapsnapshot` / `heap` | CDP HeapProfiler | ✅ Yes |
+| `browser_get_devtools_data` | CDP Console/Network/Performance buffers | ✅ Yes |
+| raw `cdp.send` / `agent-pilot cdp status` | CDP | ✅ Yes (by definition) |
+
+### CDP failure semantics
+- `click`/`drag` with `via:"cdp"`: **no silent fallback** — returns `CDP_UNAVAILABLE: <reason>` so the agent knows trusted input was not delivered. Use `via:"auto"` when a synthetic fallback is acceptable.
+- ✅-group features attach the debugger automatically and fail/degrade when attachment is impossible.
+- Common causes: DevTools already open on the tab, `chrome.debugger` blocked by the user/profile policy.
+- Pre-flight check: `agent-pilot cdp status --tab <id>`, or HTTP `{"method":"cdp.status","params":{"tabId":123}}`.
+
+### When to use which
+- Regular DOM pages: default synthetic commands are enough (visual cursor + ripple included).
+- Cross-origin iframe, `<canvas>`, WebGL/Unity game: `via:"cdp"` for click/drag (with explicit coordinates) after a `cdp status` check.
+- The neon virtual cursor / ripple is only drawn by the synthetic engine; CDP input does not render it.
 
 ---
 

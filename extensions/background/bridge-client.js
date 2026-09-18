@@ -31,7 +31,10 @@ import {
   takeHeapSnapshot,
   collectGarbage,
   dispatchCdpKeyEvent,
-  dispatchCdpMouseMove
+  dispatchCdpMouseMove,
+  ensureCdpAttached,
+  dispatchCdpMouseClick,
+  dispatchCdpMouseDrag
 } from "./cdp-manager.js";
 import {
   getActiveTabId,
@@ -311,6 +314,38 @@ export class AgentBridgeClient {
     return await captureTabScreenshot(tabId, params);
   }
 
+  /**
+   * Normalize the input backend: synthetic (default, unchanged behavior), cdp (trusted) or auto (cdp with synthetic fallback).
+   */
+  normalizeVia(params) {
+    const via = String((params && params.via) || "synthetic").toLowerCase();
+    return via === "cdp" || via === "auto" ? via : "synthetic";
+  }
+
+  /**
+   * Resolve a viewport point for trusted CDP input from explicit coordinates or a CSS selector.
+   */
+  async resolveCdpPoint(tabId, params, label = "point") {
+    const hasX = params.x !== undefined && params.x !== null && params.x !== "";
+    const hasY = params.y !== undefined && params.y !== null && params.y !== "";
+    if (hasX && hasY) {
+      return { x: Number(params.x), y: Number(params.y) };
+    }
+    if (!params.selector) {
+      throw new Error(`Cannot resolve ${label}: provide x/y coordinates or a selector`);
+    }
+    const res = await this.sendTabMessageWithRetry(tabId, {
+      action: "virtual_hover",
+      selector: params.selector,
+      dispatchSynthetic: false
+    });
+    const coords = res && (res.coords || (res.x !== undefined && res.y !== undefined ? { x: res.x, y: res.y } : null));
+    if (!coords || !Number.isFinite(Number(coords.x)) || !Number.isFinite(Number(coords.y))) {
+      throw new Error(`Cannot resolve ${label} coordinates for selector: ${params.selector}`);
+    }
+    return { x: Number(coords.x), y: Number(coords.y) };
+  }
+
   async executeBatchActions(params) {
     return await executeBatchActions(params, this);
   }
@@ -468,6 +503,27 @@ export class AgentBridgeClient {
           break;
         }
 
+        case "cdp.status": {
+          const tabId = await this.getTargetTabId(params.tabId);
+          if (!tabId) return respond(null, new Error("No target tab found"));
+          const status = await attachDebugger(tabId, this.broadcastFn).catch((err) => ({
+            success: false,
+            error: err && err.message ? err.message : String(err)
+          }));
+          if (!status || status.success === false) {
+            respond({
+              success: true,
+              attached: false,
+              tabId,
+              error: (status && status.error) || "unknown",
+              hint: "Close DevTools, allow the debugger permission, or use --via auto/synthetic."
+            });
+            break;
+          }
+          respond({ success: true, attached: true, tabId });
+          break;
+        }
+
         case "cdp.send": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
@@ -475,7 +531,15 @@ export class AgentBridgeClient {
           if (!cdpMethod) return respond(null, new Error("Missing CDP method (cdpMethod or method)"));
           const cdpParams = params.cdpParams || params.commandParams || params.params || {};
           if (!attachedTabs.has(tabId)) {
-            await attachDebugger(tabId, this.broadcastFn).catch((err) => logDebug("cdp.send auto-attach error", err));
+            const attachRes = await attachDebugger(tabId, this.broadcastFn);
+            if (!attachRes || attachRes.success === false) {
+              return respond(
+                null,
+                new Error(
+                  `CDP_UNAVAILABLE: ${(attachRes && attachRes.error) || "cannot attach debugger"}. Hint: close DevTools, allow the debugger permission, or use --via auto/synthetic.`
+                )
+              );
+            }
           }
           sendCdpCommand(tabId, cdpMethod, cdpParams)
             .then(res => respond(res || { success: true }))
@@ -556,14 +620,46 @@ export class AgentBridgeClient {
         case "page.click": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.runWithTabLock(tabId, "page.click", () =>
-            this.sendTabMessageWithRetry(tabId, {
-              action: "click_cursor",
-              x: params.x,
-              y: params.y,
-              selector: params.selector
-            })
-          )
+          const via = this.normalizeVia(params);
+          if (via === "synthetic") {
+            this.runWithTabLock(tabId, "page.click", () =>
+              this.sendTabMessageWithRetry(tabId, {
+                action: "click_cursor",
+                x: params.x,
+                y: params.y,
+                selector: params.selector
+              })
+            )
+              .then(res => respond(res || { success: true }))
+              .catch(err => respond(null, err));
+            break;
+          }
+          this.runWithTabLock(tabId, "page.click", async () => {
+            try {
+              const point = await this.resolveCdpPoint(tabId, params, "click");
+              await ensureCdpAttached(tabId, this.broadcastFn);
+              return await dispatchCdpMouseClick(tabId, point.x, point.y, {
+                button: params.button || "left",
+                clickCount: params.clickCount || 1
+              });
+            } catch (err) {
+              if (via === "auto") {
+                console.debug("[AgentPilot] CDP click failed, falling back to synthetic:", err);
+                const res = await this.sendTabMessageWithRetry(tabId, {
+                  action: "click_cursor",
+                  x: params.x,
+                  y: params.y,
+                  selector: params.selector
+                });
+                return Object.assign({}, res || {}, {
+                  via: "synthetic",
+                  fallback: true,
+                  cdpError: err.message
+                });
+              }
+              throw err;
+            }
+          })
             .then(res => respond(res || { success: true }))
             .catch(err => respond(null, err));
           break;
@@ -639,14 +735,52 @@ export class AgentBridgeClient {
         case "page.drag": {
           const tabId = await this.getTargetTabId(params.tabId);
           if (!tabId) return respond(null, new Error("No target tab found"));
-          this.runWithTabLock(tabId, "page.drag", () =>
+          const via = this.normalizeVia(params);
+          const fromSelector = params.from || params.fromSelector;
+          const toSelector = params.to || params.toSelector;
+          const syntheticDrag = () =>
             this.sendTabMessageWithRetry(tabId, {
               action: "virtual_drag",
-              fromSelector: params.from || params.fromSelector,
-              toSelector: params.to || params.toSelector,
+              fromSelector,
+              toSelector,
               steps: params.steps || 8
-            })
-          )
+            });
+          if (via === "synthetic") {
+            this.runWithTabLock(tabId, "page.drag", syntheticDrag)
+              .then(res => respond(res || { success: true }))
+              .catch(err => respond(null, err));
+            break;
+          }
+          this.runWithTabLock(tabId, "page.drag", async () => {
+            try {
+              const fromPoint = await this.resolveCdpPoint(
+                tabId,
+                { x: params.fromX, y: params.fromY, selector: fromSelector },
+                "drag source"
+              );
+              const toPoint = await this.resolveCdpPoint(
+                tabId,
+                { x: params.toX, y: params.toY, selector: toSelector },
+                "drag target"
+              );
+              await ensureCdpAttached(tabId, this.broadcastFn);
+              return await dispatchCdpMouseDrag(tabId, fromPoint.x, fromPoint.y, toPoint.x, toPoint.y, {
+                steps: params.steps || 10,
+                holdMs: params.holdMs || params.hold || 0
+              });
+            } catch (err) {
+              if (via === "auto" && fromSelector && toSelector) {
+                console.debug("[AgentPilot] CDP drag failed, falling back to synthetic:", err);
+                const res = await syntheticDrag();
+                return Object.assign({}, res || {}, {
+                  via: "synthetic",
+                  fallback: true,
+                  cdpError: err.message
+                });
+              }
+              throw err;
+            }
+          })
             .then(res => respond(res || { success: true }))
             .catch(err => respond(null, err));
           break;

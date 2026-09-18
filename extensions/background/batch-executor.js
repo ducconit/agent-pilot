@@ -11,7 +11,7 @@ import {
   getBuffer,
   logDebug
 } from "./constants.js";
-import { attachDebugger, sendCdpCommand, uploadFileInput, handleJavaScriptDialog } from "./cdp-manager.js";
+import { attachDebugger, sendCdpCommand, uploadFileInput, handleJavaScriptDialog, ensureCdpAttached, dispatchCdpMouseClick, dispatchCdpMouseDrag } from "./cdp-manager.js";
 import {
   getActiveTabId,
   getTargetTabId,
@@ -36,6 +36,33 @@ function getPositiveNumber(...candidates) {
     }
   }
   return null;
+}
+
+function normalizeVia(step) {
+  const via = String((step && step.via) || "synthetic").toLowerCase();
+  return via === "cdp" || via === "auto" ? via : "synthetic";
+}
+
+async function resolvePoint(targetTabId, x, y, selector, label) {
+  const hasX = x !== undefined && x !== null && x !== "";
+  const hasY = y !== undefined && y !== null && y !== "";
+  if (hasX && hasY) {
+    return { x: Number(x), y: Number(y) };
+  }
+  if (!selector) {
+    throw new Error(`Cannot resolve ${label}: provide coordinates or a selector`);
+  }
+  await ensureContentScript(targetTabId);
+  const res = await sendTabMessageWithRetry(targetTabId, {
+    action: "virtual_hover",
+    selector,
+    dispatchSynthetic: false
+  });
+  const coords = res && (res.coords || (res.x !== undefined && res.y !== undefined ? { x: res.x, y: res.y } : null));
+  if (!coords || !Number.isFinite(Number(coords.x)) || !Number.isFinite(Number(coords.y))) {
+    throw new Error(`Cannot resolve ${label} coordinates for selector: ${selector}`);
+  }
+  return { x: Number(coords.x), y: Number(coords.y) };
 }
 
 /**
@@ -234,6 +261,23 @@ export async function executeBatchActions(params, bridgeClient = null) {
         case "page.click": {
           const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
           if (!targetTabId) throw new Error("No active tab for click");
+          const via = normalizeVia(act);
+          if (via !== "synthetic") {
+            try {
+              const point = await resolvePoint(targetTabId, act.x, act.y, act.selector, "click");
+              await ensureCdpAttached(targetTabId);
+              stepResult.result = await dispatchCdpMouseClick(targetTabId, point.x, point.y, {
+                button: act.button || "left",
+                clickCount: act.clickCount || 1
+              });
+              stepResult.success = true;
+              stepResult.via = "cdp";
+              break;
+            } catch (err) {
+              if (via !== "auto") throw err;
+              logDebug("batch CDP click fallback", err);
+            }
+          }
           await ensureContentScript(targetTabId);
           const res = await sendTabMessageWithRetry(targetTabId, {
             action: "click_cursor",
@@ -314,11 +358,35 @@ export async function executeBatchActions(params, bridgeClient = null) {
         case "page.drag": {
           const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : currentTabId;
           if (!targetTabId) throw new Error("No active tab for drag");
+          const via = normalizeVia(act);
+          const fromSelector = act.from || act.fromSelector;
+          const toSelector = act.to || act.toSelector;
+          if (via !== "synthetic") {
+            try {
+              const fromPoint = await resolvePoint(targetTabId, act.fromX, act.fromY, fromSelector, "drag source");
+              const toPoint = await resolvePoint(targetTabId, act.toX, act.toY, toSelector, "drag target");
+              await ensureCdpAttached(targetTabId);
+              stepResult.result = await dispatchCdpMouseDrag(
+                targetTabId,
+                fromPoint.x,
+                fromPoint.y,
+                toPoint.x,
+                toPoint.y,
+                { steps: act.steps || 10, holdMs: act.holdMs || act.hold || 0 }
+              );
+              stepResult.success = true;
+              stepResult.via = "cdp";
+              break;
+            } catch (err) {
+              if (via !== "auto" || !fromSelector || !toSelector) throw err;
+              logDebug("batch CDP drag fallback", err);
+            }
+          }
           await ensureContentScript(targetTabId);
           const res = await sendTabMessageWithRetry(targetTabId, {
             action: "virtual_drag",
-            fromSelector: act.from || act.fromSelector,
-            toSelector: act.to || act.toSelector,
+            fromSelector,
+            toSelector,
             steps: act.steps || 8
           });
           if (!res || !res.success) throw new Error(res?.error || "Drag failed");

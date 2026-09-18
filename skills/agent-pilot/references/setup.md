@@ -139,3 +139,19 @@ In Cursor Settings -> Features -> MCP Servers -> Add New MCP Server:
 * **Resolution**: Agent Pilot has built-in **Dual Mode**:
   - The Master Bridge Service holds port 58765.
   - All subsequent CLI and MCP invocations detect the master service and forward commands over HTTP (`/api`) or stdio without binding 58765.
+
+### Issue 4: `CDP_UNAVAILABLE` / CDP-required command fails
+* **Root Cause**: The debugger cannot attach to the tab. Common causes:
+  1. Chrome DevTools is already open on that tab (only one debugger client per tab).
+  2. The `chrome.debugger` permission/policy is blocked (enterprise policy or restricted profile).
+* **Diagnosis**:
+  ```bash
+  agent-pilot cdp status --tab <id>
+  # 🟢 CDP attached (trusted input available)  → trusted CDP input works
+  # 🔴 CDP NOT attached — <reason>             → fix the cause or use --via auto/synthetic
+  ```
+* **Fix / Workarounds**:
+  1. Close DevTools on the target tab and retry.
+  2. For `click`/`drag`, use `--via auto` (CDP first, automatic synthetic fallback) or the default synthetic mode for regular DOM pages.
+  3. Commands that are inherently CDP-based (`upload`, `dialog`, `emulate`, `resize`, `network`, `trace`, `metrics`, `heap`, background-tab `screenshot`) cannot run without debugger access — use an unrestricted profile.
+  4. Remember: synthetic input cannot cross cross-origin iframes or drive canvas/WebGL apps; on those targets CDP access is required.

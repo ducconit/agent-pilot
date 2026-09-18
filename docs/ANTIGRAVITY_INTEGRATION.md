@@ -89,7 +89,8 @@ Antigravity có thể tạo ra các chuỗi lệnh JSON có cấu trúc để n�
 | `navigate` | `url` (string) | Điều hướng tab hiện tại đến địa chỉ mong muốn |
 | `wait` | `ms` (number) | Tạm dừng luồng thực thi trong khoảng thời gian mili-giây |
 | `mouse_move` | `x`, `y`, `duration` (ms) | Di chuyển con trỏ chuột ảo mượt mà đến tọa độ chỉ định |
-| `mouse_click` | `x`, `y` | Phát hiệu ứng sóng click và kích hoạt chuỗi sự kiện DOM (`mousedown`, `mouseup`, `click`) |
+| `mouse_click` | `x`, `y`, `via?` ("synthetic" \| "cdp" \| "auto") | Phát hiệu ứng sóng click và chuỗi sự kiện DOM; `via: "cdp"` phát trusted click (bắt buộc cho cross-origin iframe/canvas/WebGL) |
+| `mouse_drag` | `from`/`to` (selector) hoặc `fromX/fromY/toX/toY`, `steps?`, `holdMs?`, `via?` | Kéo thả; dùng tọa độ + `via: "cdp"` cho game canvas (slingshot/aim) |
 | `type` | `selector` (string), `text` (string) | Di chuyển đến ô nhập liệu, kích hoạt focus và tự động gõ ký tự từng bước |
 | `scroll` | `deltaX`, `deltaY` (px) | Cuộn trang mượt mà theo trục X/Y |
 | `screenshot` | `mode` ("visible" \| "element" \| "region") | Kích hoạt bộ chụp màn hình |
@@ -126,11 +127,13 @@ Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/c
 ```
 *(Nếu cài đặt binary ở đường dẫn riêng, thay `"agent-pilot"` bằng đường dẫn tuyệt đối như `"/home/ubuntu/.agk/bin/agent-pilot"` hoặc `"/usr/local/bin/agent-pilot"`)*.
 
-### 3.3. Danh mục 16 Công cụ MCP Cung Cấp Cho AI Agent:
+### 3.3. Bộ Công Cụ MCP Cung Cấp Cho AI Agent (35 Tools — trích lược):
 1. `browser_open_tab(url, active)`: Mở tab trình duyệt mới (mặc định mở nền không cướp focus của người dùng, tự động phân nhóm Chrome Tab Group).
 2. `browser_list_tabs()`: Liệt kê toàn bộ các tab trình duyệt kèm trạng thái tab do Agent quản lý.
 3. `browser_navigate(url, tabId)`: Điều hướng tab đang hoạt động hoặc tab chỉ định.
-4. `browser_click(x, y, selector)`: Di chuyển chuột ảo mượt mà và click vào tọa độ (X, Y) hoặc selector CSS (tự động cuộn phần tử vào khung nhìn).
+4. `browser_click(x, y, selector, via)`: Di chuyển chuột ảo mượt mà và click vào tọa độ (X, Y) hoặc selector CSS. Thêm `via: "cdp"` để phát **trusted CDP input** — bắt buộc khi click bên trong cross-origin iframe hoặc canvas/WebGL; `via: "auto"` tự fallback synthetic.
+4b. `browser_drag(from, to, fromX, fromY, toX, toY, steps, holdMs, via)`: Kéo thả phần tử hoặc kéo giữa tọa độ; `via: "cdp"` + `holdMs` cho cơ chế kéo slingshot trong game.
+   *(Tiền kiểm tra CDP: `browser_run_actions` với action `cdp` gọi `cdp.status`, hoặc CLI `agent-pilot cdp status --tab <id>`.)*
 5. `browser_type(selector, text, delay, clear, pressEnter)`: Tự động gõ phím human-like vào ô nhập liệu.
 6. `browser_scroll(deltaX, deltaY)`: Cuộn trang web mượt mà theo trục X hoặc Y.
 7. `browser_get_element(selector)`: Trích xuất Bounding Box, kích thước, CSS selector và XPath của phần tử DOM.

@@ -37,7 +37,8 @@ func DispatchCommand(method string, params map[string]interface{}, port int) (in
 	return SendCommandToExtension(method, params, DeriveCommandTimeout(method, params, 15000))
 }
 
-func ExecClick(selector string, x, y float64, tabID interface{}) error {
+// BuildClickParams builds the page.click payload. via: synthetic (default) | cdp | auto.
+func BuildClickParams(selector string, x, y float64, via string) (map[string]interface{}, error) {
 	params := map[string]interface{}{}
 	if selector != "" {
 		params["selector"] = selector
@@ -45,6 +46,30 @@ func ExecClick(selector string, x, y float64, tabID interface{}) error {
 	if x > 0 || y > 0 {
 		params["x"] = x
 		params["y"] = y
+	}
+	via = normalizeVia(via)
+	if via != "synthetic" {
+		params["via"] = via
+	}
+	if selector == "" && !(x > 0 || y > 0) {
+		return nil, fmt.Errorf("click requires a selector or x/y coordinates")
+	}
+	return params, nil
+}
+
+func normalizeVia(via string) string {
+	switch strings.ToLower(strings.TrimSpace(via)) {
+	case "cdp", "auto":
+		return strings.ToLower(strings.TrimSpace(via))
+	default:
+		return "synthetic"
+	}
+}
+
+func ExecClick(selector string, x, y float64, via string, tabID interface{}) error {
+	params, err := BuildClickParams(selector, x, y, via)
+	if err != nil {
+		return err
 	}
 	if tabID != nil {
 		params["tabId"] = tabID
@@ -97,7 +122,7 @@ func ExecNavigate(url string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("tabs.navigate", params, DefaultPort)
+	res, err := DispatchCommand("tabs.update", params, DefaultPort)
 	if err != nil {
 		return err
 	}
@@ -366,12 +391,45 @@ func ExecHover(selector string, tabID interface{}) error {
 	return nil
 }
 
-func ExecDrag(fromSelector, toSelector string, steps int, tabID interface{}) error {
-	params := map[string]interface{}{
-		"from":  fromSelector,
-		"to":    toSelector,
-		"steps": steps,
+// BuildDragParams builds the page.drag payload from selectors and/or coordinates.
+// Requires either both selectors or all four coordinates.
+func BuildDragParams(fromSelector, toSelector string, fromX, fromY, toX, toY float64, steps, holdMs int, via string) (map[string]interface{}, error) {
+	hasSelectors := fromSelector != "" && toSelector != ""
+	hasFromCoords := fromX >= 0 && fromY >= 0
+	hasToCoords := toX >= 0 && toY >= 0
+	hasCoords := hasFromCoords && hasToCoords
+
+	if !hasSelectors && !hasCoords {
+		return nil, fmt.Errorf("drag requires both selectors or all four coordinates (--from-x --from-y --to-x --to-y)")
 	}
+
+	params := map[string]interface{}{}
+	if hasSelectors {
+		params["from"] = fromSelector
+		params["to"] = toSelector
+	}
+	if hasFromCoords {
+		params["fromX"] = fromX
+		params["fromY"] = fromY
+	}
+	if hasToCoords {
+		params["toX"] = toX
+		params["toY"] = toY
+	}
+	if steps > 0 {
+		params["steps"] = steps
+	}
+	if holdMs > 0 {
+		params["holdMs"] = holdMs
+	}
+	via = normalizeVia(via)
+	if via != "synthetic" {
+		params["via"] = via
+	}
+	return params, nil
+}
+
+func ExecDrag(params map[string]interface{}, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
@@ -379,7 +437,26 @@ func ExecDrag(fromSelector, toSelector string, steps int, tabID interface{}) err
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Dragged %s -> %s: %v\n", fromSelector, toSelector, res)
+	fmt.Printf("✅ Drag dispatched: %v\n", res)
+	return nil
+}
+
+func ExecCdpStatus(tabID interface{}) error {
+	params := map[string]interface{}{}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := DispatchCommand("cdp.status", params, DefaultPort)
+	if err != nil {
+		return err
+	}
+	resMap, _ := res.(map[string]interface{})
+	attached, _ := resMap["attached"].(bool)
+	if attached {
+		fmt.Printf("🟢 CDP attached (trusted input available) — tab %v\n", resMap["tabId"])
+	} else {
+		fmt.Printf("🔴 CDP NOT attached — %v\n   Hint: %v\n", resMap["error"], resMap["hint"])
+	}
 	return nil
 }
 

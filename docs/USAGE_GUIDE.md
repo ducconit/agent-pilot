@@ -211,6 +211,28 @@ agent-pilot batch flow_test.json
 agent-pilot feedback list
 ```
 
+#### Điều khiển Cross-Origin Iframe / Canvas / Game bằng CDP (tùy chọn)
+
+Mặc định `click`/`drag` dùng synthetic DOM event (nhanh, có con trỏ neon). Khi cần điều khiển **iframe khác origin, `<canvas>`, WebGL/Unity game**, hãy bật engine CDP trusted:
+
+```bash
+# Kiểm tra debugger có gắn được không (DevTools đang mở trên tab sẽ chặn)
+agent-pilot cdp status --tab 12345
+
+# Click trusted theo tọa độ (mặc định vẫn là synthetic nếu không có --via)
+agent-pilot click -x 733 -y 668 --via cdp --tab 12345
+
+# Kéo slingshot trong game: kéo từ điểm A tới B, giữ 800ms rồi thả
+agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --hold 800 --via cdp --tab 12345
+
+# Chế độ an toàn: thử CDP trước, tự fallback synthetic nếu debugger bị chặn
+agent-pilot click "#play-button" --via auto --tab 12345
+```
+
+- `--via cdp` **không fallback âm thầm**: nếu gắn debugger thất bại sẽ báo lỗi `CDP_UNAVAILABLE` kèm gợi ý.
+- `--via auto` phù hợp khi muốn chạy được trên cả trang DOM thường lẫn iframe/canvas.
+- Các lệnh `upload`, `dialog`, `emulate`, `resize`, `network`, `trace`, `metrics`, `heap` và screenshot tab ngầm **bắt buộc CDP** — xem `skills/agent-pilot/references/cli-usage.md` §1.1.
+
 #### Cấu Trúc File Batch Automation JSON (`flow_test.json`):
 ```json
 [

@@ -144,7 +144,14 @@ agent-pilot tabs
 
 # 7. Chạy một kịch bản Batch Automation hoàn chỉnh từ file JSON
 agent-pilot batch flow_test.json
+
+# 8. Trusted CDP input cho cross-origin iframe / canvas / WebGL game (tùy chọn)
+agent-pilot cdp status --tab 12345
+agent-pilot click -x 733 -y 668 --via cdp --tab 12345
+agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --hold 800 --via cdp --tab 12345
 ```
+
+> `--via synthetic` (mặc định) · `--via cdp` (trusted, không fallback) · `--via auto` (CDP trước, fallback synthetic). Xem ma trận CDP đầy đủ tại `skills/agent-pilot/references/cli-usage.md` §1.1.
 
 ### 4. Cấu Trúc File Batch Automation JSON
 

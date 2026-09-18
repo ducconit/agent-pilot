@@ -91,13 +91,14 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_click",
-		Description: "Simulate human-like virtual mouse click with visual neon cursor and ripple effects.",
+		Description: "Click with the virtual mouse (visual cursor). Set via:'cdp' for trusted CDP input that works on cross-origin iframes, canvas and WebGL apps; via:'auto' falls back to synthetic.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"selector": map[string]interface{}{"type": "string", "description": "CSS selector to click"},
 				"x":        map[string]interface{}{"type": "number", "description": "X coordinate"},
 				"y":        map[string]interface{}{"type": "number", "description": "Y coordinate"},
+				"via":      map[string]interface{}{"type": "string", "description": "Input backend: synthetic (default), cdp (trusted), auto (cdp with synthetic fallback)"},
 				"tabId":    map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
 		},
@@ -349,16 +350,21 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_drag",
-		Description: "Simulate virtual drag and drop from a source element (@ref or CSS selector) to a target element.",
+		Description: "Drag from a source to a target element, or between coordinates (fromX/fromY/toX/toY) for canvas/game aiming. Set via:'cdp' for trusted CDP input; via:'auto' falls back to synthetic.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"from":  map[string]interface{}{"type": "string", "description": "Source element selector or @ref"},
-				"to":    map[string]interface{}{"type": "string", "description": "Target element selector or @ref"},
-				"steps": map[string]interface{}{"type": "integer", "description": "Number of interpolation animation steps (default: 8)"},
-				"tabId": map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"from":   map[string]interface{}{"type": "string", "description": "Source element selector or @ref"},
+				"to":     map[string]interface{}{"type": "string", "description": "Target element selector or @ref"},
+				"fromX":  map[string]interface{}{"type": "number", "description": "Source X coordinate (canvas/game)"},
+				"fromY":  map[string]interface{}{"type": "number", "description": "Source Y coordinate (canvas/game)"},
+				"toX":    map[string]interface{}{"type": "number", "description": "Target X coordinate (canvas/game)"},
+				"toY":    map[string]interface{}{"type": "number", "description": "Target Y coordinate (canvas/game)"},
+				"steps":  map[string]interface{}{"type": "integer", "description": "Number of interpolation steps (default: 8)"},
+				"holdMs": map[string]interface{}{"type": "integer", "description": "Hold at destination before release in ms (slingshot pull)"},
+				"via":    map[string]interface{}{"type": "string", "description": "Input backend: synthetic (default), cdp (trusted), auto (cdp with synthetic fallback)"},
+				"tabId":  map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
-			"required": []string{"from", "to"},
 		},
 	},
 	{
