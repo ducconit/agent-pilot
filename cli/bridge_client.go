@@ -111,7 +111,7 @@ func SendCommandToExtension(method string, params map[string]interface{}, timeou
 	instanceID, _ := params["instanceId"].(string)
 	client := getClientByID(instanceID)
 	if client == nil {
-		return nil, fmt.Errorf("no Chrome Extension connected to Agent Pilot bridge on port %d", DefaultPort)
+		return nil, fmt.Errorf("no Chrome Extension connected to Agent Pilot bridge on port %d", ActiveBridgePort())
 	}
 
 	reqID := atomic.AddInt64(&requestCounter, 1)

@@ -253,7 +253,7 @@ WantedBy=default.target
 	fmt.Printf("✅ Đã cài đặt và kích hoạt thành công Agent Pilot Service (systemd --user)!\n")
 	fmt.Printf("📁 Tệp cấu hình: %s\n", serviceFilePath)
 	fmt.Printf("🚀 Lệnh thực thi: \"%s\" %s\n", escapedExec, serverSubcommand)
-	fmt.Printf("🌐 Cổng lắng nghe: http://127.0.0.1:%d (ws://127.0.0.1:%d)\n", DefaultPort, DefaultPort)
+	fmt.Printf("🌐 Cổng lắng nghe: http://127.0.0.1:%d (ws://127.0.0.1:%d)\n", DefaultBridgePort(), DefaultBridgePort())
 	return nil
 }
 
@@ -386,7 +386,7 @@ func (m *DarwinServiceManager) Install() error {
 
 	fmt.Printf("✅ Đã cài đặt và kích hoạt thành công Agent Pilot LaunchAgent trên macOS!\n")
 	fmt.Printf("📁 Tệp plist: %s\n", plistPath)
-	fmt.Printf("🌐 Cổng lắng nghe: http://127.0.0.1:%d (ws://127.0.0.1:%d)\n", DefaultPort, DefaultPort)
+	fmt.Printf("🌐 Cổng lắng nghe: http://127.0.0.1:%d (ws://127.0.0.1:%d)\n", DefaultBridgePort(), DefaultBridgePort())
 	return nil
 }
 
@@ -480,7 +480,7 @@ func (m *WindowsServiceManager) Install() error {
 
 	fmt.Printf("✅ Đã cài đặt và kích hoạt thành công Agent Pilot Background Service trên Windows!\n")
 	fmt.Printf("📌 Task Name: %s\n", taskNameWindows)
-	fmt.Printf("🌐 Cổng lắng nghe: http://127.0.0.1:%d (ws://127.0.0.1:%d)\n", DefaultPort, DefaultPort)
+	fmt.Printf("🌐 Cổng lắng nghe: http://127.0.0.1:%d (ws://127.0.0.1:%d)\n", DefaultBridgePort(), DefaultBridgePort())
 	return nil
 }
 

@@ -109,3 +109,16 @@ func DefaultBridgePort() int {
 	}
 	return DefaultPort
 }
+
+// activeBridgePort is the port the in-process bridge actually bound to.
+// It starts at the configured default and is updated by StartBridgeServer so
+// /health and error messages report the real listener, not a guess.
+var activeBridgePort = DefaultBridgePort()
+
+// ActiveBridgePort returns the effective port for in-process bridge operations.
+func ActiveBridgePort() int {
+	return activeBridgePort
+}
+
+// maxSanitizeDepth caps recursion in SanitizeData for attacker-shaped payloads.
+const maxSanitizeDepth = 64

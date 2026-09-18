@@ -446,8 +446,8 @@ func TestDeriveCommandTimeout(t *testing.T) {
 		},
 	}
 	to = DeriveCommandTimeout("batch.run", longBatch, 0)
-	if to != 460000 {
-		t.Errorf("expected 460000, got %d", to)
+	if to != 430000 {
+		t.Errorf("expected 430000, got %d", to)
 	}
 
 	// 8. batch.run with wait_for_selector timeout > 5m
@@ -457,8 +457,8 @@ func TestDeriveCommandTimeout(t *testing.T) {
 		},
 	}
 	to = DeriveCommandTimeout("batch.run", selectorWaitBatch, 0)
-	if to != 460000 {
-		t.Errorf("expected 460000, got %d", to)
+	if to != 430000 {
+		t.Errorf("expected 430000, got %d", to)
 	}
 
 	// 9. batch.run with wait on selector timeout > 5m
@@ -468,8 +468,8 @@ func TestDeriveCommandTimeout(t *testing.T) {
 		},
 	}
 	to = DeriveCommandTimeout("batch.run", waitSelectorBatch, 0)
-	if to != 410000 {
-		t.Errorf("expected 410000, got %d", to)
+	if to != 380000 {
+		t.Errorf("expected 380000, got %d", to)
 	}
 
 	// 10. batch.run with navigation loadTimeout and aliases
@@ -480,8 +480,8 @@ func TestDeriveCommandTimeout(t *testing.T) {
 		},
 	}
 	to = DeriveCommandTimeout("batch.run", navBatch, 0)
-	if to != 660000 {
-		t.Errorf("expected 660000, got %d", to)
+	if to != 630000 {
+		t.Errorf("expected 630000, got %d", to)
 	}
 }
 

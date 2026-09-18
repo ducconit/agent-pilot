@@ -15,7 +15,7 @@ func ExecCdpStatus(tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("cdp.status", params, DefaultPort)
+	res, err := DispatchCommand("cdp.status", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -39,7 +39,7 @@ func ExecHandleDialog(accept bool, promptText string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("page.handleDialog", params, DefaultPort)
+	res, err := DispatchCommand("page.handleDialog", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func ExecEmulate(network, cpu, theme string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("emulation.set", params, DefaultPort)
+	res, err := DispatchCommand("emulation.set", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func ExecResizePage(width, height int, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("emulation.resize", params, DefaultPort)
+	res, err := DispatchCommand("emulation.resize", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func ExecListNetworkRequests(filterUrl, method, resType string, limit int, tabID
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("network.listRequests", params, DefaultPort)
+	res, err := DispatchCommand("network.listRequests", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func ExecGetNetworkResponseBody(requestId string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("network.getResponseBody", params, DefaultPort)
+	res, err := DispatchCommand("network.getResponseBody", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func ExecPerformanceTrace(action, categories string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("performance.trace", params, DefaultPort)
+	res, err := DispatchCommand("performance.trace", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func ExecPerformanceMetrics(tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("performance.metrics", params, DefaultPort)
+	res, err := DispatchCommand("performance.metrics", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func ExecTakeHeapSnapshot(gc bool, tabID interface{}) error {
 	if gc {
 		method = "memory.collectGarbage"
 	}
-	res, err := DispatchCommand(method, params, DefaultPort)
+	res, err := DispatchCommand(method, params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func ExecManageExtensions(action, extensionID string, enabled *bool) error {
 	if enabled != nil {
 		params["enabled"] = *enabled
 	}
-	res, err := DispatchCommand("extensions.manage", params, DefaultPort)
+	res, err := DispatchCommand("extensions.manage", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}

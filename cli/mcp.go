@@ -48,7 +48,7 @@ type JSONRPCResponse struct {
 func RunMCPServer() {
 	// Automatically ensure bridge server is listening on port 58765 in background
 	go func() {
-		if err := StartBridgeServer(DefaultPort); err != nil {
+		if err := StartBridgeServer(DefaultBridgePort()); err != nil {
 			log.Printf("[MCP] Embedded bridge server error: %v", err)
 		}
 	}()

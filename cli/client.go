@@ -19,7 +19,7 @@ import (
 // DispatchCommand routes the command either via local in-memory bridge or forwarder HTTP
 func DispatchCommand(method string, params map[string]interface{}, port int) (interface{}, error) {
 	if port <= 0 {
-		port = DefaultPort
+		port = DefaultBridgePort()
 	}
 
 	addr := net.JoinHostPort(DefaultHost, strconv.Itoa(port))

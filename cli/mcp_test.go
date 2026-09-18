@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -157,5 +159,56 @@ func TestToolsListDoesNotDispatch(t *testing.T) {
 	})
 	if !strings.Contains(out, "browser_run_actions") {
 		t.Fatalf("expected tools/list to return the registry, got: %s", out)
+	}
+}
+
+// TestMCPToolDispatchTargetsExist guards against the class of bug where an MCP
+// tool dispatching to a method the extension does not implement (e.g. a stale
+// "tabs.navigate" route) silently returns "Unknown method".
+func TestMCPToolDispatchTargetsExist(t *testing.T) {
+	// Methods served by the Go bridge itself instead of the extension
+	bridgeLocal := map[string]bool{
+		"instances.list":   true,
+		"instances.select": true,
+	}
+
+	// Extension handler keys: `"method": async (...)` in each handler module and
+	// legacy aliases `"method": someHandlers[...]` in agent-handlers/index.js.
+	handlerFiles, err := filepath.Glob(filepath.Join("..", "extensions", "background", "agent-handlers", "*.js"))
+	if err != nil || len(handlerFiles) == 0 {
+		t.Skipf("extension handler modules not found (running outside the repo?): %v", err)
+	}
+
+	keyPattern := regexp.MustCompile(`"([a-zA-Z][a-zA-Z0-9.\-]*)"\s*:\s*(?:async\s*\(|[a-zA-Z]+Handlers\[)`)
+	supported := map[string]bool{}
+	for _, file := range handlerFiles {
+		data, readErr := os.ReadFile(file)
+		if readErr != nil {
+			t.Fatalf("cannot read %s: %v", file, readErr)
+		}
+		for _, match := range keyPattern.FindAllStringSubmatch(string(data), -1) {
+			supported[match[1]] = true
+		}
+	}
+	if len(supported) == 0 {
+		t.Fatal("no extension handler methods parsed; the handler registry format changed")
+	}
+
+	dispatchSource, err := os.ReadFile("mcp_dispatch.go")
+	if err != nil {
+		t.Fatalf("cannot read mcp_dispatch.go: %v", err)
+	}
+	targetPattern := regexp.MustCompile(`DispatchCommand\("([a-zA-Z][a-zA-Z0-9.\-]*)"`)
+	targets := targetPattern.FindAllStringSubmatch(string(dispatchSource), -1)
+	if len(targets) == 0 {
+		t.Fatal("no DispatchCommand targets found in mcp_dispatch.go")
+	}
+
+	for _, match := range targets {
+		method := match[1]
+		if supported[method] || bridgeLocal[method] {
+			continue
+		}
+		t.Errorf("MCP tool dispatches to %q, but no extension handler implements it", method)
 	}
 }

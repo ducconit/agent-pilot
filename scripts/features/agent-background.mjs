@@ -7,7 +7,7 @@
  * is reachable both over WebSocket and plain HTTP.
  */
 import http from "node:http";
-import { TIMEOUTS } from "../lib/config.mjs";
+import { TIMEOUTS, LOCAL_HOST } from "../lib/config.mjs";
 import { sleep, waitForServiceWorker, extensionIdFromTarget } from "../lib/harness.mjs";
 
 export async function run({ browser, testPage, tabId, sendAgentCommand, bridgePort, httpPort, record }) {
@@ -18,7 +18,7 @@ export async function run({ browser, testPage, tabId, sendAgentCommand, bridgePo
 
   // 18. Test Background Tab Screenshot (while user is working on another active tab)
   const userActivePage = await browser.newPage();
-  await userActivePage.goto(`http://127.0.0.1:${httpPort}/test-page.html?user_tab=active`);
+  await userActivePage.goto(`http://${LOCAL_HOST}:${httpPort}/test-page.html?user_tab=active`);
   await userActivePage.bringToFront();
   await sleep(400);
   // Now userActivePage is active in foreground, tabId is in background!
@@ -66,7 +66,7 @@ export async function run({ browser, testPage, tabId, sendAgentCommand, bridgePo
 
   // 21. Test HTTP API Endpoint (POST http://127.0.0.1:58765/api)
   const httpRes = await new Promise((resolve) => {
-    const req = http.request(`http://127.0.0.1:${bridgePort}/api`, {
+    const req = http.request(`http://${LOCAL_HOST}:${bridgePort}/api`, {
       method: "POST",
       headers: { "Content-Type": "application/json" }
     }, (res) => {

@@ -6,6 +6,8 @@
  * was found — the original kept them behind `if (tabInfo)`, and we preserve that
  * by recording tabInfo on ctx for the screenshot section that follows.
  */
+import { LOCAL_HOST } from "../lib/config.mjs";
+
 export async function run(ctx) {
   const { sw, page, sidepanelPage, httpPort, record } = ctx;
 
@@ -52,9 +54,10 @@ export async function run(ctx) {
   record("11. DevTools Console Interception via CDP", hasLog, `Captured ${capturedLogs?.console?.length} log entries`);
 
   // Trigger network fetch on page and verify CDP intercepts it
-  await page.evaluate((port) => {
-    fetch(`http://127.0.0.1:${port}/test-page.html`).catch(() => {});
-  }, httpPort);
+  // (host/port must be passed in: page.evaluate runs in the browser context)
+  await page.evaluate((host, port) => {
+    fetch(`http://${host}:${port}/test-page.html`).catch(() => {});
+  }, LOCAL_HOST, httpPort);
   await new Promise(r => setTimeout(r, 600));
 
   const capturedNet = await sidepanelPage.evaluate(async (tabId) => {

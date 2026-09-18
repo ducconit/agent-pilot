@@ -36,8 +36,8 @@ jobs:
       - name: Verify Embedded Skill Assets Up To Date
         run: npm run check:skills
 
-      - name: Run Browserless Unit Tests (Sanitizer, Item Schema, Color Utils)
-        run: npm run test:secret && npm run test:item-schema && npm run test:color-utils
+      - name: Run Browserless Unit Tests (Sanitizer, Item Schema, Color Utils, Background API)
+        run: npm run test:secret && npm run test:item-schema && npm run test:color-utils && npm run test:background-api
 
       - name: Run Go Unit Tests (Race Detector)
         run: npm run test:cli

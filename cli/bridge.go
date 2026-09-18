@@ -39,7 +39,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":             "ok",
 		"name":               "Agent Pilot Go Bridge Server",
-		"port":               DefaultPort,
+		"port":               ActiveBridgePort(),
 		"extensionConnected": extConnected,
 		"clientCount":        len(clientList),
 		"version":            ServerVersion,
@@ -49,6 +49,12 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 // StartBridgeServer runs the dual-mode WebSocket/HTTP server
 func StartBridgeServer(port int) error {
+	if port <= 0 {
+		port = DefaultBridgePort()
+	}
+	// Remember the effective port so /health reports what is actually bound
+	// (the server may be started with --port or AGENT_PILOT_PORT).
+	activeBridgePort = port
 	addr := fmt.Sprintf("%s:%d", DefaultHost, port)
 
 	// Test if port is already open (Dual Mode)

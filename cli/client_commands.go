@@ -24,7 +24,7 @@ func ExecClick(selector string, x, y float64, via string, tabID interface{}) err
 		params["tabId"] = tabID
 	}
 
-	res, err := DispatchCommand("page.click", params, DefaultPort)
+	res, err := DispatchCommand("page.click", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func ExecType(selector, text string, clear, enter bool, tabID interface{}) error
 		params["tabId"] = tabID
 	}
 
-	res, err := DispatchCommand("page.type", params, DefaultPort)
+	res, err := DispatchCommand("page.type", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func ExecOpen(url string, active bool) error {
 		"url":    url,
 		"active": active,
 	}
-	res, err := DispatchCommand("tabs.create", params, DefaultPort)
+	res, err := DispatchCommand("tabs.create", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func ExecNavigate(url string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("tabs.update", params, DefaultPort)
+	res, err := DispatchCommand("tabs.update", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func ExecScreenshot(mode, selector, outputPath string, tabID interface{}) error 
 		params["tabId"] = tabID
 	}
 
-	res, err := DispatchCommand("page.screenshot", params, DefaultPort)
+	res, err := DispatchCommand("page.screenshot", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func ExecInspect(selector string, tabID interface{}) error {
 		params["tabId"] = tabID
 	}
 
-	res, err := DispatchCommand("page.getElement", params, DefaultPort)
+	res, err := DispatchCommand("page.getElement", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func ExecInspect(selector string, tabID interface{}) error {
 }
 
 func ExecListTabs() error {
-	res, err := DispatchCommand("tabs.listAll", map[string]interface{}{}, DefaultPort)
+	res, err := DispatchCommand("tabs.listAll", map[string]interface{}{}, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func ExecBusy(busy bool, action string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("page.setBusy", params, DefaultPort)
+	res, err := DispatchCommand("page.setBusy", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func ExecSession(subcmd string, name string, tabID interface{}) error {
 		method = "session.status"
 	}
 
-	res, err := DispatchCommand(method, params, DefaultPort)
+	res, err := DispatchCommand(method, params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func ExecEvaluate(expression string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("page.evaluate", params, DefaultPort)
+	res, err := DispatchCommand("page.evaluate", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -282,7 +282,7 @@ func ExecSnapshot(maxElements int, format string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("page.snapshot", params, DefaultPort)
+	res, err := DispatchCommand("page.snapshot", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -312,7 +312,7 @@ func ExecFillForm(fields []map[string]interface{}, submitSelector string, pressE
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("page.fillForm", params, DefaultPort)
+	res, err := DispatchCommand("page.fillForm", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -332,7 +332,7 @@ func ExecHover(selector string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("page.hover", params, DefaultPort)
+	res, err := DispatchCommand("page.hover", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -344,7 +344,7 @@ func ExecDrag(params map[string]interface{}, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("page.drag", params, DefaultPort)
+	res, err := DispatchCommand("page.drag", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -362,7 +362,7 @@ func ExecPressKey(key, selector string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("page.pressKey", params, DefaultPort)
+	res, err := DispatchCommand("page.pressKey", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -387,7 +387,7 @@ func ExecWaitFor(selector, text, state string, timeoutMs int, tabID interface{})
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("page.waitFor", params, DefaultPort)
+	res, err := DispatchCommand("page.waitFor", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}
@@ -408,7 +408,7 @@ func ExecUploadFile(selector string, files []string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
-	res, err := DispatchCommand("page.uploadFile", params, DefaultPort)
+	res, err := DispatchCommand("page.uploadFile", params, DefaultBridgePort())
 	if err != nil {
 		return err
 	}

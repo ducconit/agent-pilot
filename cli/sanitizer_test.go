@@ -207,3 +207,38 @@ func TestSanitizeDataErrorStrings(t *testing.T) {
 		t.Fatalf("error string leaked the secret: %s", masked)
 	}
 }
+
+func TestSanitizeDataDepthCap(t *testing.T) {
+	// Build a payload deeper than maxSanitizeDepth; the walker must stop instead
+	// of recursing without bound on attacker-shaped data.
+	deep := map[string]interface{}{"password": "top-secret-value"}
+	for i := 0; i < maxSanitizeDepth+10; i++ {
+		deep = map[string]interface{}{"nested": deep}
+	}
+
+	result, ok := SanitizeData(deep, true).(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected a map result, got %T", SanitizeData(deep, true))
+	}
+
+	// Walk down until the cap marker appears; it must exist before we reach the leaf.
+	foundMarker := false
+	current := result
+	for i := 0; i < maxSanitizeDepth+10; i++ {
+		next, ok := current["nested"]
+		if !ok {
+			break
+		}
+		if marker, isString := next.(string); isString && strings.Contains(marker, "SANITIZE_MAX_DEPTH_EXCEEDED") {
+			foundMarker = true
+			break
+		}
+		current, ok = next.(map[string]interface{})
+		if !ok {
+			break
+		}
+	}
+	if !foundMarker {
+		t.Fatalf("expected depth-cap marker at depth > %d", maxSanitizeDepth)
+	}
+}

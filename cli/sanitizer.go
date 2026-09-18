@@ -203,6 +203,9 @@ func MaskString(text string) (string, bool, []string) {
 }
 
 // SanitizeData recursively inspects and masks sensitive keys in map or slice payloads.
+// Recursion is depth-capped: even though the JSON decoder already rejects nesting
+// beyond 10k levels, an explicit limit keeps attacker-shaped payloads cheap and
+// makes the bound obvious to future readers.
 func SanitizeData(data interface{}, isEnabled bool) interface{} {
 	if !isEnabled || data == nil {
 		return data
@@ -211,10 +214,13 @@ func SanitizeData(data interface{}, isEnabled bool) interface{} {
 	totalMasked := 0
 	allTypes := make(map[string]bool)
 
-	var walk func(val interface{}, keyContext string) interface{}
-	walk = func(val interface{}, keyContext string) interface{} {
+	var walk func(val interface{}, keyContext string, depth int) interface{}
+	walk = func(val interface{}, keyContext string, depth int) interface{} {
 		if val == nil {
 			return nil
+		}
+		if depth > maxSanitizeDepth {
+			return fmt.Sprintf("[SANITIZE_MAX_DEPTH_EXCEEDED: >%d]", maxSanitizeDepth)
 		}
 
 		switch v := val.(type) {
@@ -244,14 +250,14 @@ func SanitizeData(data interface{}, isEnabled bool) interface{} {
 		case map[string]interface{}:
 			copyMap := make(map[string]interface{}, len(v))
 			for k, item := range v {
-				copyMap[k] = walk(item, k)
+				copyMap[k] = walk(item, k, depth+1)
 			}
 			return copyMap
 
 		case []interface{}:
 			copySlice := make([]interface{}, len(v))
 			for i, item := range v {
-				copySlice[i] = walk(item, keyContext)
+				copySlice[i] = walk(item, keyContext, depth+1)
 			}
 			return copySlice
 
@@ -260,7 +266,7 @@ func SanitizeData(data interface{}, isEnabled bool) interface{} {
 		}
 	}
 
-	sanitized := walk(data, "")
+	sanitized := walk(data, "", 0)
 
 	if totalMasked > 0 {
 		switch m := sanitized.(type) {

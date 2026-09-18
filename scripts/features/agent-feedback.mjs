@@ -6,11 +6,13 @@
  * the reactive long-poll: a `wait` request stays open until a submission lands,
  * which the delayed save below triggers.
  */
+import { LOCAL_HOST } from "../lib/config.mjs";
+
 export async function run({ bridgePort, httpPort, record }) {
   // 28. Visual UI Feedback (Channel B - Persistent Shared Inbox)
   const testFeedbackPayload = {
     timestamp: Date.now(),
-    url: `http://127.0.0.1:${httpPort}/test-page.html`,
+    url: `http://${LOCAL_HOST}:${httpPort}/test-page.html`,
     title: "Agent Pilot Test Page",
     items: [
       {
@@ -33,12 +35,12 @@ export async function run({ bridgePort, httpPort, record }) {
   let saveResp = null;
   let pendingResp = null;
   try {
-    saveResp = await fetch(`http://127.0.0.1:${bridgePort}/api/feedback/save`, {
+    saveResp = await fetch(`http://${LOCAL_HOST}:${bridgePort}/api/feedback/save`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(testFeedbackPayload)
     }).then(r => r.json());
-    pendingResp = await fetch(`http://127.0.0.1:${bridgePort}/api/feedback/pending?sessionId=${testFeedbackPayload.timestamp}`, {
+    pendingResp = await fetch(`http://${LOCAL_HOST}:${bridgePort}/api/feedback/pending?sessionId=${testFeedbackPayload.timestamp}`, {
       headers: { "Content-Type": "application/json" }
     }).then(r => r.json());
   } catch (e) {
@@ -59,7 +61,7 @@ export async function run({ bridgePort, httpPort, record }) {
 
   const livePushPayload = {
     timestamp: Date.now() + 50,
-    url: `http://127.0.0.1:${httpPort}/test-page.html`,
+    url: `http://${LOCAL_HOST}:${httpPort}/test-page.html`,
     title: "Agent Pilot Test Page - Live Push",
     items: [
       {
@@ -72,7 +74,7 @@ export async function run({ bridgePort, httpPort, record }) {
     ]
   };
 
-  const waitPromise = fetch(`http://127.0.0.1:${bridgePort}/api/feedback/wait`, {
+  const waitPromise = fetch(`http://${LOCAL_HOST}:${bridgePort}/api/feedback/wait`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ timeout: 5 })
@@ -85,7 +87,7 @@ export async function run({ bridgePort, httpPort, record }) {
 
   setTimeout(async () => {
     try {
-      await fetch(`http://127.0.0.1:${bridgePort}/api/feedback/save`, {
+      await fetch(`http://${LOCAL_HOST}:${bridgePort}/api/feedback/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(livePushPayload)

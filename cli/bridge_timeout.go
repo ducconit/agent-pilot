@@ -108,14 +108,16 @@ func deriveBatchTimeout(params map[string]interface{}, defaultTimeoutMs int) int
 					actsSum += batchDefaultActionMs
 				}
 			}
-			if actsSum+batchActionsOverheadMs > estDuration {
-				estDuration = actsSum + batchActionsOverheadMs
+			if actsSum > estDuration {
+				estDuration = actsSum
 			}
 		}
 	}
 
-	if estDuration > minBatch {
-		return estDuration + batchActionsOverheadMs
+	// Apply the fixed overhead exactly once (the previous implementation added it
+	// both here and inside the actions loop, inflating every batch timeout).
+	if total := estDuration + batchActionsOverheadMs; total > minBatch {
+		return total
 	}
 	return minBatch
 }

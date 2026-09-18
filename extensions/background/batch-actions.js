@@ -2,9 +2,10 @@
  * Agent Pilot - Batch Action Handlers
  *
  * One handler per batch action, extracted from the executor's switch. Handlers
- * are pure with respect to module state: everything they need is passed in via
- * `ctx`, and they mutate `ctx` (never executor locals) so the executor remains
- * the single owner of the loop's mutable state.
+ * keep no executor-loop state of their own: everything they need is passed in
+ * via `ctx`, and they mutate `ctx` (never executor locals) so the executor
+ * remains the single owner of the loop's mutable state. They may still touch
+ * shared browser bookkeeping (agent tab sets, devtools buffers, chrome.* APIs).
  *
  * ctx shape: { bridgeClient, currentTabId, params, stepResult, stepNum }
  *   - currentTabId: mutable; handlers may reassign ctx.currentTabId

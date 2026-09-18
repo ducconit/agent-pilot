@@ -356,7 +356,7 @@ func getIntOrFloat(m map[string]interface{}, key string) (int, bool) {
 // already-running master bridge and unwraps its {success, result} envelope.
 func ForwardCommandToActiveServer(method string, params map[string]interface{}, port int) (interface{}, error) {
 	if port <= 0 {
-		port = DefaultPort
+		port = DefaultBridgePort()
 	}
 	url := fmt.Sprintf("http://%s:%d/api", DefaultHost, port)
 	payload := map[string]interface{}{

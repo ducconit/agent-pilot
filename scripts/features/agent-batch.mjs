@@ -6,14 +6,14 @@
  * screenshot -> close sequence, proving one tool call can perform a whole flow.
  */
 import http from "node:http";
-import { TIMEOUTS } from "../lib/config.mjs";
+import { TIMEOUTS, LOCAL_HOST } from "../lib/config.mjs";
 
 export async function run({ sendAgentCommand, bridgePort, httpPort, getSelectedInstanceId, record }) {
   // 23. Test Batch Action Execution via WebSocket (batch.run)
   // Sequence: open -> wait_for_selector -> click -> type (with clear) -> devtools -> screenshot -> close
   const batchRes = await sendAgentCommand("batch.run", {
     actions: [
-      { type: "open", url: `http://127.0.0.1:${httpPort}/test-page.html`, loadTimeout: TIMEOUTS.BATCH_LOAD_MS },
+      { type: "open", url: `http://${LOCAL_HOST}:${httpPort}/test-page.html`, loadTimeout: TIMEOUTS.BATCH_LOAD_MS },
       { type: "wait_for_selector", selector: "#btn-sample-click", timeoutMs: TIMEOUTS.WAIT_FOR_SELECTOR_MS },
       { type: "click", selector: "#btn-sample-click" },
       { type: "type", selector: "#test-search-input", text: "Batch Action Automation Verified", clear: true },
@@ -39,7 +39,7 @@ export async function run({ sendAgentCommand, bridgePort, httpPort, getSelectedI
   // 24. Test Batch Actions via HTTP REST API (POST /api method: batch.run)
   const httpBatchParams = {
     actions: [
-      { type: "open", url: `http://127.0.0.1:${httpPort}/test-page.html` },
+      { type: "open", url: `http://${LOCAL_HOST}:${httpPort}/test-page.html` },
       { type: "wait_for_selector", selector: "#btn-sample-click" },
       { type: "devtools" },
       { type: "close" }
@@ -51,7 +51,7 @@ export async function run({ sendAgentCommand, bridgePort, httpPort, getSelectedI
   }
 
   const httpBatchRes = await new Promise((resolve) => {
-    const req = http.request(`http://127.0.0.1:${bridgePort}/api`, {
+    const req = http.request(`http://${LOCAL_HOST}:${bridgePort}/api`, {
       method: "POST",
       headers: { "Content-Type": "application/json" }
     }, (res) => {

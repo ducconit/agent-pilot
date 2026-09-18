@@ -6,7 +6,7 @@
  * apps and native browser UI, which is why the agent prefers them when available.
  */
 
-import { LIMITS, TIMEOUTS } from "./constants.js";
+import { LIMITS, TIMEOUTS, DEFAULTS } from "./constants.js";
 import { sendCdpCommand } from "./cdp-connection.js";
 
 // CDP key descriptors keyed by lower-cased user-facing key name
@@ -179,6 +179,20 @@ export async function dispatchCdpMouseClick(tabId, x, y, options = {}) {
 }
 
 /**
+ * Clamp the drag interpolation step count.
+ * Fewer than CDP_DRAG_MIN_STEPS moves looks like a teleport to physics/aiming
+ * logic, while unbounded steps would stall the service worker (each step is a
+ * CDP round trip plus a frame delay). Non-numeric input falls back to the
+ * shared default instead of producing NaN (which would skip the move loop).
+ * Exported for unit testing.
+ */
+export function clampCdpDragSteps(value) {
+  const parsed = Number(value);
+  const steps = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DEFAULTS.DRAG_STEPS_CDP;
+  return Math.max(LIMITS.CDP_DRAG_MIN_STEPS, Math.min(LIMITS.CDP_DRAG_MAX_STEPS, steps));
+}
+
+/**
  * Dispatch a real, trusted mouse drag (press -> interpolated moves -> optional hold -> release) via CDP.
  * Useful for slingshot/aim mechanics in canvas games.
  */
@@ -188,10 +202,7 @@ export async function dispatchCdpMouseDrag(tabId, fromX, fromY, toX, toY, option
   const x2 = Math.round(Number(toX));
   const y2 = Math.round(Number(toY));
   const button = options.button || "left";
-  // Clamp the interpolation: fewer than 2 moves looks like a teleport to
-  // physics/aiming logic, while unbounded steps would stall the service worker
-  // (each step is a CDP round trip plus a frame delay).
-  const steps = Math.max(LIMITS.CDP_DRAG_MIN_STEPS, Math.min(LIMITS.CDP_DRAG_MAX_STEPS, parseInt(options.steps, 10) || LIMITS.CDP_DRAG_DEFAULT_STEPS));
+  const steps = clampCdpDragSteps(options.steps);
   // A negative hold is meaningless; the upper bound stops a bad caller from
   // pinning the pointer "down" indefinitely.
   const holdMs = Math.max(0, Math.min(TIMEOUTS.CDP_DRAG_HOLD_MAX_MS, parseInt(options.holdMs, 10) || 0));
