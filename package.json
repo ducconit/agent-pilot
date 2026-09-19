@@ -23,6 +23,8 @@
     "server": "./cli/agent-pilot server",
     "lint": "node scripts/lint.mjs",
     "pack": "node scripts/pack_extension.mjs",
+    "pack:bundle": "node scripts/pack_bundle.mjs",
+    "pack:release": "node scripts/pack_extension.mjs && node scripts/pack_bundle.mjs",
     "export:mcp": "node scripts/export_mcp.mjs",
     "sync:mcp": "npm run export:mcp && npm run sync:agk",
     "sync:agk": "node scripts/sync_agk.mjs"

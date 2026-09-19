@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name (e.g. v1.0.2-beta)'
-        required: false
+        description: 'Tag to release (e.g. v1.0.8-beta). Required for manual runs.'
+        required: true
         default: ''
 
 permissions:
@@ -20,8 +20,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Resolve the tag first so every later step (checkout, version gate,
+      # release creation) works for both tag pushes and manual dispatches.
+      - name: Resolve Release Tag
+        id: rel
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.tag_name }}"
+            if [[ -z "$TAG" ]]; then
+              echo "❌ workflow_dispatch requires the 'tag_name' input." >&2
+              exit 1
+            fi
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Resolved release tag: $TAG"
+
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.rel.outputs.tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -32,7 +51,8 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          # Single source of truth: the toolchain required by cli/go.mod
+          go-version-file: cli/go.mod
           cache-dependency-path: cli/go.sum
 
       - name: Install Node Dependencies
@@ -41,116 +61,115 @@ jobs:
       - name: Run Syntax & Lint Checks
         run: npm run lint
 
-      - name: Run Go Unit Tests
+      - name: Verify Embedded Skill Assets Up To Date
+        run: npm run check:skills
+
+      - name: Run Browserless Unit Tests
+        run: npm run test:secret && npm run test:item-schema && npm run test:color-utils && npm run test:background-api
+
+      - name: Run Go Unit Tests (Race Detector)
         run: npm run test:cli
 
+      # Block the release when the tag, package.json and manifest.json disagree.
       - name: Validate Version Alignment
+        env:
+          RELEASE_TAG: ${{ steps.rel.outputs.tag }}
         run: |
-          REF_TAG="${{ github.ref_name }}"
-          PKG_VER="v$(node -p "require('./package.json').version")"
-          MAN_VER="v$(node -p "require('./extensions/manifest.json').version_name || require('./extensions/manifest.json').version")"
-          echo "GitHub Tag       : $REF_TAG"
-          echo "package.json     : $PKG_VER"
-          echo "manifest.json    : $MAN_VER"
-          if [[ "$REF_TAG" != "$PKG_VER" ]]; then
-            echo "::warning::Git tag ($REF_TAG) does not match package.json version ($PKG_VER)"
-          fi
+          node - <<'NODE'
+          const fs = require("fs");
+          const tag = process.env.RELEASE_TAG;
+          const pkg = require("./package.json");
+          const manifest = require("./extensions/manifest.json");
+          const manifestVer = manifest.version_name || manifest.version;
+          console.log(`GitHub Tag     : ${tag}`);
+          console.log(`package.json   : v${pkg.version}`);
+          console.log(`manifest.json  : v${manifestVer}`);
+          if (tag !== `v${pkg.version}` || tag !== `v${manifestVer}`) {
+            console.error("❌ Release blocked: tag, package.json and manifest.json versions must match.");
+            process.exit(1);
+          }
+          NODE
 
       - name: Package Chrome Extension Archive
         run: npm run pack
 
-      - name: Cross-Compile Standalone Go CLI Binaries
-        run: |
-          mkdir -p dist
-          cd cli
-          targets=(
-            "linux/amd64/agent-pilot-linux-amd64"
-            "linux/arm64/agent-pilot-linux-arm64"
-            "darwin/amd64/agent-pilot-darwin-amd64"
-            "darwin/arm64/agent-pilot-darwin-arm64"
-            "windows/amd64/agent-pilot-windows-amd64.exe"
-            "windows/arm64/agent-pilot-windows-arm64.exe"
-          )
-          for target in "${targets[@]}"; do
-            IFS="/" read -r goos goarch output <<< "$target"
-            echo "→ Compiling $output for $goos/$goarch..."
-            CGO_ENABLED=0 GOOS=$goos GOARCH=$goarch go build -ldflags="-s -w" -o "../dist/$output" .
-          done
-
-      - name: Generate Unified SHA-256 Checksums
-        run: |
-          cd dist
-          sha256sum agent-pilot-* > checksums.txt
-          echo "Unified SHA-256 Checksums:"
-          cat checksums.txt
+      - name: Package Per-Platform Release Bundles (extension + CLI + skills + README)
+        run: npm run pack:bundle
 
       - name: Generate Release Body with User & Installation Guides
-        id: release_body
+        env:
+          RELEASE_TAG: ${{ steps.rel.outputs.tag }}
         run: |
-          VERSION="${{ github.ref_name }}"
+          VERSION="$RELEASE_TAG"
           cat << 'BODY_EOF' > dist/release_body.md
           # 🚀 Agent Pilot $VERSION
 
           **Universal AI Agent Browser Controller • Antigravity-First**
-          *Biên dịch đa nền tảng cho Chrome Extension & Standalone Golang CLI / MCP Server*
+          *Gói phát hành tổng hợp: Chrome Extension + Standalone Golang CLI / MCP Server + Agent Skill*
 
           ---
 
           ### 📦 Tài Nguyên Bản Phát Hành (Release Assets)
 
-          | Tài Nguyên | Hệ Điều Hành / Kiến Trúc | Mô Tả |
+          | Tài Nguyên | Nền Tảng | Nội Dung |
           | :--- | :--- | :--- |
-          | `agent-pilot-$VERSION.zip` | All Platforms (Chrome MV3) | Tiện ích mở rộng Google Chrome đóng gói hoàn chỉnh |
-          | `agent-pilot-linux-amd64` | Linux x86_64 | Standalone Go CLI / MCP Server (Zero-dep) |
-          | `agent-pilot-linux-arm64` | Linux ARM64 (aarch64) | Standalone Go CLI / MCP Server (Zero-dep) |
-          | `agent-pilot-darwin-amd64` | macOS Intel | Standalone Go CLI / MCP Server (Zero-dep) |
-          | `agent-pilot-darwin-arm64` | macOS Apple Silicon (M1-M4) | Standalone Go CLI / MCP Server (Zero-dep) |
-          | `agent-pilot-windows-amd64.exe` | Windows x86_64 | Standalone Go CLI / MCP Server (Zero-dep) |
-          | `agent-pilot-windows-arm64.exe` | Windows ARM64 | Standalone Go CLI / MCP Server (Zero-dep) |
-          | `checksums.txt` | All Files | Bảng mã băm SHA-256 xác minh tính toàn vẹn |
+          | `agent-pilot-$VERSION-linux-amd64.zip` | Linux x86_64 | extensions/ + binary + README.md + skills/ |
+          | `agent-pilot-$VERSION-linux-arm64.zip` | Linux ARM64 | extensions/ + binary + README.md + skills/ |
+          | `agent-pilot-$VERSION-darwin-amd64.zip` | macOS Intel | extensions/ + binary + README.md + skills/ |
+          | `agent-pilot-$VERSION-darwin-arm64.zip` | macOS Apple Silicon | extensions/ + binary + README.md + skills/ |
+          | `agent-pilot-$VERSION-windows-amd64.zip` | Windows x86_64 | extensions/ + binary + README.md + skills/ |
+          | `agent-pilot-$VERSION-windows-arm64.zip` | Windows ARM64 | extensions/ + binary + README.md + skills/ |
+          | `agent-pilot-$VERSION.zip` | Mọi nền tảng | Chỉ Chrome Extension (dùng cho Chrome Web Store) |
+          | `bundles/checksums.txt` | Mọi nền tảng | SHA-256 để xác minh tính toàn vẹn |
+
+          Mỗi gói bundle đã bao gồm **mọi thứ cần thiết**:
+
+          ```
+          agent-pilot-$VERSION-<platform>/
+          ├── extensions/            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome
+          ├── agent-pilot(|.exe)     Standalone CLI / MCP Server (binary tĩnh, zero-dep)
+          ├── skills/agent-pilot/    Agent Skill (SKILL.md + references + examples)
+          └── README.md              Hướng dẫn cài đặt & sử dụng với AI Agent
+          ```
 
           ---
 
-          ### 🚀 Hướng Dẫn Cài Đặt (Installation)
+          ### 🚀 Hướng Dẫn Cài Đặt Nhanh (từ bundle)
 
-          #### 1. Cài Đặt Chrome Extension (Giao Diện & Cầu Nối Trình Duyệt)
-          1. Tải tệp `agent-pilot-$VERSION.zip` bên dưới và giải nén ra một thư mục.
-          2. Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
-          3. Bật công tắc **Developer mode** ở góc trên bên phải.
-          4. Nhấp nút **Load unpacked** và chọn thư mục vừa giải nén.
-          5. Ghim icon và nhấp chuột vào biểu tượng **Agent Pilot (📌)** trên thanh công cụ để mở Side Panel (hoặc phím tắt <kbd>Ctrl+Shift+P</kbd> / <kbd>Cmd+Shift+P</kbd>).
+          **1. Chrome Extension**
+          1. Giải nén gói bundle cho đúng nền tảng của bạn.
+          2. Mở `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục `extensions/`.
+          3. Ghim icon **Agent Pilot (📌)**; mở Side Panel bằng click icon hoặc <kbd>Ctrl+Shift+P</kbd> / <kbd>Cmd+Shift+P</kbd>.
 
-          #### 2. Cài Đặt Standalone Go CLI & MCP Server
-          Tải binary tương ứng với hệ điều hành của bạn bên dưới:
+          **2. CLI / MCP Server**
           ```bash
-          # Ví dụ trên Linux AMD64:
-          curl -LO https://github.com/ducconit/agent-pilot-extension/releases/download/$VERSION/agent-pilot-linux-amd64
-          chmod +x agent-pilot-linux-amd64
-          sudo mv agent-pilot-linux-amd64 /usr/local/bin/agent-pilot
-
-          # Kiểm tra hoạt động:
+          # Linux / macOS
+          chmod +x ./agent-pilot
+          sudo mv ./agent-pilot /usr/local/bin/agent-pilot
           agent-pilot --help
-          ```
 
-          #### 3. Cài Đặt Kỹ Năng Cho Trợ Lý AI (Agent Skills)
-          Mọi coding agent (Claude Code, Cursor, Antigravity, OpenCode, Codex, Devin,...) có thể cài đặt tự động kỹ năng chỉ với 1 lệnh:
+          # Chạy bridge như service chạy ngầm (khuyên dùng)
+          agent-pilot service install
+          ```
+          Windows: giữ `agent-pilot.exe`, thêm thư mục chứa nó vào `PATH`.
+
+          **3. Agent Skill (tùy chọn)**
           ```bash
-          npx skills add https://github.com/ducconit/agent-pilot-extension
+          agent-pilot skill install          # ~/.agents/skills/agent-pilot
+          agent-pilot skill install --agy    # ~/.gemini/config/skills/agent-pilot
           ```
 
           ---
 
           ### 🤖 Cấu Hình MCP Server Cho AI Coding Assistant
 
-          Thêm cấu hình sau vào tệp cấu hình MCP của bạn (`mcp_config.json`, Claude Desktop, hoặc Cursor Settings):
+          Thêm vào file cấu hình MCP của agent (Antigravity `~/.gemini/config/mcp_config.json`,
+          Claude Desktop, Cursor, Codex, OpenCode…):
 
           ```json
           {
             "mcpServers": {
-              "agent-pilot": {
-                "command": "agent-pilot",
-                "args": ["mcp"]
-              }
+              "agent-pilot": { "command": "agent-pilot", "args": ["mcp"] }
             }
           }
           ```
@@ -158,9 +177,8 @@ jobs:
           ---
 
           ### 🎮 Cẩm Nang Lệnh CLI Cho Tester / QC
-          Kỹ sư kiểm thử tự động có thể điều khiển trình duyệt trực tiếp qua terminal mà không cần viết mã:
           ```bash
-          agent-pilot open "https://github.com"
+          agent-pilot open "https://github.com" --active
           agent-pilot click "#login-button"
           agent-pilot type "#username" "testuser" --enter
           agent-pilot screenshot -o page.png --mode visible
@@ -173,23 +191,31 @@ jobs:
           ---
 
           ### ✨ Tính Năng Nổi Bật
-          - **16 Công cụ MCP chuẩn hóa**: Mở tab, click chuột ảo neon, gõ phím human-like, soi DOM, chụp ảnh màn hình, kiểm tra DevTools (Console/Network/RAM).
-          - **Động cơ Batch Engine (`browser_run_actions`)**: Gom chuỗi kịch bản đa bước thực thi trong 1 tool call duy nhất, tiết kiệm >80% token.
-          - **Visual UI Feedback Studio**: Khoanh vùng ghim lỗi trực quan trên trang web, hỗ trợ 3 kênh giao tiếp (Live Push A, Persistent Inbox B, Clipboard Prompt C).
-          - **Bảo mật Secret Redaction**: Tự động nhận diện và che giấu 12 mẫu khóa bí mật (API Key, Private Key, JWT, Bearer tokens).
+          - **35 công cụ MCP chuẩn hóa**: quản lý tab, click chuột ảo neon, gõ phím human-like, soi DOM,
+            chụp ảnh màn hình, batch actions, đọc DevTools (Console/Network/Performance) qua CDP.
+          - **Động cơ Batch Engine (`browser_run_actions`)**: gom chuỗi kịch bản đa bước trong 1 tool call,
+            tiết kiệm >80% token.
+          - **Visual UI Feedback Studio**: khoanh vùng ghim lỗi trực quan, 3 kênh giao tiếp
+            (Live Push A, Persistent Inbox B, Clipboard Prompt C).
+          - **Bảo mật Secret Redaction**: tự động che 12 nhóm khóa bí mật (API Key, Private Key, JWT,
+            Bearer token, header Authorization/Cookie…) trước khi gửi cho LLM.
+          - **Bridge cục bộ an toàn**: chỉ lắng nghe `127.0.0.1:58765` (đổi bằng `AGENT_PILOT_PORT`).
           BODY_EOF
           sed -i "s/\$VERSION/$VERSION/g" dist/release_body.md
 
       - name: Create GitHub Release & Upload Assets
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          name: "Agent Pilot ${{ steps.rel.outputs.tag }}"
           files: |
-            dist/agent-pilot-*
+            dist/bundles/agent-pilot-*.zip
+            dist/agent-pilot-*.zip
+            dist/bundles/checksums.txt
             dist/checksums.txt
-          name: "Agent Pilot ${{ github.ref_name }}"
           body_path: dist/release_body.md
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+          prerelease: ${{ contains(steps.rel.outputs.tag, '-alpha') || contains(steps.rel.outputs.tag, '-beta') || contains(steps.rel.outputs.tag, '-rc') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

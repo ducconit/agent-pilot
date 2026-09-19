@@ -56,6 +56,7 @@ agent-pilot-extension/
 │   ├── ARCHITECTURE.md                 # Kiến trúc chi tiết Manifest V3 & IPC
 │   ├── CDP_GUIDE.md                    # Hướng dẫn Chrome DevTools Protocol (CDP)
 │   ├── API_REFERENCE.md                # Danh mục tin nhắn & đặc tả JSON Action
+│   ├── BUNDLE_README.md                # README hướng dẫn cài đặt đóng gói kèm bundle phát hành
 │   └── USAGE_GUIDE.md                  # Sổ tay hướng dẫn sử dụng từng tính năng
 ├── skills/                             # Kỹ năng chuẩn Agent Skills Ecosystem (skills.sh)
 │   └── agent-pilot/
@@ -119,19 +120,27 @@ agent-pilot-extension/
 ├── mcp/agent-pilot/                    # 35 tệp lược đồ chuẩn Single Source of Truth (SSOT)
 ├── scripts/                            # Bộ công cụ build, test, pack & sync cross-platform
 │   ├── browser_resolver.mjs            # Tự động tìm kiếm Chrome/Chromium/Edge/Brave đa nền tảng
+│   ├── build_cli.mjs                   # Build CLI tĩnh cross-platform (thay cho env-var prefix POSIX)
 │   ├── embed_skills.mjs                # Nhúng kỹ năng vào CLI Go dạng base64 (cli/skill_assets.go)
+│   ├── export_mcp.mjs                  # Xuất schema MCP ra repo + config Antigravity (không cần `~`)
 │   ├── export_mcp_schemas.mjs          # Trích xuất schema MCP tự động (SSOT)
-│   ├── pack_extension.mjs              # Đóng gói tiện ích ra ZIP release (có kiểm tra manifest)
-│   ├── run_test.mjs                    # Bộ chạy test tự động Windows/macOS/Linux
+│   ├── lint.mjs                        # Syntax-check mọi file .js/.mjs trong extensions/ và scripts/
+│   ├── pack_extension.mjs              # Đóng gói tiện ích ra ZIP (kiểm tra manifest, dùng cho CWS)
+│   ├── pack_bundle.mjs                 # Đóng gói bundle từng nền tảng: extensions + binary + skills + README
+│   ├── run_test.mjs                    # Bộ chạy test tự động Windows/macOS/Linux (kèm xvfb-run)
 │   ├── sync_agk.mjs                    # Đồng bộ sang plugin AGK Antigravity
+│   ├── lib/                            # Tiện ích dùng chung: config.mjs, harness.mjs, zip.mjs
+│   ├── features/                       # Các khối kiểm thử tách từ verify_all_features / verify_agent_connection
 │   ├── verify_all_features.mjs         # Bộ kiểm thử 15 tính năng cốt lõi trên trình duyệt thật
 │   ├── verify_agent_connection.mjs     # Bộ kiểm thử 29 tính năng kết nối & điều khiển Agent
 │   ├── verify_annotator_tools.mjs      # Bộ kiểm thử chuyển đổi công cụ Annotator & kéo khung
+│   ├── verify_background_api.mjs       # Kiểm thử cấu trúc background: CDP facade, registry, drag clamp
+│   ├── verify_color_utils.mjs          # Kiểm thử chuyển đổi màu HEX/RGB/HSL/OKLCH
 │   ├── verify_feedback_system.mjs      # Bộ kiểm thử hệ thống Feedback Channel B & Channel A
 │   ├── verify_feedback_edit_delete.mjs # Bộ kiểm thử sửa & xóa feedback (in-page + Side Panel)
 │   ├── verify_feedback_item_xss.mjs    # Bộ kiểm thử kháng XSS cho nội dung feedback
 │   ├── verify_pinned_regions.mjs       # Bộ kiểm thử ghim vùng chọn & đa vùng trực quan
-│   ├── verify_secret_sanitizer.mjs     # Bộ kiểm thử 19 kịch bản lọc che giấu Secret/API Key
+│   ├── verify_secret_sanitizer.mjs     # Bộ kiểm thử 26 kịch bản lọc che giấu Secret/API Key
 │   ├── verify_session_lifecycle.mjs    # Bộ kiểm thử vòng đời phiên điều khiển của Agent
 │   ├── agent-pilot.service             # Unit systemd --user mẫu (Linux)
 │   ├── com.agentpilot.bridge.plist     # Cấu hình launchd User Agent mẫu (macOS)
@@ -157,19 +166,22 @@ flowchart LR
 ### 1. Cài Đặt Chrome Extension
 
 #### Cách A: Cài đặt từ Bản Phát Hành (Khuyên dùng)
-1. Tải gói tiện ích mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (tệp `agent-pilot-v1.0.8-beta.zip` hoặc trong thư mục `dist/`).
-2. Giải nén tệp `.zip` vào một thư mục cố định trên máy.
+1. Tải **gói bundle** cho đúng nền tảng của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) — ví dụ `agent-pilot-v1.0.8-beta-linux-amd64.zip` (đã gồm sẵn extension + CLI + skills + README hướng dẫn), hoặc tệp chỉ-chứa-extension `agent-pilot-v1.0.8-beta.zip` nếu bạn chỉ cần phần Chrome.
+2. Giải nén tệp `.zip` ra một thư mục cố định.
 3. Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
 4. Gạt bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải.
-5. Nhấn nút **Load unpacked** (Tải tiện ích đã giải nén) và chọn thư mục vừa giải nén.
+5. Nhấn nút **Load unpacked** (Tải tiện ích đã giải nén) và chọn thư mục **`extensions/`** bên trong gói vừa giải nén.
 6. Nhấp biểu tượng Extensions (mảnh ghép) trên thanh công cụ Chrome và **Ghim (Pin)** biểu tượng **Agent Pilot (📌)**.
+
+> 📄 Hướng dẫn đầy đủ từng bước nằm trong `README.md` ngay trong gói bundle.
 
 #### Cách B: Cài đặt từ Mã Nguồn (Dành cho Lập trình viên)
 ```bash
 git clone https://github.com/ducconit/agent-pilot-extension.git
 cd agent-pilot-extension
 npm ci
-npm run pack  # Đóng gói tự động ra dist/agent-pilot-v*.zip
+npm run pack          # Chỉ extension -> dist/agent-pilot-v*.zip
+npm run pack:bundle   # Bundle từng nền tảng -> dist/bundles/agent-pilot-v*-<os>-<arch>.zip
 ```
 Sau đó nạp thư mục `extensions/` trực tiếp vào `chrome://extensions`.
 
@@ -179,17 +191,19 @@ Sau đó nạp thư mục `extensions/` trực tiếp vào `chrome://extensions`
 
 Bản binary độc lập viết bằng **Golang** tích hợp sẵn máy chủ **WebSocket/REST Bridge Server (cổng 58765)**, **MCP Server (stdio)** và **bộ lệnh CLI** điều khiển trình duyệt trực tiếp (khởi động `<5ms`, RAM `~12MB` — số liệu tham khảo, có thể thay đổi theo nền tảng, đóng gói tĩnh pure static `CGO_ENABLED=0`, không phụ thuộc Node.js hay thư viện hệ thống).
 
-#### Cách A: Tải Binary Biên Dịch Sẵn (GitHub Releases)
-Tải binary tương ứng với hệ điều hành và kiến trúc máy tính của bạn:
+#### Cách A: Tải Bundle Biên Dịch Sẵn (GitHub Releases)
+Mỗi bundle chứa sẵn `extensions/` + binary đúng nền tảng + `skills/` + `README.md`:
 
-| Hệ Điều Hành | Kiến Trúc | Tên Tệp Tải Về | Lệnh Cài Đặt Toàn Cục |
+| Nền Tảng | Kiến Trúc | Tên Tệp Tải Về | Cài Đặt |
 | :--- | :--- | :--- | :--- |
-| **Linux** | x86_64 (amd64) | `agent-pilot-linux-amd64` | `sudo mv agent-pilot-linux-amd64 /usr/local/bin/agent-pilot && sudo chmod +x /usr/local/bin/agent-pilot` |
-| **Linux** | ARM64 (aarch64) | `agent-pilot-linux-arm64` | `sudo mv agent-pilot-linux-arm64 /usr/local/bin/agent-pilot && sudo chmod +x /usr/local/bin/agent-pilot` |
-| **macOS** | Apple Silicon (M1-M4) | `agent-pilot-darwin-arm64` | `sudo mv agent-pilot-darwin-arm64 /usr/local/bin/agent-pilot && sudo chmod +x /usr/local/bin/agent-pilot` |
-| **macOS** | Intel (x86_64) | `agent-pilot-darwin-amd64` | `sudo mv agent-pilot-darwin-amd64 /usr/local/bin/agent-pilot && sudo chmod +x /usr/local/bin/agent-pilot` |
-| **Windows** | x86_64 (amd64) | `agent-pilot-windows-amd64.exe` | Đổi tên thành `agent-pilot.exe` và thêm vào biến môi trường `PATH` |
-| **Windows** | ARM64 | `agent-pilot-windows-arm64.exe` | Đổi tên thành `agent-pilot.exe` và thêm vào biến môi trường `PATH` |
+| **Linux** | x86_64 (amd64) | `agent-pilot-v1.0.8-beta-linux-amd64.zip` | `chmod +x agent-pilot && sudo mv agent-pilot /usr/local/bin/` |
+| **Linux** | ARM64 (aarch64) | `agent-pilot-v1.0.8-beta-linux-arm64.zip` | như trên |
+| **macOS** | Apple Silicon (M1-M4) | `agent-pilot-v1.0.8-beta-darwin-arm64.zip` | như trên |
+| **macOS** | Intel (x86_64) | `agent-pilot-v1.0.8-beta-darwin-amd64.zip` | như trên |
+| **Windows** | x86_64 (amd64) | `agent-pilot-v1.0.8-beta-windows-amd64.zip` | Giữ `agent-pilot.exe`, thêm thư mục vào `PATH` |
+| **Windows** | ARM64 | `agent-pilot-v1.0.8-beta-windows-arm64.zip` | như trên |
+
+Trong bundle, binary nằm ngay cạnh thư mục `extensions/` — cài xong extension theo mục 1 là dùng được ngay.
 
 #### Cách B: Tự Biên Dịch Từ Nguồn (Yêu cầu Go 1.21+)
 ```bash
