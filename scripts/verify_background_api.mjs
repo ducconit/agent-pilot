@@ -16,6 +16,7 @@ import { executeBatchActions } from "../extensions/background/batch-executor.js"
 import { BATCH_ACTION_HANDLERS } from "../extensions/background/batch-actions.js";
 import { AGENT_COMMAND_HANDLERS } from "../extensions/background/agent-handlers/index.js";
 import { DEFAULTS } from "../extensions/background/constants.js";
+import { transportMethods } from "../extensions/background/bridge-transport.js";
 
 const recorder = createRecorder({
   title: "📊 BẢNG TỔNG KẾT KIỂM THỬ BACKGROUND API:",
@@ -138,6 +139,36 @@ record(
   "5. Drag defaults are consistent (single source of truth)",
   DEFAULTS.DRAG_STEPS_CDP === 10 && DEFAULTS.DRAG_STEPS === 8,
   `CDP=${DEFAULTS.DRAG_STEPS_CDP}, synthetic=${DEFAULTS.DRAG_STEPS}`
+);
+
+// 6. A send failure during reconnect must preserve the failed and remaining frames
+// in order instead of losing them after the queue is cleared.
+globalThis.WebSocket = { OPEN: 1 };
+const transportClient = {
+  ws: { readyState: 1, send: () => { throw new Error("socket closed during flush"); } },
+  connected: true,
+  enabled: true,
+  outboundQueue: [{ id: 1 }, { id: 2 }],
+  maxQueueSize: 10
+};
+Object.assign(transportClient, transportMethods);
+const originalWarn = console.warn;
+console.warn = () => {};
+transportClient.flushOutboundQueue();
+console.warn = originalWarn;
+const preservedAfterFailure = transportClient.outboundQueue.map((item) => item.id).join(",") === "1,2";
+transportClient.ws = {
+  readyState: 1,
+  send: (payload) => {
+    transportClient.sent = transportClient.sent || [];
+    transportClient.sent.push(JSON.parse(payload).id);
+  }
+};
+transportClient.flushOutboundQueue();
+record(
+  "6. Outbound queue preserves frames across send failure",
+  preservedAfterFailure && transportClient.outboundQueue.length === 0 && transportClient.sent.join(",") === "1,2",
+  `preserved=${preservedAfterFailure}, sent=${transportClient.sent.join(",")}`
 );
 
 recorder.summarize();

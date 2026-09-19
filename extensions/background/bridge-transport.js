@@ -228,15 +228,19 @@ export const transportMethods = {
     }
   },
 
-  send(data) {
-    if (this.ws && this.connected && this.ws.readyState === WebSocket.OPEN) {
-      try {
-        this.ws.send(JSON.stringify(data));
-      } catch (e) {
-        console.warn("[AgentPilot] Failed to send over websocket:", e);
-      }
-      return;
+  trySend(data) {
+    if (!this.ws || !this.connected || this.ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      this.ws.send(JSON.stringify(data));
+      return true;
+    } catch (e) {
+      console.warn("[AgentPilot] Failed to send over websocket:", e);
+      return false;
     }
+  },
+
+  send(data) {
+    if (this.trySend(data)) return;
 
     // Bounded queue prevents async responses from disappearing during reconnect.
     if (!this.enabled) return;
@@ -251,7 +255,14 @@ export const transportMethods = {
     if (!this.outboundQueue.length) return;
     const queued = this.outboundQueue;
     this.outboundQueue = [];
-    for (const item of queued) this.send(item);
+    for (let index = 0; index < queued.length; index++) {
+      // If the socket closes between two frames, preserve the failed frame and
+      // every remaining frame in order for the next reconnect.
+      if (!this.trySend(queued[index])) {
+        this.outboundQueue = queued.slice(index);
+        return;
+      }
+    }
   },
 
   broadcastStatus() {

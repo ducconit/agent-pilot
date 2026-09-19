@@ -38,6 +38,7 @@ Máy chủ cầu nối (Bridge Server) chỉ lắng nghe trên giao diện cục
 
 - **Mặc định không có token xác thực**: Bridge không yêu cầu khóa để giữ tương thích.
 - **Auth tuỳ chọn**: đặt `AGENT_PILOT_API_KEY` trên server/CLI và nhập cùng key ở Side Panel → API key. Khi bật, HTTP và WebSocket yêu cầu API key; khi không đặt, bridge giữ nguyên behavior cũ.
+- **Giới hạn mã hoá**: bridge dùng `ws://` trên loopback; API key không nằm trong URL/log nhưng frame vẫn không được mã hoá TLS. API key bảo vệ khỏi client local/web không biết key, không phải cơ chế chống process đặc quyền trên cùng máy.
 - **Hệ quả khi tắt auth**: Bất kỳ tiến trình cục bộ (local process) nào trên cùng máy đều có thể kết nối tới cổng `58765` và điều khiển trình duyệt của bạn.
 
 **Khuyến nghị an toàn**:
