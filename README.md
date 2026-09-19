@@ -61,16 +61,18 @@ agent-pilot-extension/
 ├── skills/                             # Kỹ năng chuẩn Agent Skills Ecosystem (skills.sh)
 │   └── agent-pilot/
 │       └── SKILL.md                    # Hướng dẫn & cấu hình skill cho npx skills add
+├── go.mod                              # Go module gốc repo (github.com/ducconit/agent-pilot-extension)
+├── embed.go                            # //go:embed skills → binary CLI dùng chung nguồn skills/
 ├── cli/                                # Bộ công cụ dòng lệnh (CLI) & MCP Server độc lập bằng Go (Golang)
-│   ├── main.go                         # Điểm khởi đầu mỏng: chuyển tiếp tới internal/cli
-│   ├── internal/                       # Mã nguồn CLI tách thành các package nội bộ, routing bằng Cobra
-│   │   ├── cli/                        # Cobra root + commands (page/cdp/meta) + parser tương thích flag cũ (-tab → --tab)
-│   │   ├── config/                     # Hằng số cấu hình dùng chung & DefaultBridgePort()
-│   │   ├── bridge/                     # WebSocket Server 58765, HTTP REST API, timeout derivation, sanitizer
-│   │   ├── feedback/                   # Feedback Inbox, Waiter & long-poll (Channel A/B)
-│   │   ├── mcp/                        # MCP stdio server & registry 35 công cụ
-│   │   ├── service/                    # Quản lý service chạy ngầm (systemd / launchd / Task Scheduler)
-│   │   └── skill/                      # Cài Agent Skill & kỹ năng nhúng base64 (assets.go sinh tự động)
+│   ├── cmd/agent-pilot/main.go         # Entry point mỏng: chuyển tiếp tới package cli
+│   ├── cli/                            # Cobra root + commands (page/cdp/meta) + parser tương thích flag cũ (-tab → --tab)
+│   ├── config/                         # Hằng số cấu hình dùng chung & DefaultBridgePort()
+│   ├── bridge/                         # WebSocket Server 58765, HTTP REST API, timeout derivation, sanitizer
+│   ├── feedback/                       # Feedback Inbox, Waiter & long-poll (Channel A/B)
+│   ├── mcp/                            # MCP stdio server & registry 35 công cụ
+│   ├── service/                        # Quản lý service chạy ngầm (systemd / launchd / Task Scheduler)
+│   ├── skill/                          # Cài Agent Skill từ //go:embed (một nguồn: skills/ ở gốc repo)
+│   ├── version/                        # Version/Commit/Date — inject lúc build bằng -ldflags -X
 │   └── README.md                       # Hướng dẫn sử dụng & biên dịch Go binary
 
 ├── extensions/                         # Toàn bộ mã nguồn Chrome Extension (Manifest V3)
@@ -207,16 +209,17 @@ Trong bundle, binary nằm ngay cạnh thư mục `extensions/` — cài xong ex
 
 #### Cách B: Tự Biên Dịch Từ Nguồn (Yêu cầu Go 1.21+)
 ```bash
-# Cách 1: Sử dụng npm script
+# Cách 1: Sử dụng npm script (tự inject version từ package.json)
 npm run build:cli
 
-# Cách 2: Tự biên dịch trực tiếp qua go build
-cd cli
-go build -ldflags="-s -w" -o agent-pilot .
+# Cách 2: Tự biên dịch trực tiếp qua go build (từ gốc repo)
+go build -ldflags "-s -w -X github.com/ducconit/agent-pilot-extension/cli/version.Version=$(node -p "require('./package.json').version")" -o cli/agent-pilot ./cli/cmd/agent-pilot
 
-# Hoặc cài đặt trực tiếp qua Go toolchain
-go install github.com/ducconit/agent-pilot-extension/cli@latest
+# Hoặc cài đặt trực tiếp qua Go toolchain (skills vẫn được nhúng sẵn)
+go install github.com/ducconit/agent-pilot-extension/cli/cmd/agent-pilot@latest
 ```
+
+> Lưu ý: `go build` không kèm `-X` sẽ báo version là `dev`; mọi script build của repo đều tự inject version từ `package.json`.
 
 #### Cách Kích Hoạt Service Chạy Ngầm (Khuyên dùng cho trải nghiệm tốt nhất)
 Thay vì phải tự chạy server thủ công, bạn chỉ cần gõ 1 lệnh để hệ thống tự động đăng ký service chạy ngầm (Linux `systemd --user`, macOS `launchd`, Windows `Task Scheduler`):

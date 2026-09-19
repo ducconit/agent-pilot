@@ -59,10 +59,9 @@ npm run pack
 Download the pre-compiled binary for your operating system from GitHub Releases or build from source:
 
 ```bash
-# Build from source
-cd cli
-CGO_ENABLED=0 go build -ldflags="-s -w" -o agent-pilot .
-sudo cp agent-pilot /usr/local/bin/   # or copy to ~/.local/bin/
+# Build from source (run from the repository root)
+go build -ldflags "-s -w -X github.com/ducconit/agent-pilot-extension/cli/version.Version=1.0.8-beta" -o cli/agent-pilot ./cli/cmd/agent-pilot
+sudo cp cli/agent-pilot /usr/local/bin/   # or copy to ~/.local/bin/
 ```
 
 ### Step 2: Install Persistent Background Service

@@ -29,7 +29,6 @@ import { validateManifestReferences, readExtensionManifest } from "./lib/manifes
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
-const CLI_DIR = path.join(ROOT_DIR, "cli");
 const EXT_DIR = path.join(ROOT_DIR, "extensions");
 const SKILLS_DIR = path.join(ROOT_DIR, "skills");
 const BUNDLE_README = path.join(ROOT_DIR, "docs", "BUNDLE_README.md");
@@ -122,8 +121,16 @@ function renderBundleReadme(version, platform) {
 }
 
 function buildBinary(platform, outputPath) {
-  execFileSync("go", ["build", "-ldflags=-s -w", "-o", outputPath, "."], {
-    cwd: CLI_DIR,
+  // -X flags inject the build metadata; package.json stays the version source
+  const ldflags = [
+    "-s",
+    "-w",
+    `-X github.com/ducconit/agent-pilot-extension/cli/version.Version=${version}`,
+    `-X github.com/ducconit/agent-pilot-extension/cli/version.Commit=${commit}`,
+    `-X github.com/ducconit/agent-pilot-extension/cli/version.Date=${buildDate}`
+  ].join(" ");
+  execFileSync("go", ["build", "-ldflags", ldflags, "-o", outputPath, "./cli/cmd/agent-pilot"], {
+    cwd: ROOT_DIR,
     stdio: "inherit",
     env: { ...process.env, CGO_ENABLED: "0", GOOS: platform.goos, GOARCH: platform.goarch }
   });
@@ -139,6 +146,18 @@ function sha256File(filePath) {
 const options = parseArgs(process.argv.slice(2));
 const version = readVersion();
 checkPrerequisites();
+
+// Build metadata injected into every binary (-ldflags -X); package.json is the
+// single source of truth for the version.
+function gitValue(args, fallback = "") {
+  try {
+    return execFileSync("git", args, { cwd: ROOT_DIR, encoding: "utf8" }).trim() || fallback;
+  } catch (_) {
+    return fallback;
+  }
+}
+const commit = gitValue(["rev-parse", "--short", "HEAD"], "unknown");
+const buildDate = new Date().toISOString();
 
 const platforms = options.platforms.length
   ? ALL_PLATFORMS.filter((p) => options.platforms.includes(platformLabel(p)))

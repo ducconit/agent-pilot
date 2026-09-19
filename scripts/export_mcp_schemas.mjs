@@ -30,7 +30,13 @@ console.log("=================================================================="
 
 if (!fs.existsSync(binaryPath)) {
   console.log("→ Building cli/agent-pilot binary first...");
-  execSync("go build -ldflags=\"-s -w\" -o agent-pilot .", { cwd: path.join(PROJECT_DIR, "cli"), stdio: "inherit" });
+  const pkg = JSON.parse(fs.readFileSync(path.join(PROJECT_DIR, "package.json"), "utf-8"));
+  const ldflags = `-s -w -X github.com/ducconit/agent-pilot-extension/cli/version.Version=${pkg.version}`;
+  execSync(`go build -ldflags "${ldflags}" -o cli/agent-pilot ./cli/cmd/agent-pilot`, {
+    cwd: PROJECT_DIR,
+    stdio: "inherit",
+    env: { ...process.env, CGO_ENABLED: "0" }
+  });
 }
 
 execSync(`"${binaryPath}" export-mcp "${REPO_MCP_DIR}"`, { stdio: "inherit" });

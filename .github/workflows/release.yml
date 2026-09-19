@@ -51,18 +51,15 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          # Single source of truth: the toolchain required by cli/go.mod
-          go-version-file: cli/go.mod
-          cache-dependency-path: cli/go.sum
+          # Single source of truth: the toolchain required by go.mod
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Install Node Dependencies
         run: npm ci
 
       - name: Run Syntax & Lint Checks
         run: npm run lint
-
-      - name: Verify Embedded Skill Assets Up To Date
-        run: npm run check:skills
 
       - name: Run Browserless Unit Tests
         run: npm run test:secret && npm run test:item-schema && npm run test:color-utils && npm run test:background-api

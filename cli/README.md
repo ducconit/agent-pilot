@@ -33,13 +33,16 @@ Tải tệp binary tương ứng với hệ điều hành và CPU của bạn t�
 ### 2. Tự Biên Dịch Từ Mã Nguồn (Yêu cầu Go >= 1.21)
 
 ```bash
-cd cli
-
-# Tải dependencies
+# Từ GỐC repo (module Go nằm ở gốc, package cli/ nằm trong đó)
 go mod tidy
 
-# Biên dịch pure static binary không phụ thuộc thư viện ngoài
-CGO_ENABLED=0 go build -ldflags="-s -w" -o agent-pilot .
+# Biên dịch pure static binary, inject version từ package.json
+CGO_ENABLED=0 go build \
+  -ldflags "-s -w -X github.com/ducconit/agent-pilot-extension/cli/version.Version=$(node -p "require('./package.json').version")" \
+  -o cli/agent-pilot ./cli/cmd/agent-pilot
+
+# Hoặc dùng script tiện dụng (tự thêm cả Commit/Date):
+npm run build:cli
 ```
 
 ### 3. Cài Đặt Vào Hệ Thống (Toàn cục)
@@ -49,7 +52,7 @@ CGO_ENABLED=0 go build -ldflags="-s -w" -o agent-pilot .
 sudo mv agent-pilot /usr/local/bin/
 
 # Hoặc cài đặt qua go install:
-go install github.com/ducconit/agent-pilot-extension/cli@latest
+go install github.com/ducconit/agent-pilot-extension/cli/cmd/agent-pilot@latest
 ```
 
 ---
@@ -189,6 +192,6 @@ Khi bạn chạy đồng thời nhiều AI Agent (như **Antigravity IDE**, **Co
 ## 🧪 Chạy Kiểm Thử (Unit Tests)
 
 ```bash
-cd cli
+# Từ gốc repo:
 go test -v ./...
 ```
