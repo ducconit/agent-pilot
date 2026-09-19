@@ -82,11 +82,17 @@ agent-pilot-extension/
 │   ├── background/                     # Các module dịch vụ nền
 │   │   ├── constants.js                # Hằng số hệ thống & cấu hình
 │   │   ├── secret-sanitizer.js         # Lớp lọc che giấu Secret & API Key
-│   │   ├── cdp-manager.js              # Quản lý Chrome DevTools Protocol
+│   │   ├── cdp-manager.js              # Facade CDP (cdp-connection/events/input/network/page/performance)
 │   │   ├── tab-manager.js              # Quản lý Tabs & Native Tab Groups
 │   │   ├── screenshot-service.js       # Dịch vụ chụp ảnh màn hình
-│   │   ├── batch-executor.js           # Bộ chạy kịch bản gom cụm Batch Actions
-│   │   └── bridge-client.js            # WebSocket client kết nối AI Agent bridge
+│   │   ├── batch-executor.js           # Orchestrator chạy kịch bản Batch Actions
+│   │   ├── batch-actions.js            # Registry handler batch + bảng alias
+│   │   ├── batch-navigation.js         # Handler batch: open / navigate / close
+│   │   ├── batch-interaction.js        # Handler batch: click / type / scroll / hover / drag / upload / dialog / fill
+│   │   ├── batch-observation.js        # Handler batch: wait / screenshot / snapshot / evaluate / cdp / devtools
+│   │   ├── batch-validation.js         # Validate timeout / toạ độ / selector cho batch
+│   │   ├── agent-handlers/             # Registry handler cho Agent bridge (tabs, cdp, page, devtools, system…)
+│   │   └── bridge-client.js            # WebSocket client + queue + dispatch tới agent-handlers
 │   ├── content.js                      # Content Script điều phối in-page
 │   ├── content/                        # Các module tương tác DOM & Visuals
 │   │   ├── toast.js                    # Thông báo Toast HUD trên trang web
