@@ -90,13 +90,13 @@ var mcpTools = []ToolInfo{
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"selector":   map[string]interface{}{"type": "string", "description": "CSS selector of input"},
+				"selector":   map[string]interface{}{"type": "string", "description": "CSS selector of input (optional; defaults to focused active element or cursor position)"},
 				"text":       map[string]interface{}{"type": "string", "description": "Text to type"},
 				"clear":      map[string]interface{}{"type": "boolean", "description": "Clear field first"},
 				"pressEnter": map[string]interface{}{"type": "boolean", "description": "Press Enter after typing"},
 				"tabId":      map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
-			"required": []string{"selector", "text"},
+			"required": []string{"text"},
 		},
 	},
 	{

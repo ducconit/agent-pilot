@@ -144,6 +144,22 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 		}
 		return effective
 	}
+	if method == "page.type" || method == "page.typeText" {
+		if params != nil {
+			if textStr, ok := params["text"].(string); ok && len(textStr) > 0 {
+				delayMs := 40
+				if d, ok := getIntOrFloat(params, "delay"); ok && d > 0 {
+					delayMs = d
+				}
+				// Estimate typing duration: length * delay + 2500ms mouse move / focus buffer
+				estimated := (len(textStr) * delayMs) + 2500
+				effective := estimated + config.PageWaitBufferMs
+				if effective > defaultTimeoutMs {
+					return effective
+				}
+			}
+		}
+	}
 	if defaultTimeoutMs <= 0 {
 		return config.DefaultCommandTimeoutMs
 	}

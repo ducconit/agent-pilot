@@ -144,6 +144,8 @@ export const pageInputHandlers = {
         action: "type_text",
         selector: params.selector,
         text: params.text,
+        clear: Boolean(params.clear),
+        pressEnter: Boolean(params.pressEnter),
         delay: params.delay || DEFAULTS.TYPE_DELAY_MS
       })
     )

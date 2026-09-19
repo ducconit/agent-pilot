@@ -49,6 +49,10 @@ func TestValidateToolArguments(t *testing.T) {
 		t.Fatalf("expected missing 'text' to be rejected for browser_type")
 	}
 
+	if err := validateToolArguments("browser_type", map[string]interface{}{"text": "hello"}); err != nil {
+		t.Fatalf("expected browser_type with only 'text' (no selector) to pass, got: %v", err)
+	}
+
 	if err := validateToolArguments("does_not_exist", map[string]interface{}{}); err == nil {
 		t.Fatalf("expected unknown tool error")
 	}

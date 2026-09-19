@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ducconit/agent-pilot-extension/cli/config"
@@ -149,5 +150,13 @@ func TestDeriveCommandTimeout(t *testing.T) {
 	to = DeriveCommandTimeout("batch.run", navBatch, 0)
 	if to != 630000 {
 		t.Errorf("expected 630000, got %d", to)
+	}
+
+	// 11. page.type with long text scales timeout
+	longText := strings.Repeat("A", 400)
+	to = DeriveCommandTimeout("page.type", map[string]interface{}{"text": longText, "delay": 50}, 15000)
+	// (400 * 50) + 2500 + 5000 = 27500
+	if to != 27500 {
+		t.Errorf("expected 27500, got %d", to)
 	}
 }

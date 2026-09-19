@@ -121,11 +121,26 @@
     }
 
     return new Promise((resolve) => {
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        if (safetyTimer) clearTimeout(safetyTimer);
+        updateCursorTransform(targetX, targetY);
+        resolve({ success: true, x: targetX, y: targetY });
+      };
+
+      // Safety fallback: Chromium throttles or pauses requestAnimationFrame when the
+      // window is minimized, occluded, backgrounded, or on display servers without focus.
+      // Ensure we ALWAYS resolve even if requestAnimationFrame never fires.
+      const safetyTimer = setTimeout(done, Math.max(duration + 100, 300));
+
       const startX = currentMouseX;
       const startY = currentMouseY;
       const startTime = performance.now();
 
       function step(currentTime) {
+        if (settled) return;
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
         // Ease out cubic
@@ -137,8 +152,7 @@
         if (progress < 1) {
           requestAnimationFrame(step);
         } else {
-          updateCursorTransform(targetX, targetY);
-          resolve({ success: true, x: targetX, y: targetY });
+          done();
         }
       }
 
@@ -310,25 +324,56 @@
         }
       }
     } else {
-      const prevCursorDisplay = cursorLayer.style.display;
-      const lockOverlayEl = window.__AP_INTERNAL__.shield?.getLockOverlayEl?.();
-      const prevOverlayDisplay = lockOverlayEl ? lockOverlayEl.style.display : null;
-      cursorLayer.style.display = "none";
-      if (lockOverlayEl) lockOverlayEl.style.display = "none";
+      // 1. Prioritize active element if it's an editable form control or contentEditable
+      const active = document.activeElement;
+      if (active && active !== document.body && active !== document.documentElement) {
+        if (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable) {
+          el = active;
+        } else {
+          const nestedInput = active.querySelector ? active.querySelector("input, textarea, [contenteditable='true']") : null;
+          if (nestedInput) el = nestedInput;
+        }
+      }
 
-      el = document.elementFromPoint(currentMouseX, currentMouseY);
+      // 2. Fall back to element under current virtual cursor
+      if (!el) {
+        const prevCursorDisplay = cursorLayer.style.display;
+        const lockOverlayEl = window.__AP_INTERNAL__.shield?.getLockOverlayEl?.();
+        const prevOverlayDisplay = lockOverlayEl ? lockOverlayEl.style.display : null;
+        cursorLayer.style.display = "none";
+        if (lockOverlayEl) lockOverlayEl.style.display = "none";
 
-      cursorLayer.style.display = prevCursorDisplay;
-      if (lockOverlayEl && prevOverlayDisplay !== null) lockOverlayEl.style.display = prevOverlayDisplay;
+        const pointEl = document.elementFromPoint(currentMouseX, currentMouseY);
+
+        cursorLayer.style.display = prevCursorDisplay;
+        if (lockOverlayEl && prevOverlayDisplay !== null) lockOverlayEl.style.display = prevOverlayDisplay;
+
+        if (pointEl) {
+          if (pointEl.tagName === "INPUT" || pointEl.tagName === "TEXTAREA" || pointEl.isContentEditable) {
+            el = pointEl;
+          } else {
+            const nested = pointEl.querySelector ? pointEl.querySelector("input, textarea, [contenteditable='true']") : null;
+            el = nested || pointEl;
+          }
+        }
+      }
     }
 
     if (!el) return { success: false, error: "Target element not found" };
 
     const rect = el.getBoundingClientRect();
-    await moveVirtualMouse(rect.left + rect.width / 2, rect.top + rect.height / 2, CONFIG.FIELD_FOCUS_MOVE_MS);
-    await virtualClick(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    if (el !== document.activeElement) {
+      if (rect.width > 0 && rect.height > 0) {
+        await moveVirtualMouse(rect.left + rect.width / 2, rect.top + rect.height / 2, CONFIG.FIELD_FOCUS_MOVE_MS);
+        await virtualClick(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      }
+    } else if (rect.width > 0 && rect.height > 0) {
+      await moveVirtualMouse(rect.left + rect.width / 2, rect.top + rect.height / 2, CONFIG.FIELD_FOCUS_MOVE_MS);
+    }
 
-    el.focus();
+    if (typeof el.focus === "function") {
+      el.focus();
+    }
     // React/Vue native-setter fallback: frameworks patch the `value` property on the
     // DOM element instance and track state through their own listener. Assigning
     // `el.value = ...` directly can be swallowed; calling the ORIGINAL descriptor setter
@@ -370,8 +415,21 @@
     }
     const cleanText = String(text ?? "").replace(/\r\n/g, "\n");
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) {
-      for (const char of cleanText) {
+      const isHidden = Boolean(document.hidden);
+      const typeInterval = isHidden ? 0 : (CONFIG.TYPING_INTERVAL || 25);
+      const typingStartTime = Date.now();
+      let useFastTyping = isHidden || cleanText.length > 50;
+
+      for (let i = 0; i < cleanText.length; i++) {
+        const char = cleanText[i];
         if (char === "\r") continue;
+
+        // Background timer throttling guard: if typing loop takes >3500ms,
+        // fast-forward remaining characters so we never hit the RPC bridge timeout.
+        if (!useFastTyping && Date.now() - typingStartTime > 3500) {
+          useFastTyping = true;
+        }
+
         try {
           setDispatching(true);
           if (el.isContentEditable) {
@@ -396,7 +454,10 @@
         } finally {
           setDispatching(false);
         }
-        await new Promise((r) => setTimeout(r, CONFIG.TYPING_INTERVAL));
+
+        if (!useFastTyping && typeInterval > 0) {
+          await new Promise((r) => setTimeout(r, typeInterval));
+        }
       }
       try {
         setDispatching(true);
