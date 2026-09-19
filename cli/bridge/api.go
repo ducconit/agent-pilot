@@ -376,7 +376,15 @@ func ForwardCommandToActiveServer(method string, params map[string]interface{}, 
 	client := &http.Client{
 		Timeout: timeoutDuration,
 	}
-	resp, err := client.Post(url, "application/json", bytes.NewReader(jsonBytes))
+	request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(jsonBytes))
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	if key := config.BridgeAPIKey(); key != "" {
+		request.Header.Set(config.APIKeyHeader, key)
+	}
+	resp, err := client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to contact Agent Pilot Bridge at %s: %w", url, err)
 	}

@@ -103,8 +103,14 @@ Bảng đầy đủ: `docs/API_REFERENCE.md` trong repository.
 ## 7) Bảo mật
 - **Secret Redaction**: tự động che API key / private key / JWT / Bearer token trước khi gửi cho LLM
   (bật/tắt trong Side Panel — mặc định bật).
-- **Bridge cục bộ**: chỉ lắng nghe `127.0.0.1:58765`, allowlist origin localhost + extension,
-  **không có auth token** → chỉ chạy phần mềm tin cậy trên máy này, không mở port ra ngoài.
+- **Bridge cục bộ**: chỉ lắng nghe `127.0.0.1:58765`, allowlist origin localhost + extension.
+  Mặc định **không yêu cầu auth** để tương thích ngược; nếu cần, bật API key:
+  ```bash
+  export AGENT_PILOT_API_KEY="your-long-random-key"
+  agent-pilot server
+  ```
+  rồi nhập cùng key vào Side Panel → **API key (tuỳ chọn)**. Key được dùng cho HTTP/WebSocket,
+  không truyền qua URL và không hiển thị trong UI/log.
 
 ## 8) Xử lý sự cố
 | Vấn đề | Cách xử lý |

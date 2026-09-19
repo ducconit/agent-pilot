@@ -41,6 +41,7 @@ export class AgentBridgeClient {
     this.maxReconnectDelay = BRIDGE.RECONNECT_MAX_MS;
     this.enabled = true;
     this.lastAgentTabId = null;
+    this.apiKey = "";
     this.broadcastFn = broadcastFn;
     this.outboundQueue = [];
     this.maxQueueSize = LIMITS.OUTBOUND_QUEUE_MAX;
@@ -65,9 +66,10 @@ export class AgentBridgeClient {
 
     // Load saved port/enabled state from storage
     if (chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(["agent_port", "agent_bridge_enabled"], (res) => {
+      chrome.storage.local.get(["agent_port", "agent_bridge_enabled", "agent_bridge_api_key"], (res) => {
         if (res.agent_port) this.port = Number(res.agent_port) || DEFAULT_AGENT_PORT;
         if (res.agent_bridge_enabled !== undefined) this.enabled = !!res.agent_bridge_enabled;
+        if (typeof res.agent_bridge_api_key === "string") this.apiKey = res.agent_bridge_api_key.trim();
         if (this.enabled) this.connect();
       });
     } else {
@@ -84,6 +86,7 @@ export class AgentBridgeClient {
       connected: this.connected,
       port: this.port,
       enabled: this.enabled,
+      authConfigured: Boolean(this.apiKey),
       url: `ws://127.0.0.1:${this.port}`
     };
   }
@@ -98,6 +101,14 @@ export class AgentBridgeClient {
       }
       this.reconnect();
     }
+  }
+
+  setApiKey(value) {
+    this.apiKey = typeof value === "string" ? value.trim() : "";
+    if (chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({ agent_bridge_api_key: this.apiKey });
+    }
+    this.reconnect();
   }
 
   setEnabled(enabled) {
@@ -144,6 +155,7 @@ export class AgentBridgeClient {
           type: "HANDSHAKE",
           version: EXTENSION_VERSION,
           agent: "AgentPilot-Extension",
+          ...(this.apiKey ? { apiKey: this.apiKey } : {}),
           capabilities: ["tabs", "cdp", "cursor", "type", "click", "scroll", "inspector", "eyedropper", "screenshot"],
           details: {
             browser: browserName,

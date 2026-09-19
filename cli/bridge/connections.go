@@ -176,6 +176,23 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return conn.SetReadDeadline(time.Now().Add(config.WSReadTimeout))
 	})
 
+	// When API-key auth is enabled, the extension proves possession in its
+	// first HANDSHAKE frame. The key never appears in the WebSocket URL.
+	var firstRaw []byte
+	if AuthEnabled() {
+		_, firstRaw, err = conn.ReadMessage()
+		if err != nil {
+			_ = conn.Close()
+			return
+		}
+		var handshake map[string]interface{}
+		if json.Unmarshal(firstRaw, &handshake) != nil || handshake["type"] != "HANDSHAKE" || !AuthorizeWebSocketHandshake(handshake) {
+			_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "invalid API key"), time.Now().Add(config.WSWriteControlTimeout))
+			_ = conn.Close()
+			return
+		}
+	}
+
 	clientSeq := atomic.AddInt64(&clientCounter, 1)
 	clientID := fmt.Sprintf("browser_%d_%d", time.Now().UnixNano(), clientSeq)
 	client := &ClientConnection{
@@ -238,9 +255,14 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	for {
-		_, raw, err := conn.ReadMessage()
-		if err != nil {
-			break
+		var raw []byte
+		if firstRaw != nil {
+			raw, firstRaw = firstRaw, nil
+		} else {
+			_, raw, err = conn.ReadMessage()
+			if err != nil {
+				break
+			}
 		}
 		_ = conn.SetReadDeadline(time.Now().Add(config.WSReadTimeout))
 

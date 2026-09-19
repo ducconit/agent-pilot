@@ -27,6 +27,13 @@ const (
 	DefaultPort = 58765
 	DefaultHost = "127.0.0.1"
 
+	// Optional bridge authentication. Empty API key means auth remains disabled
+	// for backward compatibility with existing local agents and extensions.
+	APIKeyEnvVar   = "AGENT_PILOT_API_KEY"
+	APIKeyHeader   = "X-Agent-Pilot-Key"
+	APITokenScheme = "Bearer"
+	WSAuthTimeout  = 5 * time.Second
+
 	// --- HTTP server timeouts (StartBridgeServer) ---------------------------
 	HTTPReadHeaderTimeout = 5 * time.Second
 	HTTPReadTimeout       = 15 * time.Second
@@ -96,6 +103,13 @@ const (
 	PlistNameDarwin  = "com.agentpilot.bridge.plist"
 	TaskNameWindows  = "AgentPilotBridge"
 )
+
+// BridgeAPIKey returns the optional API key configured for the local bridge.
+// Reading the environment at request time makes tests and long-running service
+// wrappers predictable without ever persisting or logging the secret.
+func BridgeAPIKey() string {
+	return strings.TrimSpace(os.Getenv(APIKeyEnvVar))
+}
 
 // DefaultBridgePort resolves the bridge port, honoring the AGENT_PILOT_PORT
 // environment variable and falling back to DefaultPort. A malformed, non-numeric

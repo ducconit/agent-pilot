@@ -13,6 +13,7 @@ export class AgentMonitor {
     this.agentBridgeDot = document.getElementById("agent-bridge-dot");
     this.agentBridgeText = document.getElementById("agent-bridge-text");
     this.inputBridgePort = document.getElementById("input-bridge-port");
+    this.inputBridgeApiKey = document.getElementById("input-bridge-api-key");
     this.btnReconnectBridge = document.getElementById("btn-reconnect-bridge");
 
     this.agentStatusBadge = document.getElementById("agent-status-badge");
@@ -121,6 +122,21 @@ export class AgentMonitor {
       };
     }
 
+    if (this.inputBridgeApiKey) {
+      this.inputBridgeApiKey.onchange = () => {
+        const apiKey = this.inputBridgeApiKey.value.trim();
+        chrome.runtime.sendMessage({ action: "set_agent_bridge_api_key", apiKey }, (res) => {
+          if (chrome.runtime.lastError) {
+            showToast("Không thể lưu API key bridge");
+            return;
+          }
+          this.inputBridgeApiKey.value = "";
+          this.inputBridgeApiKey.placeholder = res?.authConfigured ? "Đã cấu hình API key (nhập để thay)" : "API key (tuỳ chọn)";
+          showToast(res?.authConfigured ? "Đã lưu API key bridge" : "Đã tắt API key bridge");
+        });
+      };
+    }
+
     // Secret Redaction Filter Event Listeners
     if (this.toggleSecretFilter) {
       this.toggleSecretFilter.addEventListener("change", () => {
@@ -223,6 +239,12 @@ export class AgentMonitor {
     }
     if (this.inputBridgePort && status.port) {
       this.inputBridgePort.value = status.port;
+    }
+    if (this.inputBridgeApiKey) {
+      this.inputBridgeApiKey.value = "";
+      this.inputBridgeApiKey.placeholder = status.authConfigured
+        ? "Đã cấu hình API key (nhập để thay)"
+        : "API key (tuỳ chọn)";
     }
   }
 

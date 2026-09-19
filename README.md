@@ -239,8 +239,26 @@ agent-pilot service status
 
 # Các lệnh quản trị khác:
 agent-pilot service restart    # Khởi động lại
-agent-pilot service stop       # Dừng tạm thời
-agent-pilot service uninstall  # Gỡ bỏ service
+agent-pilot service stop        # Dừng tạm thời
+agent-pilot service uninstall   # Gỡ bỏ service
+```
+
+#### API key tuỳ chọn cho Bridge
+Mặc định bridge **không yêu cầu auth** để giữ tương thích với extension/agent hiện có.
+Nếu muốn bật auth, dùng cùng một API key cho server, CLI/MCP và Side Panel:
+
+```bash
+export AGENT_PILOT_API_KEY="your-long-random-key"
+agent-pilot server
+# Hoặc: agent-pilot service restart (sau khi service nhận biến môi trường này)
+```
+
+Sau đó mở Side Panel → trường **API key (tuỳ chọn)** → nhập cùng key. Khi key được cấu hình,
+HTTP/WebSocket bridge sẽ từ chối client thiếu key; key không được truyền qua URL và không hiển thị trong UI/log.
+
+```text
+API key bật  : AGENT_PILOT_API_KEY + key trong Side Panel
+API key tắt  : bỏ biến môi trường + xoá key trong Side Panel
 ```
 
 > 💡 **Lưu Ý Khi Chạy Nhiều AI Agent Đồng Thời (Multi-Agent Concurrency)**:

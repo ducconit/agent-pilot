@@ -408,6 +408,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (action === "set_agent_bridge_api_key") {
+    if (agentBridge) agentBridge.setApiKey(request.apiKey);
+    sendResponse({ success: true, authConfigured: Boolean(request.apiKey && String(request.apiKey).trim()) });
+    return true;
+  }
+
   if (action === "reconnect_agent_bridge") {
     if (agentBridge) agentBridge.reconnect();
     sendResponse({ success: true });

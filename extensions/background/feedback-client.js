@@ -15,9 +15,11 @@ import { sanitizeData } from "./secret-sanitizer.js";
  */
 export async function saveFeedbackInbox(client, payload) {
   try {
+    const headers = { "Content-Type": "application/json" };
+    if (client.apiKey) headers["X-Agent-Pilot-Key"] = client.apiKey;
     const resp = await fetch(`http://127.0.0.1:${client.port}/api/feedback/save`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(payload)
     });
     const data = await resp.json();
@@ -64,9 +66,11 @@ export async function saveFeedbackInbox(client, payload) {
  */
 export async function pushFeedbackLive(client, payload) {
   try {
+    const headers = { "Content-Type": "application/json" };
+    if (client.apiKey) headers["X-Agent-Pilot-Key"] = client.apiKey;
     const resp = await fetch(`http://127.0.0.1:${client.port}/api/feedback/push`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(payload)
     });
     const data = await resp.json();

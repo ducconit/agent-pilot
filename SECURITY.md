@@ -36,8 +36,9 @@ Chúng tôi cung cấp các bản vá bảo mật cho các phiên bản sau:
 
 Máy chủ cầu nối (Bridge Server) chỉ lắng nghe trên giao diện cục bộ `127.0.0.1:58765` và kiểm tra nguồn gốc kết nối (`verifyClient`) theo danh sách cho phép: `localhost`, `127.0.0.1` và các nguồn `chrome-extension://`. Tuy nhiên cần lưu ý:
 
-- **Không có token xác thực**: Bridge không yêu cầu khóa hay token để xác thực lệnh.
-- **Hệ quả**: Bất kỳ tiến trình cục bộ (local process) nào trên cùng máy đều có thể kết nối tới cổng `58765` và điều khiển trình duyệt của bạn.
+- **Mặc định không có token xác thực**: Bridge không yêu cầu khóa để giữ tương thích.
+- **Auth tuỳ chọn**: đặt `AGENT_PILOT_API_KEY` trên server/CLI và nhập cùng key ở Side Panel → API key. Khi bật, HTTP và WebSocket yêu cầu API key; khi không đặt, bridge giữ nguyên behavior cũ.
+- **Hệ quả khi tắt auth**: Bất kỳ tiến trình cục bộ (local process) nào trên cùng máy đều có thể kết nối tới cổng `58765` và điều khiển trình duyệt của bạn.
 
 **Khuyến nghị an toàn**:
 - Chỉ chạy phần mềm cục bộ đáng tin cậy trên máy đã cài Agent Pilot.

@@ -73,17 +73,19 @@ func StartBridgeServer(port int) error {
 			return
 		}
 		if r.URL.Path == "/" || r.URL.Path == "/health" {
-			handleHealth(w, r)
+			if requireHTTPAuth(w, r) {
+				handleHealth(w, r)
+			}
 			return
 		}
 		http.NotFound(w, r)
 	})
 
-	mux.HandleFunc("/api", handleHTTPAPI)
-	mux.HandleFunc("/api/feedback/save", handleFeedbackSaveEndpoint)
-	mux.HandleFunc("/api/feedback/push", handleFeedbackSaveEndpoint)
-	mux.HandleFunc("/api/feedback/pending", handleFeedbackPendingEndpoint)
-	mux.HandleFunc("/api/feedback/wait", handleFeedbackWaitEndpoint)
+	mux.HandleFunc("/api", WithHTTPAuth(handleHTTPAPI))
+	mux.HandleFunc("/api/feedback/save", WithHTTPAuth(handleFeedbackSaveEndpoint))
+	mux.HandleFunc("/api/feedback/push", WithHTTPAuth(handleFeedbackSaveEndpoint))
+	mux.HandleFunc("/api/feedback/pending", WithHTTPAuth(handleFeedbackPendingEndpoint))
+	mux.HandleFunc("/api/feedback/wait", WithHTTPAuth(handleFeedbackWaitEndpoint))
 
 	log.Printf("[AgentPilot Go] 🚀 Bridge Server listening on http://%s (WebSocket: ws://%s)", addr, addr)
 	server := &http.Server{
