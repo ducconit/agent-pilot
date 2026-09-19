@@ -62,15 +62,15 @@ agent-pilot-extension/
 │   └── agent-pilot/
 │       └── SKILL.md                    # Hướng dẫn & cấu hình skill cho npx skills add
 ├── cli/                                # Bộ công cụ dòng lệnh (CLI) & MCP Server độc lập bằng Go (Golang)
-│   ├── main.go                         # Điểm khởi đầu & phân luồng subcommands (mcp, server, click, type,...)
-│   ├── bridge.go                       # WebSocket Server 58765 & HTTP REST API nhúng
-│   ├── client.go                       # Trình điều khiển trực tiếp qua CLI cho Tester/QC
-│   ├── mcp.go                          # Máy chủ MCP chuẩn 35 công cụ qua giao thức stdio
-│   ├── sanitizer.go                    # Lớp che giấu Secret/API Key bảo mật
-│   ├── feedback.go                     # Quản lý Hộp thư Feedback Inbox & Waiter
-│   ├── service.go                      # Quản lý service chạy ngầm (systemd / launchd / Task Scheduler)
-│   ├── skill_install.go                # Cài Agent Skill trực tiếp từ binary (không cần clone repo)
-│   ├── skill_assets.go                 # Kỹ năng nhúng sẵn dạng base64 (sinh bởi scripts/embed_skills.mjs)
+│   ├── main.go                         # Điểm khởi đầu mỏng: chuyển tiếp tới internal/cli
+│   ├── internal/                       # Mã nguồn CLI tách thành các package nội bộ, routing bằng Cobra
+│   │   ├── cli/                        # Cobra root + commands (page/cdp/meta) + parser tương thích flag cũ (-tab → --tab)
+│   │   ├── config/                     # Hằng số cấu hình dùng chung & DefaultBridgePort()
+│   │   ├── bridge/                     # WebSocket Server 58765, HTTP REST API, timeout derivation, sanitizer
+│   │   ├── feedback/                   # Feedback Inbox, Waiter & long-poll (Channel A/B)
+│   │   ├── mcp/                        # MCP stdio server & registry 35 công cụ
+│   │   ├── service/                    # Quản lý service chạy ngầm (systemd / launchd / Task Scheduler)
+│   │   └── skill/                      # Cài Agent Skill & kỹ năng nhúng base64 (assets.go sinh tự động)
 │   └── README.md                       # Hướng dẫn sử dụng & biên dịch Go binary
 
 ├── extensions/                         # Toàn bộ mã nguồn Chrome Extension (Manifest V3)
@@ -121,7 +121,7 @@ agent-pilot-extension/
 ├── scripts/                            # Bộ công cụ build, test, pack & sync cross-platform
 │   ├── browser_resolver.mjs            # Tự động tìm kiếm Chrome/Chromium/Edge/Brave đa nền tảng
 │   ├── build_cli.mjs                   # Build CLI tĩnh cross-platform (thay cho env-var prefix POSIX)
-│   ├── embed_skills.mjs                # Nhúng kỹ năng vào CLI Go dạng base64 (cli/skill_assets.go)
+│   ├── embed_skills.mjs                # Nhúng kỹ năng vào CLI Go dạng base64 (cli/internal/skill/assets.go)
 │   ├── export_mcp.mjs                  # Xuất schema MCP ra repo + config Antigravity (không cần `~`)
 │   ├── export_mcp_schemas.mjs          # Trích xuất schema MCP tự động (SSOT)
 │   ├── lint.mjs                        # Syntax-check mọi file .js/.mjs trong extensions/ và scripts/
