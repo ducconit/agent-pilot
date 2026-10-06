@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -217,4 +218,203 @@ func TestMCPToolDispatchTargetsExist(t *testing.T) {
 		}
 		t.Errorf("MCP tool dispatches to %q, but no extension handler implements it", method)
 	}
+}
+
+func TestProcessScreenshotResult(t *testing.T) {
+	sampleDataURL := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+	rawPayload := map[string]interface{}{
+		"success":         true,
+		"tabId":           float64(42),
+		"isBackgroundTab": false,
+		"dataUrl":         sampleDataURL,
+	}
+
+	t.Run("DefaultSavesToLocalFileWithoutDataURL", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		prevWd, _ := os.Getwd()
+		_ = os.Chdir(tmpDir)
+		defer func() { _ = os.Chdir(prevWd) }()
+
+		resText, isErr := processScreenshotResult(rawPayload, nil, map[string]interface{}{})
+		if isErr {
+			t.Fatalf("unexpected error: %s", resText)
+		}
+
+		var parsed map[string]interface{}
+		if err := json.Unmarshal([]byte(resText), &parsed); err != nil {
+			t.Fatalf("failed to parse json result: %v", err)
+		}
+
+		if _, hasDataURL := parsed["dataUrl"]; hasDataURL {
+			t.Errorf("expected dataUrl to be omitted from default output")
+		}
+
+		filePath, ok := parsed["path"].(string)
+		if !ok || filePath == "" {
+			t.Fatalf("expected path to be returned, got %v", parsed["path"])
+		}
+
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			t.Errorf("expected screenshot file to exist at %s", filePath)
+		}
+
+		bytesCount, ok := parsed["bytes"].(float64)
+		if !ok || bytesCount <= 0 {
+			t.Errorf("expected positive bytes count, got %v", parsed["bytes"])
+		}
+	})
+
+	t.Run("CustomOutputPathSpecified", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		customPath := filepath.Join(tmpDir, "subfolder", "test_screen.png")
+
+		resText, isErr := processScreenshotResult(rawPayload, nil, map[string]interface{}{
+			"path": customPath,
+		})
+		if isErr {
+			t.Fatalf("unexpected error: %s", resText)
+		}
+
+		var parsed map[string]interface{}
+		if err := json.Unmarshal([]byte(resText), &parsed); err != nil {
+			t.Fatalf("failed to parse json result: %v", err)
+		}
+
+		if _, hasDataURL := parsed["dataUrl"]; hasDataURL {
+			t.Errorf("expected dataUrl to be omitted")
+		}
+
+		if _, err := os.Stat(customPath); os.IsNotExist(err) {
+			t.Errorf("expected file to be written to %s", customPath)
+		}
+	})
+
+	t.Run("Base64FlagTrueReturnsDataURLWithoutDiskWrite", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		prevWd, _ := os.Getwd()
+		_ = os.Chdir(tmpDir)
+		defer func() { _ = os.Chdir(prevWd) }()
+
+		resText, isErr := processScreenshotResult(rawPayload, nil, map[string]interface{}{
+			"base64": true,
+		})
+		if isErr {
+			t.Fatalf("unexpected error: %s", resText)
+		}
+
+		var parsed map[string]interface{}
+		if err := json.Unmarshal([]byte(resText), &parsed); err != nil {
+			t.Fatalf("failed to parse json result: %v", err)
+		}
+
+		dataURL, ok := parsed["dataUrl"].(string)
+		if !ok || dataURL != sampleDataURL {
+			t.Errorf("expected original dataUrl returned, got %v", parsed["dataUrl"])
+		}
+
+		if _, hasPath := parsed["path"]; hasPath {
+			t.Errorf("expected no path when base64 is true and path was not specified")
+		}
+
+		entries, _ := os.ReadDir(tmpDir)
+		if len(entries) > 0 {
+			t.Errorf("expected no files written when base64: true and no path provided")
+		}
+	})
+
+	t.Run("Base64TrueWithCustomPathWritesFileAndKeepsDataURL", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		customPath := filepath.Join(tmpDir, "both.png")
+
+		resText, isErr := processScreenshotResult(rawPayload, nil, map[string]interface{}{
+			"base64": true,
+			"path":   customPath,
+		})
+		if isErr {
+			t.Fatalf("unexpected error: %s", resText)
+		}
+
+		var parsed map[string]interface{}
+		if err := json.Unmarshal([]byte(resText), &parsed); err != nil {
+			t.Fatalf("failed to parse json result: %v", err)
+		}
+
+		if _, ok := parsed["dataUrl"].(string); !ok {
+			t.Errorf("expected dataUrl to be present")
+		}
+
+		if _, err := os.Stat(customPath); os.IsNotExist(err) {
+			t.Errorf("expected file to be written to %s", customPath)
+		}
+	})
+
+	t.Run("InvalidDataURLFormatReturnsError", func(t *testing.T) {
+		badPayload := map[string]interface{}{
+			"dataUrl": "invalid-format-without-comma",
+		}
+		resText, isErr := processScreenshotResult(badPayload, nil, map[string]interface{}{})
+		if !isErr || !strings.Contains(resText, "invalid screenshot dataUrl format") {
+			t.Errorf("expected invalid format error, got %v (isErr: %v)", resText, isErr)
+		}
+	})
+
+	t.Run("InvalidBase64PayloadReturnsError", func(t *testing.T) {
+		badPayload := map[string]interface{}{
+			"dataUrl": "data:image/png;base64,!!!NotBase64!!!",
+		}
+		resText, isErr := processScreenshotResult(badPayload, nil, map[string]interface{}{})
+		if !isErr || !strings.Contains(resText, "failed to decode base64") {
+			t.Errorf("expected decode error, got %v (isErr: %v)", resText, isErr)
+		}
+	})
+
+	t.Run("UnsupportedFileExtensionReturnsError", func(t *testing.T) {
+		resText, isErr := processScreenshotResult(rawPayload, nil, map[string]interface{}{
+			"path": "malicious_script.sh",
+		})
+		if !isErr || !strings.Contains(resText, "unsupported screenshot file extension") {
+			t.Errorf("expected unsupported extension error, got %v (isErr: %v)", resText, isErr)
+		}
+	})
+
+	t.Run("SensitivePathRejected", func(t *testing.T) {
+		resText, isErr := processScreenshotResult(rawPayload, nil, map[string]interface{}{
+			"path": "/etc/malicious.png",
+		})
+		if !isErr || !strings.Contains(resText, "sensitive system path") {
+			t.Errorf("expected sensitive path error, got %v (isErr: %v)", resText, isErr)
+		}
+
+		resSSH, isErrSSH := processScreenshotResult(rawPayload, nil, map[string]interface{}{
+			"path": ".ssh/authorized_keys.png",
+		})
+		if !isErrSSH || !strings.Contains(resSSH, "sensitive user configuration") {
+			t.Errorf("expected sensitive config error for .ssh, got %v", resSSH)
+		}
+	})
+
+	t.Run("FileWriteFailurePropagated", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		// Create a regular file where a directory is expected to cause MkdirAll failure
+		blockerFile := filepath.Join(tmpDir, "blocker")
+		if err := os.WriteFile(blockerFile, []byte("x"), 0644); err != nil {
+			t.Fatalf("failed to create blocker: %v", err)
+		}
+		impossiblePath := filepath.Join(blockerFile, "sub", "shot.png")
+
+		resText, isErr := processScreenshotResult(rawPayload, nil, map[string]interface{}{
+			"path": impossiblePath,
+		})
+		if !isErr || (!strings.Contains(resText, "failed to create directory") && !strings.Contains(resText, "failed to write screenshot")) {
+			t.Errorf("expected write or mkdir error, got %v (isErr: %v)", resText, isErr)
+		}
+	})
+
+	t.Run("BridgeErrorPropagated", func(t *testing.T) {
+		bridgeErr := fmt.Errorf("simulated bridge connection failure")
+		resText, isErr := processScreenshotResult(nil, bridgeErr, map[string]interface{}{})
+		if !isErr || !strings.Contains(resText, "simulated bridge connection failure") {
+			t.Errorf("expected bridge error propagation, got %v (isErr: %v)", resText, isErr)
+		}
+	})
 }

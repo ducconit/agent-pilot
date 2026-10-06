@@ -4,8 +4,13 @@
 package mcp
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/ducconit/agent-pilot-extension/cli/bridge"
 	"github.com/ducconit/agent-pilot-extension/cli/config"
@@ -63,7 +68,7 @@ func executeToolCall(name string, args map[string]interface{}) (string, bool) {
 
 	case "browser_screenshot":
 		res, err := bridge.DispatchCommand("page.screenshot", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
+		return processScreenshotResult(res, err, args)
 
 	case "browser_get_devtools_data":
 		res, err := bridge.DispatchCommand("devtools.getData", args, config.DefaultBridgePort())
@@ -189,4 +194,97 @@ func formatToolResult(res interface{}, err error) (string, bool) {
 		return fmt.Sprintf("%v", res), false
 	}
 	return string(bytes), false
+}
+
+func processScreenshotResult(res interface{}, err error, args map[string]interface{}) (string, bool) {
+	if err != nil {
+		return formatToolResult(res, err)
+	}
+
+	resMap, ok := res.(map[string]interface{})
+	if !ok {
+		return formatToolResult(res, nil)
+	}
+
+	dataURL, _ := resMap["dataUrl"].(string)
+	if dataURL == "" {
+		return formatToolResult(res, nil)
+	}
+
+	includeBase64 := false
+	if b, ok := args["base64"].(bool); ok {
+		includeBase64 = b
+	} else if s, ok := args["base64"].(string); ok && strings.EqualFold(s, "true") {
+		includeBase64 = true
+	}
+
+	pathParam, _ := args["path"].(string)
+
+	// When base64 is requested and no file path is specified, return inline dataUrl without writing to disk
+	if includeBase64 && pathParam == "" {
+		return formatToolResult(res, nil)
+	}
+
+	outputPath := pathParam
+	if outputPath != "" {
+		cleanPath := filepath.Clean(outputPath)
+		ext := strings.ToLower(filepath.Ext(cleanPath))
+		if ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".webp" {
+			return fmt.Sprintf("Error: unsupported screenshot file extension %q (allowed: .png, .jpg, .jpeg, .webp)", ext), true
+		}
+
+		// Guard against sensitive system paths and directory traversal into restricted areas
+		for _, forbidden := range []string{"/etc", "/proc", "/sys", "/dev", "/boot", "/root"} {
+			if cleanPath == forbidden || strings.HasPrefix(cleanPath, forbidden+"/") {
+				return fmt.Sprintf("Error: writing to sensitive system path %q is not permitted", cleanPath), true
+			}
+		}
+		if strings.Contains(cleanPath, ".ssh") || strings.Contains(cleanPath, "authorized_keys") ||
+			strings.HasSuffix(cleanPath, ".bashrc") || strings.HasSuffix(cleanPath, ".zshrc") ||
+			strings.HasSuffix(cleanPath, ".profile") {
+			return fmt.Sprintf("Error: writing to sensitive user configuration %q is not permitted", cleanPath), true
+		}
+		outputPath = cleanPath
+	} else {
+		outputPath = fmt.Sprintf("screenshot_%d.png", time.Now().UnixMilli())
+	}
+
+	parts := strings.SplitN(dataURL, ",", 2)
+	if len(parts) != 2 {
+		return "Error: invalid screenshot dataUrl format", true
+	}
+
+	imgBytes, b64Err := base64.StdEncoding.DecodeString(parts[1])
+	if b64Err != nil {
+		return fmt.Sprintf("Error: failed to decode base64 screenshot: %v", b64Err), true
+	}
+
+	if dir := filepath.Dir(outputPath); dir != "" && dir != "." {
+		if mkErr := os.MkdirAll(dir, 0755); mkErr != nil {
+			return fmt.Sprintf("Error: failed to create directory %s: %v", dir, mkErr), true
+		}
+	}
+
+	if writeErr := os.WriteFile(outputPath, imgBytes, 0644); writeErr != nil {
+		return fmt.Sprintf("Error: failed to write screenshot to %s: %v", outputPath, writeErr), true
+	}
+
+	absPath, absErr := filepath.Abs(outputPath)
+	if absErr != nil {
+		return fmt.Sprintf("Error: failed to resolve absolute path for %s: %v", outputPath, absErr), true
+	}
+
+	result := make(map[string]interface{})
+	for k, v := range resMap {
+		if k != "dataUrl" {
+			result[k] = v
+		}
+	}
+	result["path"] = absPath
+	result["bytes"] = len(imgBytes)
+	if includeBase64 {
+		result["dataUrl"] = dataURL
+	}
+
+	return formatToolResult(result, nil)
 }

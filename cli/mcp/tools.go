@@ -164,13 +164,15 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_screenshot",
-		Description: "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs).",
+		Description: "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs). Saves to local PNG file by default; set base64: true to return raw base64 dataUrl.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"mode":     map[string]interface{}{"type": "string", "description": "visible, region, element, or full"},
 				"selector": map[string]interface{}{"type": "string", "description": "Selector for element mode"},
 				"tabId":    map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"path":     map[string]interface{}{"type": "string", "description": "Output file path to save PNG image (default: auto-generated filename)"},
+				"base64":   map[string]interface{}{"type": "boolean", "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)"},
 			},
 		},
 	},

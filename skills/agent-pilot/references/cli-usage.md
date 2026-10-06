@@ -290,4 +290,3 @@ Notes:
 - Without `--force`, an existing `agent-pilot` folder is left untouched and the command exits with an error.
 - Running `agent-pilot skill` (no subcommand) is treated as `agent-pilot skill install`.
 - The installed folder mirrors `skills/agent-pilot/` (`SKILL.md`, `references/`, `examples/`).
-

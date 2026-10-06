@@ -1,9 +1,17 @@
 {
-  "description": "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs).",
+  "description": "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs). Saves to local PNG file by default; set base64: true to return raw base64 dataUrl.",
   "inputSchema": {
     "properties": {
+      "base64": {
+        "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)",
+        "type": "boolean"
+      },
       "mode": {
         "description": "visible, region, element, or full",
+        "type": "string"
+      },
+      "path": {
+        "description": "Output file path to save PNG image (default: auto-generated filename)",
         "type": "string"
       },
       "selector": {
@@ -20,8 +28,16 @@
   "name": "browser_screenshot",
   "parameters": {
     "properties": {
+      "base64": {
+        "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)",
+        "type": "boolean"
+      },
       "mode": {
         "description": "visible, region, element, or full",
+        "type": "string"
+      },
+      "path": {
+        "description": "Output file path to save PNG image (default: auto-generated filename)",
         "type": "string"
       },
       "selector": {
