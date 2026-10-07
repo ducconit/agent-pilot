@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -339,5 +340,25 @@ func TestParseWaitArgs(t *testing.T) {
 	_, _, _, _, _, err = parseWaitArgs([]string{"#submit", "--ta", "42"})
 	if err == nil {
 		t.Fatalf("expected error for unknown flag --ta, got nil")
+	}
+}
+
+func TestExecScreenshotWithOptions_ClipValidation(t *testing.T) {
+	// 1. Invalid part count
+	err := ExecScreenshotWithOptions("region", "", "10,20,30", "", nil)
+	if err == nil || !strings.Contains(err.Error(), "expected 'x,y,width,height'") {
+		t.Fatalf("expected part count error, got: %v", err)
+	}
+
+	// 2. Non-numeric coordinate
+	err = ExecScreenshotWithOptions("region", "", "10,abc,30,40", "", nil)
+	if err == nil || !strings.Contains(err.Error(), "invalid clip y coordinate") {
+		t.Fatalf("expected non-numeric y error, got: %v", err)
+	}
+
+	// 3. Zero or negative width
+	err = ExecScreenshotWithOptions("region", "", "10,20,0,40", "", nil)
+	if err == nil || !strings.Contains(err.Error(), "width and height must be > 0") {
+		t.Fatalf("expected dimensions > 0 error, got: %v", err)
 	}
 }

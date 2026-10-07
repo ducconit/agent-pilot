@@ -72,13 +72,13 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_click",
-		Description: "Click with the virtual mouse (visual cursor). Set via:'cdp' for trusted CDP input that works on cross-origin iframes, canvas and WebGL apps; via:'auto' falls back to synthetic.",
+		Description: "Click with the virtual mouse (visual cursor). Accepts CSS selector or direct (x, y) coordinates. Tip: If a button/element cannot be found via selector (e.g. Canvas/Shadow DOM), take a screenshot -> locate pixel coordinates -> click with x, y and via:'cdp'.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"selector": map[string]interface{}{"type": "string", "description": "CSS selector to click"},
-				"x":        map[string]interface{}{"type": "number", "description": "X coordinate"},
-				"y":        map[string]interface{}{"type": "number", "description": "Y coordinate"},
+				"x":        map[string]interface{}{"type": "number", "description": "X coordinate in viewport pixels"},
+				"y":        map[string]interface{}{"type": "number", "description": "Y coordinate in viewport pixels"},
 				"via":      map[string]interface{}{"type": "string", "description": "Input backend: synthetic (default), cdp (trusted), auto (cdp with synthetic fallback)"},
 				"tabId":    map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
@@ -164,12 +164,27 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_screenshot",
-		Description: "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs). Saves to local PNG file by default; set base64: true to return raw base64 dataUrl.",
+		Description: "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs). Defaults to capturing the full visible screen viewport (mode: 'visible'). Saves to local PNG file by default; set base64: true to return raw base64 dataUrl.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"mode":     map[string]interface{}{"type": "string", "description": "visible, region, element, or full"},
-				"selector": map[string]interface{}{"type": "string", "description": "Selector for element mode"},
+				"mode":     map[string]interface{}{"type": "string", "description": "Capture mode: 'visible' (default full screen viewport), 'full' (entire scrollable page), 'region', or 'element'"},
+				"selector": map[string]interface{}{"type": "string", "description": "CSS selector or snapshot ref (e.g. '@1') for element mode. Automatically scrolls element into view and crops to its bounding box."},
+				"clip": map[string]interface{}{
+					"type":        "object",
+					"description": "Bounding box coordinates for region mode: { x, y, width, height }",
+					"properties": map[string]interface{}{
+						"x":      map[string]interface{}{"type": "number", "description": "X coordinate in pixels"},
+						"y":      map[string]interface{}{"type": "number", "description": "Y coordinate in pixels"},
+						"width":  map[string]interface{}{"type": "number", "description": "Width in pixels"},
+						"height": map[string]interface{}{"type": "number", "description": "Height in pixels"},
+					},
+					"required": []string{"x", "y", "width", "height"},
+				},
+				"x":        map[string]interface{}{"type": "number", "description": "X coordinate in pixels for region mode (alternative to clip object)"},
+				"y":        map[string]interface{}{"type": "number", "description": "Y coordinate in pixels for region mode (alternative to clip object)"},
+				"width":    map[string]interface{}{"type": "number", "description": "Width in pixels for region mode (alternative to clip object)"},
+				"height":   map[string]interface{}{"type": "number", "description": "Height in pixels for region mode (alternative to clip object)"},
 				"tabId":    map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 				"path":     map[string]interface{}{"type": "string", "description": "Output file path to save PNG image (default: auto-generated filename)"},
 				"base64":   map[string]interface{}{"type": "boolean", "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)"},

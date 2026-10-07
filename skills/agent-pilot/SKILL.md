@@ -246,6 +246,121 @@ For exploratory tasks or interactive debugging:
 
 ---
 
+## ⚡ Token Efficiency & Anti-Bloat Best Practices (Kinh nghiệm tối ưu Token)
+
+Browser automation có thể tiêu tốn lượng token rất lớn nếu không sử dụng đúng các công cụ tối ưu. Hãy tuân thủ 4 nguyên tắc sau:
+
+1. **Ưu tiên Batch Engine (`browser_run_actions`)**:
+   - Thay vì thực hiện 5-7 lượt chat đơn lẻ (mỗi lượt phải gửi lại toàn bộ lịch sử hội thoại), hãy gom các bước (`open` $\rightarrow$ `wait` $\rightarrow$ `fill_form` $\rightarrow$ `click` $\rightarrow$ `screenshot`) vào một lệnh gọi `browser_run_actions`. Tiết kiệm $\sim 80\%$ token và loại bỏ độ trễ mạng giữa các bước.
+2. **Dùng `browser_snapshot` thay vì dump raw HTML**:
+   - Không bao giờ trích xuất toàn bộ DOM HTML bằng JavaScript (thường tốn 30.000 - 100.000 tokens).
+   - Sử dụng `browser_snapshot` để lấy Cây tiếp cận (Accessibility Tree) với mã tham chiếu `@1`, `@2` nhỏ gọn (chỉ tốn $\sim 300 - 800$ tokens cho toàn trang).
+3. **Tận dụng `browser_screenshot` lưu file**:
+   - Mặc định ảnh chụp được decode và lưu ra file `.png` trên đĩa cục bộ, chỉ trả về đường dẫn file và kích thước byte (tốn $\sim 30$ tokens thay vì $\sim 100.000$ tokens khi trả Base64 inline).
+   - Chỉ truyền `base64: true` khi bắt buộc cần inline data trong bộ nhớ.
+4. **Điền form hàng loạt với `browser_fill_form`**:
+   - Điền toàn bộ các trường input, select, checkbox trong một lệnh duy nhất thay vì click và type từng ô.
+
+---
+
+## 🎭 Phối hợp với Playwright trong Automation Testing (Synergy with Playwright)
+
+Agent Pilot và Playwright bổ trợ cho nhau theo mô hình hai tầng:
+
+```text
+Agent Pilot (Khám phá trên browser thật & Human Feedback)
+    ↳ AI Agent phân tích DOM & luồng nghiệp vụ
+        ↳ Sinh kịch bản Playwright E2E (`.spec.ts`) chuẩn Page Object Model
+            ↳ Chạy tự động trong CI/CD (Token Cost = 0)
+```
+
+1. **Khám phá trước, đóng gói sau**:
+   - Dùng Agent Pilot tương tác trên trình duyệt thật (giữ nguyên session, cookies, 2FA) để AI hiểu luồng người dùng và tìm kiếm các locator bền vững (`getByRole`, `getByLabel`).
+   - Yêu cầu AI Agent viết mã kịch bản Playwright hoàn chỉnh (`.spec.ts`) và Page Object Model tương ứng.
+2. **Cảnh báo xung đột CDP (CDP Conflict)**:
+   - **Tuyệt đối không** gọi lệnh Agent Pilot bên trong file test Playwright đang chạy trên cùng một tab trình duyệt. Chromium chỉ cho phép một debugger client (`chrome.debugger`) đính kèm tại một thời điểm.
+3. **Biến Visual Feedback thành Regression Test**:
+   - Khi Tester ghim lỗi qua Feedback Studio của Agent Pilot, AI Agent vừa sửa mã nguồn vừa tự động bổ sung một test case Playwright tương ứng để khóa lỗi (Zero Regression).
+4. **Tự phục hồi Locator (Self-Healing Tests)**:
+   - Khi test Playwright bị fail trên CI do thay đổi giao diện, AI Agent dùng `browser_snapshot` của Agent Pilot để quét lại DOM trang thật và tự động cập nhật selector trong file test.
+
+---
+
+## 🎯 Mẹo Tương Tác Khi Không Tìm Thấy Button/Element (Coordinate Click Fallback)
+
+Khi AI Agent gặp các phần tử không có selector DOM rõ ràng hoặc không thể click qua CSS selector (nút không có ID/class ổn định, Canvas game/chart, WebGL, Shadow DOM đóng, iframe bảo mật, SVG phức tạp, dynamic obfuscated class):
+
+1. **Chụp toàn màn hình (`browser_screenshot`)**:
+   - Mặc định `browser_screenshot` luôn chụp toàn bộ màn hình hiển thị (viewport hiện tại, `mode: "visible"`).
+   - Tệp ảnh được giải mã và lưu thành file `.png` trên đĩa cục bộ, chỉ trả về đường dẫn tệp (`path`) và kích thước byte, giúp Agent phân tích hình ảnh mà không làm phình context token.
+2. **Xác định tọa độ pixel `(x, y)`**:
+   - Dựa trên ảnh chụp màn hình, xác định tọa độ pixel `(x, y)` tại tâm của nút bấm hoặc vùng cần tương tác (tọa độ pixel tương đối theo viewport hiển thị).
+3. **Click bằng chuột ảo (Mặc định không cần CDP vs Tùy chọn CDP)**:
+   - **Click thông thường (Mặc định - Khuyên dùng cho 95% trường hợp)**:
+     Chỉ cần truyền `x` và `y`, bỏ qua `selector` và `via`:
+     ```json
+     {
+       "x": 540,
+       "y": 320
+     }
+     ```
+     Cơ chế chuột ảo dùng `document.elementFromPoint(x, y)` định vị phần tử và phát chuỗi sự kiện DOM hoàn chỉnh (`pointerdown` $\rightarrow$ `mousedown` $\rightarrow$ `pointerup` $\rightarrow$ `mouseup` $\rightarrow$ `click`). **Ưu điểm lớn**: Hoàn toàn không chiếm quyền debugger, không sợ xung đột với DevTools hay Playwright.
+   - **Click phần cứng qua CDP (`via: "cdp"`)**:
+     Dành cho 5% trường hợp đặc thù khi nút nằm trong Canvas/WebGL, cross-origin iframe, hoặc website chống bot yêu cầu sự kiện chuột phần cứng (`event.isTrusted === true`):
+     ```json
+     {
+       "x": 540,
+       "y": 320,
+       "via": "cdp"
+     }
+     ```
+
+---
+
+## 🎨 Lấy Màu Sắc & Computed CSS Style Của Element (Color & Style Inspection)
+
+AI Agent hoàn toàn có thể tự động bóc tách màu sắc, font chữ, layout và CSS của bất kỳ phần tử nào trên trang thông qua 2 cơ chế chuyên dụng:
+
+### Cách 1: Đọc CSS Computed Styles & Thông số Hộp (`browser_get_element`)
+Khi cần kiểm tra mã màu (background, text color), font chữ, padding, border, hoặc kích thước layout của một element:
+- Gọi `browser_get_element` với `includeStyles: true`:
+  ```json
+  {
+    "selector": "button.primary-btn",
+    "includeStyles": true
+  }
+  ```
+- **Dữ liệu trả về**:
+  - `styles.color`: Mã màu chữ (e.g. `rgb(255, 255, 255)`).
+  - `styles.backgroundColor`: Mã màu nền (e.g. `rgb(37, 99, 235)`).
+  - `computedStyles`: Chi tiết Typography (`font-family`, `font-size`, `font-weight`, `line-height`), Box Model (`margin`, `padding`, `border`, `border-radius`, `box-shadow`), và Flex/Grid layout.
+  - `rect`: Toạ độ và kích thước thực tế trên màn hình (`x`, `y`, `width`, `height`).
+
+> [!TIP]
+> Thuộc tính `includeStyles` mặc định tắt (`false`) để tiết kiệm token. Chỉ bật `includeStyles: true` khi Agent cần thẩm định giao diện (UI QA), trích xuất Design System, hoặc kiểm tra contrast màu sắc theo chuẩn WCAG.
+
+### Cách 2: Lấy màu pixel thực tế tại tọa độ màn hình (`browser_pick_color`)
+Khi phần tử là hình ảnh, icon Canvas/SVG, hoặc gradient mà CSS selector không biểu diễn được giá trị màu cụ thể:
+- Gọi `browser_pick_color` kèm tọa độ `x`, `y`:
+  ```json
+  {
+    "x": 350,
+    "y": 180
+  }
+  ```
+- **Dữ liệu trả về**: Trả về chính xác giá trị màu tại pixel đó dưới nhiều hệ màu hiện đại:
+  ```json
+  {
+    "hex": "#2563EB",
+    "rgb": "rgb(37, 99, 235)",
+    "rgba": "rgba(37, 99, 235, 1)",
+    "hsl": "hsl(221, 83%, 53%)",
+    "oklch": "oklch(54.6% 0.215 262.9)"
+  }
+  ```
+
+---
+
 ## 🌐 Fallback HTTP REST API
 
 If stdio MCP is not supported by your environment, invoke tools directly via HTTP JSON-RPC:

@@ -484,7 +484,8 @@ func newScreenshotCommand() *cobra.Command {
 		tabID := shotFlags.Int("tab", 0, "Target tab ID")
 		mode := shotFlags.String("mode", "visible", "Capture mode: visible, region, element, full")
 		out := shotFlags.String("o", "", "Output PNG path")
-		selector := shotFlags.String("selector", "", "CSS selector for element mode")
+		selector := shotFlags.String("selector", "", "CSS selector or snapshot ref for element mode")
+		clip := shotFlags.String("clip", "", "Clip bounding box 'x,y,width,height' for region mode")
 		if err := shotFlags.Parse(args); err != nil {
 			return errUsage
 		}
@@ -493,7 +494,7 @@ func newScreenshotCommand() *cobra.Command {
 		if *tabID > 0 {
 			t = *tabID
 		}
-		if err := ExecScreenshot(*mode, *selector, *out, t); err != nil {
+		if err := ExecScreenshotWithOptions(*mode, *selector, *clip, *out, t); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
 		return nil
@@ -502,7 +503,8 @@ func newScreenshotCommand() *cobra.Command {
 	f.Int("tab", 0, "Target tab ID")
 	f.String("mode", "visible", "Capture mode: visible, region, element, full")
 	f.String("o", "", "Output PNG path")
-	f.String("selector", "", "CSS selector for element mode")
+	f.String("selector", "", "CSS selector or snapshot ref for element mode")
+	f.String("clip", "", "Clip bounding box 'x,y,width,height' for region mode")
 	return cmd
 }
 

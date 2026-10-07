@@ -1,5 +1,5 @@
 {
-  "description": "Click with the virtual mouse (visual cursor). Set via:'cdp' for trusted CDP input that works on cross-origin iframes, canvas and WebGL apps; via:'auto' falls back to synthetic.",
+  "description": "Click with the virtual mouse (visual cursor). Accepts CSS selector or direct (x, y) coordinates. Tip: If a button/element cannot be found via selector (e.g. Canvas/Shadow DOM), take a screenshot -\u003e locate pixel coordinates -\u003e click with x, y and via:'cdp'.",
   "inputSchema": {
     "properties": {
       "selector": {
@@ -15,11 +15,11 @@
         "type": "string"
       },
       "x": {
-        "description": "X coordinate",
+        "description": "X coordinate in viewport pixels",
         "type": "number"
       },
       "y": {
-        "description": "Y coordinate",
+        "description": "Y coordinate in viewport pixels",
         "type": "number"
       }
     },
@@ -41,11 +41,11 @@
         "type": "string"
       },
       "x": {
-        "description": "X coordinate",
+        "description": "X coordinate in viewport pixels",
         "type": "number"
       },
       "y": {
-        "description": "Y coordinate",
+        "description": "Y coordinate in viewport pixels",
         "type": "number"
       }
     },

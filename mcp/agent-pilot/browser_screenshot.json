@@ -1,13 +1,45 @@
 {
-  "description": "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs). Saves to local PNG file by default; set base64: true to return raw base64 dataUrl.",
+  "description": "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs). Defaults to capturing the full visible screen viewport (mode: 'visible'). Saves to local PNG file by default; set base64: true to return raw base64 dataUrl.",
   "inputSchema": {
     "properties": {
       "base64": {
         "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)",
         "type": "boolean"
       },
+      "clip": {
+        "description": "Bounding box coordinates for region mode: { x, y, width, height }",
+        "properties": {
+          "height": {
+            "description": "Height in pixels",
+            "type": "number"
+          },
+          "width": {
+            "description": "Width in pixels",
+            "type": "number"
+          },
+          "x": {
+            "description": "X coordinate in pixels",
+            "type": "number"
+          },
+          "y": {
+            "description": "Y coordinate in pixels",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "type": "object"
+      },
+      "height": {
+        "description": "Height in pixels for region mode (alternative to clip object)",
+        "type": "number"
+      },
       "mode": {
-        "description": "visible, region, element, or full",
+        "description": "Capture mode: 'visible' (default full screen viewport), 'full' (entire scrollable page), 'region', or 'element'",
         "type": "string"
       },
       "path": {
@@ -15,12 +47,24 @@
         "type": "string"
       },
       "selector": {
-        "description": "Selector for element mode",
+        "description": "CSS selector or snapshot ref (e.g. '@1') for element mode. Automatically scrolls element into view and crops to its bounding box.",
         "type": "string"
       },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "width": {
+        "description": "Width in pixels for region mode (alternative to clip object)",
+        "type": "number"
+      },
+      "x": {
+        "description": "X coordinate in pixels for region mode (alternative to clip object)",
+        "type": "number"
+      },
+      "y": {
+        "description": "Y coordinate in pixels for region mode (alternative to clip object)",
+        "type": "number"
       }
     },
     "type": "object"
@@ -32,8 +76,40 @@
         "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)",
         "type": "boolean"
       },
+      "clip": {
+        "description": "Bounding box coordinates for region mode: { x, y, width, height }",
+        "properties": {
+          "height": {
+            "description": "Height in pixels",
+            "type": "number"
+          },
+          "width": {
+            "description": "Width in pixels",
+            "type": "number"
+          },
+          "x": {
+            "description": "X coordinate in pixels",
+            "type": "number"
+          },
+          "y": {
+            "description": "Y coordinate in pixels",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "type": "object"
+      },
+      "height": {
+        "description": "Height in pixels for region mode (alternative to clip object)",
+        "type": "number"
+      },
       "mode": {
-        "description": "visible, region, element, or full",
+        "description": "Capture mode: 'visible' (default full screen viewport), 'full' (entire scrollable page), 'region', or 'element'",
         "type": "string"
       },
       "path": {
@@ -41,12 +117,24 @@
         "type": "string"
       },
       "selector": {
-        "description": "Selector for element mode",
+        "description": "CSS selector or snapshot ref (e.g. '@1') for element mode. Automatically scrolls element into view and crops to its bounding box.",
         "type": "string"
       },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "width": {
+        "description": "Width in pixels for region mode (alternative to clip object)",
+        "type": "number"
+      },
+      "x": {
+        "description": "X coordinate in pixels for region mode (alternative to clip object)",
+        "type": "number"
+      },
+      "y": {
+        "description": "Y coordinate in pixels for region mode (alternative to clip object)",
+        "type": "number"
       }
     },
     "type": "object"

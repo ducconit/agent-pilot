@@ -5,6 +5,7 @@
 
 import { attachedTabs, CDP_SCREENSHOT_TIMEOUT_MS, logDebug } from "./constants.js";
 import { attachDebugger, sendCdpCommand } from "./cdp-manager.js";
+import { sendTabMessageWithRetry, ensureContentScript } from "./tab-manager.js";
 
 /**
  * OffscreenCanvas-based image cropping utility for Service Workers
@@ -20,8 +21,8 @@ export async function cropDataUrlInWorker(dataUrl, clip) {
     const imgW = bitmap.width;
     const imgH = bitmap.height;
 
-    const vpW = clip.pageWidth || clip.viewportWidth || imgW;
-    const vpH = clip.pageHeight || clip.viewportHeight || imgH;
+    const vpW = clip.pageWidth || clip.viewportWidth || (clip.devicePixelRatio ? imgW / clip.devicePixelRatio : imgW);
+    const vpH = clip.pageHeight || clip.viewportHeight || (clip.devicePixelRatio ? imgH / clip.devicePixelRatio : imgH);
     const scaleX = imgW / vpW;
     const scaleY = imgH / vpH;
 
@@ -68,6 +69,66 @@ export async function captureTabScreenshot(tabId, params = {}) {
   const isTabActive = Boolean(targetTab && targetTab.active);
   const isFullPage = mode === "full" || mode === "fullpage";
 
+  let clip = null;
+  if (params.clip && typeof params.clip === "object") {
+    clip = {
+      ...params.clip,
+      x: Number(params.clip.x),
+      y: Number(params.clip.y),
+      width: Number(params.clip.width),
+      height: Number(params.clip.height)
+    };
+  }
+
+  if (mode === "region") {
+    if (!clip && params.x !== undefined && params.y !== undefined && params.width !== undefined && params.height !== undefined) {
+      clip = {
+        x: Math.round(Number(params.x)),
+        y: Math.round(Number(params.y)),
+        width: Math.round(Number(params.width)),
+        height: Math.round(Number(params.height))
+      };
+    }
+    if (!clip || typeof clip.x !== "number" || typeof clip.y !== "number" || isNaN(clip.x) || isNaN(clip.y) || isNaN(clip.width) || isNaN(clip.height) || clip.width <= 0 || clip.height <= 0) {
+      throw new Error(`Screenshot mode 'region' requires valid coordinates: clip { x, y, width, height } or flat x, y, width, height`);
+    }
+  } else if (mode === "element") {
+    if (!params.selector) {
+      throw new Error(`Screenshot mode 'element' requires a 'selector' parameter`);
+    }
+    await ensureContentScript(tabId);
+    const elRes = await sendTabMessageWithRetry(tabId, {
+      action: "get_element_info",
+      selector: params.selector,
+      scrollIntoView: true
+    });
+    if (!elRes || !elRes.success || !elRes.rect) {
+      throw new Error(`Element not found for selector: ${params.selector}`);
+    }
+    const rect = elRes.rect;
+    if (rect.width <= 0 || rect.height <= 0) {
+      throw new Error(`Element has zero dimensions (${rect.width}x${rect.height}) for selector: ${params.selector}`);
+    }
+    clip = {
+      x: Math.max(0, rect.x),
+      y: Math.max(0, rect.y),
+      width: rect.width,
+      height: rect.height
+    };
+    if (elRes.viewport) {
+      clip.viewportWidth = elRes.viewport.width;
+      clip.viewportHeight = elRes.viewport.height;
+      clip.devicePixelRatio = elRes.viewport.devicePixelRatio;
+    }
+    // Allow small pause for render tree to settle after scrolling
+    await new Promise(r => setTimeout(r, 60));
+  }
+
+  if (clip && !clip.viewportWidth && targetTab?.width && targetTab?.height) {
+    clip.viewportWidth = targetTab.width;
+    clip.viewportHeight = targetTab.height;
+  }
+
   // If targetTab is running in background or CDP is attached or full page requested, capture via CDP
   if (!isTabActive || attachedTabs.has(tabId) || isFullPage) {
     if (!attachedTabs.has(tabId)) {
@@ -82,12 +143,12 @@ export async function captureTabScreenshot(tabId, params = {}) {
       if (isTabActive) {
         cdpParams.fromSurface = true;
       }
-      if ((mode === "element" || mode === "region") && params.clip) {
+      if ((mode === "element" || mode === "region") && clip) {
         cdpParams.clip = {
-          x: params.clip.x,
-          y: params.clip.y,
-          width: params.clip.width,
-          height: params.clip.height,
+          x: Math.max(0, clip.x),
+          y: Math.max(0, clip.y),
+          width: Math.max(1, clip.width),
+          height: Math.max(1, clip.height),
           scale: 1
         };
       }
@@ -99,12 +160,12 @@ export async function captureTabScreenshot(tabId, params = {}) {
         } catch (firstErr) {
           logDebug("CDP screenshot initial attempt note", firstErr);
           res = await sendCdpCommand(tabId, "Page.captureScreenshot", { format: "png" }, CDP_SCREENSHOT_TIMEOUT_MS);
-          requiresCrop = Boolean((mode === "element" || mode === "region") && params.clip);
+          requiresCrop = Boolean((mode === "element" || mode === "region") && clip);
         }
 
         let resultUrl = "data:image/png;base64," + res.data;
-        if (requiresCrop && params.clip) {
-          resultUrl = await cropDataUrlInWorker(resultUrl, params.clip);
+        if (requiresCrop && clip) {
+          resultUrl = await cropDataUrlInWorker(resultUrl, clip);
           requiresCrop = false;
         }
 
@@ -113,7 +174,7 @@ export async function captureTabScreenshot(tabId, params = {}) {
           tabId,
           isBackgroundTab: !isTabActive,
           dataUrl: resultUrl,
-          clip: params.clip,
+          clip: clip,
           requiresCrop
         };
       } catch (cdpErr) {
@@ -136,17 +197,17 @@ export async function captureTabScreenshot(tabId, params = {}) {
   return new Promise((resolve, reject) => {
     chrome.tabs.captureVisibleTab(winId, { format: "png" }, async (rawUrl) => {
       if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-      const needsCrop = Boolean((mode === "element" || mode === "region") && params.clip);
+      const needsCrop = Boolean((mode === "element" || mode === "region") && clip);
       let finalUrl = rawUrl;
       if (needsCrop) {
-        finalUrl = await cropDataUrlInWorker(rawUrl, params.clip);
+        finalUrl = await cropDataUrlInWorker(rawUrl, clip);
       }
       resolve({
         success: true,
         tabId,
         isBackgroundTab: false,
         dataUrl: finalUrl,
-        clip: params.clip,
+        clip: clip,
         requiresCrop: false
       });
     });

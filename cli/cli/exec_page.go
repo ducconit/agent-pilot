@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -83,11 +84,46 @@ func ExecNavigate(url string, tabID interface{}) error {
 }
 
 func ExecScreenshot(mode, selector, outputPath string, tabID interface{}) error {
+	return ExecScreenshotWithOptions(mode, selector, "", outputPath, tabID)
+}
+
+func ExecScreenshotWithOptions(mode, selector, clipStr, outputPath string, tabID interface{}) error {
 	params := map[string]interface{}{
 		"mode": mode,
 	}
 	if selector != "" {
 		params["selector"] = selector
+	}
+	if clipStr != "" {
+		parts := strings.Split(clipStr, ",")
+		if len(parts) != 4 {
+			return fmt.Errorf("invalid clip format: expected 'x,y,width,height', got '%s'", clipStr)
+		}
+		x, err := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+		if err != nil {
+			return fmt.Errorf("invalid clip x coordinate '%s': %w", parts[0], err)
+		}
+		y, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+		if err != nil {
+			return fmt.Errorf("invalid clip y coordinate '%s': %w", parts[1], err)
+		}
+		w, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
+		if err != nil {
+			return fmt.Errorf("invalid clip width '%s': %w", parts[2], err)
+		}
+		h, err := strconv.ParseFloat(strings.TrimSpace(parts[3]), 64)
+		if err != nil {
+			return fmt.Errorf("invalid clip height '%s': %w", parts[3], err)
+		}
+		if w <= 0 || h <= 0 {
+			return fmt.Errorf("invalid clip dimensions: width and height must be > 0 (got %vx%v)", w, h)
+		}
+		params["clip"] = map[string]interface{}{
+			"x":      x,
+			"y":      y,
+			"width":  w,
+			"height": h,
+		}
 	}
 	if tabID != nil {
 		params["tabId"] = tabID

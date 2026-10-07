@@ -351,7 +351,7 @@
     }
 
     if (req.action === "scroll_into_view") {
-      const el = document.querySelector(req.selector);
+      const el = req.selector ? (cursor.resolveElement ? cursor.resolveElement(req.selector) : document.querySelector(req.selector)) : null;
       if (!el) {
         sendResponse({ success: false, error: `Selector '${req.selector}' not found` });
         return true;
@@ -392,8 +392,24 @@
 
     if (req.action === "get_element_info") {
       const el = req.selector ? (cursor.resolveElement ? cursor.resolveElement(req.selector) : document.querySelector(req.selector)) : null;
+      if (req.scrollIntoView && el && el.scrollIntoView) {
+        const r = el.getBoundingClientRect();
+        const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+        if (!inView) {
+          el.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+        }
+      }
       const details = el ? inspector.getDetailedElementInfo(el, Boolean(req.includeStyles)) : inspector.getLockedElement();
-      sendResponse({ success: !!(el || details), ...(details || {}), details });
+      sendResponse({
+        success: !!(el || details),
+        ...(details || {}),
+        details,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          devicePixelRatio: window.devicePixelRatio || 1
+        }
+      });
       return true;
     }
 

@@ -418,3 +418,42 @@ func TestProcessScreenshotResult(t *testing.T) {
 		}
 	})
 }
+
+func TestBrowserScreenshotSchema(t *testing.T) {
+	var shotTool *ToolInfo
+	for i := range mcpTools {
+		if mcpTools[i].Name == "browser_screenshot" {
+			shotTool = &mcpTools[i]
+			break
+		}
+	}
+	if shotTool == nil {
+		t.Fatalf("browser_screenshot tool not found in mcpTools list")
+	}
+
+	props, ok := shotTool.InputSchema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("browser_screenshot schema has no properties map")
+	}
+
+	expectedProps := []string{"mode", "selector", "clip", "x", "y", "width", "height", "tabId", "path", "base64"}
+	for _, prop := range expectedProps {
+		if _, exists := props[prop]; !exists {
+			t.Errorf("browser_screenshot schema missing expected property: %s", prop)
+		}
+	}
+
+	clipProp, ok := props["clip"].(map[string]interface{})
+	if !ok || clipProp["type"] != "object" {
+		t.Fatalf("browser_screenshot clip property must be an object")
+	}
+	clipProps, ok := clipProp["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("browser_screenshot clip property missing properties map")
+	}
+	for _, coord := range []string{"x", "y", "width", "height"} {
+		if _, exists := clipProps[coord]; !exists {
+			t.Errorf("clip schema missing expected coordinate property: %s", coord)
+		}
+	}
+}
