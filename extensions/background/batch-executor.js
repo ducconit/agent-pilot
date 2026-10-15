@@ -8,7 +8,7 @@
  * helpers in ./batch-validation.js.
  */
 
-import { getActiveTabId, getTargetTabId } from "./tab-manager.js";
+import { getTargetTabId } from "./tab-manager.js";
 import { BATCH_ACTION_HANDLERS } from "./batch-actions.js";
 
 /**
@@ -27,9 +27,12 @@ export async function executeBatchActions(params, bridgeClient = null) {
   // stopOnError defaults to TRUE: an error halts the batch. Callers must pass
   // an explicit `stopOnError: false` to keep running and collect every failure.
   const stopOnError = params.stopOnError !== false;
-  let currentTabId = params.tabId
-    ? await getTargetTabId(params.tabId, bridgeClient?.lastAgentTabId)
-    : (bridgeClient?.lastAgentTabId || (await getActiveTabId()));
+  let currentTabId = null;
+  try {
+    currentTabId = await getTargetTabId(params.tabId, bridgeClient?.lastAgentTabId);
+  } catch (err) {
+    if (stopOnError) throw err;
+  }
   const results = [];
   const startTime = Date.now();
 

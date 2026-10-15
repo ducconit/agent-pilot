@@ -96,6 +96,32 @@
     if (coordsBadge) coordsBadge.textContent = `(${Math.round(x)}, ${Math.round(y)})`;
   }
 
+  function calculateMoveDuration(startX, startY, targetX, targetY) {
+    if (!Number.isFinite(startX) || !Number.isFinite(startY) || !Number.isFinite(targetX) || !Number.isFinite(targetY)) {
+      return CONFIG.DEFAULT_MOVE_DURATION;
+    }
+    const dist = Math.hypot(targetX - startX, targetY - startY);
+    if (dist < 5) return 60;
+    return Math.min(380, Math.max(180, Math.round(150 + dist * 0.2)));
+  }
+
+  function renderClickRipple(x, y) {
+    if (document.hidden) return;
+    if (!cursorLayer.parentNode) {
+      (document.body || document.documentElement).appendChild(cursorLayer);
+    }
+    const ripple = document.createElement("div");
+    ripple.className = "agent-pilot-click-ripple";
+    ripple.style.left = `${Math.round(x)}px`;
+    ripple.style.top = `${Math.round(y)}px`;
+    ripple.style.width = "48px";
+    ripple.style.height = "48px";
+    cursorLayer.appendChild(ripple);
+    setTimeout(() => {
+      if (ripple.parentNode) ripple.remove();
+    }, CONFIG.CLICK_RIPPLE_MS);
+  }
+
   function setDispatching(val) {
     if (window.__AP_INTERNAL__.shield?.setIsDispatching) {
       window.__AP_INTERNAL__.shield.setIsDispatching(val);
@@ -217,6 +243,37 @@
   }
 
   /**
+   * Visually move the cursor to (x, y) or selector, render click ripple,
+   * without dispatching DOM click events (used by CDP or visual sync).
+   */
+  async function animateCursorClick(x, y, selector = null) {
+    if (selector) {
+      const center = getElementCenter(selector);
+      if (center) {
+        x = center.x;
+        y = center.y;
+      } else {
+        return { success: false, error: "Could not calculate element center for selector: " + selector };
+      }
+    }
+
+    if (x === undefined || x === null) x = currentMouseX;
+    if (y === undefined || y === null) y = currentMouseY;
+
+    activateCursor();
+    const duration = calculateMoveDuration(currentMouseX, currentMouseY, x, y);
+    await moveVirtualMouse(x, y, duration);
+    renderClickRipple(x, y);
+
+    // Brief tactile pause (60ms) to allow ripple animation to start visibly before next action
+    if (!document.hidden) {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+
+    return { success: true, x, y };
+  }
+
+  /**
    * Trigger click animation & dispatch synthetic events on DOM element
    */
   async function virtualClick(x, y, selector = null) {
@@ -237,18 +294,15 @@
     if (y === undefined || y === null) y = currentMouseY;
 
     activateCursor();
-    await moveVirtualMouse(x, y, CONFIG.CLICK_DELAY);
+    const duration = calculateMoveDuration(currentMouseX, currentMouseY, x, y);
+    await moveVirtualMouse(x, y, duration);
 
     // Render Ripple Effect (skipped when tab is in background)
+    renderClickRipple(x, y);
+
+    // Brief tactile pause for visual feedback before event dispatch
     if (!document.hidden) {
-      const ripple = document.createElement("div");
-      ripple.className = "agent-pilot-click-ripple";
-      ripple.style.left = `${x}px`;
-      ripple.style.top = `${y}px`;
-      ripple.style.width = "48px";
-      ripple.style.height = "48px";
-      cursorLayer.appendChild(ripple);
-      setTimeout(() => ripple.remove(), CONFIG.CLICK_RIPPLE_MS);
+      await new Promise((resolve) => setTimeout(resolve, 60));
     }
 
     // Find element under pointer if selector was not specified
@@ -582,8 +636,12 @@
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
     }
     const center = getElementCenter(selector);
+    if (!center) {
+      return { success: false, error: "Could not calculate element center for selector: " + selector };
+    }
     activateCursor();
-    await moveVirtualMouse(center.x, center.y, CONFIG.DEFAULT_MOVE_DURATION);
+    const hoverDuration = options.duration || calculateMoveDuration(currentMouseX, currentMouseY, center.x, center.y);
+    await moveVirtualMouse(center.x, center.y, hoverDuration);
 
     const shouldDispatch = options.dispatchSynthetic !== false;
     if (shouldDispatch) {
@@ -714,6 +772,9 @@
   window.__AP_INTERNAL__.cursor = {
     moveVirtualMouse,
     virtualClick,
+    animateCursorClick,
+    calculateMoveDuration,
+    renderClickRipple,
     virtualType,
     virtualScroll,
     virtualFillForm,

@@ -16,6 +16,7 @@ import {
   devtoolsBuffers,
   activeTracingSessions,
   activeDialogs,
+  agentControlledTabs,
   LIMITS,
   getBuffer
 } from "./constants.js";
@@ -48,6 +49,7 @@ export function initCdpEventListeners(broadcastFn) {
       devtoolsBuffers.delete(tabId);
       activeTracingSessions.delete(tabId);
       activeDialogs.delete(tabId);
+      agentControlledTabs.delete(tabId);
     });
   }
 

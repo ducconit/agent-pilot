@@ -271,13 +271,13 @@ async function run() {
         return {
           hasOverlay: !!overlay,
           display: overlay ? window.getComputedStyle(overlay).display : null,
-          titleText: overlay ? overlay.querySelector("#agent-pilot-lock-title-text")?.textContent : "",
-          descText: overlay ? overlay.querySelector("#agent-pilot-lock-action-desc")?.textContent : ""
+          hasCard: overlay ? !!overlay.querySelector(".agent-pilot-lock-card") : false,
+          actionDesc: overlay ? overlay.dataset.action || "" : ""
         };
       });
     }
-    const lockOverlayActive = lockOverlayDetails.hasOverlay && lockOverlayDetails.display === "flex";
-    record("6. Agent Lock Overlay Active", lockOverlayActive, `Overlay: ${lockOverlayDetails.display}, Title: "${lockOverlayDetails.titleText}"`);
+    const lockOverlayActive = lockOverlayDetails.hasOverlay && lockOverlayDetails.display === "flex" && !lockOverlayDetails.hasCard;
+    record("6. Agent Lock Overlay Active", lockOverlayActive, `Overlay: ${lockOverlayDetails.display}, CardRemoved: ${!lockOverlayDetails.hasCard}, Action: "${lockOverlayDetails.actionDesc}"`);
 
     // 7. Test: Explicit Lock Persistence across automated action (Finding 1)
     await sendAgentCommand("page.setBusy", { tabId, busy: true, action: "Khóa kiểm thử chuỗi thao tác" });

@@ -68,6 +68,11 @@ async function clickAction(ctx, act) {
   if (via !== "synthetic") {
     try {
       const point = await resolvePoint(targetTabId, act.x, act.y, act.selector, "click");
+      await sendTabMessageWithRetry(targetTabId, {
+        action: "animate_cursor_click",
+        x: point.x,
+        y: point.y
+      }).catch((err) => logDebug("batch visual cursor animation note", err));
       await ensureCdpAttached(targetTabId);
       ctx.stepResult.result = await dispatchCdpMouseClick(targetTabId, point.x, point.y, {
         button: act.button || "left",

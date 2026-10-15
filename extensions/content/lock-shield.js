@@ -54,58 +54,16 @@
     }
   }
 
-  function triggerEmergencyUnlock() {
-    isSessionActive = false;
-    setAgentBusyState(false);
-    if (window.__AP_INTERNAL__.cursor?.setSessionActive) {
-      window.__AP_INTERNAL__.cursor.setSessionActive(false);
-    }
-    try {
-      chrome.runtime.sendMessage({ action: "agent_emergency_unlocked" }).catch((err) => {
-        console.debug("[AgentPilot Shield] notify unlock rejected:", err);
-      });
-    } catch (err) {
-      console.debug("[AgentPilot Shield] notify unlock error:", err);
-    }
-  }
-
   function showLockOverlay(action = "") {
-    if (!lockOverlayEl) {
-      lockOverlayEl = document.createElement("div");
-      lockOverlayEl.id = "agent-pilot-lock-overlay";
-      lockOverlayEl.innerHTML = `
-        <div class="agent-pilot-lock-card">
-          <div class="agent-pilot-lock-spinner"></div>
-          <div class="agent-pilot-lock-info">
-            <span class="agent-pilot-lock-title">
-              <span>🤖</span>
-              <span id="agent-pilot-lock-title-text">AI Agent</span>
-            </span>
-            <span class="agent-pilot-lock-separator">•</span>
-            <span class="agent-pilot-lock-desc" id="agent-pilot-lock-action-desc">Đang thao tác...</span>
-          </div>
-          <button class="agent-pilot-unlock-btn" id="agent-pilot-emergency-unlock" title="Lấy lại quyền điều khiển thủ công (Phím Esc)">
-            <span>🔓</span> Chiếm quyền
-          </button>
-        </div>
-      `;
-      (document.body || document.documentElement).appendChild(lockOverlayEl);
-
-      const unlockBtn = lockOverlayEl.querySelector("#agent-pilot-emergency-unlock");
-      if (unlockBtn) {
-        unlockBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          triggerEmergencyUnlock();
-        });
+    if (!lockOverlayEl || !lockOverlayEl.isConnected) {
+      if (!lockOverlayEl) {
+        lockOverlayEl = document.createElement("div");
+        lockOverlayEl.id = "agent-pilot-lock-overlay";
       }
+      (document.body || document.documentElement).appendChild(lockOverlayEl);
     }
 
-    const descEl = document.getElementById("agent-pilot-lock-action-desc");
-    if (descEl) {
-      const desc = getActionDescription(action);
-      descEl.textContent = desc;
-    }
+    lockOverlayEl.dataset.action = getActionDescription(action);
     lockOverlayEl.style.display = "flex";
   }
 
@@ -120,19 +78,6 @@
 
     // Allow synthetic events dispatched by Agent Pilot
     if (isAgentDispatching || !e.isTrusted) {
-      return;
-    }
-
-    // Allow emergency takeover via Escape key
-    if (e.key === "Escape") {
-      e.stopImmediatePropagation();
-      e.preventDefault();
-      triggerEmergencyUnlock();
-      return;
-    }
-
-    // Allow emergency takeover button clicks
-    if (e.target && typeof e.target.closest === "function" && e.target.closest("#agent-pilot-emergency-unlock")) {
       return;
     }
 

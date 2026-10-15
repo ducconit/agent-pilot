@@ -57,7 +57,7 @@ Chuyển sang tab **🤖 AI Agent** trên Side Panel:
   - Hover vào icon **`?`** để xem nhanh mô tả bảo vệ.
   - Khi người dùng gạt tắt công tắc, hộp thoại cảnh báo bảo mật sẽ xuất hiện yêu cầu xác nhận rủi ro nhà cung cấp mô hình LLM có thể thu thập thông tin.
 - **Nhật ký Lệnh Thời gian thực (Live Action Stream)**: Hiển thị thời gian thực luồng lệnh Agent gửi đến (`moveMouse`, `click`, `type`, `run_actions`...) kèm nút sao chép toàn bộ nhật ký (📋) và nút xóa nhật ký (🗑️).
-- **Chỉ Báo Hoạt Động Tinh Tế (Subtle Indicator)**: Khi AI Agent thao tác, trang web hiển thị viền neon phát sáng nhẹ nhàng và thanh trạng thái nhỏ gọn (floating pill) hiển thị hành động đang chạy kèm nút `[ 🔓 Chiếm quyền ]` và phím <kbd>Esc</kbd> để mở khóa tức thì, không làm mờ trang web hay cản trở tầm nhìn của người dùng.
+- **Chỉ Báo Hoạt Động Tinh Tế (Subtle Indicator)**: Khi AI Agent thao tác, trang web hiển thị viền neon phát sáng nhẹ nhàng và tạm thời khóa chuột/bàn phím để tránh xung đột thao tác, không hiển thị thanh trạng thái nổi hay làm mờ trang web cản trở tầm nhìn của người dùng.
 - **Tự kiểm tra hệ thống (Self-Test)**: Nhấp nút **🧪 Tự kiểm tra hệ thống** để kiểm tra tự động 3 bước:
   1. Quyền truy cập tab web hiện tại.
   2. Khả năng nạp Content Script và kích hoạt API Chuột ảo.

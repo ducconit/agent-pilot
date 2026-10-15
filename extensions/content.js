@@ -81,6 +81,7 @@
     version: EXTENSION_VERSION,
     moveMouse: (x, y, duration) => cursor.moveVirtualMouse(x, y, duration),
     click: (x, y, selector) => cursor.virtualClick(x, y, selector),
+    animateClick: (x, y, selector) => cursor.animateCursorClick(x, y, selector),
     type: (selector, text, clear, pressEnter) => cursor.virtualType(selector, text, clear, pressEnter),
     scroll: (deltaX, deltaY) => cursor.virtualScroll(deltaX, deltaY),
     toggleInspector: (enabled) => inspector.toggleInspector(enabled),
@@ -166,6 +167,7 @@
           version: "${EXTENSION_VERSION}",
           moveMouse: (x, y, duration) => sendBridgeRequest("virtual_mouse_move", { x, y, duration }),
           click: (x, y) => sendBridgeRequest("virtual_mouse_click", { x, y }),
+          animateClick: (x, y, selector) => sendBridgeRequest("animate_cursor_click", { x, y, selector }),
           type: (selector, text) => sendBridgeRequest("virtual_type", { selector, text }),
           scroll: (deltaX, deltaY) => sendBridgeRequest("virtual_scroll", { deltaX, deltaY }),
           hover: (selector) => sendBridgeRequest("virtual_hover", { selector }),
@@ -222,6 +224,7 @@
     try {
       if (action === "virtual_mouse_move") result = await cursor.moveVirtualMouse(data.x, data.y, data.duration);
       else if (action === "virtual_mouse_click") result = await cursor.virtualClick(data.x, data.y);
+      else if (action === "animate_cursor_click") result = await cursor.animateCursorClick(data.x, data.y, data.selector);
       else if (action === "virtual_type") result = await cursor.virtualType(data.selector, data.text);
       else if (action === "virtual_scroll") result = cursor.virtualScroll(data.deltaX, data.deltaY);
       else if (action === "virtual_hover") result = await cursor.virtualHover(data.selector);
@@ -278,6 +281,11 @@
 
     if (req.action === "virtual_mouse_click" || req.action === "click_cursor") {
       cursor.virtualClick(req.x, req.y, req.selector).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
+      return true;
+    }
+
+    if (req.action === "animate_cursor_click") {
+      cursor.animateCursorClick(req.x, req.y, req.selector).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 

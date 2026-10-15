@@ -62,16 +62,17 @@ async function runSessionTest() {
     const activeState1 = await page.evaluate(() => {
       const cursor = document.querySelector(".agent-pilot-virtual-cursor");
       const overlay = document.getElementById("agent-pilot-lock-overlay");
-      const desc = document.getElementById("agent-pilot-lock-action-desc");
       return {
         cursorVisible: cursor?.classList.contains("visible"),
         overlayDisplay: overlay?.style.display,
-        descText: desc?.textContent
+        hasLockCard: !!overlay?.querySelector(".agent-pilot-lock-card"),
+        descText: overlay?.dataset?.action
       };
     });
     console.log("   State immediately after start:", activeState1);
     if (!activeState1.cursorVisible) throw new Error("Cursor must be visible upon session start");
     if (activeState1.overlayDisplay !== "flex") throw new Error("Overlay must be display: flex");
+    if (activeState1.hasLockCard) throw new Error("Floating lock card should not be rendered");
 
     // Step 3: Wait 3.2 seconds (exceeds default 2.5s hide timeout)
     console.log("3. Waiting 3200ms to verify no auto-hide occurs during active session...");
@@ -107,11 +108,10 @@ async function runSessionTest() {
     const postActionState = await page.evaluate(() => {
       const cursor = document.querySelector(".agent-pilot-virtual-cursor");
       const overlay = document.getElementById("agent-pilot-lock-overlay");
-      const desc = document.getElementById("agent-pilot-lock-action-desc");
       return {
         cursorVisible: cursor?.classList.contains("visible"),
         overlayFlex: overlay?.style.display === "flex",
-        descText: desc?.textContent
+        descText: overlay?.dataset?.action
       };
     });
     console.log("   Post-action state (reverted to session standby):", postActionState);

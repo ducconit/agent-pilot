@@ -20,35 +20,57 @@ export const tabsHandlers = {
   "tabs.query": async (client, params, respond) => {
     const queryParams = { ...params };
     delete queryParams.instanceId;
-    chrome.tabs.query(queryParams, (tabs) => {
-      if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
-      else respond(tabs);
+    return new Promise((resolve) => {
+      chrome.tabs.query(queryParams, async (tabs) => {
+        if (chrome.runtime.lastError) {
+          respond(null, chrome.runtime.lastError);
+          return resolve();
+        }
+        try {
+          const agentGroupIds = await client.getAgentGroupIds();
+          const filtered = (tabs || []).filter((t) => {
+            if (!t || !t.id) return false;
+            if (agentGroupIds.size > 0 && agentGroupIds.has(t.groupId)) return true;
+            return agentControlledTabs.has(t.id);
+          });
+          respond(filtered);
+        } catch (err) {
+          respond(null, err);
+        }
+        resolve();
+      });
     });
   },
 
   "tabs.listAll": async (client, params, respond) => {
-    chrome.tabs.query({}, (tabs) => {
-      if (chrome.runtime.lastError) {
-        return respond(null, chrome.runtime.lastError);
-      }
+    try {
+      const tabs = await client.getAgentGroupTabs();
       const list = (tabs || []).map((t) => ({
         tabId: t.id,
         title: t.title,
         url: t.url,
         active: t.active,
         windowId: t.windowId,
-        isAgentTab: agentControlledTabs.has(t.id),
+        isAgentTab: true,
         groupId: t.groupId
       }));
       respond(list);
-    });
+    } catch (err) {
+      respond(null, err);
+    }
   },
 
   "tabs.getActive": async (client, params, respond) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
-      else respond(tabs[0] || null);
-    });
+    try {
+      const tabId = await client.getTargetTabId(null);
+      if (!tabId) {
+        return respond(null);
+      }
+      const tab = await chrome.tabs.get(tabId);
+      respond(tab || null);
+    } catch (err) {
+      respond(null, err);
+    }
   },
 
   "tabs.create": async (client, params, respond) => {
@@ -81,8 +103,13 @@ export const tabsHandlers = {
   },
 
   "tabs.update": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    let tabId;
+    try {
+      tabId = await client.getTargetTabId(params.tabId);
+    } catch (err) {
+      return respond(null, err);
+    }
+    if (!tabId) return respond(null, new Error("No target tab found in Agent Pilot group"));
     const updateProps = {};
     if (params.url) updateProps.url = normalizeUrl(params.url);
     if (params.active !== undefined) updateProps.active = Boolean(params.active);
@@ -103,8 +130,13 @@ export const tabsHandlers = {
   },
 
   "tabs.remove": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    let tabId;
+    try {
+      tabId = await client.getTargetTabId(params.tabId);
+    } catch (err) {
+      return respond(null, err);
+    }
+    if (!tabId) return respond(null, new Error("No target tab found in Agent Pilot group"));
     chrome.tabs.remove(tabId, () => {
       if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
       else respond({ success: true });

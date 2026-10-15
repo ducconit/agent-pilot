@@ -108,6 +108,11 @@ export const pageInputHandlers = {
     client.runWithTabLock(tabId, "page.click", async () => {
       try {
         const point = await client.resolveCdpPoint(tabId, params, "click");
+        await client.sendTabMessageWithRetry(tabId, {
+          action: "animate_cursor_click",
+          x: point.x,
+          y: point.y
+        }).catch((err) => logDebug("visual cursor animation note", err));
         await ensureCdpAttached(tabId, client.broadcastFn);
         return await dispatchCdpMouseClick(tabId, point.x, point.y, {
           button: params.button || "left",

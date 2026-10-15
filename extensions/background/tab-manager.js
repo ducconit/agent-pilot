@@ -29,39 +29,160 @@ export async function getActiveTabId() {
 }
 
 /**
- * Resolve target tab ID based on requested ID, agent-controlled tabs, or focused window
+ * Query all active Agent Pilot Tab Group IDs across windows
+ */
+export async function getAgentGroupIds() {
+  if (!chrome.tabGroups || !chrome.tabGroups.query) {
+    return new Set();
+  }
+  try {
+    const groups = await chrome.tabGroups.query({});
+    const agentGroups = (groups || []).filter(
+      (g) => g && (g.title === AGENT_GROUP_TITLE || g.title === "Agent Pilot")
+    );
+    return new Set(agentGroups.map((g) => g.id));
+  } catch (err) {
+    logDebug("getAgentGroupIds query error", err);
+    return new Set();
+  }
+}
+
+/**
+ * Verify whether a tab belongs to an Agent Pilot tab group or is agent-controlled.
+ * Foreign groups and unassigned user tabs return false.
+ */
+export async function isTabInAgentGroup(tabOrId) {
+  if (!tabOrId) return false;
+  let tab = typeof tabOrId === "object" ? tabOrId : null;
+  if (!tab || typeof tab.groupId === "undefined") {
+    const tid = typeof tabOrId === "number" ? tabOrId : tabOrId?.id;
+    if (!tid) return false;
+    try {
+      tab = await chrome.tabs.get(tid);
+    } catch (_) {
+      return false;
+    }
+  }
+  if (!tab || !tab.id) return false;
+
+  // Check if chrome.tabGroups API is supported in this browser runtime
+  if (chrome.tabGroups && chrome.tabGroups.query) {
+    const agentGroupIds = await getAgentGroupIds();
+
+    // 1. If tab has a valid groupId
+    if (tab.groupId !== undefined && tab.groupId !== null && tab.groupId !== -1 && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+      return agentGroupIds.has(tab.groupId);
+    }
+
+    // 2. Tab is not in any group (groupId === -1):
+    // Only permit if it was actively created/controlled by the agent
+    if (agentControlledTabs.has(tab.id)) {
+      return true;
+    }
+
+    // Tab is an unassigned user tab -> strictly prohibited
+    return false;
+  }
+
+  // Fallback if tabGroups API is not available in current browser environment
+  return agentControlledTabs.has(tab.id);
+}
+
+/**
+ * Get all tabs belonging exclusively to the Agent Pilot group(s)
+ */
+export async function getAgentGroupTabs() {
+  if (chrome.tabGroups && chrome.tabGroups.query) {
+    const agentGroupIds = await getAgentGroupIds();
+    const allTabs = await new Promise((resolve) => {
+      chrome.tabs.query({}, (tabs) => {
+        if (chrome.runtime.lastError || !tabs) resolve([]);
+        else resolve(tabs);
+      });
+    });
+
+    if (agentGroupIds.size > 0) {
+      return (allTabs || []).filter((t) => {
+        if (!t || !t.id) return false;
+        if (agentGroupIds.has(t.groupId)) return true;
+        if (agentControlledTabs.has(t.id) && (!t.groupId || t.groupId === -1 || t.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE)) {
+          return true;
+        }
+        return false;
+      });
+    }
+
+    return (allTabs || []).filter((t) => t && t.id && agentControlledTabs.has(t.id));
+  }
+
+  // Fallback when tabGroups is not supported
+  const agentTabs = [];
+  for (const tid of agentControlledTabs) {
+    try {
+      const tab = await chrome.tabs.get(tid);
+      if (tab && tab.id) agentTabs.push(tab);
+    } catch (_) {
+      agentControlledTabs.delete(tid);
+    }
+  }
+  return agentTabs;
+}
+
+/**
+ * Resolve target tab ID strictly within the Agent Pilot tab group.
+ * Operations on any other group or outside tabs are rejected.
  */
 export async function getTargetTabId(requestedTabId, lastAgentTabId = null) {
+  // 1. If explicit tab ID was requested by the agent
   if (requestedTabId !== undefined && requestedTabId !== null) {
     const numId = Number(requestedTabId);
     if (isNaN(numId)) return null;
+
     try {
       const tab = await chrome.tabs.get(numId);
-      return tab?.id || null;
-    } catch (_) {
+      if (!tab || !tab.id) return null;
+
+      const isAllowed = await isTabInAgentGroup(tab);
+      if (!isAllowed) {
+        logDebug(`[Security] Target tab ${numId} denied: not in Agent Pilot group`);
+        throw new Error(`Access denied: Tab ${numId} does not belong to the Agent Pilot tab group ('${AGENT_GROUP_TITLE}'). Operations on other tabs or groups are prohibited.`);
+      }
+      return tab.id;
+    } catch (err) {
+      if (err.message && err.message.startsWith("Access denied")) {
+        throw err;
+      }
       return null;
     }
   }
 
+  // 2. If no tab ID requested, find the most appropriate tab strictly within the Agent Pilot group
+  // 2a. Check lastAgentTabId if still valid and within the agent group
   if (lastAgentTabId) {
     try {
       const tab = await chrome.tabs.get(lastAgentTabId);
-      if (tab && tab.id) return tab.id;
+      if (tab && tab.id && (await isTabInAgentGroup(tab))) {
+        return tab.id;
+      }
     } catch (err) {
       logDebug("resolveTabId: lastAgentTabId lookup failed", err);
     }
   }
 
-  for (const tid of agentControlledTabs) {
-    try {
-      const tab = await chrome.tabs.get(tid);
-      if (tab && tab.id) return tab.id;
-    } catch (_) {
-      agentControlledTabs.delete(tid);
-    }
+  // 2b. Query all tabs in the Agent Pilot group
+  const agentTabs = await getAgentGroupTabs();
+  if (agentTabs.length > 0) {
+    // Prefer the active tab within the agent group
+    const activeAgentTab = agentTabs.find((t) => t.active);
+    if (activeAgentTab) return activeAgentTab.id;
+
+    // Otherwise return the most recently opened tab in the agent group
+    return agentTabs[agentTabs.length - 1].id;
   }
 
-  return await getActiveTabId();
+  // 3. Strictest isolation: NEVER fall back to getActiveTabId().
+  // If no tab exists in Agent Pilot group, return null.
+  return null;
 }
 
 /**
@@ -333,5 +454,21 @@ export async function runWithTabLock(tabId, actionName, runner) {
         }
       }, 1200);
     }
+  }
+}
+
+// Clean up agentControlledTabs when tabs are removed or ungrouped
+if (typeof chrome !== "undefined" && chrome.tabs) {
+  if (chrome.tabs.onRemoved) {
+    chrome.tabs.onRemoved.addListener((tabId) => {
+      agentControlledTabs.delete(tabId);
+    });
+  }
+  if (chrome.tabs.onUpdated) {
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+      if (changeInfo.groupId !== undefined && changeInfo.groupId === -1) {
+        agentControlledTabs.delete(tabId);
+      }
+    });
   }
 }

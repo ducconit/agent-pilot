@@ -382,6 +382,21 @@ curl -s -X POST http://127.0.0.1:58765/api \
 
 ---
 
+## 🛡️ Cơ Chế Cô Lập Tab Group (Tab Group Isolation & Safety Boundary)
+
+Để bảo vệ tối đa tính riêng tư và bảo mật cho người dùng, Agent Pilot áp dụng cơ chế **Cô lập Tab Group độc quyền**:
+1. **Chỉ hoạt động trong nhóm tab "🤖 Agent Pilot"**:
+   - Khi Agent mở tab bằng `browser_open_tab` (`tabs.create`) hoặc `open` trong batch, tab sẽ được tự động gom vào Native Chrome Tab Group mang tên `🤖 Agent Pilot` (màu cyan) kèm huy hiệu `AI` trên biểu tượng extension.
+   - Agent **chỉ được phép** truy vấn, đọc nội dung, click, nhập liệu, chụp màn hình hoặc điều khiển các tab nằm trong nhóm `🤖 Agent Pilot`.
+2. **Tuyệt đối cấm can thiệp tab hoặc group khác**:
+   - Mọi nỗ lực truy cập hoặc thao tác vào tab thuộc group khác (ví dụ: nhóm "Cá nhân", "Công việc") hoặc các tab cá nhân chưa gom nhóm (`groupId === -1`) sẽ bị hệ thống **chặn đứng lập tức** với lỗi bảo mật: `Access denied: Tab [id] does not belong to the Agent Pilot tab group`.
+   - Danh sách tab từ `browser_list_tabs` (`tabs.listAll`) và `tabs.query` tự động lọc sạch, không bao giờ làm rò rỉ tiêu đề hay URL các tab cá nhân của người dùng vào context của AI.
+3. **Người dùng toàn quyền kiểm soát**:
+   - Người dùng có thể kéo thả tab bất kỳ vào nhóm `🤖 Agent Pilot` để cấp quyền cho Agent tương tác.
+   - Ngược lại, chỉ cần kéo tab ra khỏi nhóm `🤖 Agent Pilot`, Agent lập tức bị tước quyền thao tác trên tab đó.
+
+---
+
 ## ⚙️ Configuration & Environment Variables
 
 - **Default Port**: `58765` (customizable via `AGENT_PILOT_PORT=58765`).

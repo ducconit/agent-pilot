@@ -6,7 +6,20 @@
  * existing agent handlers and background callers keep the same contract.
  */
 
-import { getActiveTabId, getTargetTabId, assignTabToAgentGroup, markTabAsAgentControlled, ensureContentScript, sendTabMessageWithRetry, setTabLock, setTabSession, runWithTabLock } from "./tab-manager.js";
+import {
+  getActiveTabId,
+  getTargetTabId,
+  getAgentGroupIds,
+  isTabInAgentGroup,
+  getAgentGroupTabs,
+  assignTabToAgentGroup,
+  markTabAsAgentControlled,
+  ensureContentScript,
+  sendTabMessageWithRetry,
+  setTabLock,
+  setTabSession,
+  runWithTabLock
+} from "./tab-manager.js";
 import { captureTabScreenshot } from "./screenshot-service.js";
 import { executeBatchActions } from "./batch-executor.js";
 
@@ -18,9 +31,22 @@ export const commandMethods = {
   async getTargetTabId(requestedTabId) {
     const tabId = await getTargetTabId(requestedTabId, this.lastAgentTabId);
     if (tabId) {
+      this.lastAgentTabId = tabId;
       this.markTabAsAgentControlled(tabId).catch((err) => console.debug("[AgentPilot] markTabAsAgentControlled error", err));
     }
     return tabId;
+  },
+
+  async isTabInAgentGroup(tab) {
+    return await isTabInAgentGroup(tab);
+  },
+
+  async getAgentGroupIds() {
+    return await getAgentGroupIds();
+  },
+
+  async getAgentGroupTabs() {
+    return await getAgentGroupTabs();
   },
 
   async markTabAsAgentControlled(tabId) {
