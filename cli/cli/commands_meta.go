@@ -126,7 +126,10 @@ func newFeedbackCommand() *cobra.Command {
 				}
 			}
 			fmt.Printf("⏳ Đang chờ người dùng gửi feedback từ trình duyệt (Timeout: %ds)...\n", timeout)
-			res := feedback.WaitForFeedback(timeout, nil)
+			res, err := bridge.DispatchFeedbackWait(timeout, nil, config.DefaultBridgePort())
+			if err != nil {
+				return fmt.Errorf("❌ Lỗi: %v", err)
+			}
 			jsonB, mErr := json.MarshalIndent(res, "", "  ")
 			if mErr != nil {
 				fmt.Printf("%v\n", res)

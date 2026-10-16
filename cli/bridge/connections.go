@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -33,7 +34,8 @@ type ClientConnection struct {
 }
 
 type PendingRequest struct {
-	Resolve chan map[string]interface{}
+	ClientID string
+	Resolve  chan map[string]interface{}
 }
 
 var (
@@ -125,7 +127,10 @@ func SendCommandToExtension(method string, params map[string]interface{}, timeou
 
 	resChan := make(chan map[string]interface{}, 1)
 	pendingReqLock.Lock()
-	pendingRequests[reqID] = &PendingRequest{Resolve: resChan}
+	pendingRequests[reqID] = &PendingRequest{
+		ClientID: client.ID,
+		Resolve:  resChan,
+	}
 	pendingReqLock.Unlock()
 
 	client.WriteMu.Lock()
@@ -162,6 +167,46 @@ func SendCommandToExtension(method string, params map[string]interface{}, timeou
 		pendingReqLock.Unlock()
 		return nil, fmt.Errorf("command '%s' timed out after %dms", method, timeoutMs)
 	}
+}
+
+// failPendingRequestsForClient wakes and removes any in-flight requests bound to
+// a disconnected extension socket so callers fail immediately instead of hanging.
+func failPendingRequestsForClient(clientID string) {
+	pendingReqLock.Lock()
+	var orphaned []*PendingRequest
+	for id, req := range pendingRequests {
+		if req.ClientID == clientID {
+			delete(pendingRequests, id)
+			orphaned = append(orphaned, req)
+		}
+	}
+	pendingReqLock.Unlock()
+
+	for _, req := range orphaned {
+		select {
+		case req.Resolve <- map[string]interface{}{"error": fmt.Sprintf("extension connection [%s] closed while command was in flight", clientID)}:
+		default:
+		}
+	}
+}
+
+// listConnectedClients returns all active extension connections sorted by ConnectedAt.
+func listConnectedClients() []map[string]interface{} {
+	clientsLock.RLock()
+	defer clientsLock.RUnlock()
+
+	conns := make([]*ClientConnection, 0, len(clients))
+	for _, c := range clients {
+		conns = append(conns, c)
+	}
+	sort.Slice(conns, func(i, j int) bool {
+		return conns[i].ConnectedAt.Before(conns[j].ConnectedAt)
+	})
+	clientList := make([]map[string]interface{}, 0, len(conns))
+	for _, c := range conns {
+		clientList = append(clientList, describeClientConnection(c, activeClientID))
+	}
+	return clientList
 }
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -250,6 +295,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		clientsLock.Unlock()
+		failPendingRequestsForClient(clientID)
 		_ = conn.Close()
 		log.Printf("[BridgeServer] 🔌 Extension disconnected [%s]", clientID)
 	}()

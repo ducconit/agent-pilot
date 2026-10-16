@@ -86,11 +86,21 @@ func ResolveSkillRoot(flagPath string, antigravity bool) (string, error) {
 
 // EmbeddedSkillFileCount returns the number of skill files embedded in this binary.
 func EmbeddedSkillFileCount() int {
-	files, err := collectEmbeddedFiles()
+	root := path.Join(embeddedSkillsRoot, skillDirName)
+	count := 0
+	err := fs.WalkDir(agentpilot.SkillFiles, root, func(_ string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !d.IsDir() {
+			count++
+		}
+		return nil
+	})
 	if err != nil {
 		return 0
 	}
-	return len(files)
+	return count
 }
 
 // InstallSkill writes the embedded skill into <root>/agent-pilot.

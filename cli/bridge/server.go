@@ -15,28 +15,16 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/ducconit/agent-pilot-extension/cli/config"
 	"github.com/ducconit/agent-pilot-extension/cli/version"
 )
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
-	clientsLock.RLock()
-	conns := make([]*ClientConnection, 0, len(clients))
-	for _, c := range clients {
-		conns = append(conns, c)
-	}
-	sort.Slice(conns, func(i, j int) bool {
-		return conns[i].ConnectedAt.Before(conns[j].ConnectedAt)
-	})
-	clientList := make([]map[string]interface{}, 0, len(conns))
-	for _, c := range conns {
-		clientList = append(clientList, describeClientConnection(c, activeClientID))
-	}
+	clientList := listConnectedClients()
 	extConnected := len(clientList) > 0
-	clientsLock.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -55,9 +43,6 @@ func StartBridgeServer(port int) error {
 	if port <= 0 {
 		port = config.DefaultBridgePort()
 	}
-	// Remember the effective port so /health reports what is actually bound
-	// (the server may be started with --port or AGENT_PILOT_PORT).
-	activeBridgePort = port
 	addr := fmt.Sprintf("%s:%d", config.DefaultHost, port)
 
 	// Test if port is already open (Dual Mode)
@@ -65,6 +50,10 @@ func StartBridgeServer(port int) error {
 	if err != nil {
 		return fmt.Errorf("port %d is already in use: %w", port, err)
 	}
+	// Remember the effective port once bound so /health and DispatchFeedbackWait
+	// know this process owns the active listener.
+	setActiveBridgePort(port)
+	defer setActiveBridgePort(0)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -99,11 +88,18 @@ func StartBridgeServer(port int) error {
 }
 
 // activeBridgePort is the port the in-process bridge actually bound to.
-// It starts at the configured default and is updated by StartBridgeServer so
-// /health and error messages report the real listener, not a guess.
-var activeBridgePort = config.DefaultBridgePort()
+// Stored atomically so concurrent /health requests and background server
+// startup never race.
+var activeBridgePort atomic.Int32
+
+func setActiveBridgePort(port int) {
+	activeBridgePort.Store(int32(port))
+}
 
 // ActiveBridgePort returns the effective port for in-process bridge operations.
 func ActiveBridgePort() int {
-	return activeBridgePort
+	if p := int(activeBridgePort.Load()); p > 0 {
+		return p
+	}
+	return config.DefaultBridgePort()
 }

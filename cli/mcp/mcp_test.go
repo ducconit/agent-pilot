@@ -207,12 +207,19 @@ func TestMCPToolDispatchTargetsExist(t *testing.T) {
 	}
 	targetPattern := regexp.MustCompile(`DispatchCommand\("([a-zA-Z][a-zA-Z0-9.\-]*)"`)
 	targets := targetPattern.FindAllStringSubmatch(string(dispatchSource), -1)
-	if len(targets) == 0 {
-		t.Fatal("no DispatchCommand targets found in mcp_dispatch.go")
+
+	allMethods := make(map[string]bool)
+	for _, m := range mcpToolBridgeMap {
+		allMethods[m] = true
+	}
+	for _, match := range targets {
+		allMethods[match[1]] = true
+	}
+	if len(allMethods) == 0 {
+		t.Fatal("no dispatch targets found in mcp_dispatch.go")
 	}
 
-	for _, match := range targets {
-		method := match[1]
+	for method := range allMethods {
 		if supported[method] || bridgeLocal[method] {
 			continue
 		}

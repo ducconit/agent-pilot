@@ -88,6 +88,26 @@ func ExecResizePage(width, height int, tabID interface{}) error {
 	return nil
 }
 
+func dispatchAndPrintJSON(method string, params map[string]interface{}, tabID interface{}) error {
+	if params == nil {
+		params = map[string]interface{}{}
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := bridge.DispatchCommand(method, params, config.DefaultBridgePort())
+	if err != nil {
+		return err
+	}
+	jsonB, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		fmt.Printf("%v\n", res)
+		return nil
+	}
+	fmt.Println(string(jsonB))
+	return nil
+}
+
 func ExecListNetworkRequests(filterUrl, method, resType string, limit int, tabID interface{}) error {
 	params := map[string]interface{}{}
 	if filterUrl != "" {
@@ -102,32 +122,14 @@ func ExecListNetworkRequests(filterUrl, method, resType string, limit int, tabID
 	if limit > 0 {
 		params["limit"] = limit
 	}
-	if tabID != nil {
-		params["tabId"] = tabID
-	}
-	res, err := bridge.DispatchCommand("network.listRequests", params, config.DefaultBridgePort())
-	if err != nil {
-		return err
-	}
-	jsonB, _ := json.MarshalIndent(res, "", "  ")
-	fmt.Println(string(jsonB))
-	return nil
+	return dispatchAndPrintJSON("network.listRequests", params, tabID)
 }
 
 func ExecGetNetworkResponseBody(requestId string, tabID interface{}) error {
 	params := map[string]interface{}{
 		"requestId": requestId,
 	}
-	if tabID != nil {
-		params["tabId"] = tabID
-	}
-	res, err := bridge.DispatchCommand("network.getResponseBody", params, config.DefaultBridgePort())
-	if err != nil {
-		return err
-	}
-	jsonB, _ := json.MarshalIndent(res, "", "  ")
-	fmt.Println(string(jsonB))
-	return nil
+	return dispatchAndPrintJSON("network.getResponseBody", params, tabID)
 }
 
 func ExecPerformanceTrace(action, categories string, tabID interface{}) error {
@@ -137,48 +139,19 @@ func ExecPerformanceTrace(action, categories string, tabID interface{}) error {
 	if categories != "" {
 		params["categories"] = categories
 	}
-	if tabID != nil {
-		params["tabId"] = tabID
-	}
-	res, err := bridge.DispatchCommand("performance.trace", params, config.DefaultBridgePort())
-	if err != nil {
-		return err
-	}
-	jsonB, _ := json.MarshalIndent(res, "", "  ")
-	fmt.Println(string(jsonB))
-	return nil
+	return dispatchAndPrintJSON("performance.trace", params, tabID)
 }
 
 func ExecPerformanceMetrics(tabID interface{}) error {
-	params := map[string]interface{}{}
-	if tabID != nil {
-		params["tabId"] = tabID
-	}
-	res, err := bridge.DispatchCommand("performance.metrics", params, config.DefaultBridgePort())
-	if err != nil {
-		return err
-	}
-	jsonB, _ := json.MarshalIndent(res, "", "  ")
-	fmt.Println(string(jsonB))
-	return nil
+	return dispatchAndPrintJSON("performance.metrics", nil, tabID)
 }
 
 func ExecTakeHeapSnapshot(gc bool, tabID interface{}) error {
-	params := map[string]interface{}{}
-	if tabID != nil {
-		params["tabId"] = tabID
-	}
 	method := "memory.heapSnapshot"
 	if gc {
 		method = "memory.collectGarbage"
 	}
-	res, err := bridge.DispatchCommand(method, params, config.DefaultBridgePort())
-	if err != nil {
-		return err
-	}
-	jsonB, _ := json.MarshalIndent(res, "", "  ")
-	fmt.Println(string(jsonB))
-	return nil
+	return dispatchAndPrintJSON(method, nil, tabID)
 }
 
 func ExecManageExtensions(action, extensionID string, enabled *bool) error {
@@ -191,11 +164,5 @@ func ExecManageExtensions(action, extensionID string, enabled *bool) error {
 	if enabled != nil {
 		params["enabled"] = *enabled
 	}
-	res, err := bridge.DispatchCommand("extensions.manage", params, config.DefaultBridgePort())
-	if err != nil {
-		return err
-	}
-	jsonB, _ := json.MarshalIndent(res, "", "  ")
-	fmt.Println(string(jsonB))
-	return nil
+	return dispatchAndPrintJSON("extensions.manage", params, nil)
 }

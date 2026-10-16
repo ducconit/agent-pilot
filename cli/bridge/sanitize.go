@@ -184,7 +184,7 @@ var secretPatterns = []secretPattern{
 
 // MaskString inspects a single string and masks any secret patterns found.
 func MaskString(text string) (string, bool, []string) {
-	if len(text) == 0 || strings.Contains(text, "[MASKED_SECRET") {
+	if len(text) < 6 || strings.HasPrefix(text, "data:image/") || strings.Contains(text, "[MASKED_SECRET") {
 		return text, false, nil
 	}
 
@@ -193,13 +193,11 @@ func MaskString(text string) (string, bool, []string) {
 	var types []string
 
 	for _, p := range secretPatterns {
-		if p.regex.MatchString(result) {
-			result = p.regex.ReplaceAllStringFunc(result, func(m string) string {
-				masked = true
-				types = append(types, p.name)
-				return p.replacer(m)
-			})
-		}
+		result = p.regex.ReplaceAllStringFunc(result, func(m string) string {
+			masked = true
+			types = append(types, p.name)
+			return p.replacer(m)
+		})
 	}
 
 	return result, masked, types

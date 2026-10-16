@@ -129,6 +129,19 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 	if method == "batch.run" {
 		return deriveBatchTimeout(params, defaultTimeoutMs)
 	}
+	if method == "feedback.wait" {
+		timeoutSec := config.DefaultFeedbackTimeoutSec
+		if params != nil {
+			if t, ok := getIntOrFloat(params, "timeout"); ok && t > 0 {
+				timeoutSec = t
+			}
+		}
+		effective := (timeoutSec * 1000) + config.PageWaitBufferMs
+		if defaultTimeoutMs > effective {
+			return defaultTimeoutMs
+		}
+		return effective
+	}
 	if method == "page.waitFor" || method == "page.wait" {
 		waitMs := config.PageWaitDefaultMs
 		if params != nil {

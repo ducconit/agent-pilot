@@ -7,11 +7,11 @@ package bridge
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -22,87 +22,162 @@ import (
 	"github.com/ducconit/agent-pilot-extension/cli/version"
 )
 
-func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
+var forwardHTTPClient = &http.Client{}
+
+func writeJSON(w http.ResponseWriter, status int, payload interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	if status != http.StatusOK {
+		w.WriteHeader(status)
+	}
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
+// prepareEndpoint validates Origin, applies optional CORS headers, and handles
+// preflight OPTIONS requests. Returns false when the caller should return early.
+func prepareEndpoint(w http.ResponseWriter, r *http.Request, allowMethods string, setCORS bool, forbiddenMsg string) bool {
 	origin := r.Header.Get("Origin")
 	if !IsOriginAllowed(origin) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Forbidden: Cross-origin request rejected"})
-		return
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": forbiddenMsg})
+		return false
 	}
 
+	if setCORS {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Methods", allowMethods)
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Agent-Pilot-Key")
+	}
 	w.Header().Set("Content-Type", "application/json")
 
+	if setCORS && r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return false
+	}
+	return true
+}
+
+func requirePostMethod(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "POST method required"})
-		return
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "POST method required"})
+		return false
 	}
+	return true
+}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, config.MaxAPIBodyBytes))
+func decodeJSONRequest(w http.ResponseWriter, r *http.Request, maxBytes int64) (map[string]interface{}, bool) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxBytes))
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read request body"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+		return nil, false
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
+		return nil, false
+	}
+	return payload, true
+}
+
+// decodeOptionalJSONBody parses a JSON object when the request body is non-empty,
+// returning (nil, true) on an empty body and writing HTTP 400 on read/parse errors.
+func decodeOptionalJSONBody(w http.ResponseWriter, r *http.Request, maxBytes int64) (map[string]interface{}, bool) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxBytes))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+		return nil, false
+	}
+	if len(bytes.TrimSpace(body)) == 0 {
+		return nil, true
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
+		return nil, false
+	}
+	return payload, true
+}
+
+// extendWriteDeadline lifts the server's 30s WriteTimeout when a command or
+// long-poll legitimately needs longer (e.g. batch.run or feedback.wait).
+func extendWriteDeadline(w http.ResponseWriter, duration time.Duration) {
+	if duration+5*time.Second > config.HTTPWriteTimeout {
+		rc := http.NewResponseController(w)
+		_ = rc.SetWriteDeadline(time.Now().Add(duration + 5*time.Second))
+	}
+}
+
+func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
+	if !prepareEndpoint(w, r, "POST", false, "Forbidden: Cross-origin request rejected") {
+		return
+	}
+	if !requirePostMethod(w, r) {
 		return
 	}
 
-	var req map[string]interface{}
-	if err := json.Unmarshal(body, &req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+	req, ok := decodeJSONRequest(w, r, config.MaxAPIBodyBytes)
+	if !ok {
 		return
 	}
 
 	method, _ := req["method"].(string)
+	method = strings.TrimSpace(method)
+	if method == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"error":   "Missing or empty 'method' field in request payload",
+		})
+		return
+	}
+
 	params, _ := req["params"].(map[string]interface{})
 	if params == nil {
 		params = make(map[string]interface{})
 	}
 
-	// Feedback methods
+	timeoutMs := DeriveCommandTimeout(method, params, config.DefaultCommandTimeoutMs)
+	extendWriteDeadline(w, time.Duration(timeoutMs)*time.Millisecond)
+
+	// Feedback & local bridge methods
 	switch method {
 	case "feedback.save", "feedback.push":
 		res, err := feedback.SaveFeedbackSession(params)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
+			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": res})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "result": res})
 		return
 
 	case "feedback.pending":
 		limit := config.DefaultFeedbackListLimit
-		if l, ok := params["limit"].(float64); ok {
-			limit = int(l)
+		if l, ok := getIntOrFloat(params, "limit"); ok && l > 0 {
+			limit = l
 		}
 		sid, _ := params["sessionId"].(string)
 		clear, _ := params["clear"].(bool)
 		res, _ := feedback.GetPendingFeedback(limit, sid, clear)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": res})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "result": res})
 		return
 
 	case "feedback.wait":
 		timeout := config.DefaultFeedbackTimeoutSec
-		if t, ok := params["timeout"].(float64); ok {
-			timeout = int(t)
+		if t, ok := getIntOrFloat(params, "timeout"); ok && t > 0 {
+			timeout = t
 		}
 		res := feedback.WaitForFeedbackWithContext(r.Context(), timeout, params["tabId"])
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": res})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "result": res})
 		return
 
 	case "config.getSecretFilter":
 		res, err := SendCommandToExtension("config.getSecretFilter", params, config.ConfigRPCCommandTimeoutMs)
 		if err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			writeJSON(w, http.StatusServiceUnavailable, map[string]interface{}{
 				"success": false,
 				"error":   err.Error(),
 				"result":  map[string]interface{}{"enabled": atomic.LoadInt32(&secretFilterOn) == 1},
 			})
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": res})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "result": res})
 		return
 
 	case "config.setSecretFilter":
@@ -115,137 +190,75 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		res, err := SendCommandToExtension("config.setSecretFilter", params, config.ConfigRPCCommandTimeoutMs)
 		if err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			writeJSON(w, http.StatusServiceUnavailable, map[string]interface{}{
 				"success": false,
 				"error":   err.Error(),
 				"result":  map[string]interface{}{"enabled": atomic.LoadInt32(&secretFilterOn) == 1},
 			})
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": res})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "result": res})
 		return
 
 	case "ping":
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": map[string]interface{}{"pong": true, "version": version.Raw()}})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "result": map[string]interface{}{"pong": true, "version": version.Raw()}})
 		return
 
 	case "instances.list":
-		clientsLock.RLock()
-		conns := make([]*ClientConnection, 0, len(clients))
-		for _, c := range clients {
-			conns = append(conns, c)
-		}
-		sort.Slice(conns, func(i, j int) bool {
-			return conns[i].ConnectedAt.Before(conns[j].ConnectedAt)
-		})
-		clientList := make([]map[string]interface{}, 0, len(conns))
-		for _, c := range conns {
-			clientList = append(clientList, describeClientConnection(c, activeClientID))
-		}
-		clientsLock.RUnlock()
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": clientList})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "result": listConnectedClients()})
 		return
 
 	case "instances.select":
 		targetID, _ := params["instanceId"].(string)
 		clientsLock.Lock()
-		found := false
-		for _, c := range clients {
-			if c.ID == targetID {
-				activeClientID = targetID
-				found = true
-				break
-			}
+		_, found := clients[targetID]
+		if found {
+			activeClientID = targetID
 		}
+		activeID := activeClientID
 		clientsLock.Unlock()
 		if !found && targetID != "" {
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Instance not found"})
+			writeJSON(w, http.StatusOK, map[string]interface{}{"success": false, "error": "Instance not found"})
 			return
 		}
-		clientsLock.RLock()
-		activeID := activeClientID
-		clientsLock.RUnlock()
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "activeInstanceId": activeID})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "activeInstanceId": activeID})
 		return
 	}
 
 	// Dispatch to extension
 	res, err := SendCommandToExtension(method, params, 0)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
 
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": res})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "result": res})
 }
 
 func handleFeedbackSaveEndpoint(w http.ResponseWriter, r *http.Request) {
-	origin := r.Header.Get("Origin")
-	if !IsOriginAllowed(origin) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Forbidden origin"})
+	if !prepareEndpoint(w, r, "POST, OPTIONS", true, "Forbidden origin") {
 		return
 	}
-
-	w.Header().Set("Access-Control-Allow-Origin", origin)
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "POST" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "POST method required"})
+	if !requirePostMethod(w, r) {
 		return
 	}
 
 	// Feedback saves may carry inline base64 screenshots, hence the larger cap.
-	body, err := io.ReadAll(io.LimitReader(r.Body, config.MaxFeedbackBodyBytes))
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read request body"})
-		return
-	}
-
-	var p map[string]interface{}
-	if err := json.Unmarshal(body, &p); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+	p, ok := decodeJSONRequest(w, r, config.MaxFeedbackBodyBytes)
+	if !ok {
 		return
 	}
 
 	res, err := feedback.SaveFeedbackSession(p)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": res})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "result": res})
 }
 
 func handleFeedbackPendingEndpoint(w http.ResponseWriter, r *http.Request) {
-	origin := r.Header.Get("Origin")
-	if !IsOriginAllowed(origin) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Forbidden origin"})
-		return
-	}
-
-	w.Header().Set("Access-Control-Allow-Origin", origin)
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
+	if !prepareEndpoint(w, r, "GET, POST, OPTIONS", true, "Forbidden origin") {
 		return
 	}
 
@@ -261,74 +274,57 @@ func handleFeedbackPendingEndpoint(w http.ResponseWriter, r *http.Request) {
 	// cross-origin GET requests (e.g. <img src>) wiping the feedback inbox.
 	clear := false
 
-	if r.Method == "POST" {
-		body, err := io.ReadAll(io.LimitReader(r.Body, config.MaxAPIBodyBytes))
-		if err == nil && len(body) > 0 {
-			var p map[string]interface{}
-			if err := json.Unmarshal(body, &p); err == nil {
-				if sid, ok := p["sessionId"].(string); ok && sid != "" {
-					sessionId = sid
-				}
-				if l, ok := p["limit"].(float64); ok && l > 0 {
-					limit = int(l)
-				}
-				if c, ok := p["clear"].(bool); ok {
-					clear = c
-				}
+	if r.Method == http.MethodPost {
+		p, ok := decodeOptionalJSONBody(w, r, config.MaxAPIBodyBytes)
+		if !ok {
+			return
+		}
+		if p != nil {
+			if sid, ok := p["sessionId"].(string); ok && sid != "" {
+				sessionId = sid
+			}
+			if l, ok := getIntOrFloat(p, "limit"); ok && l > 0 {
+				limit = l
+			}
+			if c, ok := p["clear"].(bool); ok {
+				clear = c
 			}
 		}
 	}
 
 	res, err := feedback.GetPendingFeedback(limit, sessionId, clear)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
-	_ = json.NewEncoder(w).Encode(res)
+	writeJSON(w, http.StatusOK, res)
 }
 
 func handleFeedbackWaitEndpoint(w http.ResponseWriter, r *http.Request) {
-	origin := r.Header.Get("Origin")
-	if !IsOriginAllowed(origin) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Forbidden origin"})
+	if !prepareEndpoint(w, r, "POST, OPTIONS", true, "Forbidden origin") {
 		return
 	}
-
-	w.Header().Set("Access-Control-Allow-Origin", origin)
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "POST" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "POST method required"})
+	if !requirePostMethod(w, r) {
 		return
 	}
 
 	timeout := config.DefaultFeedbackTimeoutSec
 	var tabID interface{}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, config.MaxAPIBodyBytes))
-	if err == nil && len(body) > 0 {
-		var p map[string]interface{}
-		if err := json.Unmarshal(body, &p); err == nil {
-			if t, ok := p["timeout"].(float64); ok && t > 0 {
-				timeout = int(t)
-			}
-			tabID = p["tabId"]
+	p, ok := decodeOptionalJSONBody(w, r, config.MaxAPIBodyBytes)
+	if !ok {
+		return
+	}
+	if p != nil {
+		if t, ok := getIntOrFloat(p, "timeout"); ok && t > 0 {
+			timeout = t
 		}
+		tabID = p["tabId"]
 	}
 
+	extendWriteDeadline(w, time.Duration(timeout)*time.Second)
 	res := feedback.WaitForFeedbackWithContext(r.Context(), timeout, tabID)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "result": res})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "result": res})
 }
 
 // getIntOrFloat reads a numeric value from a loosely-typed JSON map, accepting
@@ -373,10 +369,10 @@ func ForwardCommandToActiveServer(method string, params map[string]interface{}, 
 	}
 
 	timeoutDuration := time.Duration(DeriveCommandTimeout(method, params, config.ForwardCommandTimeoutMs)) * time.Millisecond
-	client := &http.Client{
-		Timeout: timeoutDuration,
-	}
-	request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(jsonBytes))
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutDuration)
+	defer cancel()
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +380,7 @@ func ForwardCommandToActiveServer(method string, params map[string]interface{}, 
 	if key := config.BridgeAPIKey(); key != "" {
 		request.Header.Set(config.APIKeyHeader, key)
 	}
-	resp, err := client.Do(request)
+	resp, err := forwardHTTPClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to contact Agent Pilot Bridge at %s: %w", url, err)
 	}

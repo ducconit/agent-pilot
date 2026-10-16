@@ -4,52 +4,62 @@
 package mcp
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/ducconit/agent-pilot-extension/cli/bridge"
 	"github.com/ducconit/agent-pilot-extension/cli/config"
 	"github.com/ducconit/agent-pilot-extension/cli/feedback"
 )
 
+// mcpToolBridgeMap maps 1-to-1 pass-through MCP tool names onto their
+// corresponding bridge command names (Table-Driven Command Registry).
+var mcpToolBridgeMap = map[string]string{
+	"browser_run_actions":           "batch.run",
+	"browser_open_tab":              "tabs.create",
+	"browser_list_tabs":             "tabs.listAll",
+	"browser_navigate":              "tabs.update",
+	"browser_click":                 "page.click",
+	"browser_type":                  "page.type",
+	"browser_scroll":                "page.scroll",
+	"browser_fill_form":             "page.fillForm",
+	"browser_get_element":           "page.getElement",
+	"browser_get_devtools_data":     "devtools.getData",
+	"browser_pick_color":            "page.pickColor",
+	"browser_list_instances":        "instances.list",
+	"browser_select_instance":       "instances.select",
+	"browser_set_busy":              "page.setBusy",
+	"browser_start_session":         "session.start",
+	"browser_end_session":           "session.end",
+	"browser_evaluate":              "page.evaluate",
+	"browser_upload_file":           "page.uploadFile",
+	"browser_handle_dialog":         "page.handleDialog",
+	"browser_hover":                 "page.hover",
+	"browser_drag":                  "page.drag",
+	"browser_press_key":             "page.pressKey",
+	"browser_wait_for":              "page.waitFor",
+	"browser_emulate":               "emulation.set",
+	"browser_resize_page":           "emulation.resize",
+	"browser_list_network_requests": "network.listRequests",
+	"browser_get_network_request":   "network.getResponseBody",
+	"browser_performance_trace":     "performance.trace",
+	"browser_performance_metrics":   "performance.metrics",
+	"browser_manage_extensions":     "extensions.manage",
+}
+
 func executeToolCall(name string, args map[string]interface{}) (string, bool) {
-	// Map MCP tool name to bridge action
+	port := config.DefaultBridgePort()
+
+	if bridgeMethod, ok := mcpToolBridgeMap[name]; ok {
+		res, err := bridge.DispatchCommand(bridgeMethod, args, port)
+		return formatToolResult(res, err)
+	}
+
 	switch name {
-	case "browser_run_actions":
-		res, err := bridge.DispatchCommand("batch.run", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_open_tab":
-		res, err := bridge.DispatchCommand("tabs.create", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_list_tabs":
-		res, err := bridge.DispatchCommand("tabs.listAll", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_navigate":
-		res, err := bridge.DispatchCommand("tabs.update", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_click":
-		res, err := bridge.DispatchCommand("page.click", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_type":
-		res, err := bridge.DispatchCommand("page.type", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_scroll":
-		res, err := bridge.DispatchCommand("page.scroll", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
 	case "browser_snapshot":
-		res, err := bridge.DispatchCommand("page.snapshot", args, config.DefaultBridgePort())
+		res, err := bridge.DispatchCommand("page.snapshot", args, port)
 		if err != nil {
 			return fmt.Sprintf("Error: %v", err), true
 		}
@@ -58,49 +68,13 @@ func executeToolCall(name string, args map[string]interface{}) (string, bool) {
 		}
 		return formatToolResult(res, nil)
 
-	case "browser_fill_form":
-		res, err := bridge.DispatchCommand("page.fillForm", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_get_element":
-		res, err := bridge.DispatchCommand("page.getElement", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
 	case "browser_screenshot":
-		res, err := bridge.DispatchCommand("page.screenshot", args, config.DefaultBridgePort())
+		res, err := bridge.DispatchCommand("page.screenshot", args, port)
 		return processScreenshotResult(res, err, args)
-
-	case "browser_get_devtools_data":
-		res, err := bridge.DispatchCommand("devtools.getData", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_pick_color":
-		res, err := bridge.DispatchCommand("page.pickColor", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_list_instances":
-		res, err := bridge.DispatchCommand("instances.list", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_select_instance":
-		res, err := bridge.DispatchCommand("instances.select", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_set_busy":
-		res, err := bridge.DispatchCommand("page.setBusy", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_start_session":
-		res, err := bridge.DispatchCommand("session.start", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_end_session":
-		res, err := bridge.DispatchCommand("session.end", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
 
 	case "browser_get_pending_feedback":
 		limit := config.DefaultFeedbackListLimit
-		if l, ok := args["limit"].(float64); ok {
+		if l, ok := args["limit"].(float64); ok && l > 0 {
 			limit = int(l)
 		}
 		sid, _ := args["sessionId"].(string)
@@ -110,74 +84,18 @@ func executeToolCall(name string, args map[string]interface{}) (string, bool) {
 
 	case "browser_wait_for_feedback":
 		timeout := config.DefaultFeedbackTimeoutSec
-		if t, ok := args["timeout"].(float64); ok {
+		if t, ok := args["timeout"].(float64); ok && t > 0 {
 			timeout = int(t)
 		}
-		res := feedback.WaitForFeedback(timeout, args["tabId"])
-		return formatToolResult(res, nil)
-
-	case "browser_evaluate":
-		res, err := bridge.DispatchCommand("page.evaluate", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_upload_file":
-		res, err := bridge.DispatchCommand("page.uploadFile", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_handle_dialog":
-		res, err := bridge.DispatchCommand("page.handleDialog", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_hover":
-		res, err := bridge.DispatchCommand("page.hover", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_drag":
-		res, err := bridge.DispatchCommand("page.drag", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_press_key":
-		res, err := bridge.DispatchCommand("page.pressKey", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_wait_for":
-		res, err := bridge.DispatchCommand("page.waitFor", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_emulate":
-		res, err := bridge.DispatchCommand("emulation.set", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_resize_page":
-		res, err := bridge.DispatchCommand("emulation.resize", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_list_network_requests":
-		res, err := bridge.DispatchCommand("network.listRequests", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_get_network_request":
-		res, err := bridge.DispatchCommand("network.getResponseBody", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_performance_trace":
-		res, err := bridge.DispatchCommand("performance.trace", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_performance_metrics":
-		res, err := bridge.DispatchCommand("performance.metrics", args, config.DefaultBridgePort())
+		res, err := bridge.DispatchFeedbackWait(timeout, args["tabId"], port)
 		return formatToolResult(res, err)
 
 	case "browser_take_heapsnapshot":
+		method := "memory.heapSnapshot"
 		if cg, ok := args["collectGarbage"].(bool); ok && cg {
-			res, err := bridge.DispatchCommand("memory.collectGarbage", args, config.DefaultBridgePort())
-			return formatToolResult(res, err)
+			method = "memory.collectGarbage"
 		}
-		res, err := bridge.DispatchCommand("memory.heapSnapshot", args, config.DefaultBridgePort())
-		return formatToolResult(res, err)
-
-	case "browser_manage_extensions":
-		res, err := bridge.DispatchCommand("extensions.manage", args, config.DefaultBridgePort())
+		res, err := bridge.DispatchCommand(method, args, port)
 		return formatToolResult(res, err)
 
 	default:
@@ -225,63 +143,24 @@ func processScreenshotResult(res interface{}, err error, args map[string]interfa
 		return formatToolResult(res, nil)
 	}
 
-	outputPath := pathParam
-	if outputPath != "" {
-		cleanPath := filepath.Clean(outputPath)
-		ext := strings.ToLower(filepath.Ext(cleanPath))
-		if ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".webp" {
-			return fmt.Sprintf("Error: unsupported screenshot file extension %q (allowed: .png, .jpg, .jpeg, .webp)", ext), true
-		}
-
-		// Guard against sensitive system paths and directory traversal into restricted areas
-		for _, forbidden := range []string{"/etc", "/proc", "/sys", "/dev", "/boot", "/root"} {
-			if cleanPath == forbidden || strings.HasPrefix(cleanPath, forbidden+"/") {
-				return fmt.Sprintf("Error: writing to sensitive system path %q is not permitted", cleanPath), true
-			}
-		}
-		if strings.Contains(cleanPath, ".ssh") || strings.Contains(cleanPath, "authorized_keys") ||
-			strings.HasSuffix(cleanPath, ".bashrc") || strings.HasSuffix(cleanPath, ".zshrc") ||
-			strings.HasSuffix(cleanPath, ".profile") {
-			return fmt.Sprintf("Error: writing to sensitive user configuration %q is not permitted", cleanPath), true
-		}
-		outputPath = cleanPath
-	} else {
-		outputPath = fmt.Sprintf("screenshot_%d.png", time.Now().UnixMilli())
+	savedPath, byteCount, saveErr := bridge.SaveScreenshotDataURL(dataURL, pathParam)
+	if saveErr != nil {
+		return fmt.Sprintf("Error: %v", saveErr), true
 	}
 
-	parts := strings.SplitN(dataURL, ",", 2)
-	if len(parts) != 2 {
-		return "Error: invalid screenshot dataUrl format", true
-	}
-
-	imgBytes, b64Err := base64.StdEncoding.DecodeString(parts[1])
-	if b64Err != nil {
-		return fmt.Sprintf("Error: failed to decode base64 screenshot: %v", b64Err), true
-	}
-
-	if dir := filepath.Dir(outputPath); dir != "" && dir != "." {
-		if mkErr := os.MkdirAll(dir, 0755); mkErr != nil {
-			return fmt.Sprintf("Error: failed to create directory %s: %v", dir, mkErr), true
-		}
-	}
-
-	if writeErr := os.WriteFile(outputPath, imgBytes, 0644); writeErr != nil {
-		return fmt.Sprintf("Error: failed to write screenshot to %s: %v", outputPath, writeErr), true
-	}
-
-	absPath, absErr := filepath.Abs(outputPath)
+	absPath, absErr := filepath.Abs(savedPath)
 	if absErr != nil {
-		return fmt.Sprintf("Error: failed to resolve absolute path for %s: %v", outputPath, absErr), true
+		return fmt.Sprintf("Error: failed to resolve absolute path for %s: %v", savedPath, absErr), true
 	}
 
-	result := make(map[string]interface{})
+	result := make(map[string]interface{}, len(resMap)+2)
 	for k, v := range resMap {
 		if k != "dataUrl" {
 			result[k] = v
 		}
 	}
 	result["path"] = absPath
-	result["bytes"] = len(imgBytes)
+	result["bytes"] = byteCount
 	if includeBase64 {
 		result["dataUrl"] = dataURL
 	}

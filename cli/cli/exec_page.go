@@ -6,14 +6,10 @@
 package cli
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ducconit/agent-pilot-extension/cli/bridge"
 	"github.com/ducconit/agent-pilot-extension/cli/config"
@@ -140,26 +136,12 @@ func ExecScreenshotWithOptions(mode, selector, clipStr, outputPath string, tabID
 		return fmt.Errorf("no screenshot dataUrl returned")
 	}
 
-	parts := strings.SplitN(dataURL, ",", 2)
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid screenshot dataUrl format")
-	}
-
-	imgBytes, err := base64.StdEncoding.DecodeString(parts[1])
+	savedPath, byteCount, err := bridge.SaveScreenshotDataURL(dataURL, outputPath)
 	if err != nil {
-		return fmt.Errorf("failed to decode base64 screenshot: %w", err)
+		return err
 	}
 
-	if outputPath == "" {
-		outputPath = fmt.Sprintf("screenshot_%d.png", time.Now().Unix())
-	}
-
-	_ = os.MkdirAll(filepath.Dir(outputPath), 0755)
-	if err := os.WriteFile(outputPath, imgBytes, 0644); err != nil {
-		return fmt.Errorf("failed to write screenshot to %s: %w", outputPath, err)
-	}
-
-	fmt.Printf("📸 Screenshot saved to %s (%d bytes)\n", outputPath, len(imgBytes))
+	fmt.Printf("📸 Screenshot saved to %s (%d bytes)\n", savedPath, byteCount)
 	return nil
 }
 

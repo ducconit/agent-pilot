@@ -114,6 +114,33 @@ func TestBridgeCommandRoundTripAndTimeout(t *testing.T) {
 	}
 }
 
+func TestBridgeCommandFailsFastOnClientDisconnect(t *testing.T) {
+	_, wsURL := startTestBridgeWS(t)
+
+	var conn *websocket.Conn
+	conn = dialFakeExtension(t, wsURL, func(method string, id interface{}) (map[string]interface{}, bool) {
+		if method == "disconnect.now" {
+			go func() {
+				time.Sleep(30 * time.Millisecond)
+				_ = conn.Close()
+			}()
+		}
+		return nil, false
+	})
+	defer conn.Close()
+	waitForClientCount(t, 1)
+
+	start := time.Now()
+	_, err := SendCommandToExtension("disconnect.now", map[string]interface{}{}, 10000)
+	elapsed := time.Since(start)
+	if err == nil || !strings.Contains(err.Error(), "closed while command was in flight") {
+		t.Fatalf("expected fail-fast disconnect error, got: %v", err)
+	}
+	if elapsed > 2*time.Second {
+		t.Fatalf("expected immediate fail-fast (<2s) on disconnect, took %v", elapsed)
+	}
+}
+
 func TestBridgeConcurrentConnectDisconnectAndSelect(t *testing.T) {
 	_, wsURL := startTestBridgeWS(t)
 
@@ -228,5 +255,28 @@ func TestFeedbackPendingGetClearIsIgnored(t *testing.T) {
 	}
 	if _, statErr := os.Stat(sessionDir); !os.IsNotExist(statErr) {
 		t.Fatalf("POST clear=true should archive the session dir (stat err: %v)", statErr)
+	}
+}
+
+func TestHTTPAPIRejectsEmptyMethodAndMalformedFeedbackJSON(t *testing.T) {
+	emptyMethodReq := httptest.NewRequest(http.MethodPost, "/api", strings.NewReader(`{"method":"  ","params":{}}`))
+	emptyMethodRec := httptest.NewRecorder()
+	handleHTTPAPI(emptyMethodRec, emptyMethodReq)
+	if emptyMethodRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request for empty method, got %d: %s", emptyMethodRec.Code, emptyMethodRec.Body.String())
+	}
+
+	badPendingReq := httptest.NewRequest(http.MethodPost, "/api/feedback/pending", strings.NewReader(`{"clear":true`))
+	badPendingRec := httptest.NewRecorder()
+	handleFeedbackPendingEndpoint(badPendingRec, badPendingReq)
+	if badPendingRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request for malformed JSON in /api/feedback/pending, got %d", badPendingRec.Code)
+	}
+
+	badWaitReq := httptest.NewRequest(http.MethodPost, "/api/feedback/wait", strings.NewReader(`{"timeout":10`))
+	badWaitRec := httptest.NewRecorder()
+	handleFeedbackWaitEndpoint(badWaitRec, badWaitReq)
+	if badWaitRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 Bad Request for malformed JSON in /api/feedback/wait, got %d", badWaitRec.Code)
 	}
 }
