@@ -33,7 +33,8 @@ type ClientConnection struct {
 }
 
 type PendingRequest struct {
-	Resolve chan map[string]interface{}
+	ClientID string
+	Resolve  chan map[string]interface{}
 }
 
 var (
@@ -125,7 +126,7 @@ func SendCommandToExtension(method string, params map[string]interface{}, timeou
 
 	resChan := make(chan map[string]interface{}, 1)
 	pendingReqLock.Lock()
-	pendingRequests[reqID] = &PendingRequest{Resolve: resChan}
+	pendingRequests[reqID] = &PendingRequest{ClientID: client.ID, Resolve: resChan}
 	pendingReqLock.Unlock()
 
 	client.WriteMu.Lock()
@@ -250,6 +251,21 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		clientsLock.Unlock()
+
+		// Immediately fail any pending requests bound to this disconnected client.
+		var orphaned []*PendingRequest
+		pendingReqLock.Lock()
+		for reqID, req := range pendingRequests {
+			if req.ClientID == clientID {
+				delete(pendingRequests, reqID)
+				orphaned = append(orphaned, req)
+			}
+		}
+		pendingReqLock.Unlock()
+		for _, req := range orphaned {
+			req.Resolve <- map[string]interface{}{"error": "extension disconnected"}
+		}
+
 		_ = conn.Close()
 		log.Printf("[BridgeServer] 🔌 Extension disconnected [%s]", clientID)
 	}()

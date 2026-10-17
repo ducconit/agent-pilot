@@ -32,6 +32,14 @@ export class FeedbackPanel {
     this.btnModeRegion = document.getElementById("btn-panel-mode-region");
     this.btnModeScreen = document.getElementById("btn-panel-mode-screen");
     this.btnModeFullpage = document.getElementById("btn-panel-mode-fullpage");
+
+    this.btnRefreshQaDiag = document.getElementById("btn-refresh-qa-diag");
+    this.qaConsoleErrCount = document.getElementById("qa-console-err-count");
+    this.qaNetErrCount = document.getElementById("qa-net-err-count");
+    this.qaReproStepCount = document.getElementById("qa-repro-step-count");
+    this.qaDiagSummaryBox = document.getElementById("qa-diag-summary-box");
+    this.btnCopyReproBatch = document.getElementById("btn-copy-repro-batch");
+    this.btnResetSiteStorage = document.getElementById("btn-reset-site-storage");
   }
 
   bindEvents() {
@@ -68,6 +76,16 @@ export class FeedbackPanel {
       this.btnModeFullpage.onclick = () => this.setMode("fullpage");
     }
 
+    if (this.btnRefreshQaDiag) {
+      this.btnRefreshQaDiag.onclick = () => this.refreshDiagnostics({ silent: false });
+    }
+    if (this.btnCopyReproBatch) {
+      this.btnCopyReproBatch.onclick = () => this.copyReproBatch();
+    }
+    if (this.btnResetSiteStorage) {
+      this.btnResetSiteStorage.onclick = () => this.resetSiteStorage();
+    }
+
     // Listen to messages from content script
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg.action === "FEEDBACK_MODE_CHANGED") {
@@ -75,6 +93,7 @@ export class FeedbackPanel {
       } else if (msg.action === "FEEDBACK_ITEMS_UPDATED") {
         this.items = msg.items || [];
         this.renderItemsList();
+        this.refreshDiagnostics({ silent: true });
       }
     });
   }
@@ -130,6 +149,101 @@ export class FeedbackPanel {
       this.updateActiveState(res.active);
       this.items = res.items || [];
       this.renderItemsList();
+    }
+    await this.refreshDiagnostics({ silent: true });
+  }
+
+  async refreshDiagnostics({ silent = true } = {}) {
+    const res = await this.sendTabMessage({ action: "get_page_diagnostics" }, { silent });
+    if (!res || !res.success || !res.diagnostics) return;
+    const diag = res.diagnostics;
+    const cCount = Array.isArray(diag.consoleErrors) ? diag.consoleErrors.length : 0;
+    const nCount = Array.isArray(diag.networkErrors) ? diag.networkErrors.length : 0;
+    const sCount = Array.isArray(diag.reproSteps) ? diag.reproSteps.length : 0;
+
+    if (this.qaConsoleErrCount) {
+      this.qaConsoleErrCount.textContent = String(cCount);
+      this.qaConsoleErrCount.style.color = cCount > 0 ? "#f87171" : "";
+    }
+    if (this.qaNetErrCount) {
+      this.qaNetErrCount.textContent = String(nCount);
+      this.qaNetErrCount.style.color = nCount > 0 ? "#fbbf24" : "";
+    }
+    if (this.qaReproStepCount) {
+      this.qaReproStepCount.textContent = String(sCount);
+      this.qaReproStepCount.style.color = sCount > 0 ? "#38bdf8" : "";
+    }
+
+    if (this.qaDiagSummaryBox) {
+      const lines = [];
+      if (cCount > 0) {
+        diag.consoleErrors.slice(-3).forEach((err) => {
+          lines.push(`<div style="color:#f87171;margin-bottom:3px;">🚨 <strong>[${this.escapeHtml(err.type || "error")}]</strong> ${this.escapeHtml(err.message.slice(0, 120))}</div>`);
+        });
+      }
+      if (nCount > 0) {
+        diag.networkErrors.slice(-3).forEach((net) => {
+          lines.push(`<div style="color:#fbbf24;margin-bottom:3px;">🌐 <strong>[${this.escapeHtml(String(net.status || "ERR"))}]</strong> ${this.escapeHtml(net.method)} ${this.escapeHtml(net.url.slice(0, 90))}</div>`);
+        });
+      }
+      if (sCount > 0) {
+        diag.reproSteps.slice(-4).forEach((step, idx) => {
+          lines.push(`<div style="color:#94a3b8;margin-bottom:2px;">👣 ${idx + 1}. ${this.escapeHtml(step.description)}</div>`);
+        });
+      }
+      if (lines.length > 0) {
+        this.qaDiagSummaryBox.innerHTML = lines.join("");
+        this.qaDiagSummaryBox.style.display = "block";
+      } else {
+        this.qaDiagSummaryBox.innerHTML = "";
+        this.qaDiagSummaryBox.style.display = "none";
+      }
+    }
+
+    if (!silent) {
+      this.ui.showToast(`🩺 Đã cập nhật: ${cCount} lỗi Console, ${nCount} lỗi mạng, ${sCount} bước thao tác.`);
+    }
+  }
+
+  async copyReproBatch() {
+    const res = await this.sendTabMessage({ action: "export_repro_batch" });
+    if (!res || !res.success || !res.batch || !Array.isArray(res.batch.actions) || res.batch.actions.length === 0) {
+      this.ui.showToast("Chưa có bước thao tác nào trên trang để xuất kịch bản Replay!", "warning");
+      return;
+    }
+    const jsonText = JSON.stringify(res.batch, null, 2);
+    try {
+      await navigator.clipboard.writeText(jsonText);
+      this.ui.showToast(`📋 Đã copy kịch bản Replay (${res.batch.actions.length} bước) dạng JSON vào Clipboard!`);
+    } catch (_) {
+      this.ui.showToast("Không thể sao chép kịch bản vào Clipboard!", "warning");
+    }
+  }
+
+  async resetSiteStorage() {
+    const tabId = await this.getActiveTabId();
+    if (!tabId) {
+      this.ui.showToast("Không tìm thấy tab web đang hoạt động!", "warning");
+      return;
+    }
+    const res = await this.sendTabMessage({
+      action: "get_page_diagnostics",
+      clear: true,
+      clearStorage: true
+    });
+    if (res && res.success) {
+      if (this.diagConsoleCountEl) this.diagConsoleCountEl.textContent = "0";
+      if (this.diagNetworkCountEl) this.diagNetworkCountEl.textContent = "0";
+      if (this.diagReproCountEl) this.diagReproCountEl.textContent = "0";
+      try {
+        await chrome.tabs.reload(tabId);
+      } catch (_) {}
+      setTimeout(() => {
+        this.refreshDiagnostics({ silent: true });
+      }, 600);
+      this.ui.showToast("🧹 Đã xóa sạch Storage/Cookies của trang và tải lại phiên mới!");
+    } else {
+      this.ui.showToast("Không thể xóa dữ liệu trên trang này.", "warning");
     }
   }
 
@@ -375,7 +489,8 @@ export class FeedbackPanel {
         btn.onclick = (e) => {
           e.stopPropagation();
           const id = btn.dataset.id;
-          const textarea = document.querySelector(`#side-comment-edit-${id} textarea`);
+          const editBox = document.getElementById("side-comment-edit-" + id);
+          const textarea = editBox ? editBox.querySelector("textarea") : null;
           const newText = textarea ? textarea.value.trim() : "";
           this.updateComment(id, newText);
         };

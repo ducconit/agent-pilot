@@ -120,100 +120,7 @@
     }
   };
 
-  // Bridge to Main World so page scripts, DevTools Console and Agents can access window.__AGENT_PILOT__
-  try {
-    const bridgeScript = document.createElement("script");
-    bridgeScript.textContent = `
-      (() => {
-        function sendBridgeRequest(action, data = {}, customTimeout = null) {
-          let timeoutMs = ${BRIDGE_REQUEST_MS};
-          if (customTimeout && Number(customTimeout) > 0) {
-            timeoutMs = Number(customTimeout);
-          } else if (action === "wait_for") {
-            const waitDur = (data && (data.timeout || data.timeoutMs)) ? Number(data.timeout || data.timeoutMs) : 10000;
-            timeoutMs = waitDur + ${WAIT_FOR_EXTRA_MS};
-          }
-          if (!Number.isFinite(timeoutMs) || timeoutMs > ${BRIDGE_MAX_DELAY_MS}) {
-            timeoutMs = ${BRIDGE_MAX_DELAY_MS};
-          } else if (timeoutMs <= 0) {
-            timeoutMs = ${BRIDGE_REQUEST_MS};
-          }
-          return new Promise((resolve, reject) => {
-            const reqId = "ap_" + Math.random().toString(36).substr(2, ${UNIQUE_ID_SALT_LEN});
-            const timer = setTimeout(() => {
-              window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
-              resolve(null);
-            }, timeoutMs);
-            function onResponse(e) {
-              if (e.detail && e.detail.reqId === reqId) {
-                clearTimeout(timer);
-                window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
-                if (e.detail.error) {
-                  reject(new Error(String(e.detail.error)));
-                } else {
-                  resolve(e.detail.result);
-                }
-              }
-            }
-            window.addEventListener("__AGENT_PILOT_RESP__", onResponse);
-            window.dispatchEvent(new CustomEvent("__AGENT_PILOT_REQ__", {
-              detail: { reqId, action, data }
-            }));
-          });
-        }
-
-        const pageApi = {
-          version: "${EXTENSION_VERSION}",
-          moveMouse: (x, y, duration) => sendBridgeRequest("virtual_mouse_move", { x, y, duration }),
-          click: (x, y) => sendBridgeRequest("virtual_mouse_click", { x, y }),
-          type: (selector, text) => sendBridgeRequest("virtual_type", { selector, text }),
-          scroll: (deltaX, deltaY) => sendBridgeRequest("virtual_scroll", { deltaX, deltaY }),
-          hover: (selector) => sendBridgeRequest("virtual_hover", { selector }),
-          drag: (from, to, steps) => sendBridgeRequest("virtual_drag", { from, to, steps }),
-          pressKey: (key, selector) => sendBridgeRequest("press_key", { key, selector }),
-          waitFor: (options) => sendBridgeRequest("wait_for", options),
-          toggleInspector: (enabled) => sendBridgeRequest("toggle_inspector", { enabled }),
-          getElement: (selector, includeStyles) => sendBridgeRequest("get_element_info", { selector, includeStyles }),
-          snapshot: (maxElements, format) => sendBridgeRequest("get_snapshot", { maxElements, format }),
-          fillForm: (fields, submitSelector, pressEnter) => sendBridgeRequest("fill_form", { fields, submitSelector, pressEnter }),
-          startElementSnap: () => sendBridgeRequest("start_element_snap", {}),
-          stopElementSnap: () => sendBridgeRequest("stop_element_snap", {}),
-          isElementSnapActive: () => sendBridgeRequest("is_element_snap_active", {}),
-          startRegionCrop: () => sendBridgeRequest("start_region_crop", {}),
-          getLockedElement: () => sendBridgeRequest("get_locked_element", {}),
-          pickColor: (x, y) => sendBridgeRequest("pick_color", { x, y }),
-          stopEyedropper: () => sendBridgeRequest("stop_eyedropper", {}),
-          isEyedropperActive: () => sendBridgeRequest("is_eyedropper_active", {}),
-          getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {}),
-          isBusy: () => sendBridgeRequest("is_busy", {}),
-          isAgentTab: () => sendBridgeRequest("is_agent_tab", {}),
-          setAgentTab: (enabled) => sendBridgeRequest("set_agent_tab", { enabled }),
-          setBusy: (busy, action) => sendBridgeRequest("set_busy", { busy, action }),
-          startFeedbackStudio: () => sendBridgeRequest("start_feedback_studio", {}),
-          stopFeedbackStudio: () => sendBridgeRequest("stop_feedback_studio", {}),
-          isFeedbackStudioActive: () => sendBridgeRequest("is_feedback_studio_active", {}),
-          getFeedbackItems: () => sendBridgeRequest("get_feedback_items", {}),
-          addFeedbackItem: (item) => sendBridgeRequest("add_feedback_item", { item }),
-          clearFeedbackItems: () => sendBridgeRequest("clear_feedback_items", {}),
-          copyFeedbackPrompt: () => sendBridgeRequest("copy_feedback_prompt", {}),
-          generateFeedbackPrompt: (items) => sendBridgeRequest("generate_feedback_prompt", { items }),
-          saveFeedbackToInbox: () => sendBridgeRequest("save_feedback_inbox", {}),
-          pushFeedbackToAgent: () => sendBridgeRequest("push_feedback_agent", {})
-        };
-
-        window.__AGENT_PILOT__ = window.__AGENT_PILOT__ || {};
-        for (const [name, fn] of Object.entries(pageApi)) {
-          if (typeof window.__AGENT_PILOT__[name] === "undefined") {
-            window.__AGENT_PILOT__[name] = fn;
-          }
-        }
-      })();
-    `;
-    (document.head || document.documentElement).appendChild(bridgeScript);
-    bridgeScript.remove();
-  } catch (e) {}
-
-  // Listen for bridge requests from Main World
+  // Listen for bridge requests from Main World (main-world-bridge.js)
   window.addEventListener("__AGENT_PILOT_REQ__", async (e) => {
     if (!e.detail) return;
     const { reqId, action, data = {} } = e.detail;
@@ -247,7 +154,6 @@
       else if (action === "get_cursor_pos") result = cursor.getCursorPosition();
       else if (action === "is_busy") result = shield.isBusy();
       else if (action === "is_agent_tab") result = isAgentTab;
-      else if (action === "set_agent_tab") { isAgentTab = Boolean(data.enabled); result = isAgentTab; }
       else if (action === "set_busy") { shield.setAgentBusyState(data.busy, data.action); result = { success: true, isAgentBusy: shield.isBusy() }; }
       else if (action === "start_feedback_studio") { feedback.start(); result = { success: true, active: feedback.isActive() }; }
       else if (action === "stop_feedback_studio") { feedback.stop(); result = { success: true, active: feedback.isActive() }; }
@@ -257,8 +163,9 @@
       else if (action === "clear_feedback_items") { feedback.clearAll(); result = { success: true }; }
       else if (action === "copy_feedback_prompt") result = await feedback.copyPrompt();
       else if (action === "generate_feedback_prompt") result = feedback.generateMarkdownPrompt(data.items);
-      else if (action === "save_feedback_inbox") result = await feedback.saveToInbox();
-      else if (action === "push_feedback_agent") result = await feedback.pushToAgent();
+      else {
+        error = `Unsupported or restricted bridge action: ${action}`;
+      }
     } catch (err) {
       console.warn("[AgentPilot] Bridge request error:", action, err);
       error = err?.message || String(err);
@@ -539,6 +446,25 @@
 
     if (req.action === "push_feedback_agent_tab") {
       feedback.pushToAgent().then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
+      return true;
+    }
+
+    if (req.action === "get_page_diagnostics") {
+      if (inspector.queryPageDiagnostics) {
+        inspector.queryPageDiagnostics({
+          clear: Boolean(req.clear),
+          clearStorage: Boolean(req.clearStorage)
+        }).then((diagnostics) => sendResponse({ success: true, diagnostics }))
+          .catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
+      } else {
+        sendResponse({ success: false, error: "Diagnostics unavailable" });
+      }
+      return true;
+    }
+
+    if (req.action === "export_repro_batch") {
+      const batch = inspector.exportReproBatchJson ? inspector.exportReproBatchJson() : { actions: [] };
+      sendResponse({ success: true, batch });
       return true;
     }
 

@@ -73,16 +73,127 @@
     return el.id && !el.id.includes('"') ? `//*[@id="${el.id}"]` : "";
   }
 
+  function parseRgbColor(colorStr) {
+    if (!colorStr || typeof colorStr !== "string") return null;
+    const match = colorStr.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*[,/]\s*([\d.]+))?\s*\)/i);
+    if (!match) return null;
+    return {
+      r: Number(match[1]),
+      g: Number(match[2]),
+      b: Number(match[3]),
+      a: match[4] !== undefined ? Number(match[4]) : 1
+    };
+  }
+
+  function getEffectiveBackgroundColor(el) {
+    let node = el;
+    while (node && node.nodeType === 1) {
+      const bg = window.getComputedStyle(node).backgroundColor;
+      const parsed = parseRgbColor(bg);
+      if (parsed && parsed.a > 0.05) {
+        if (parsed.a < 1) {
+          const alpha = parsed.a;
+          return {
+            r: Math.round(parsed.r * alpha + 255 * (1 - alpha)),
+            g: Math.round(parsed.g * alpha + 255 * (1 - alpha)),
+            b: Math.round(parsed.b * alpha + 255 * (1 - alpha)),
+            a: 1
+          };
+        }
+        return parsed;
+      }
+      node = node.parentElement;
+    }
+    return { r: 255, g: 255, b: 255, a: 1 };
+  }
+
+  function computeRelativeLuminance({ r, g, b }) {
+    const toLinear = (c) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+  }
+
+  function computeContrastRatio(fg, bg) {
+    if (!fg || !bg) return null;
+    const l1 = computeRelativeLuminance(fg);
+    const l2 = computeRelativeLuminance(bg);
+    const lighter = Math.max(l1, l2);
+    const darker = Math.min(l1, l2);
+    return Math.round(((lighter + 0.05) / (darker + 0.05)) * 100) / 100;
+  }
+
+  function evaluateAccessibility(el, style, rect, testLocators) {
+    const fg = parseRgbColor(style.color);
+    const bg = getEffectiveBackgroundColor(el);
+    const contrastRatio = computeContrastRatio(fg, bg);
+    const fontSizePx = parseFloat(style.fontSize) || 16;
+    const fontWeightNum = parseInt(style.fontWeight, 10) || (style.fontWeight === "bold" ? 700 : 400);
+    const isLargeText = fontSizePx >= 24 || (fontSizePx >= 18.66 && fontWeightNum >= 700);
+
+    let wcagLevel = "AA";
+    if (contrastRatio !== null) {
+      const minAA = isLargeText ? 3.0 : 4.5;
+      const minAAA = isLargeText ? 4.5 : 7.0;
+      if (contrastRatio >= minAAA) wcagLevel = "AAA";
+      else if (contrastRatio >= minAA) wcagLevel = "AA";
+      else wcagLevel = "Fail";
+    }
+
+    const warnings = [];
+    const tag = el.tagName.toLowerCase();
+    const role = testLocators?.role || "";
+    const accessibleName = testLocators?.accessibleName || "";
+    const isInteractive = ["button", "a", "input", "select", "textarea"].includes(tag) ||
+      ["button", "link", "checkbox", "radio", "switch", "combobox", "textbox"].includes(role);
+
+    if (tag === "img" && !el.hasAttribute("alt")) {
+      warnings.push("Thẻ <img> thiếu thuộc tính alt");
+    }
+    if (isInteractive && !accessibleName && el.getAttribute("type") !== "hidden") {
+      warnings.push(`Phần tử tương tác <${tag}> thiếu nhãn trợ năng (aria-label / label / text)`);
+    }
+    if (isInteractive && rect.width > 0 && rect.height > 0 && (rect.width < 24 || rect.height < 24)) {
+      warnings.push(`Kích thước vùng bấm nhỏ (${Math.round(rect.width)}×${Math.round(rect.height)}px < 24×24px chuẩn WCAG 2.2)`);
+    }
+    const hasDirectText = Boolean((el.innerText || "").trim());
+    if (hasDirectText && wcagLevel === "Fail" && contrastRatio !== null) {
+      warnings.push(`Độ tương phản chữ thấp (${contrastRatio}:1 - chưa đạt chuẩn WCAG AA)`);
+    }
+
+    return {
+      contrastRatio,
+      wcagLevel,
+      role: role || undefined,
+      accessibleName: accessibleName || undefined,
+      warnings
+    };
+  }
+
   function getDetailedElementInfo(el, includeStyles = false) {
     if (!el) return null;
     const rect = el.getBoundingClientRect();
     const style = window.getComputedStyle(el);
+    const testLocators = selectorUtils?.getTestLocators ? selectorUtils.getTestLocators(el) : null;
+    const selector = testLocators?.selector || getElementSelector(el);
+    const xpath = testLocators?.xpath || getXPath(el);
+    const selectorMatches = testLocators?.selectorMatches ?? (selectorUtils?.getSelectorMatchCount ? selectorUtils.getSelectorMatchCount(selector) : 1);
+    const a11y = evaluateAccessibility(el, style, rect, testLocators);
+
     const info = {
       tagName: el.tagName.toLowerCase(),
       id: el.id || "",
       className: typeof el.className === "string" ? el.className : "",
-      selector: getElementSelector(el),
-      xpath: getXPath(el),
+      selector,
+      selectorMatches,
+      xpath,
+      playwrightLocator: testLocators?.playwrightLocator || "",
+      testId: testLocators?.testId || undefined,
+      testIdAttr: testLocators?.testIdAttr || undefined,
+      role: testLocators?.role || undefined,
+      accessibleName: testLocators?.accessibleName || undefined,
+      a11y,
       rect: {
         x: Math.round(rect.x),
         y: Math.round(rect.y),
@@ -346,26 +457,35 @@
     inspectorBox.style.height = `${rect.height}px`;
 
     const selector = getElementSelector(target);
-    const classes = target.className && typeof target.className === "string" 
-      ? target.className.trim().split(/\s+/).slice(0, 2).map(c => `.${c}`).join("") 
+    const matchCount = selectorUtils?.getSelectorMatchCount ? selectorUtils.getSelectorMatchCount(selector) : 1;
+    const testInfo = selectorUtils?.getTestIdInfo ? selectorUtils.getTestIdInfo(target) : null;
+    const classes = target.className && typeof target.className === "string"
+      ? target.className.trim().split(/\s+/).filter(c => !c.startsWith("agent-pilot")).slice(0, 2).map(c => `.${c}`).join("")
       : "";
 
     const safeTag = escapeHtml(target.tagName.toLowerCase());
     const safeClasses = escapeHtml(classes);
     const safeSelector = escapeHtml(selector);
+    const matchBadge = matchCount === 1
+      ? `<span style="color:#10b981;font-weight:700;margin-left:6px;">✓ 1 match</span>`
+      : `<span style="color:#f59e0b;font-weight:700;margin-left:6px;">⚠ ${matchCount} matches</span>`;
+    const testIdLine = testInfo
+      ? `<div style="font-size: 10px; color: #38bdf8; margin-top: 2px;">🧪 ${escapeHtml(testInfo.attr)}="${escapeHtml(testInfo.value)}"</div>`
+      : "";
 
     inspectorTooltip.innerHTML = `
       <div class="agent-pilot-tooltip-header">
         <span class="agent-pilot-tag">&lt;${safeTag}&gt;</span>
         <span class="agent-pilot-class">${safeClasses}</span>
-        <span class="agent-pilot-dimensions">${Math.round(rect.width)} × ${Math.round(rect.height)}</span>
+        <span class="agent-pilot-dimensions">${Math.round(rect.width)} × ${Math.round(rect.height)} ${matchBadge}</span>
       </div>
       <div class="agent-pilot-selector">${safeSelector}</div>
+      ${testIdLine}
       <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Tọa độ: (${Math.round(rect.left)}, ${Math.round(rect.top)})</div>
     `;
 
     // Position tooltip above or below element
-    let tooltipTop = rect.top - 54;
+    let tooltipTop = rect.top - (testInfo ? 70 : 54);
     if (tooltipTop < 10) tooltipTop = rect.bottom + 10;
     let tooltipLeft = Math.max(10, Math.min(rect.left, window.innerWidth - 390));
 
@@ -389,7 +509,7 @@
     e.stopPropagation();
 
     lockedElement = e.target;
-    const details = getDetailedElementInfo(lockedElement);
+    const details = getDetailedElementInfo(lockedElement, true);
 
     // Tự động tắt ngay chế độ soi sau khi chọn xong phần tử
     toggleInspector(false, false);
@@ -700,6 +820,179 @@
     };
   }
 
+  // =========================================================================
+  // QA User Action Breadcrumbs ("Steps to Reproduce") & Page Diagnostics
+  // =========================================================================
+
+  const MAX_REPRO_STEPS = 15;
+  const SENSITIVE_FIELD_RE = /pass(word)?|passcode|secret|token|api[-_]?key|auth|cvv|cvc|pin|otp|one[-_]?time|credit|card/i;
+  const reproSteps = [];
+
+  function isInternalAgentPilotNode(target) {
+    if (!target || target.nodeType !== 1) return true;
+    if (target.id && target.id.startsWith("agent-pilot")) return true;
+    return Boolean(
+      target.closest &&
+      (target.closest("[id^='agent-pilot-']") ||
+       target.closest(".agent-pilot-virtual-cursor"))
+    );
+  }
+
+  function isOverlayModeBusy() {
+    if (isInspectorActive || isElementSnapActive || cropState.active) return true;
+    if (window.__AP_INTERNAL__.eyedropper?.isEyedropperActive?.()) return true;
+    if (window.__AP_INTERNAL__.feedbackStudio?.state?.isActive?.()) return true;
+    return false;
+  }
+
+  function recordReproStep(entry) {
+    if (!entry || !entry.action) return;
+    const prev = reproSteps[reproSteps.length - 1];
+    if (prev && prev.action === entry.action && prev.selector === entry.selector && prev.value === entry.value && (Date.now() - prev.timestamp < 800)) {
+      prev.timestamp = Date.now();
+      return;
+    }
+    if (reproSteps.length >= MAX_REPRO_STEPS) {
+      reproSteps.shift();
+    }
+    reproSteps.push({
+      ...entry,
+      timestamp: Date.now()
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    try {
+      if (!e.isTrusted || isOverlayModeBusy() || isInternalAgentPilotNode(e.target)) return;
+      const target = e.target.closest("button, a, input, select, textarea, summary, label, [role='button'], [role='link'], [role='tab'], [role='menuitem'], [role='checkbox'], [role='radio']") || e.target;
+      if (!target || target === document.body || target === document.documentElement) return;
+      const tag = target.tagName.toLowerCase();
+      const selector = getElementSelector(target);
+      const label = (selectorUtils?.getAccessibleName ? selectorUtils.getAccessibleName(target) : (target.innerText || "").trim())
+        .replace(/\s+/g, " ")
+        .slice(0, 50);
+      recordReproStep({
+        action: "click",
+        tagName: tag,
+        selector,
+        label: label || undefined,
+        description: `Click <${tag}>${label ? ` "${label}"` : ""} (\`${selector}\`)`
+      });
+    } catch (_) {}
+  }, true);
+
+  document.addEventListener("change", (e) => {
+    try {
+      if (!e.isTrusted || isOverlayModeBusy() || isInternalAgentPilotNode(e.target)) return;
+      const target = e.target;
+      if (!target || !target.tagName) return;
+      const tag = target.tagName.toLowerCase();
+      if (!["input", "textarea", "select"].includes(tag)) return;
+
+      const type = (target.getAttribute("type") || "text").toLowerCase();
+      const nameAttr = `${target.name || ""} ${target.id || ""} ${target.getAttribute("autocomplete") || ""}`;
+      const isSensitive = type === "password" || SENSITIVE_FIELD_RE.test(nameAttr);
+      const selector = getElementSelector(target);
+      const label = (selectorUtils?.getAccessibleName ? selectorUtils.getAccessibleName(target) : "").slice(0, 40);
+
+      let displayVal = "";
+      if (type === "checkbox" || type === "radio") {
+        displayVal = target.checked ? "checked" : "unchecked";
+      } else if (isSensitive) {
+        displayVal = "[REDACTED]";
+      } else {
+        displayVal = String(target.value || "").replace(/\s+/g, " ").slice(0, 40);
+      }
+
+      const verb = tag === "select" ? "Chọn" : (type === "checkbox" || type === "radio" ? "Đánh dấu" : "Nhập");
+      recordReproStep({
+        action: tag === "select" ? "select" : "type",
+        tagName: tag,
+        selector,
+        label: label || undefined,
+        value: displayVal,
+        description: `${verb} "${displayVal}" vào <${tag}>${label ? ` "${label}"` : ""} (\`${selector}\`)`
+      });
+    } catch (_) {}
+  }, true);
+
+  function getReproSteps() {
+    return reproSteps.slice();
+  }
+
+  function clearReproSteps() {
+    reproSteps.length = 0;
+  }
+
+  function exportReproBatchJson() {
+    const actions = reproSteps.map((step) => {
+      if (step.action === "type" || step.action === "select") {
+        return {
+          action: "type",
+          selector: step.selector,
+          text: step.value === "[REDACTED]" ? "<SENSITIVE_VALUE>" : (step.value || "")
+        };
+      }
+      return {
+        action: "click",
+        selector: step.selector
+      };
+    });
+    return {
+      url: window.location.href,
+      title: document.title,
+      generatedAt: new Date().toISOString(),
+      actions
+    };
+  }
+
+  function queryPageDiagnostics({ clear = false, clearStorage = false } = {}) {
+    return new Promise((resolve) => {
+      const reqId = "diag_" + Math.random().toString(36).slice(2, 10);
+      const environment = {
+        viewport: `${window.innerWidth}×${window.innerHeight}`,
+        devicePixelRatio: window.devicePixelRatio || 1,
+        userAgent: navigator.userAgent,
+        language: navigator.language || "vi-VN",
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      };
+
+      const timeout = setTimeout(() => {
+        window.removeEventListener("__AP_DIAGNOSTICS_RESP__", onResp);
+        if (clear || clearStorage) clearReproSteps();
+        resolve({
+          environment,
+          consoleErrors: [],
+          networkErrors: [],
+          reproSteps: getReproSteps(),
+          clearedStorage: null
+        });
+      }, 250);
+
+      function onResp(e) {
+        if (e.detail && e.detail.reqId === reqId) {
+          clearTimeout(timeout);
+          window.removeEventListener("__AP_DIAGNOSTICS_RESP__", onResp);
+          const stepsSnapshot = getReproSteps();
+          if (clear || clearStorage) clearReproSteps();
+          resolve({
+            environment,
+            consoleErrors: Array.isArray(e.detail.consoleErrors) ? e.detail.consoleErrors : [],
+            networkErrors: Array.isArray(e.detail.networkErrors) ? e.detail.networkErrors : [],
+            reproSteps: stepsSnapshot,
+            clearedStorage: e.detail.clearedStorage || null
+          });
+        }
+      }
+
+      window.addEventListener("__AP_DIAGNOSTICS_RESP__", onResp);
+      window.dispatchEvent(new CustomEvent("__AP_DIAGNOSTICS_REQ__", {
+        detail: { reqId, clear, clearStorage }
+      }));
+    });
+  }
+
   window.__AP_INTERNAL__.inspector = {
     toggleInspector,
     isInspectorActive: () => isInspectorActive,
@@ -707,10 +1000,14 @@
     getInteractiveSnapshot,
     getElementSelector,
     getXPath,
-    getLockedElement: () => (lockedElement ? getDetailedElementInfo(lockedElement) : null),
+    getLockedElement: () => (lockedElement ? getDetailedElementInfo(lockedElement, true) : null),
     startRegionCrop,
     startElementSnap,
     stopElementSnap,
-    isElementSnapActive: () => isElementSnapActive
+    isElementSnapActive: () => isElementSnapActive,
+    getReproSteps,
+    clearReproSteps,
+    exportReproBatchJson,
+    queryPageDiagnostics
   };
 })();

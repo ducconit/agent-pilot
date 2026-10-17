@@ -26,6 +26,7 @@ import {
 import {
   getActiveTabId,
   getTargetTabId,
+  markTabAsAgentControlled,
   ensureContentScript
 } from "./background/tab-manager.js";
 
@@ -41,14 +42,25 @@ function validateFeedbackRequest(sender, payload) {
   if (!sender || sender.id !== chrome.runtime.id) {
     return { ok: false, error: "Rejected: untrusted sender" };
   }
-  if (!sender.tab) {
-    return { ok: false, error: "Rejected: feedback actions must originate from a content script" };
-  }
   if (!feedbackItemSchema) {
     return { ok: false, error: "Rejected: feedback validation module unavailable" };
   }
   return { ok: true, payload: feedbackItemSchema.sanitizeFeedbackPayload(payload) };
 }
+
+const PRIVILEGED_EXTENSION_ONLY_ACTIONS = new Set([
+  "set_secret_filter_status",
+  "set_agent_bridge_port",
+  "set_agent_bridge_api_key",
+  "toggle_agent_bridge",
+  "reconnect_agent_bridge",
+  "attach_debugger",
+  "detach_debugger",
+  "close_tab",
+  "new_tab",
+  "navigate",
+  "reload_tab"
+]);
 
 // Broadcast helper for extension views and agent bridge
 export function broadcastToExtension(message) {
@@ -134,8 +146,12 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   const state = tabLockStates.get(tabId);
   if (state && state.unlockTimer) clearTimeout(state.unlockTimer);
   tabLockStates.delete(tabId);
-  if (agentBridge && agentBridge.lastAgentTabId === tabId) {
-    agentBridge.lastAgentTabId = null;
+  if (agentBridge) {
+    if (typeof agentBridge.clearAgentTab === "function") {
+      agentBridge.clearAgentTab(tabId);
+    } else if (agentBridge.lastAgentTabId === tabId) {
+      agentBridge.lastAgentTabId = null;
+    }
   }
 });
 
@@ -164,6 +180,25 @@ if (chrome.runtime && chrome.runtime.onConnect) {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (agentBridge && !agentBridge.connected && agentBridge.enabled) {
     agentBridge.requestReconnect();
+  }
+  // If user manually ungroups a tab or moves it into a non-Agent tab group, revoke agent access
+  if (changeInfo.groupId !== undefined && agentControlledTabs.has(tabId)) {
+    if (changeInfo.groupId <= 0) {
+      agentControlledTabs.delete(tabId);
+      if (agentBridge && typeof agentBridge.clearAgentTab === "function") {
+        agentBridge.clearAgentTab(tabId);
+      }
+    } else if (chrome.tabGroups?.get) {
+      try {
+        const grp = await chrome.tabGroups.get(changeInfo.groupId);
+        if (!grp || (grp.title !== "🤖 Agent Pilot" && grp.title !== "Agent Pilot")) {
+          agentControlledTabs.delete(tabId);
+          if (agentBridge && typeof agentBridge.clearAgentTab === "function") {
+            agentBridge.clearAgentTab(tabId);
+          }
+        }
+      } catch (_) {}
+    }
   }
   if (changeInfo.status === "complete") {
     const lockState = tabLockStates.get(tabId);
@@ -199,7 +234,16 @@ if (chrome.alarms) {
  * Main Message Router for Sidepanel, Popup, Content Script
  */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  const { action, type } = request;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    sendResponse({ success: false, error: "Rejected: untrusted sender" });
+    return false;
+  }
+  const { action, type } = request || {};
+
+  if (sender.tab && action && PRIVILEGED_EXTENSION_ONLY_ACTIONS.has(action)) {
+    sendResponse({ success: false, error: `Rejected: privileged action '${action}' is not allowed from content scripts` });
+    return false;
+  }
 
   if (type === "REGION_CROP_REQUESTED" || type === "ELEMENT_SNAP_REQUESTED") {
     broadcastToExtension(request);
@@ -292,7 +336,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // 2. Debugger & CDP Operations
   if (action === "attach_debugger") {
-    attachDebugger(request.tabId, broadcastToExtension).then(sendResponse);
+    attachDebugger(request.tabId, broadcastToExtension).then(async (res) => {
+      if (res && res.success && request.tabId) {
+        await markTabAsAgentControlled(request.tabId).catch(() => {});
+      }
+      sendResponse(res);
+    });
     return true;
   }
 
@@ -348,11 +397,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  // 3. Screenshot Capture Operations
+  // 3. Screenshot Capture Operations (Human UI: Sidepanel, Popup, Content Script)
   if (action === "capture_screenshot") {
     (async () => {
       try {
-        const targetTabId = request.tabId || sender.tab?.id || (agentBridge ? await agentBridge.getTargetTabId() : null);
+        const targetTabId = request.tabId || sender.tab?.id || (await getActiveTabId());
         if (!targetTabId) return sendResponse({ success: false, error: "No target tab found" });
         const res = await captureTabScreenshot(targetTabId, request);
         sendResponse(res);

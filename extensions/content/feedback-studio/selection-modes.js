@@ -149,7 +149,7 @@
 
     // 1. Inspect DOM & Framework Source
     const detailedInfo = window.__AP_INTERNAL__.inspector?.getDetailedElementInfo
-      ? window.__AP_INTERNAL__.inspector.getDetailedElementInfo(target)
+      ? window.__AP_INTERNAL__.inspector.getDetailedElementInfo(target, true)
       : {
           tagName: target.tagName.toLowerCase(),
           selector: target.tagName.toLowerCase() + (target.id ? `#${target.id}` : ""),

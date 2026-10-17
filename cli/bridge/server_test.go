@@ -8,11 +8,11 @@ import (
 )
 
 func TestHealthReportsActiveBridgePort(t *testing.T) {
-	original := activeBridgePort
-	defer func() { activeBridgePort = original }()
+	original := activeBridgePort.Load()
+	defer func() { activeBridgePort.Store(original) }()
 
 	// /health must report the port the server actually bound, not a compiled-in guess
-	activeBridgePort = 12345
+	activeBridgePort.Store(12345)
 	rec := httptest.NewRecorder()
 	handleHealth(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
 

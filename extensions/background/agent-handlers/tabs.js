@@ -20,6 +20,8 @@ export const tabsHandlers = {
   "tabs.query": async (client, params, respond) => {
     const queryParams = { ...params };
     delete queryParams.instanceId;
+    delete queryParams.agentId;
+    delete queryParams.agentLastTabId;
     chrome.tabs.query(queryParams, (tabs) => {
       if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
       else respond(tabs);
@@ -38,6 +40,7 @@ export const tabsHandlers = {
         active: t.active,
         windowId: t.windowId,
         isAgentTab: agentControlledTabs.has(t.id),
+        ownerAgentId: client.tabOwners instanceof Map ? (client.tabOwners.get(t.id) || null) : null,
         groupId: t.groupId
       }));
       respond(list);
@@ -63,7 +66,11 @@ export const tabsHandlers = {
       } else {
         if (tab && tab.id) {
           agentControlledTabs.add(tab.id);
-          client.lastAgentTabId = tab.id;
+          if (typeof client.recordAgentTab === "function") {
+            client.recordAgentTab(tab.id, params.agentId, { isOwner: true });
+          } else {
+            client.lastAgentTabId = tab.id;
+          }
           await client.assignTabToAgentGroup(tab).catch((err) => logDebug("assignTabToAgentGroup error", err));
 
           if (!makeActive && activeTabBefore && activeTabBefore !== tab.id) {
@@ -81,7 +88,7 @@ export const tabsHandlers = {
   },
 
   "tabs.update": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     const updateProps = {};
     if (params.url) updateProps.url = normalizeUrl(params.url);
@@ -93,7 +100,11 @@ export const tabsHandlers = {
       } else {
         if (tab && tab.id) {
           agentControlledTabs.add(tab.id);
-          client.lastAgentTabId = tab.id;
+          if (typeof client.recordAgentTab === "function") {
+            client.recordAgentTab(tab.id, params.agentId);
+          } else {
+            client.lastAgentTabId = tab.id;
+          }
           await client.assignTabToAgentGroup(tab).catch((err) => logDebug("assignTabToAgentGroup error", err));
           await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("attachDebugger error", err));
         }
@@ -103,11 +114,24 @@ export const tabsHandlers = {
   },
 
   "tabs.remove": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    const hasExplicitTab = params.tabId !== undefined && params.tabId !== null && params.tabId !== "";
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId, {
+      // If an agentId is provided without an explicit tabId, only allow closing its own last tab
+      allowFallback: hasExplicitTab || !params.agentId
+    });
+    if (!tabId) return respond(null, new Error("No target tab found in Agent Pilot group"));
     chrome.tabs.remove(tabId, () => {
-      if (chrome.runtime.lastError) respond(null, chrome.runtime.lastError);
-      else respond({ success: true });
+      if (chrome.runtime.lastError) {
+        respond(null, chrome.runtime.lastError);
+      } else {
+        agentControlledTabs.delete(tabId);
+        if (typeof client.clearAgentTab === "function") {
+          client.clearAgentTab(tabId);
+        } else if (client.lastAgentTabId === tabId) {
+          client.lastAgentTabId = null;
+        }
+        respond({ success: true, closedTabId: tabId });
+      }
     });
   }
 };

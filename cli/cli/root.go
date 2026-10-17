@@ -112,6 +112,7 @@ func newRootCommand() *cobra.Command {
 	root.AddCommand(
 		newOpenCommand(),
 		newNavigateCommand(),
+		newCloseCommand(),
 		newClickCommand(),
 		newTypeCommand(),
 		newHoverCommand(),

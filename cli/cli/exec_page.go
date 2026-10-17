@@ -83,6 +83,19 @@ func ExecNavigate(url string, tabID interface{}) error {
 	return nil
 }
 
+func ExecClose(tabID interface{}) error {
+	params := map[string]interface{}{}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := bridge.DispatchCommand("tabs.remove", params, config.DefaultBridgePort())
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✅ Closed tab: %v\n", res)
+	return nil
+}
+
 func ExecScreenshot(mode, selector, outputPath string, tabID interface{}) error {
 	return ExecScreenshotWithOptions(mode, selector, "", outputPath, tabID)
 }
@@ -151,7 +164,7 @@ func ExecScreenshotWithOptions(mode, selector, clipStr, outputPath string, tabID
 	}
 
 	if outputPath == "" {
-		outputPath = fmt.Sprintf("screenshot_%d.png", time.Now().Unix())
+		outputPath = filepath.Join(os.TempDir(), fmt.Sprintf("screenshot_%d_%d.png", time.Now().UnixMilli(), os.Getpid()))
 	}
 
 	_ = os.MkdirAll(filepath.Dir(outputPath), 0755)
@@ -439,7 +452,30 @@ func ExecWaitFor(selector, text, state string, timeoutMs int, tabID interface{})
 	return nil
 }
 
+func validateUploadFilePath(p string) error {
+	clean := filepath.ToSlash(filepath.Clean(p))
+	if abs, err := filepath.Abs(p); err == nil {
+		clean = filepath.ToSlash(abs)
+	}
+	lower := strings.ToLower(clean)
+	forbiddenSubstrings := []string{
+		"/.ssh/", "/.aws/", "/.gnupg/", "/.kube/", "/.config/gcloud/",
+		"/etc/shadow", "/etc/passwd", "/etc/gshadow", "/proc/", "/sys/",
+	}
+	for _, sub := range forbiddenSubstrings {
+		if strings.Contains(lower, sub) {
+			return fmt.Errorf("refusing to upload sensitive system/credential file: %s", p)
+		}
+	}
+	return nil
+}
+
 func ExecUploadFile(selector string, files []string, tabID interface{}) error {
+	for _, f := range files {
+		if err := validateUploadFilePath(f); err != nil {
+			return err
+		}
+	}
 	params := map[string]interface{}{
 		"selector": selector,
 		"files":    files,

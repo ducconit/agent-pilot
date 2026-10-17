@@ -39,11 +39,21 @@ export const interactionHandlers = {
   scroll_into_view: scrollIntoViewAction
 };
 
-
+async function resolveStepTabId(ctx, act) {
+  if (!act.tabId) return ctx.currentTabId;
+  const agentId = act.agentId || ctx.params?.agentId || null;
+  if (ctx.bridgeClient && typeof ctx.bridgeClient.getTargetTabId === "function") {
+    return await ctx.bridgeClient.getTargetTabId(act.tabId, agentId);
+  }
+  return await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId, {
+    tabOwners: ctx.bridgeClient?.tabOwners,
+    agentId
+  });
+}
 
 /** scroll_into_view — ask the content script to scroll an element into view. */
 async function scrollIntoViewAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for scroll_into_view");
   await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
@@ -62,7 +72,7 @@ async function scrollIntoViewAction(ctx, act) {
  * "auto"), otherwise click via the content script.
  */
 async function clickAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for click");
   const via = normalizeVia(act);
   if (via !== "synthetic") {
@@ -95,7 +105,7 @@ async function clickAction(ctx, act) {
 
 /** type / page.type — type text into an element via the content script. */
 async function typeAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for type");
   await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
@@ -112,7 +122,7 @@ async function typeAction(ctx, act) {
 
 /** press_key / key — dispatch a key press via the content script. */
 async function pressKeyAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for press_key");
   await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
@@ -126,7 +136,7 @@ async function pressKeyAction(ctx, act) {
 
 /** scroll / page.scroll — scroll the page by a delta. */
 async function scrollAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for scroll");
   await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
@@ -140,7 +150,7 @@ async function scrollAction(ctx, act) {
 
 /** hover / page.hover — hover an element via the content script. */
 async function hoverAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for hover");
   await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
@@ -157,7 +167,7 @@ async function hoverAction(ctx, act) {
  * selectors present, fall back to the synthetic content-script drag.
  */
 async function dragAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for drag");
   const via = normalizeVia(act);
   const fromSelector = act.from || act.fromSelector;
@@ -197,7 +207,7 @@ async function dragAction(ctx, act) {
 
 /** upload / upload_file — set files on a file input via CDP. */
 async function uploadAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for upload");
   if (!attachedTabs.has(targetTabId)) {
     await attachDebugger(targetTabId);
@@ -210,7 +220,7 @@ async function uploadAction(ctx, act) {
 
 /** dialog / handle_dialog — accept/dismiss a JavaScript dialog via CDP. */
 async function dialogAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for dialog");
   if (!attachedTabs.has(targetTabId)) {
     await attachDebugger(targetTabId);
@@ -222,7 +232,7 @@ async function dialogAction(ctx, act) {
 
 /** fill_form / fill / page.fillform — fill (and optionally submit) form fields. */
 async function fillFormAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for fill_form");
   await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {

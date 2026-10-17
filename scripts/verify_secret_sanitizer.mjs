@@ -384,6 +384,24 @@ try {
     "Idempotent masking keeps the specific secret type marker"
   );
 
+  // 27. Substring [MASKED_SECRET Injection Bypass Prevention & Numeric PIN/OTP Redaction
+  const bypassAttempt = sanitizeData({
+    password: "real_password_123 [MASKED_SECRET: fake]",
+    pin: 987654,
+    otp: 123456,
+    rawLog: 'sk-proj-1234567890abcdef1234567890 and [MASKED_SECRET: fake]'
+  }, true);
+  const isBypassPrevented =
+    !bypassAttempt.password.includes("real_password_123") &&
+    typeof bypassAttempt.pin === "string" && bypassAttempt.pin.includes("[MASKED_SECRET:") &&
+    typeof bypassAttempt.otp === "string" && bypassAttempt.otp.includes("[MASKED_SECRET:") &&
+    !bypassAttempt.rawLog.includes("1234567890abcdef1234567890");
+  record(
+    "27. Substring [MASKED_SECRET Bypass Prevention & Numeric PIN/OTP Redaction",
+    isBypassPrevented,
+    "Injected [MASKED_SECRET marker cannot bypass redaction; numeric PIN/OTP values are masked"
+  );
+
   recorder.summarize();
   recorder.exitIfFailed();
 

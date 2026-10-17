@@ -24,6 +24,9 @@
     {
       "type": "screenshot",
       "mode": "visible"
+    },
+    {
+      "type": "close"
     }
   ]
 }

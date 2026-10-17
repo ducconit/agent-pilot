@@ -8,21 +8,21 @@ import { attachDebugger, detachDebugger, sendCdpCommand } from "../cdp-manager.j
 
 export const cdpHandlers = {
   "cdp.attach": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     const res = await attachDebugger(tabId, client.broadcastFn);
     respond(res);
   },
 
   "cdp.detach": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     const res = await detachDebugger(tabId, client.broadcastFn);
     respond(res);
   },
 
   "cdp.status": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     const status = await attachDebugger(tabId, client.broadcastFn).catch((err) => ({
       success: false,
@@ -42,7 +42,7 @@ export const cdpHandlers = {
   },
 
   "cdp.send": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     const cdpMethod = params.cdpMethod || params.method || params.action;
     if (!cdpMethod) return respond(null, new Error("Missing CDP method (cdpMethod or method)"));

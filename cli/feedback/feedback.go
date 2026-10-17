@@ -36,12 +36,13 @@ type FeedbackItem struct {
 }
 
 type FeedbackSession struct {
-	SessionID string         `json:"sessionId"`
-	SavedAt   string         `json:"savedAt"`
-	URL       string         `json:"url"`
-	Title     string         `json:"title"`
-	Count     int            `json:"count"`
-	Items     []FeedbackItem `json:"items"`
+	SessionID   string                 `json:"sessionId"`
+	SavedAt     string                 `json:"savedAt"`
+	URL         string                 `json:"url"`
+	Title       string                 `json:"title"`
+	Count       int                    `json:"count"`
+	Items       []FeedbackItem         `json:"items"`
+	Diagnostics map[string]interface{} `json:"diagnostics,omitempty"`
 }
 
 // GetFeedbackStorageDir resolves the feedback inbox directory. AGENT_PILOT_HOME
@@ -87,6 +88,10 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 	rel, err := filepath.Rel(storageDir, sessionDir)
 	if err != nil || strings.HasPrefix(rel, "..") || rel == "." {
 		ts = fmt.Sprintf("%d", time.Now().UnixMilli())
+		sessionDir = filepath.Join(storageDir, ts)
+	}
+	if _, statErr := os.Stat(sessionDir); statErr == nil {
+		ts = fmt.Sprintf("%s_%d", ts, time.Now().UnixNano()%100000)
 		sessionDir = filepath.Join(storageDir, ts)
 	}
 
@@ -139,13 +144,13 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 		if dataURL, ok := itemMap["screenshotDataUrl"].(string); ok && strings.HasPrefix(dataURL, "data:image/") {
 			parts := strings.SplitN(dataURL, ",", 2)
 			if len(parts) == 2 {
-				ext := "png"
-				if strings.Contains(parts[0], "jpeg") || strings.Contains(parts[0], "jpg") {
-					ext = "jpg"
-				}
-				imageFileName = fmt.Sprintf("item_%d.%s", itemNum, ext)
-				imageAbsolutePath = filepath.Join(sessionDir, imageFileName)
-				if imgBytes, err := base64.StdEncoding.DecodeString(parts[1]); err == nil {
+				if imgBytes, err := base64.StdEncoding.DecodeString(parts[1]); err == nil && isValidImageBytes(imgBytes) {
+					ext := "png"
+					if len(imgBytes) >= 3 && imgBytes[0] == 0xff && imgBytes[1] == 0xd8 && imgBytes[2] == 0xff {
+						ext = "jpg"
+					}
+					imageFileName = fmt.Sprintf("item_%d.%s", itemNum, ext)
+					imageAbsolutePath = filepath.Join(sessionDir, imageFileName)
 					if writeErr := os.WriteFile(imageAbsolutePath, imgBytes, config.FeedbackFilePerm); writeErr != nil {
 						imageErrors++
 						imageFileName = ""
@@ -153,8 +158,6 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 					}
 				} else {
 					imageErrors++
-					imageFileName = ""
-					imageAbsolutePath = ""
 				}
 			}
 		}
@@ -175,14 +178,19 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 
 	pageURL, _ := payload["url"].(string)
 	pageTitle, _ := payload["title"].(string)
+	var diagMap map[string]interface{}
+	if d, ok := payload["diagnostics"].(map[string]interface{}); ok {
+		diagMap = d
+	}
 
 	meta := FeedbackSession{
-		SessionID: ts,
-		SavedAt:   time.Now().Format(time.RFC3339),
-		URL:       pageURL,
-		Title:     pageTitle,
-		Count:     len(savedItems),
-		Items:     savedItems,
+		SessionID:   ts,
+		SavedAt:     time.Now().Format(time.RFC3339),
+		URL:         pageURL,
+		Title:       pageTitle,
+		Count:       len(savedItems),
+		Items:       savedItems,
+		Diagnostics: diagMap,
 	}
 
 	metaBytes, err := json.MarshalIndent(meta, "", "  ")
@@ -193,8 +201,21 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 		return nil, fmt.Errorf("failed to write feedback session: %w", err)
 	}
 
-	// Format prompt.md
+	// Format prompt.md (guarantee zero raw base64 bloat in prompt.md)
 	promptMD, _ := payload["prompt"].(string)
+	if promptMD != "" && strings.Contains(promptMD, "data:image/") {
+		for i, raw := range rawItems {
+			if itemMap, ok := raw.(map[string]interface{}); ok {
+				if dataURL, ok := itemMap["screenshotDataUrl"].(string); ok && strings.HasPrefix(dataURL, "data:image/") {
+					replacement := fmt.Sprintf("item_%d.png", i+1)
+					if i < len(savedItems) && savedItems[i].ImageFile != "" {
+						replacement = savedItems[i].ImageFile
+					}
+					promptMD = strings.ReplaceAll(promptMD, dataURL, replacement)
+				}
+			}
+		}
+	}
 	if promptMD == "" {
 		var sb strings.Builder
 		sb.WriteString("### 🎯 YÊU CẦU CHỈNH SỬA GIAO DIỆN (Agent Pilot Visual Feedback)\n\n")
@@ -222,9 +243,13 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 			}
 			if it.DOM != nil {
 				sel, _ := it.DOM["selector"].(string)
+				pw, _ := it.DOM["playwrightLocator"].(string)
 				xp, _ := it.DOM["xpath"].(string)
 				txt, _ := it.DOM["text"].(string)
 				sb.WriteString(fmt.Sprintf("- **CSS Selector**: `%s`\n", sel))
+				if pw != "" {
+					sb.WriteString(fmt.Sprintf("- **Playwright Locator**: `%s`\n", pw))
+				}
 				if xp != "" {
 					sb.WriteString(fmt.Sprintf("- **XPath**: `%s`\n", xp))
 				}
@@ -262,6 +287,9 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 		"promptMd":   promptMD,
 		"count":      len(savedItems),
 	}
+	if tabID, ok := payload["tabId"]; ok && tabID != nil {
+		res["tabId"] = tabID
+	}
 	if imageErrors > 0 {
 		res["imageErrors"] = imageErrors
 	}
@@ -269,6 +297,19 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 	CheckAndNotifyFeedbackWaiters(res)
 
 	return res, nil
+}
+
+func isValidImageBytes(b []byte) bool {
+	// PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A
+	if len(b) >= 8 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4e && b[3] == 0x47 &&
+		b[4] == 0x0d && b[5] == 0x0a && b[6] == 0x1a && b[7] == 0x0a {
+		return true
+	}
+	// JPEG magic bytes: FF D8 FF
+	if len(b) >= 3 && b[0] == 0xff && b[1] == 0xd8 && b[2] == 0xff {
+		return true
+	}
+	return false
 }
 
 func GetPendingFeedback(limit int, sessionID string, clear bool) (map[string]interface{}, error) {
@@ -292,9 +333,12 @@ func GetPendingFeedback(limit int, sessionID string, clear bool) (map[string]int
 	}
 
 	sort.Slice(dirNames, func(i, j int) bool {
-		numI, _ := strconv.ParseInt(dirNames[i], 10, 64)
-		numJ, _ := strconv.ParseInt(dirNames[j], 10, 64)
-		return numI > numJ
+		numI, errI := strconv.ParseInt(dirNames[i], 10, 64)
+		numJ, errJ := strconv.ParseInt(dirNames[j], 10, 64)
+		if errI == nil && errJ == nil {
+			return numI > numJ
+		}
+		return dirNames[i] > dirNames[j]
 	})
 
 	if limit <= 0 {
@@ -317,24 +361,35 @@ func GetPendingFeedback(limit int, sessionID string, clear bool) (map[string]int
 
 	for _, id := range targetIDs {
 		sDir := filepath.Join(storageDir, id)
-		metaBytes, _ := os.ReadFile(filepath.Join(sDir, "session.json"))
-		promptBytes, _ := os.ReadFile(filepath.Join(sDir, "prompt.md"))
+		metaBytes, metaErr := os.ReadFile(filepath.Join(sDir, "session.json"))
+		promptBytes, promptErr := os.ReadFile(filepath.Join(sDir, "prompt.md"))
 
 		var meta map[string]interface{}
-		_ = json.Unmarshal(metaBytes, &meta)
+		if metaErr == nil {
+			if unmarshalErr := json.Unmarshal(metaBytes, &meta); unmarshalErr != nil {
+				fmt.Fprintf(os.Stderr, "[Feedback] Corrupt session.json in %s: %v\n", sDir, unmarshalErr)
+			}
+		}
 		if meta == nil {
 			meta = make(map[string]interface{})
 		}
 
 		meta["sessionId"] = id
 		meta["sessionDir"] = sDir
-		meta["prompt"] = string(promptBytes)
+		if promptErr == nil {
+			meta["prompt"] = string(promptBytes)
+		} else {
+			meta["prompt"] = ""
+		}
 
 		sessions = append(sessions, meta)
 
 		if clear {
-			_ = os.MkdirAll(archiveDir, config.FeedbackDirPerm)
-			_ = os.Rename(sDir, filepath.Join(archiveDir, id))
+			if err := os.MkdirAll(archiveDir, config.FeedbackDirPerm); err == nil {
+				if err := os.Rename(sDir, filepath.Join(archiveDir, id)); err != nil {
+					fmt.Fprintf(os.Stderr, "[Feedback] Failed to archive %s: %v\n", sDir, err)
+				}
+			}
 		}
 	}
 

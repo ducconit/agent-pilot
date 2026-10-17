@@ -67,6 +67,7 @@ const (
 	EmbeddedReadyDialTimeout   = 100 * time.Millisecond
 	EmbeddedReadyRetryInterval = 50 * time.Millisecond
 	EmbeddedReadyBudget        = time.Second
+	EmbeddedClientWaitBudget   = 3 * time.Second
 
 	// --- Timeout derivation policy (bridge/timeout.go) ----------------------
 	// Batch commands never get less than a five-minute base budget; every action

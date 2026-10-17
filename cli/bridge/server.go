@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/ducconit/agent-pilot-extension/cli/config"
 	"github.com/ducconit/agent-pilot-extension/cli/version"
@@ -57,7 +58,7 @@ func StartBridgeServer(port int) error {
 	}
 	// Remember the effective port so /health reports what is actually bound
 	// (the server may be started with --port or AGENT_PILOT_PORT).
-	activeBridgePort = port
+	activeBridgePort.Store(int32(port))
 	addr := fmt.Sprintf("%s:%d", config.DefaultHost, port)
 
 	// Test if port is already open (Dual Mode)
@@ -101,9 +102,17 @@ func StartBridgeServer(port int) error {
 // activeBridgePort is the port the in-process bridge actually bound to.
 // It starts at the configured default and is updated by StartBridgeServer so
 // /health and error messages report the real listener, not a guess.
-var activeBridgePort = config.DefaultBridgePort()
+var activeBridgePort atomic.Int32
+
+func init() {
+	activeBridgePort.Store(int32(config.DefaultBridgePort()))
+}
 
 // ActiveBridgePort returns the effective port for in-process bridge operations.
 func ActiveBridgePort() int {
-	return activeBridgePort
+	p := int(activeBridgePort.Load())
+	if p <= 0 {
+		return config.DefaultBridgePort()
+	}
+	return p
 }

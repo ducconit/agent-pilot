@@ -121,6 +121,8 @@ export async function reconcileDebuggerState() {
       }
     } catch (err) {
       logDebug("reconcileDebuggerState", err);
+    } finally {
+      reconcilePromise = null;
     }
   })();
   return reconcilePromise;

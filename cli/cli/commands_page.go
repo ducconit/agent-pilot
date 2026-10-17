@@ -14,6 +14,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -62,6 +63,37 @@ func newNavigateCommand() *cobra.Command {
 		return nil
 	})
 	cmd.Flags().IntP("tab", "t", 0, "Target tab ID")
+	return cmd
+}
+
+func newCloseCommand() *cobra.Command {
+	cmd := newLeafCommand("close", []string{"close-tab"}, func(args []string) error {
+		cmdArgs, err := parseCmdArgs(args, []FlagDef{
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if tabID == nil && len(cmdArgs.Positional) > 0 {
+			parsed, convErr := strconv.Atoi(cmdArgs.Positional[0])
+			if convErr != nil || parsed <= 0 {
+				fmt.Fprintf(os.Stderr, "❌ Error: invalid tab ID: %s\n", cmdArgs.Positional[0])
+				return errUsage
+			}
+			tabID = parsed
+		}
+		if err := ExecClose(tabID); err != nil {
+			return fmt.Errorf("❌ Error: %v", err)
+		}
+		return nil
+	})
+	cmd.Flags().IntP("tab", "t", 0, "Target tab ID in Agent Pilot group to close")
 	return cmd
 }
 

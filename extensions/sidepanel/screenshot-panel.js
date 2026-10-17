@@ -186,8 +186,13 @@ export class ScreenshotPanel {
   }
 
   captureVisibleScreenshot() {
+    const activeTabId = this.getActiveTabId();
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: "capture_screenshot", mode: "visible" }, (res) => {
+      chrome.runtime.sendMessage({
+        action: "capture_screenshot",
+        mode: "visible",
+        ...(activeTabId ? { tabId: activeTabId } : {})
+      }, (res) => {
         if (res && res.success && res.dataUrl) {
           this.displayScreenshot(res.dataUrl, "Đã chụp toàn bộ khung nhìn!");
           resolve(res.dataUrl);

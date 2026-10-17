@@ -91,15 +91,20 @@
           // the element instance and track state via their own listener, so a plain
           // `el.value = x` can be swallowed. Calling the ORIGINAL prototype descriptor
           // setter bypasses the patch and reliably notifies the framework's tracker.
-          const proto = (el instanceof HTMLTextAreaElement) ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+          const win = el.ownerDocument?.defaultView || window;
+          const proto = (tag === "textarea") ? win.HTMLTextAreaElement.prototype : win.HTMLInputElement.prototype;
           const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
 
           if (field.clear !== false) {
+            const prevClear = el.value;
             if (nativeSetter) nativeSetter.call(el, ""); else el.value = "";
+            if (el._valueTracker) el._valueTracker.setValue(prevClear);
             el.dispatchEvent(new Event("input", { bubbles: true }));
           }
 
+          const prevVal = el.value;
           if (nativeSetter) nativeSetter.call(el, String(val)); else el.value = String(val);
+          if (el._valueTracker) el._valueTracker.setValue(prevVal);
           el.dispatchEvent(new Event("input", { bubbles: true }));
           el.dispatchEvent(new Event("change", { bubbles: true }));
           filledCount++;
@@ -117,7 +122,7 @@
       const subRes = await cursor.virtualClick(undefined, undefined, submitSelector);
       submitted = subRes?.success || false;
     } else if (pressEnter && lastTargetEl) {
-      cursor.dispatchKey("Enter", "Enter", 13, null);
+      cursor.dispatchKey("Enter", "Enter", 13, lastTargetEl);
       submitted = true;
     }
 

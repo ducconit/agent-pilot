@@ -344,10 +344,16 @@ func (m *DarwinServiceManager) Install() error {
 	if err := m.mkdirAll(launchAgentsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create LaunchAgents directory: %w", err)
 	}
+	logsDir := filepath.Join(m.homeDir, "Library", "Logs")
+	if err := m.mkdirAll(logsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create Library/Logs directory: %w", err)
+	}
 
 	plistPath := m.plistPath()
-	// Safely escape XML characters in executable path
+	// Safely escape XML characters in executable and log paths
 	escapedExec := html.EscapeString(m.execPath)
+	escapedOutLog := html.EscapeString(filepath.Join(logsDir, "agent-pilot.log"))
+	escapedErrLog := html.EscapeString(filepath.Join(logsDir, "agent-pilot.err"))
 	plistContent := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -364,12 +370,12 @@ func (m *DarwinServiceManager) Install() error {
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/tmp/agent-pilot.log</string>
+    <string>%s</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/agent-pilot.err</string>
+    <string>%s</string>
 </dict>
 </plist>
-`, escapedExec, config.ServerSubcommand)
+`, escapedExec, config.ServerSubcommand, escapedOutLog, escapedErrLog)
 
 	if err := m.writeFile(plistPath, []byte(plistContent), 0644); err != nil {
 		return fmt.Errorf("failed to write launchd plist: %w", err)

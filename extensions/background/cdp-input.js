@@ -147,6 +147,12 @@ export async function dispatchCdpMouseMove(tabId, x, y) {
   return { success: true, x: Math.round(x), y: Math.round(y) };
 }
 
+function buttonToBitmask(button) {
+  if (button === "right") return 2;
+  if (button === "middle") return 4;
+  return 1;
+}
+
 /**
  * Dispatch a real, trusted mouse click (move -> press -> release) via CDP.
  * Works on cross-origin iframes, canvas and WebGL apps where synthetic DOM events fail.
@@ -155,6 +161,7 @@ export async function dispatchCdpMouseClick(tabId, x, y, options = {}) {
   const px = Math.round(x);
   const py = Math.round(y);
   const button = options.button || "left";
+  const buttons = buttonToBitmask(button);
   const clickCount = options.clickCount || 1;
 
   await sendCdpCommand(tabId, "Input.dispatchMouseEvent", { type: "mouseMoved", x: px, y: py });
@@ -163,7 +170,7 @@ export async function dispatchCdpMouseClick(tabId, x, y, options = {}) {
     x: px,
     y: py,
     button,
-    buttons: 1,
+    buttons,
     clickCount
   });
   await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
@@ -202,6 +209,7 @@ export async function dispatchCdpMouseDrag(tabId, fromX, fromY, toX, toY, option
   const x2 = Math.round(Number(toX));
   const y2 = Math.round(Number(toY));
   const button = options.button || "left";
+  const buttons = buttonToBitmask(button);
   const steps = clampCdpDragSteps(options.steps);
   // A negative hold is meaningless; the upper bound stops a bad caller from
   // pinning the pointer "down" indefinitely.
@@ -213,7 +221,7 @@ export async function dispatchCdpMouseDrag(tabId, fromX, fromY, toX, toY, option
     x: x1,
     y: y1,
     button,
-    buttons: 1,
+    buttons,
     clickCount: 1
   });
 
@@ -225,7 +233,7 @@ export async function dispatchCdpMouseDrag(tabId, fromX, fromY, toX, toY, option
       x,
       y,
       button,
-      buttons: 1
+      buttons
     });
     // Pause ~one frame so the page can process each intermediate position.
     await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.CDP_DRAG_STEP_DELAY_MS));

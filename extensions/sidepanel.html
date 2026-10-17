@@ -20,7 +20,7 @@
       </div>
     </div>
     <div class="header-actions">
-      <button class="btn btn-icon btn-sm btn-outline" id="btn-open-guide" title="Thông tin ứng dụng & Hướng dẫn sử dụng (Mở tab mới)">📖</button>
+      <button class="btn btn-icon btn-sm btn-outline" id="btn-open-guide" aria-label="Hướng dẫn sử dụng" title="Thông tin ứng dụng & Hướng dẫn sử dụng (Mở tab mới)">📖</button>
       <div class="debugger-toggle">
         <span class="status-indicator" id="cdp-status-dot"></span>
         <button class="btn btn-sm btn-outline" id="btn-toggle-cdp">Gắn CDP</button>
@@ -35,18 +35,18 @@
       <span class="bridge-status-text" id="agent-bridge-text">AI Agent: Chờ kết nối (Port 58765)</span>
     </div>
     <div class="bridge-controls">
-      <input type="number" id="input-bridge-port" class="port-input" value="58765" title="Cổng WebSocket kết nối AI Agent">
-      <input type="password" id="input-bridge-api-key" class="port-input api-key-input" placeholder="API key (tuỳ chọn)" autocomplete="off" title="API key tuỳ chọn cho bridge">
+      <input type="number" id="input-bridge-port" class="port-input" value="58765" aria-label="Cổng WebSocket kết nối AI Agent" title="Cổng WebSocket kết nối AI Agent">
+      <input type="password" id="input-bridge-api-key" class="port-input api-key-input" placeholder="API key (tuỳ chọn)" autocomplete="off" aria-label="API key tuỳ chọn cho bridge" title="API key tuỳ chọn cho bridge">
       <button class="btn btn-xs btn-outline" id="btn-reconnect-bridge" title="Kết nối lại WebSocket">⚡ Nối</button>
     </div>
   </section>
 
   <!-- Main Navigation Tabs -->
-  <nav class="tabs-nav">
-    <button class="tab-btn active" data-tab="tab-agent">🤖 Agent</button>
-    <button class="tab-btn" data-tab="tab-inspector">🎯 Inspector</button>
-    <button class="tab-btn" data-tab="tab-screenshot">📸 Chụp ảnh</button>
-    <button class="tab-btn" data-tab="tab-feedback" title="Chú thích UI & Chỉ điểm vị trí cho AI Agent">✏️ Chú thích UI</button>
+  <nav class="tabs-nav" role="tablist" aria-label="Điều hướng bảng điều khiển">
+    <button class="tab-btn active" role="tab" aria-selected="true" data-tab="tab-agent">🤖 Agent</button>
+    <button class="tab-btn" role="tab" aria-selected="false" data-tab="tab-inspector">🎯 Inspector</button>
+    <button class="tab-btn" role="tab" aria-selected="false" data-tab="tab-screenshot">📸 Chụp ảnh</button>
+    <button class="tab-btn" role="tab" aria-selected="false" data-tab="tab-feedback" title="Chú thích UI & Chỉ điểm vị trí cho AI Agent">✏️ Chú thích UI</button>
   </nav>
 
   <!-- Main Content Panels -->
@@ -325,6 +325,38 @@
           </div>
           <div id="feedback-items-list" class="feedback-items-stream" style="display:none;">
             <!-- Dynamic feedback cards -->
+          </div>
+        </div>
+      </div>
+
+      <!-- QA Diagnostics, Repro Steps & Quick State Reset Card -->
+      <div class="card mt-3" id="card-qa-diagnostics">
+        <div class="card-header">
+          <div class="card-header-title-group">
+            <span class="card-title">🩺 Chẩn Đoán QA &amp; Tái Hiện Lỗi</span>
+            <span class="tooltip-icon" tabindex="0" title="Tự động thu thập lỗi Console, lỗi API 4xx/5xx và các bước thao tác (Steps to Reproduce) để đính kèm vào báo cáo lỗi hoặc xuất thành kịch bản replay.">?</span>
+          </div>
+          <button class="btn btn-icon btn-xs" id="btn-refresh-qa-diag" title="Làm mới dữ liệu chẩn đoán trên trang hiện tại">🔄</button>
+        </div>
+        <div class="card-body">
+          <div class="agent-info-grid">
+            <div class="info-row">
+              <span class="info-label">🚨 Lỗi Console / Runtime:</span>
+              <span class="info-val font-mono" id="qa-console-err-count">0</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">🌐 Request lỗi (4xx/5xx):</span>
+              <span class="info-val font-mono" id="qa-net-err-count">0</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">👣 Bước thao tác ghi nhận:</span>
+              <span class="info-val font-mono" id="qa-repro-step-count">0</span>
+            </div>
+          </div>
+          <div class="inspector-details mt-2" id="qa-diag-summary-box" style="max-height:140px;overflow-y:auto;font-size:11px;display:none;"></div>
+          <div class="btn-grid mt-2">
+            <button class="btn btn-outline btn-sm" id="btn-copy-repro-batch" title="Sao chép các bước thao tác thành kịch bản JSON (agent-pilot batch) để chạy lại kiểm thử">📋 Copy Replay JSON</button>
+            <button class="btn btn-danger-outline btn-sm" id="btn-reset-site-storage" title="Xóa sạch localStorage, sessionStorage, Cookies và tải lại trang để test phiên mới">🧹 Reset Storage &amp; Reload</button>
           </div>
         </div>
       </div>

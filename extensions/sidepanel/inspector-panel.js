@@ -235,6 +235,10 @@ export class InspectorPanel {
 
     // 1. Render Tab 1: Tổng quan (mọi mục đều hỗ trợ click để sao chép)
     if (this.inspectorResultBox) {
+      const matchBadge = details.selectorMatches === 1
+        ? " ✓ (1 match)"
+        : (details.selectorMatches > 1 ? ` ⚠ (${details.selectorMatches} matches)` : "");
+
       const rows = [
         {
           key: "Tag Name",
@@ -264,20 +268,80 @@ export class InspectorPanel {
         {
           key: "Selector",
           label: "CSS Selector",
-          val: details.selector,
+          val: `${details.selector}${matchBadge}`,
           copyText: details.selector,
           id: "copy-selector",
-          color: "#38bdf8"
-        },
-        {
-          key: "XPath",
-          label: "XPath",
-          val: details.xpath,
-          copyText: details.xpath,
-          id: "copy-xpath",
-          color: "#a78bfa"
+          color: details.selectorMatches > 1 ? "#f59e0b" : "#38bdf8"
         }
       ];
+
+      if (details.playwrightLocator) {
+        rows.push({
+          key: "Playwright",
+          label: "Playwright Locator",
+          val: details.playwrightLocator,
+          copyText: details.playwrightLocator,
+          id: "copy-playwright",
+          color: "#22d3ee"
+        });
+      }
+
+      if (details.testId) {
+        rows.push({
+          key: "Test ID",
+          label: "Test ID",
+          val: `${details.testIdAttr || "data-testid"}="${details.testId}"`,
+          copyText: details.testId,
+          id: "copy-testid",
+          color: "#38bdf8"
+        });
+      }
+
+      rows.push({
+        key: "XPath",
+        label: "XPath",
+        val: details.xpath,
+        copyText: details.xpath,
+        id: "copy-xpath",
+        color: "#a78bfa"
+      });
+
+      if (details.role || details.accessibleName) {
+        const ariaSummary = `${details.role ? `role="${details.role}"` : ""}${details.role && details.accessibleName ? " • " : ""}${details.accessibleName ? `"${details.accessibleName}"` : ""}`;
+        rows.push({
+          key: "Trợ năng",
+          label: "Thông tin Trợ năng (ARIA)",
+          val: ariaSummary,
+          copyText: ariaSummary,
+          id: "copy-aria",
+          color: "#cbd5e1"
+        });
+      }
+
+      if (details.a11y && details.a11y.contrastRatio !== null && details.a11y.contrastRatio !== undefined) {
+        const wcag = details.a11y.wcagLevel || "AA";
+        const ratioText = `${details.a11y.contrastRatio}:1 (WCAG ${wcag === "Fail" ? "Chưa đạt AA" : wcag})`;
+        rows.push({
+          key: "Tương phản",
+          label: "Độ tương phản màu (WCAG)",
+          val: ratioText,
+          copyText: ratioText,
+          id: "copy-contrast",
+          color: wcag === "Fail" ? "#f87171" : "#34d399"
+        });
+      }
+
+      if (details.a11y?.warnings && details.a11y.warnings.length > 0) {
+        const warnText = details.a11y.warnings.join(" • ");
+        rows.push({
+          key: "⚠️ Lưu ý QA",
+          label: "Cảnh báo QA / Accessibility",
+          val: warnText,
+          copyText: warnText,
+          id: "copy-a11y-warn",
+          color: "#fbbf24"
+        });
+      }
 
       if (details.text) {
         rows.push({
@@ -344,9 +408,20 @@ export class InspectorPanel {
       `Tag Name: <${d.tagName}>`,
       `Tọa độ: X: ${d.rect.x}px, Y: ${d.rect.y}px`,
       `Kích thước: ${d.rect.width} × ${d.rect.height} px`,
-      `CSS Selector: ${d.selector}`,
-      `XPath: ${d.xpath}`
+      `CSS Selector: ${d.selector}${d.selectorMatches ? ` (${d.selectorMatches} match)` : ""}`
     ];
+    if (d.playwrightLocator) lines.push(`Playwright Locator: ${d.playwrightLocator}`);
+    if (d.testId) lines.push(`Test ID: ${d.testIdAttr || "data-testid"}="${d.testId}"`);
+    lines.push(`XPath: ${d.xpath}`);
+    if (d.role || d.accessibleName) {
+      lines.push(`ARIA: ${d.role ? `role="${d.role}" ` : ""}${d.accessibleName ? `"${d.accessibleName}"` : ""}`.trim());
+    }
+    if (d.a11y && d.a11y.contrastRatio !== null && d.a11y.contrastRatio !== undefined) {
+      lines.push(`Độ tương phản WCAG: ${d.a11y.contrastRatio}:1 (${d.a11y.wcagLevel || "AA"})`);
+    }
+    if (d.a11y?.warnings?.length) {
+      lines.push(`Lưu ý QA: ${d.a11y.warnings.join("; ")}`);
+    }
     if (d.text) lines.push(`Nội dung: ${d.text}`);
     if (d.value !== undefined && d.value !== "") lines.push(`Giá trị: ${d.value}`);
 

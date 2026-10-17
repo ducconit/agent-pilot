@@ -71,13 +71,14 @@ Agent Pilot provides an all-in-one compiled Go binary (`cli/agent-pilot`) for ul
   agent-pilot service restart
   agent-pilot service uninstall
 
-  # Direct Browser Actions
+  # Direct Browser Actions (Always open a tab in Agent Pilot group, then close when done to save RAM)
   agent-pilot open https://example.com
   agent-pilot click "#login-button"
   agent-pilot type "#search-box" "automation testing" --enter
-  agent-pilot screenshot --mode visible -o ./report.png
+  agent-pilot screenshot --mode visible
   agent-pilot inspect "#target-element"
   agent-pilot tabs
+  agent-pilot close
   agent-pilot batch flow.json
   agent-pilot feedback list
 
@@ -86,14 +87,17 @@ Agent Pilot provides an all-in-one compiled Go binary (`cli/agent-pilot`) for ul
   agent-pilot click -x 733 -y 668 --via cdp --tab 123
   agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --hold 800 --via cdp --tab 123
   ```
-- **Multi-Agent Multitasking**: Install the background service (`agent-pilot service install`) so port 58765 is persistently available. Agents operating concurrently should always retain and pass `tabId` across tool calls to operate on dedicated background tabs without collision.
+- **Multi-Agent, Multi-Conversation & External Tool Concurrency (`🤖 Agent Pilot`)**:
+  - **Strict Group Boundary**: AI Agents and external CLI/API tools are **strictly restricted** to operating on tabs inside the `🤖 Agent Pilot` tab group (`agentControlledTabs`). Attempting to target a personal user tab outside the group or calling page commands when no tab exists in the group will be rejected. Always start by opening a tab via `browser_open_tab` / `agent-pilot open` (or `"action": "open"` in `browser_run_actions`), which automatically places the tab into the `🤖 Agent Pilot` group in background mode (`active: false`). Users can also grant access to an existing tab by dragging it into the `🤖 Agent Pilot` Chrome tab group or clicking **"Gắn CDP"** in the Sidepanel.
+  - **Concurrent Agents & Explicit `tabId` Discipline**: Multiple agents (e.g., multiple Antigravity conversations, Claude Code, Cursor, subagents, or external CLI scripts) can share the bridge concurrently. Each MCP session automatically tracks its own `agentId` and tab ownership so agents do not hijack or close each other's tabs. For deterministic multi-tab/multi-agent execution, **always capture the `id` (`tabId`) returned by `browser_open_tab` and pass `tabId` explicitly** on subsequent calls (`browser_click`, `browser_screenshot`, `browser_close_tab`, etc.).
+  - **Mandatory Tab Cleanup (Save RAM)**: After completing any test or verification workflow on a tab you created, **always close your tab** (`browser_close_tab({ tabId })`, `agent-pilot close --tab <id>`, `{ "action": "close" }` at the end of `browser_run_actions`, or `browser_end_session({ tabId, closeTab: true })`) so temporary test tabs do not accumulate and waste browser RAM. Never close tabs belonging to other agents unless explicitly instructed by the user.
 
 ---
 
 
-## 🛠️ Available MCP Tools (35 Tools)
+## 🛠️ Available MCP Tools (36 Tools)
 
-When the `agent-pilot` MCP server or skill is active, agents have direct access to the following 35 tools:
+When the `agent-pilot` MCP server or skill is active, agents have direct access to the following 36 tools:
 
 | Tool Name | Key Parameters | Description |
 | :--- | :--- | :--- |
@@ -115,16 +119,17 @@ When the `agent-pilot` MCP server or skill is active, agents have direct access 
 | `browser_take_heapsnapshot` | `{ collectGarbage?: boolean, tabId?: number }` | **Memory Heap Profiler**: Captures memory heap snapshot or triggers V8 Garbage Collection to detect memory leaks. |
 | `browser_manage_extensions` | `{ action?: "list" \| "setEnabled", extensionId?: string, enabled?: boolean }` | **Extension Manager**: Lists installed browser extensions or toggles them on/off via `chrome.management`. |
 | `browser_start_session` | `{ name?: string, tabId?: number }` | **Continuous Session Start**: Initiates an active AI Agent session. Keeps the virtual cursor and glowing neon lock shield continuously visible on the tab until ended. |
-| `browser_end_session` | `{ tabId?: number }` | **Continuous Session End**: Concludes the active AI Agent session. Fades out and dismisses the virtual cursor and lock shield. |
+| `browser_end_session` | `{ tabId?: number, closeTab?: boolean }` | **Continuous Session End**: Concludes the active AI Agent session. Set `closeTab: true` to automatically close the agent tab and free RAM when the test finishes. |
 | `browser_evaluate` | `{ expression: string, tabId?: number }` | **Page Evaluator**: Evaluates a JavaScript expression or script in the context of the page (MAIN world first for direct framework/DOM state access, with CDP Runtime.evaluate fallback) and returns the serialized result. |
-| `browser_open_tab` | `{ url: string, active?: boolean }` | Opens a new browser tab with the specified URL. Defaults to `active: false` (background mode) to never interrupt or steal focus from the user's active window. |
+| `browser_open_tab` | `{ url: string, active?: boolean }` | Opens a new browser tab inside the `🤖 Agent Pilot` tab group. Defaults to `active: false` (background mode) to never interrupt or steal focus from the user's active window. |
+| `browser_close_tab` | `{ tabId?: number }` | Closes an Agent-controlled tab inside the `🤖 Agent Pilot` tab group to free browser RAM after testing is complete. |
 | `browser_list_tabs` | `{}` | Lists all open tabs with IDs, titles, URLs, active state, and agent ownership indicators. |
-| `browser_navigate` | `{ url: string, tabId?: number }` | Navigates the specified or active tab to a URL. |
+| `browser_navigate` | `{ url: string, tabId?: number }` | Navigates an Agent-controlled tab in the `🤖 Agent Pilot` group to a URL. |
 | `browser_click` | `{ x?: number, y?: number, selector?: string, via?: "synthetic"\|"cdp"\|"auto", tabId?: number }` | Moves virtual mouse cursor and clicks. `via:"cdp"` (opt-in) uses trusted CDP `Input.dispatchMouseEvent` which works on cross-origin iframes, canvas & WebGL apps; `via:"auto"` falls back to synthetic. Default remains synthetic. |
 | `browser_type` | `{ text: string, selector: string, clear?: boolean, pressEnter?: boolean, tabId?: number }` | Simulates human typing into inputs with realistic keystroke delays. Supports CSS selector or snapshot ref (`@1`). |
 | `browser_scroll` | `{ deltaX?: number, deltaY?: number, tabId?: number }` | Smoothly scrolls the page viewport by relative pixel offsets. |
 | `browser_get_element` | `{ selector: string, includeStyles?: boolean, tabId?: number }` | Inspects DOM elements, returning tag name, coordinates, bounding box dimensions, text, and value. Pass `includeStyles: true` only when styling details are needed (omitted by default to save tokens). |
-| `browser_screenshot` | `{ mode?: "visible" \| "region" \| "element" \| "full", selector?: string, path?: string, base64?: boolean, tabId?: number }` | Captures high-resolution PNG screenshot via CDP even on background tabs. By default saves to a local PNG file and returns the file path to prevent token bloat. Set `base64: true` if raw inline base64 dataUrl is required. |
+| `browser_screenshot` | `{ mode?: "visible" \| "region" \| "element" \| "full", selector?: string, path?: string, base64?: boolean, tabId?: number }` | Captures high-resolution PNG screenshot via CDP even on background tabs. By default saves to the OS temporary directory (`os.TempDir()`, e.g. `/tmp/screenshot_<ts>.png`) to avoid cluttering home or project folders and returns the file path. Set `base64: true` if raw inline base64 dataUrl is required. |
 | `browser_get_devtools_data` | `{ tabId?: number, type?: "all" \| "console" \| "network" \| "performance", filterOrigin?: boolean, limit?: number, clear?: boolean }` | Intercepts real-time CDP Console logs, Network requests, and Performance metrics. Extension noise (`chrome-extension://*`) is filtered by default (`filterOrigin: true`). |
 | `browser_pick_color` | `{ tabId?: number, x?: number, y?: number }` | Samples any on-screen pixel color. Returns all 5 modern color formats (`hex`, `rgb`, `rgba`, `hsl`, `oklch`). |
 | `browser_list_instances` | `{}` | Lists all connected browser instances (Chrome, Brave, Edge, profiles/windows). |
@@ -223,7 +228,7 @@ Check whether the browser bridge is operational:
 - Or list open tabs: `browser_list_tabs()`
 
 ### 2. High-Efficiency Automation (Batch Mode - Recommended)
-To save ~80% tokens and minimize latency, combine multiple steps into `browser_run_actions`:
+To save ~80% tokens, minimize latency, and automatically close the test tab when finished to free RAM, combine steps (ending with `"close"`) into `browser_run_actions`:
 ```json
 {
   "actions": [
@@ -232,33 +237,37 @@ To save ~80% tokens and minimize latency, combine multiple steps into `browser_r
     { "action": "type", "selector": "input#username", "text": "agent_test", "clear": true },
     { "action": "type", "selector": "input#password", "text": "secret123", "pressEnter": true },
     { "action": "sleep", "ms": 1000 },
-    { "action": "screenshot", "mode": "visible" }
+    { "action": "screenshot", "mode": "visible" },
+    { "action": "close" }
   ]
 }
 ```
 
 ### 3. Granular Step-by-Step Execution
-For exploratory tasks or interactive debugging:
-1. **Navigate**: `browser_navigate({ url: "https://example.com" })`
-2. **Inspect**: `browser_get_element({ selector: "button.submit-btn" })`
-3. **Click**: `browser_click({ selector: "button.submit-btn" })`
-4. **Audit DevTools**: `browser_get_devtools_data({ type: "console" })`
+For exploratory tasks or interactive debugging (always open a tab in the `🤖 Agent Pilot` group first, and close it when finished):
+1. **Open Agent Tab**: `browser_open_tab({ url: "https://example.com" })` (returns `tabId`)
+2. **Inspect**: `browser_get_element({ selector: "button.submit-btn", tabId })`
+3. **Click**: `browser_click({ selector: "button.submit-btn", tabId })`
+4. **Audit DevTools**: `browser_get_devtools_data({ type: "console", tabId })`
+5. **Cleanup Tab (Save RAM)**: `browser_close_tab({ tabId })`
 
 ---
 
-## ⚡ Token Efficiency & Anti-Bloat Best Practices (Kinh nghiệm tối ưu Token)
+## ⚡ Token Efficiency & Anti-Bloat Best Practices (Kinh nghiệm tối ưu Token & RAM)
 
-Browser automation có thể tiêu tốn lượng token rất lớn nếu không sử dụng đúng các công cụ tối ưu. Hãy tuân thủ 4 nguyên tắc sau:
+Browser automation có thể tiêu tốn lượng token và RAM rất lớn nếu không sử dụng đúng các công cụ tối ưu. Hãy tuân thủ 5 nguyên tắc sau:
 
-1. **Ưu tiên Batch Engine (`browser_run_actions`)**:
-   - Thay vì thực hiện 5-7 lượt chat đơn lẻ (mỗi lượt phải gửi lại toàn bộ lịch sử hội thoại), hãy gom các bước (`open` $\rightarrow$ `wait` $\rightarrow$ `fill_form` $\rightarrow$ `click` $\rightarrow$ `screenshot`) vào một lệnh gọi `browser_run_actions`. Tiết kiệm $\sim 80\%$ token và loại bỏ độ trễ mạng giữa các bước.
-2. **Dùng `browser_snapshot` thay vì dump raw HTML**:
+1. **Chỉ thao tác trên nhóm tab `🤖 Agent Pilot` & Đóng tab ngay sau khi test xong**:
+   - Agent chỉ được phép thao tác với các tab thuộc nhóm `🤖 Agent Pilot`. Mặc định khi tạo tab mới (`browser_open_tab` / `agent-pilot open`) để kiểm thử, sau khi hoàn tất bắt buộc phải đóng tab (`browser_close_tab`, `agent-pilot close`, hoặc `{ "action": "close" }` ở cuối batch) để giải phóng RAM trình duyệt.
+2. **Ưu tiên Batch Engine (`browser_run_actions`)**:
+   - Thay vì thực hiện 5-7 lượt chat đơn lẻ (mỗi lượt phải gửi lại toàn bộ lịch sử hội thoại), hãy gom các bước (`open` $\rightarrow$ `wait` $\rightarrow$ `fill_form` $\rightarrow$ `click` $\rightarrow$ `screenshot` $\rightarrow$ `close`) vào một lệnh gọi `browser_run_actions`. Tiết kiệm $\sim 80\%$ token và loại bỏ độ trễ mạng giữa các bước.
+3. **Dùng `browser_snapshot` thay vì dump raw HTML**:
    - Không bao giờ trích xuất toàn bộ DOM HTML bằng JavaScript (thường tốn 30.000 - 100.000 tokens).
    - Sử dụng `browser_snapshot` để lấy Cây tiếp cận (Accessibility Tree) với mã tham chiếu `@1`, `@2` nhỏ gọn (chỉ tốn $\sim 300 - 800$ tokens cho toàn trang).
-3. **Tận dụng `browser_screenshot` lưu file**:
-   - Mặc định ảnh chụp được decode và lưu ra file `.png` trên đĩa cục bộ, chỉ trả về đường dẫn file và kích thước byte (tốn $\sim 30$ tokens thay vì $\sim 100.000$ tokens khi trả Base64 inline).
+4. **Tận dụng `browser_screenshot` lưu vào thư mục tạm của hệ điều hành (`os.TempDir()`)**:
+   - Mặc định khi không chỉ định `path`, ảnh chụp được decode và lưu ra file `.png` trong thư mục tạm của hệ điều hành (`os.TempDir()`, ví dụ `/tmp/screenshot_<timestamp>.png`), tránh làm rác thư mục `HOME` hoặc thư mục dự án, đồng thời chỉ trả về đường dẫn file và kích thước byte (tốn $\sim 30$ tokens thay vì $\sim 100.000$ tokens khi trả Base64 inline).
    - Chỉ truyền `base64: true` khi bắt buộc cần inline data trong bộ nhớ.
-4. **Điền form hàng loạt với `browser_fill_form`**:
+5. **Điền form hàng loạt với `browser_fill_form`**:
    - Điền toàn bộ các trường input, select, checkbox trong một lệnh duy nhất thay vì click và type từng ô.
 
 ---

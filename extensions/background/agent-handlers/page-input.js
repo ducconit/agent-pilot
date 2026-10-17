@@ -22,13 +22,15 @@ import {
 
 export const pageInputHandlers = {
   "page.evaluate": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     const script = params.script || params.expression || params.code || "";
     if (!script) return respond(null, new Error("Missing script or expression to evaluate"));
 
     client.runWithTabLock(tabId, "page.evaluate", async () => {
       // Attempt 1: Execute in MAIN world for direct window/DOM framework access
+      let mainWorldRan = false;
+      let userEvalError = null;
       try {
         const results = await chrome.scripting.executeScript({
           target: { tabId },
@@ -39,7 +41,12 @@ export const pageInputHandlers = {
               const value = await Promise.resolve(rawVal);
               return { __eval_ok: true, value };
             } catch (e) {
-              return { __eval_err: true, message: e?.message || String(e), stack: e?.stack };
+              return {
+                __eval_err: true,
+                name: e?.name || "",
+                message: e?.message || String(e),
+                stack: e?.stack
+              };
             }
           },
           args: [script]
@@ -47,12 +54,23 @@ export const pageInputHandlers = {
         if (results && results[0] && results[0].result) {
           const resObj = results[0].result;
           if (resObj.__eval_err) {
-            throw new Error(resObj.message);
+            const isCspEvalError =
+              resObj.name === "EvalError" ||
+              (typeof resObj.message === "string" && resObj.message.includes("unsafe-eval"));
+            if (!isCspEvalError) {
+              mainWorldRan = true;
+              userEvalError = new Error(resObj.message);
+            }
+          } else {
+            return resObj.value;
           }
-          return resObj.value;
         }
       } catch (scriptingErr) {
         logDebug("evaluate in MAIN world fallback to CDP", scriptingErr);
+      }
+
+      if (mainWorldRan && userEvalError) {
+        throw userEvalError;
       }
 
       // Attempt 2: Fallback to CDP Runtime.evaluate
@@ -74,7 +92,7 @@ export const pageInputHandlers = {
   },
 
   "page.moveMouse": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     client.runWithTabLock(tabId, "page.moveMouse", () =>
       client.sendTabMessageWithRetry(tabId, {
@@ -89,7 +107,7 @@ export const pageInputHandlers = {
   },
 
   "page.click": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     const via = client.normalizeVia(params);
     if (via === "synthetic") {
@@ -137,7 +155,7 @@ export const pageInputHandlers = {
   },
 
   "page.type": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     client.runWithTabLock(tabId, "page.type", () =>
       client.sendTabMessageWithRetry(tabId, {
@@ -154,7 +172,7 @@ export const pageInputHandlers = {
   },
 
   "page.scroll": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     client.runWithTabLock(tabId, "page.scroll", () =>
       client.sendTabMessageWithRetry(tabId, {
@@ -169,7 +187,7 @@ export const pageInputHandlers = {
   },
 
   "page.hover": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     client.runWithTabLock(tabId, "page.hover", async () => {
       // First locate coordinates, scroll into view and move visual cursor without dispatching duplicate DOM events
@@ -203,7 +221,7 @@ export const pageInputHandlers = {
   },
 
   "page.drag": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     const via = client.normalizeVia(params);
     const fromSelector = params.from || params.fromSelector;
@@ -256,7 +274,7 @@ export const pageInputHandlers = {
   },
 
   "page.pressKey": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     client.runWithTabLock(tabId, "page.pressKey", async () => {
       try {
@@ -280,7 +298,7 @@ export const pageInputHandlers = {
   },
 
   "page.waitFor": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     let timeoutMs = DEFAULTS.WAIT_FOR_TIMEOUT_MS;
     let candidate = params.timeoutMs;
@@ -306,13 +324,15 @@ export const pageInputHandlers = {
   },
 
   "page.uploadFile": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
-    if (!attachedTabs.has(tabId)) {
-      await attachDebugger(tabId, client.broadcastFn);
-    }
     const files = Array.isArray(params.files) ? params.files : (params.filePath ? [params.filePath] : (params.file ? [params.file] : []));
-    uploadFileInput(tabId, params.selector, files)
+    client.runWithTabLock(tabId, "page.uploadFile", async () => {
+      if (!attachedTabs.has(tabId)) {
+        await attachDebugger(tabId, client.broadcastFn);
+      }
+      return await uploadFileInput(tabId, params.selector, files);
+    })
       .then(res => respond(res))
       .catch(err => respond(null, err));
   }

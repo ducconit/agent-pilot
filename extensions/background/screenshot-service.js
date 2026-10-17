@@ -14,10 +14,11 @@ export async function cropDataUrlInWorker(dataUrl, clip) {
   if (!clip || !clip.width || !clip.height || typeof OffscreenCanvas === "undefined") {
     return dataUrl;
   }
+  let bitmap = null;
   try {
     const res = await fetch(dataUrl);
     const blob = await res.blob();
-    const bitmap = await createImageBitmap(blob);
+    bitmap = await createImageBitmap(blob);
     const imgW = bitmap.width;
     const imgH = bitmap.height;
 
@@ -39,7 +40,6 @@ export async function cropDataUrlInWorker(dataUrl, clip) {
     const canvas = new OffscreenCanvas(sw, sh);
     const ctx = canvas.getContext("2d");
     ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh);
-    bitmap.close();
 
     const croppedBlob = await canvas.convertToBlob({ type: "image/png" });
     return await new Promise((resolve, reject) => {
@@ -51,6 +51,10 @@ export async function cropDataUrlInWorker(dataUrl, clip) {
   } catch (err) {
     logDebug("OffscreenCanvas crop", err);
     return dataUrl;
+  } finally {
+    if (bitmap && typeof bitmap.close === "function") {
+      bitmap.close();
+    }
   }
 }
 
@@ -92,7 +96,7 @@ export async function captureTabScreenshot(tabId, params = {}) {
     if (!clip || typeof clip.x !== "number" || typeof clip.y !== "number" || isNaN(clip.x) || isNaN(clip.y) || isNaN(clip.width) || isNaN(clip.height) || clip.width <= 0 || clip.height <= 0) {
       throw new Error(`Screenshot mode 'region' requires valid coordinates: clip { x, y, width, height } or flat x, y, width, height`);
     }
-  } else if (mode === "element") {
+  } else if (mode === "element" && !clip) {
     if (!params.selector) {
       throw new Error(`Screenshot mode 'element' requires a 'selector' parameter`);
     }

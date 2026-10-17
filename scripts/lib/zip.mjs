@@ -96,7 +96,8 @@ export function createZip(sourceDir, outputZip, options = {}) {
     const stageDir = path.join(os.tmpdir(), `agent-pilot-pack-${Date.now()}`);
     try {
       copyFiltered(sourceDir, stageDir, excludes);
-      const psCmd = `Compress-Archive -Path '${stageDir}\\*' -DestinationPath '${outputZip}' -Force`;
+      const escapePsSingleQuoted = (s) => String(s).replace(/'/g, "''");
+      const psCmd = `Compress-Archive -Path '${escapePsSingleQuoted(stageDir)}\\*' -DestinationPath '${escapePsSingleQuoted(outputZip)}' -Force`;
       execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", psCmd], { stdio: "inherit" });
       return;
     } catch (_) {

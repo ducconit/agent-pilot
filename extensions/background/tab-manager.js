@@ -29,15 +29,112 @@ export async function getActiveTabId() {
 }
 
 /**
- * Resolve target tab ID based on requested ID, agent-controlled tabs, or focused window
+ * Check whether a tab (or tabId) belongs to the Agent Pilot tab group
+ * (`agentControlledTabs` or native Chrome Tab Group titled '🤖 Agent Pilot').
  */
-export async function getTargetTabId(requestedTabId, lastAgentTabId = null) {
-  if (requestedTabId !== undefined && requestedTabId !== null) {
+export async function isTabInAgentGroup(tabOrId) {
+  if (!tabOrId) return false;
+  let tab = typeof tabOrId === "object" ? tabOrId : null;
+  const tid = tab ? tab.id : Number(tabOrId);
+  if (!tid || isNaN(tid)) return false;
+
+  if (!tab && chrome.tabs?.get) {
+    tab = await chrome.tabs.get(tid).catch(() => null);
+  }
+
+  // If the tab belongs to a Chrome Tab Group, verify that the group is actually '🤖 Agent Pilot'
+  if (tab && typeof tab.groupId === "number" && tab.groupId > 0 && chrome.tabGroups?.get) {
+    try {
+      const group = await chrome.tabGroups.get(tab.groupId);
+      if (group && (group.title === AGENT_GROUP_TITLE || group.title === "Agent Pilot")) {
+        agentControlledTabs.add(tab.id);
+        return true;
+      }
+      // Tab was moved into a non-Agent group (e.g. user's personal tab group) -> revoke access
+      agentControlledTabs.delete(tid);
+      return false;
+    } catch (err) {
+      logDebug("isTabInAgentGroup tabGroups.get error", err);
+    }
+  }
+
+  return agentControlledTabs.has(tid);
+}
+
+function isTabAllowedForAgent(tid, options = {}) {
+  const { tabOwners = null, agentId = null } = options || {};
+  if (tabOwners instanceof Map && agentId) {
+    const owner = tabOwners.get(tid);
+    if (owner && owner !== agentId) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Find any open tab belonging to the Agent Pilot group (re-hydrating from
+ * Chrome Tab Groups if the MV3 service worker restarted).
+ * When `tabOwners` and `agentId` are provided, tabs owned by a *different*
+ * agent session are skipped so concurrent agents never hijack each other's tabs.
+ */
+export async function findAnyAgentGroupTab(options = {}) {
+  const { tabOwners = null } = options || {};
+
+  for (const tid of agentControlledTabs) {
+    try {
+      const tab = await chrome.tabs.get(tid);
+      if (tab && tab.id && (await isTabInAgentGroup(tab))) {
+        if (isTabAllowedForAgent(tab.id, options)) return tab.id;
+      }
+    } catch (_) {
+      agentControlledTabs.delete(tid);
+      if (tabOwners instanceof Map) tabOwners.delete(tid);
+    }
+  }
+
+  if (chrome.tabGroups?.query && chrome.tabs?.query) {
+    try {
+      const groups = await chrome.tabGroups.query({});
+      const agentGroups = (groups || []).filter(
+        (g) => g.title === AGENT_GROUP_TITLE || g.title === "Agent Pilot"
+      );
+      for (const g of agentGroups) {
+        const tabs = await chrome.tabs.query({ groupId: g.id });
+        for (const t of tabs || []) {
+          if (t && t.id) agentControlledTabs.add(t.id);
+        }
+        for (const t of tabs || []) {
+          if (t && t.id && isTabAllowedForAgent(t.id, options)) {
+            return t.id;
+          }
+        }
+      }
+    } catch (err) {
+      logDebug("findAnyAgentGroupTab error", err);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolve target tab ID strictly within the Agent Pilot tab group.
+ * Never falls back to or hijacks a user's personal active tab outside the group,
+ * nor hijacks a tab owned by another concurrent agent session.
+ */
+export async function getTargetTabId(requestedTabId, lastAgentTabId = null, options = {}) {
+  if (requestedTabId !== undefined && requestedTabId !== null && requestedTabId !== "") {
     const numId = Number(requestedTabId);
-    if (isNaN(numId)) return null;
+    if (isNaN(numId) || numId <= 0) return null;
     try {
       const tab = await chrome.tabs.get(numId);
-      return tab?.id || null;
+      if (!tab || !tab.id) return null;
+      if (!(await isTabInAgentGroup(tab))) {
+        logDebug(`Rejecting tab ${numId}: not in Agent Pilot tab group`);
+        return null;
+      }
+      return tab.id;
     } catch (_) {
       return null;
     }
@@ -46,22 +143,19 @@ export async function getTargetTabId(requestedTabId, lastAgentTabId = null) {
   if (lastAgentTabId) {
     try {
       const tab = await chrome.tabs.get(lastAgentTabId);
-      if (tab && tab.id) return tab.id;
+      if (tab && tab.id && (await isTabInAgentGroup(tab)) && isTabAllowedForAgent(tab.id, options)) {
+        return tab.id;
+      }
     } catch (err) {
       logDebug("resolveTabId: lastAgentTabId lookup failed", err);
     }
   }
 
-  for (const tid of agentControlledTabs) {
-    try {
-      const tab = await chrome.tabs.get(tid);
-      if (tab && tab.id) return tab.id;
-    } catch (_) {
-      agentControlledTabs.delete(tid);
-    }
+  if (options && options.allowFallback === false) {
+    return null;
   }
 
-  return await getActiveTabId();
+  return await findAnyAgentGroupTab(options);
 }
 
 /**
@@ -200,6 +294,11 @@ async function ensureContentScriptInner(tabId) {
           target: { tabId },
           files: contentFiles
         });
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: ["main-world-bridge.js"],
+          world: "MAIN"
+        }).catch((err) => logDebug(`main-world-bridge injection on tab ${tabId}`, err));
       } catch (err) {
         logDebug(`dynamic script injection on tab ${tabId}`, err);
         return false;

@@ -81,8 +81,21 @@
     const text = clampString(raw.text, MAX_TEXT_LENGTH);
     const value = clampString(raw.value, 200);
     const inlineStyle = clampString(raw.inlineStyle, 2000);
+    const playwrightLocator = clampString(raw.playwrightLocator, 500);
+    const testId = clampString(raw.testId, 200);
+    const testIdAttr = clampString(raw.testIdAttr, 64);
+    const role = clampString(raw.role, 64);
+    const accessibleName = clampString(raw.accessibleName, 200);
+    const selectorMatches = finiteNumber(raw.selectorMatches);
+
     if (selector) out.selector = selector;
+    if (selectorMatches !== null && selectorMatches >= 0) out.selectorMatches = selectorMatches;
     if (xpath) out.xpath = xpath;
+    if (playwrightLocator) out.playwrightLocator = playwrightLocator;
+    if (testId) out.testId = testId;
+    if (testIdAttr) out.testIdAttr = testIdAttr;
+    if (role) out.role = role;
+    if (accessibleName) out.accessibleName = accessibleName;
     if (tagName) out.tagName = tagName;
     if (text) out.text = text;
     if (value) out.value = value;
@@ -91,11 +104,26 @@
     if (rect) out.rect = rect;
     if (raw.styles && typeof raw.styles === "object") {
       const styles = {};
-      for (const key of ["color", "backgroundColor", "fontSize"]) {
+      for (const key of ["color", "backgroundColor", "fontSize", "display", "visibility"]) {
         const v = clampString(raw.styles[key], 100);
         if (v) styles[key] = v;
       }
       if (Object.keys(styles).length) out.styles = styles;
+    }
+    if (raw.a11y && typeof raw.a11y === "object") {
+      const a11y = {};
+      const contrastRatio = finiteNumber(raw.a11y.contrastRatio);
+      if (contrastRatio !== null) a11y.contrastRatio = contrastRatio;
+      const wcagLevel = clampString(raw.a11y.wcagLevel, 16);
+      if (wcagLevel) a11y.wcagLevel = wcagLevel;
+      if (Array.isArray(raw.a11y.warnings)) {
+        const warnings = raw.a11y.warnings
+          .map((w) => clampString(w, 250))
+          .filter(Boolean)
+          .slice(0, 8);
+        if (warnings.length) a11y.warnings = warnings;
+      }
+      if (Object.keys(a11y).length) out.a11y = a11y;
     }
     return Object.keys(out).length ? out : null;
   }
@@ -144,6 +172,68 @@
     }).filter(Boolean);
   }
 
+  function sanitizeDiagnostics(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const out = {};
+    if (raw.environment && typeof raw.environment === "object") {
+      const env = {};
+      for (const key of ["viewport", "userAgent", "language", "url", "timestamp"]) {
+        const v = clampString(raw.environment[key], 500);
+        if (v) env[key] = v;
+      }
+      const dpr = finiteNumber(raw.environment.devicePixelRatio);
+      if (dpr !== null) env.devicePixelRatio = dpr;
+      if (Object.keys(env).length) out.environment = env;
+    }
+    if (Array.isArray(raw.consoleErrors)) {
+      const consoleErrors = raw.consoleErrors.slice(0, 15).map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const message = clampString(item.message, 500);
+        if (!message) return null;
+        return {
+          type: clampString(item.type, 50) || "console.error",
+          message,
+          source: clampString(item.source, 250) || undefined,
+          count: finiteNumber(item.count) || 1
+        };
+      }).filter(Boolean);
+      if (consoleErrors.length) out.consoleErrors = consoleErrors;
+    }
+    if (Array.isArray(raw.networkErrors)) {
+      const networkErrors = raw.networkErrors.slice(0, 15).map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const url = clampString(item.url, 500);
+        if (!url) return null;
+        return {
+          method: clampString(item.method, 16) || "GET",
+          url,
+          status: finiteNumber(item.status) ?? 0,
+          statusText: clampString(item.statusText, 120) || undefined,
+          durationMs: finiteNumber(item.durationMs) ?? 0,
+          count: finiteNumber(item.count) || 1
+        };
+      }).filter(Boolean);
+      if (networkErrors.length) out.networkErrors = networkErrors;
+    }
+    if (Array.isArray(raw.reproSteps)) {
+      const reproSteps = raw.reproSteps.slice(0, 15).map((step) => {
+        if (!step || typeof step !== "object") return null;
+        const description = clampString(step.description, 300);
+        if (!description) return null;
+        return {
+          action: clampString(step.action, 32) || "click",
+          tagName: clampString(step.tagName, 32) || undefined,
+          selector: clampString(step.selector, 500) || undefined,
+          label: clampString(step.label, 100) || undefined,
+          value: clampString(step.value, 100) || undefined,
+          description
+        };
+      }).filter(Boolean);
+      if (reproSteps.length) out.reproSteps = reproSteps;
+    }
+    return Object.keys(out).length ? out : null;
+  }
+
   function validateFeedbackItem(raw) {
     const source = raw && typeof raw === "object" ? raw : {};
     const item = {
@@ -177,13 +267,16 @@
     const items = Array.isArray(source.items)
       ? source.items.slice(0, MAX_ITEMS_PER_PAYLOAD).map(validateFeedbackItem)
       : [];
-    return {
+    const out = {
       timestamp: finiteNumber(source.timestamp) || Date.now(),
       url: clampString(source.url, 2048) || "",
       title: clampString(source.title, 300) || "",
       items,
       prompt: clampString(source.prompt, 200000) || ""
     };
+    const diagnostics = sanitizeDiagnostics(source.diagnostics);
+    if (diagnostics) out.diagnostics = diagnostics;
+    return out;
   }
 
   const api = {

@@ -14,13 +14,14 @@ import { sanitizeData } from "./secret-sanitizer.js";
  * recent FALLBACK_FEEDBACK_SESSIONS so storage cannot grow without limit.
  */
 export async function saveFeedbackInbox(client, payload) {
+  const sanitizedPayload = sanitizeData(payload, getSecretFilterEnabled());
   try {
     const headers = { "Content-Type": "application/json" };
     if (client.apiKey) headers["X-Agent-Pilot-Key"] = client.apiKey;
     const resp = await fetch(`http://127.0.0.1:${client.port}/api/feedback/save`, {
       method: "POST",
       headers,
-      body: JSON.stringify(payload)
+      body: JSON.stringify(sanitizedPayload)
     });
     const data = await resp.json();
     if (data && data.success) {
@@ -30,7 +31,6 @@ export async function saveFeedbackInbox(client, payload) {
   } catch (err) {
     const timestamp = String(payload?.timestamp || Date.now());
     const key = `ap_feedback_${timestamp}`;
-    const sanitizedPayload = sanitizeData(payload, getSecretFilterEnabled());
     await new Promise((resolve) => {
       if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
         chrome.storage.local.set({ [key]: sanitizedPayload }, () => {
@@ -65,13 +65,14 @@ export async function saveFeedbackInbox(client, payload) {
  * Order of transports: HTTP long-poll endpoint → WebSocket → persistent storage.
  */
 export async function pushFeedbackLive(client, payload) {
+  const sanitizedPayload = sanitizeData(payload, getSecretFilterEnabled());
   try {
     const headers = { "Content-Type": "application/json" };
     if (client.apiKey) headers["X-Agent-Pilot-Key"] = client.apiKey;
     const resp = await fetch(`http://127.0.0.1:${client.port}/api/feedback/push`, {
       method: "POST",
       headers,
-      body: JSON.stringify(payload)
+      body: JSON.stringify(sanitizedPayload)
     });
     const data = await resp.json();
     if (data && data.success) {
@@ -83,11 +84,11 @@ export async function pushFeedbackLive(client, payload) {
     if (client.connected && client.ws && client.ws.readyState === WebSocket.OPEN) {
       client.send({
         type: "FEEDBACK_SUBMISSION",
-        payload
+        payload: sanitizedPayload
       });
       return { success: true, channel: "ws_push", sessionId: String(payload?.timestamp || Date.now()) };
     }
     // If server is completely offline, fall back to persistent extension storage
-    return await saveFeedbackInbox(client, payload);
+    return await saveFeedbackInbox(client, sanitizedPayload);
   }
 }

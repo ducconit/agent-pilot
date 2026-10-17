@@ -111,14 +111,15 @@ export const SECRET_PATTERNS = [
     regex: /(["']?(?:password|passwd|secret|client_?secret|access_?token|auth_?token|api_?key|authorization|proxy-authorization|cookie|set-cookie|x-api-key|credentials|token)["']?\s*[:=]\s*["'])([^"'\\,]{4,}?)(["'])/gi,
     replacer: (match, prefix, secretVal, suffix) => {
       // Never re-mask an already masked value, or the inner marker type is lost
-      if (secretVal.includes("[MASKED_SECRET")) return match;
+      if (ALREADY_MASKED_REGEX.test(secretVal.trim())) return match;
       const p = secretVal.slice(0, 2);
       return `${prefix}${p}******************** [MASKED_SECRET: Sensitive Field]${suffix}`;
     }
   }
 ];
 
-const SENSITIVE_KEY_REGEX = /^(?:password|passwd|secret|api_?key|x-api-key|access_?token|auth_?token|private_?key|client_?secret|authorization|proxy-authorization|cookie|set-cookie|credentials|token)$/i;
+const ALREADY_MASKED_REGEX = /^[a-zA-Z0-9_-]{0,10}\*{20} \[MASKED_SECRET: [^\]]+\]$/;
+const SENSITIVE_KEY_REGEX = /^(?:password|passwd|passcode|pin|otp|secret|api_?key|x-api-key|access_?token|auth_?token|private_?key|client_?secret|authorization|proxy-authorization|cookie|set-cookie|credentials|token)$/i;
 
 /**
  * Mask a single string by checking all secret patterns.
@@ -139,9 +140,14 @@ export function maskString(text) {
     if (pattern.regex.test(result)) {
       pattern.regex.lastIndex = 0;
       result = result.replace(pattern.regex, (...args) => {
-        masked = true;
-        types.add(pattern.name);
-        return pattern.replacer(...args);
+        const match = args[0];
+        if (ALREADY_MASKED_REGEX.test(match.trim())) return match;
+        const replaced = pattern.replacer(...args);
+        if (replaced !== match) {
+          masked = true;
+          types.add(pattern.name);
+        }
+        return replaced;
       });
     }
   }
@@ -167,7 +173,7 @@ export function sanitizeDataWithMeta(data, isEnabled = true) {
 
     if (typeof val === "string") {
       // First check if property key context is sensitive
-      if (keyContext && SENSITIVE_KEY_REGEX.test(keyContext) && val.length >= 1 && !val.includes("[MASKED_SECRET")) {
+      if (keyContext && SENSITIVE_KEY_REGEX.test(keyContext) && val.length >= 1 && !ALREADY_MASKED_REGEX.test(val.trim())) {
         totalMaskedCount++;
         allMaskedTypes.add(`Field:${keyContext}`);
         const prefix = val.slice(0, 2);
@@ -184,7 +190,16 @@ export function sanitizeDataWithMeta(data, isEnabled = true) {
       return val;
     }
 
-    if (typeof val === "number" || typeof val === "boolean" || typeof val === "symbol" || typeof val === "bigint") {
+    if (typeof val === "number" || typeof val === "bigint") {
+      if (keyContext && SENSITIVE_KEY_REGEX.test(keyContext)) {
+        totalMaskedCount++;
+        allMaskedTypes.add(`Field:${keyContext}`);
+        return `******************** [MASKED_SECRET: ${keyContext}]`;
+      }
+      return val;
+    }
+
+    if (typeof val === "boolean" || typeof val === "symbol") {
       return val;
     }
 

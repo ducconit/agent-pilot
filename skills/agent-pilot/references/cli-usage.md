@@ -7,7 +7,7 @@ The `agent-pilot` standalone binary is a zero-dependency CLI written in Go for c
 ## 1. Global Flags & Conventions
 
 - **Default Port**: `58765` (WebSocket: `ws://127.0.0.1:58765`, HTTP: `http://127.0.0.1:58765`)
-- **Target Tab (`--tab <id>`)**: By default, CLI commands target the active browser tab or the most recently controlled agent tab. Specify `--tab <id>` to explicitly target a specific tab.
+- **Target Tab (`--tab <id>`) & Group Isolation (`🤖 Agent Pilot`)**: Commands strictly target tabs belonging to the `🤖 Agent Pilot` tab group. They never hijack the user's personal active tab outside the group. Specify `--tab <id>` to explicitly target a specific tab within the group, and always run `agent-pilot close` when finished testing to free RAM.
 - **Output Format**: Commands output user-friendly icons (`✅`, `❌`, `🌐`) with structured JSON results where applicable.
 
 ### 1.1 CDP Requirement Matrix (Mandatory vs Optional)
@@ -16,7 +16,7 @@ Commands use either the **synthetic DOM engine** (no debugger needed) or the **C
 
 | CLI command | CDP required? |
 | :--- | :--- |
-| `tabs`, `open`, `navigate`, `snapshot`, `inspect`, `fill`, `type`, `scroll`, `wait`, `evaluate` | ❌ No (DOM / `chrome.tabs` / content script) |
+| `tabs`, `open`, `close`, `navigate`, `snapshot`, `inspect`, `fill`, `type`, `scroll`, `wait`, `evaluate` | ❌ No (DOM / `chrome.tabs` / content script) |
 | `click`, `drag` | ⚙️ Optional — default synthetic; add `--via cdp` for cross-origin iframes / canvas / WebGL |
 | `click --via auto`, `drag --via auto` | ⚙️ Optional — tries CDP, falls back to synthetic |
 | `hover`, `key` | ⚙️ Optional — CDP-first with automatic synthetic fallback |
@@ -102,14 +102,17 @@ agent-pilot busy off
 
 ---
 
-## 4. Browser Navigation & Tabs
+## 4. Browser Navigation & Tabs (`open`, `close`, `tabs`)
 
 ```bash
-# Open a new URL in background (active=false by default to prevent stealing user focus)
+# Open a new URL in background inside the 🤖 Agent Pilot tab group (active=false by default)
 agent-pilot open https://example.com
 
 # Open URL and make it the active tab
 agent-pilot open https://example.com --active
+
+# Close the current or specified Agent tab when testing is done to free RAM
+agent-pilot close [--tab <id>]
 
 # List all open tabs across all browser windows
 agent-pilot tabs
@@ -192,10 +195,13 @@ agent-pilot evaluate "document.querySelector('h1').innerText" --tab 12345
 
 > Engine: CDP `Page.captureScreenshot`. CDP is **required for background tabs**; the active tab can fall back to `chrome.tabs.captureVisibleTab`.
 
-Capture high-resolution PNG screenshots via Chrome DevTools Protocol:
+Capture high-resolution PNG screenshots via Chrome DevTools Protocol. When `-o` is omitted, screenshots are saved by default into the OS temporary directory (`os.TempDir()`, e.g., `/tmp/screenshot_<timestamp>.png`) so home and project directories stay clean:
 
 ```bash
-# Capture visible viewport
+# Capture visible viewport (saved to OS temp directory by default)
+agent-pilot screenshot
+
+# Capture visible viewport to a specific file path
 agent-pilot screenshot -o ./viewport.png
 
 # Capture specific element
@@ -225,7 +231,8 @@ agent-pilot batch ./workflows/login-flow.json
     { "type": "type", "selector": "#password", "text": "Secret123!" },
     { "type": "click", "selector": "#btn-submit" },
     { "type": "sleep", "ms": 1000 },
-    { "type": "screenshot", "mode": "visible" }
+    { "type": "screenshot", "mode": "visible" },
+    { "type": "close" }
   ]
 }
 ```

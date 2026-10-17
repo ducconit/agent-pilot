@@ -51,6 +51,16 @@ var mcpTools = []ToolInfo{
 		},
 	},
 	{
+		Name:        "browser_close_tab",
+		Description: "Close a tab belonging to the Agent Pilot tab group to free RAM after testing is complete.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"tabId": map[string]interface{}{"type": "integer", "description": "Target tab ID in the Agent Pilot group (defaults to last agent-controlled tab)"},
+			},
+		},
+	},
+	{
 		Name:        "browser_list_tabs",
 		Description: "List all open tabs across all browser windows.",
 		InputSchema: map[string]interface{}{
@@ -186,7 +196,7 @@ var mcpTools = []ToolInfo{
 				"width":    map[string]interface{}{"type": "number", "description": "Width in pixels for region mode (alternative to clip object)"},
 				"height":   map[string]interface{}{"type": "number", "description": "Height in pixels for region mode (alternative to clip object)"},
 				"tabId":    map[string]interface{}{"type": "integer", "description": "Target tab ID"},
-				"path":     map[string]interface{}{"type": "string", "description": "Output file path to save PNG image (default: auto-generated filename)"},
+				"path":     map[string]interface{}{"type": "string", "description": "Output file path to save PNG image (default: OS temp directory screenshot_<ts>.png)"},
 				"base64":   map[string]interface{}{"type": "boolean", "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)"},
 			},
 		},
@@ -262,11 +272,12 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_end_session",
-		Description: "End the active AI Agent session. Fades out and dismisses the virtual cursor and lock shield.",
+		Description: "End the active AI Agent session. Fades out and dismisses the virtual cursor and lock shield, and optionally closes the tab to free RAM.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"tabId": map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"tabId":    map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"closeTab": map[string]interface{}{"type": "boolean", "description": "Close the Agent tab after ending the session to free RAM (default: false)"},
 			},
 		},
 	},

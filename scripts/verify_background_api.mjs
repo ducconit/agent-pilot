@@ -171,5 +171,90 @@ record(
   `preserved=${preservedAfterFailure}, sent=${transportClient.sent.join(",")}`
 );
 
+import { getTargetTabId, isTabInAgentGroup } from "../extensions/background/tab-manager.js";
+import { commandMethods } from "../extensions/background/bridge-commands.js";
+import { agentControlledTabs } from "../extensions/background/constants.js";
+
+// 7. Strict Tab Group Isolation: getTargetTabId must reject non-group tabs and never hijack active user tab
+globalThis.chrome = {
+  tabs: {
+    get: async (id) => {
+      if (id === 101) return { id: 101, groupId: 7 };
+      if (id === 102) return { id: 102, groupId: 7 };
+      if (id === 103) return { id: 103, groupId: 9 }; // Moved to user's personal tab group
+      if (id === 202) return { id: 202, groupId: -1 };
+      throw new Error("No tab");
+    },
+    query: async () => [
+      { id: 202, active: true, groupId: -1 }
+    ]
+  },
+  tabGroups: {
+    get: async (gid) => {
+      if (gid === 7) return { id: 7, title: "🤖 Agent Pilot" };
+      if (gid === 9) return { id: 9, title: "Personal Work" };
+      throw new Error("No group");
+    }
+  }
+};
+agentControlledTabs.clear();
+agentControlledTabs.add(103); // Stale entry moved into Personal Work group
+const inGroup101 = await isTabInAgentGroup(101);
+const inGroup202 = await isTabInAgentGroup(202);
+const inGroup103Moved = await isTabInAgentGroup(103);
+const rejectedNonGroup = (await getTargetTabId(202, null)) === null;
+agentControlledTabs.clear();
+const rejectedWhenNoAgentTabs = (await getTargetTabId(null, null)) === null;
+const resolvedGroupTab = await getTargetTabId(101, null);
+record(
+  "7. Strict Tab Group Isolation (never hijacks personal tabs or foreign tab groups)",
+  inGroup101 === true &&
+    inGroup202 === false &&
+    inGroup103Moved === false &&
+    !agentControlledTabs.has(103) &&
+    rejectedNonGroup &&
+    rejectedWhenNoAgentTabs &&
+    resolvedGroupTab === 101,
+  `inGroup(101)=${inGroup101}, inGroup(202)=${inGroup202}, movedToPersonal(103)=${inGroup103Moved}, rejectedNonGroup=${rejectedNonGroup}, rejectedEmpty=${rejectedWhenNoAgentTabs}`
+);
+
+// 8. Multi-Agent Concurrent Tab Affinity & Ownership Isolation (including rehydration steal protection)
+const mockBridge = Object.assign({
+  lastAgentTabId: null,
+  agentLastTabIds: new Map(),
+  tabOwners: new Map()
+}, commandMethods);
+agentControlledTabs.clear();
+agentControlledTabs.add(101);
+agentControlledTabs.add(102);
+mockBridge.recordAgentTab(101, "agent_conv_A", { isOwner: true });
+mockBridge.recordAgentTab(102, "agent_conv_B", { isOwner: true });
+
+// Attempt by Agent C to steal Agent A's Tab 101 via recordAgentTab / rehydration hint must be ignored:
+mockBridge.recordAgentTab(101, "agent_conv_C", { isOwner: true });
+const ownerOf101AfterStealAttempt = mockBridge.tabOwners.get(101);
+const targetCAfterStealAttempt = await mockBridge.getTargetTabId(undefined, "agent_conv_C");
+
+const targetA = await mockBridge.getTargetTabId(undefined, "agent_conv_A");
+const targetB = await mockBridge.getTargetTabId(undefined, "agent_conv_B");
+// Simulate Agent B closing its own tab (102), then calling an implicit command or close again:
+mockBridge.clearAgentTab(102);
+agentControlledTabs.delete(102);
+const targetBAfterClose = await mockBridge.getTargetTabId(undefined, "agent_conv_B", { allowFallback: false });
+const targetBFallbackBlocked = await mockBridge.getTargetTabId(undefined, "agent_conv_B");
+const targetAStillIntact = await mockBridge.getTargetTabId(undefined, "agent_conv_A");
+
+record(
+  "8. Multi-Agent Concurrent Tab Affinity (no cross-conversation tab hijacking, steal, or accidental close)",
+  ownerOf101AfterStealAttempt === "agent_conv_A" &&
+    targetCAfterStealAttempt === null &&
+    targetA === 101 &&
+    targetB === 102 &&
+    targetBAfterClose === null &&
+    targetBFallbackBlocked === null &&
+    targetAStillIntact === 101,
+  `owner101=${ownerOf101AfterStealAttempt}, C=${targetCAfterStealAttempt}, A=${targetA}, B=${targetB}, B_afterClose=${targetBAfterClose}, B_fallback=${targetBFallbackBlocked}, A_after=${targetAStillIntact}`
+);
+
 recorder.summarize();
 recorder.exitIfFailed();
