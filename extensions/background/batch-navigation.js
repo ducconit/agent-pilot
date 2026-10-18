@@ -42,7 +42,14 @@ async function openAction(ctx, act) {
   });
 
   ctx.currentTabId = tab.id;
-  if (bridgeClient) bridgeClient.lastAgentTabId = tab.id;
+  const agentId = act.agentId || ctx.params?.agentId || null;
+  if (bridgeClient) {
+    if (typeof bridgeClient.recordAgentTab === "function") {
+      bridgeClient.recordAgentTab(tab.id, agentId, { isOwner: true });
+    } else {
+      bridgeClient.lastAgentTabId = tab.id;
+    }
+  }
   agentControlledTabs.add(tab.id);
   await assignTabToAgentGroup(tab).catch((err) => logDebug("batch assignTabToAgentGroup", err));
 
@@ -97,7 +104,12 @@ async function openAction(ctx, act) {
  */
 async function navigateAction(ctx, act) {
   const { bridgeClient } = ctx;
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const agentId = act.agentId || ctx.params?.agentId || null;
+  const targetTabId = act.tabId
+    ? (bridgeClient && typeof bridgeClient.getTargetTabId === "function"
+        ? await bridgeClient.getTargetTabId(act.tabId, agentId)
+        : await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId, { tabOwners: bridgeClient?.tabOwners, agentId }))
+    : ctx.currentTabId;
   if (!targetTabId) throw new Error("No active tab for navigate");
   const url = normalizeUrl(act.url);
 
@@ -153,7 +165,12 @@ async function navigateAction(ctx, act) {
  */
 async function closeAction(ctx, act) {
   const { bridgeClient } = ctx;
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const agentId = act.agentId || ctx.params?.agentId || null;
+  const targetTabId = act.tabId
+    ? (bridgeClient && typeof bridgeClient.getTargetTabId === "function"
+        ? await bridgeClient.getTargetTabId(act.tabId, agentId)
+        : await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId, { tabOwners: bridgeClient?.tabOwners, agentId }))
+    : ctx.currentTabId;
   if (!targetTabId) throw new Error("No active tab to close");
   await new Promise((resolve, reject) => {
     chrome.tabs.remove(targetTabId, () => {
@@ -165,8 +182,12 @@ async function closeAction(ctx, act) {
   if (ctx.currentTabId === targetTabId) {
     ctx.currentTabId = null;
   }
-  if (bridgeClient && bridgeClient.lastAgentTabId === targetTabId) {
-    bridgeClient.lastAgentTabId = null;
+  if (bridgeClient) {
+    if (typeof bridgeClient.clearAgentTab === "function") {
+      bridgeClient.clearAgentTab(targetTabId);
+    } else if (bridgeClient.lastAgentTabId === targetTabId) {
+      bridgeClient.lastAgentTabId = null;
+    }
   }
   ctx.stepResult.success = true;
   ctx.stepResult.closedTabId = targetTabId;

@@ -36,6 +36,12 @@
         selector = "";
       }
     }
+    if (!selector && !text) {
+      return {
+        success: false,
+        error: "waitFor requires either 'selector' or 'text' option"
+      };
+    }
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeoutMs) {

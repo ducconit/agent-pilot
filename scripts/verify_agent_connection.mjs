@@ -412,6 +412,10 @@ async function run() {
 
     await agentFeedback.run(ctx);
 
+    if (tabId) {
+      await sendAgentCommand("tabs.remove", { tabId }).catch(() => {});
+    }
+
     recorder.summarize();
     recorder.exitIfFailed();
   } catch (err) {

@@ -4,10 +4,18 @@
  */
 
 import { LIMITS } from "../constants.js";
+import {
+  getFlowState,
+  setFlowRecording,
+  clearFlowSteps,
+  exportFlowAsBatch,
+  exportFlowAsPlaywright,
+  replayRecordedFlow
+} from "../flow-recorder.js";
 
 export const pageQueryHandlers = {
   "page.getElement": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     client.runWithTabLock(tabId, "page.getElement", () =>
       client.sendTabMessageWithRetry(tabId, {
@@ -23,7 +31,7 @@ export const pageQueryHandlers = {
   },
 
   "page.snapshot": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     client.runWithTabLock(tabId, "page.snapshot", () =>
       client.sendTabMessageWithRetry(tabId, {
@@ -37,7 +45,7 @@ export const pageQueryHandlers = {
   },
 
   "page.fillForm": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     client.runWithTabLock(tabId, "page.fillForm", () =>
       client.sendTabMessageWithRetry(tabId, {
@@ -52,7 +60,7 @@ export const pageQueryHandlers = {
   },
 
   "page.pickColor": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     client.runWithTabLock(tabId, "page.pickColor", () =>
       client.sendTabMessageWithRetry(tabId, { action: "pick_color", x: params.x, y: params.y })
@@ -62,7 +70,7 @@ export const pageQueryHandlers = {
   },
 
   "page.screenshot": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     client.runWithTabLock(tabId, "page.screenshot", () =>
       client.captureTabScreenshot(tabId, params)
@@ -74,7 +82,7 @@ export const pageQueryHandlers = {
   "batch.run": async (client, params, respond) => {
     // Batch actions run inside the tab lock when a target tab can be resolved,
     // so a batch cannot interleave with a concurrent single-step command.
-    client.getTargetTabId(params.tabId).then(tabId => {
+    client.getTargetTabId(params.tabId, params.agentId).then(tabId => {
       if (tabId) {
         return client.runWithTabLock(tabId, "batch.run", () => client.executeBatchActions(params));
       }
@@ -82,5 +90,70 @@ export const pageQueryHandlers = {
     })
       .then(res => respond(res))
       .catch(err => respond(null, err));
+  },
+
+  "flow.record": async (client, params, respond) => {
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
+    setFlowRecording(tabId || params.tabId || null, params.enabled !== false, params.url || "")
+      .then((res) => {
+        if (res?.tabId && typeof client.registerAgentTab === "function") {
+          client.registerAgentTab(res.tabId, params.agentId);
+        }
+        respond(res);
+      })
+      .catch(err => respond(null, err));
+  },
+
+  "flow.export": async (client, params, respond) => {
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
+    try {
+      let diagRes = null;
+      if (tabId) {
+        try {
+          diagRes = await client.sendTabMessageWithRetry(tabId, { action: "get_page_diagnostics" });
+        } catch (_) {}
+      }
+      const targetKey = tabId || params.tabId || null;
+      const state = getFlowState(targetKey);
+      const batch = exportFlowAsBatch(targetKey, diagRes?.diagnostics?.environment?.url || "", "", params.steps || null);
+      const playwright = exportFlowAsPlaywright(targetKey, diagRes?.diagnostics?.environment?.url || "", params.steps || null);
+      respond({
+        tabId: targetKey,
+        ...state,
+        batch,
+        playwright,
+        diagnostics: diagRes?.diagnostics || null
+      });
+    } catch (err) {
+      respond(null, err);
+    }
+  },
+
+  "flow.replay": async (client, params, respond) => {
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
+    const runReplay = () => replayRecordedFlow(tabId || params.tabId || null, params.steps || null);
+    const promise = tabId
+      ? client.runWithTabLock(tabId, "flow.replay", runReplay)
+      : runReplay();
+    promise
+      .then((res) => {
+        if (res?.tabId && typeof client.registerAgentTab === "function") {
+          client.registerAgentTab(res.tabId, params.agentId);
+        }
+        respond(res);
+      })
+      .catch(err => respond(null, err));
+  },
+
+  "flow.clear": async (client, params, respond) => {
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
+    try {
+      if (tabId) {
+        await client.sendTabMessageWithRetry(tabId, { action: "get_page_diagnostics", clear: true }).catch(() => {});
+      }
+      respond(clearFlowSteps(tabId || params.tabId || null));
+    } catch (err) {
+      respond(null, err);
+    }
   }
 };

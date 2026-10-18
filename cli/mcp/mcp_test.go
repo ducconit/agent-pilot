@@ -260,6 +260,12 @@ func TestProcessScreenshotResult(t *testing.T) {
 		if !ok || filePath == "" {
 			t.Fatalf("expected path to be returned, got %v", parsed["path"])
 		}
+		t.Cleanup(func() { _ = os.Remove(filePath) })
+
+		expectedTempDir, _ := filepath.Abs(os.TempDir())
+		if !strings.HasPrefix(filePath, expectedTempDir) {
+			t.Errorf("expected default screenshot to be saved in OS temp dir %s, got %s", expectedTempDir, filePath)
+		}
 
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
 			t.Errorf("expected screenshot file to exist at %s", filePath)
@@ -462,5 +468,45 @@ func TestBrowserScreenshotSchema(t *testing.T) {
 		if _, exists := clipProps[coord]; !exists {
 			t.Errorf("clip schema missing expected coordinate property: %s", coord)
 		}
+	}
+}
+
+func TestMCPSessionStateTracking(t *testing.T) {
+	mcpSessionMu.Lock()
+	origTab := mcpSessionLastTabID
+	origInst := mcpSessionInstanceID
+	mcpSessionLastTabID = 0
+	mcpSessionInstanceID = ""
+	mcpSessionMu.Unlock()
+	defer func() {
+		mcpSessionMu.Lock()
+		mcpSessionLastTabID = origTab
+		mcpSessionInstanceID = origInst
+		mcpSessionMu.Unlock()
+	}()
+
+	recordSessionOpenedTab(map[string]interface{}{"id": float64(305)})
+	prepared := prepareSessionArgs(map[string]interface{}{"selector": "#btn"})
+	if prepared["agentId"] == "" {
+		t.Fatalf("expected agentId to be injected into MCP session args")
+	}
+	if prepared["agentLastTabId"] != 305 {
+		t.Fatalf("expected agentLastTabId=305, got %v", prepared["agentLastTabId"])
+	}
+
+	recordSessionBatchOutcome(map[string]interface{}{
+		"results": []interface{}{
+			map[string]interface{}{"step": 1, "tabId": float64(410)},
+		},
+	})
+	preparedAfterBatch := prepareSessionArgs(map[string]interface{}{})
+	if preparedAfterBatch["agentLastTabId"] != 410 {
+		t.Fatalf("expected batch open to update agentLastTabId=410, got %v", preparedAfterBatch["agentLastTabId"])
+	}
+
+	recordSessionClosedTab(map[string]interface{}{"closedTabId": float64(410)}, nil)
+	preparedAfterClose := prepareSessionArgs(map[string]interface{}{})
+	if _, hasHint := preparedAfterClose["agentLastTabId"]; hasHint {
+		t.Fatalf("expected agentLastTabId to be cleared after closing tab 410, got %v", preparedAfterClose["agentLastTabId"])
 	}
 }

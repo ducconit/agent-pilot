@@ -29,11 +29,63 @@ export const commandMethods = {
     return await getActiveTabId();
   },
 
-  async getTargetTabId(requestedTabId) {
-    const tabId = await getTargetTabId(requestedTabId, this.lastAgentTabId);
-    if (tabId) {
+  getAgentLastTabId(agentId = null) {
+    if (agentId && typeof agentId === "string" && this.agentLastTabIds instanceof Map) {
+      return this.agentLastTabIds.get(agentId) || null;
+    }
+    return this.lastAgentTabId || null;
+  },
+
+  recordAgentTab(tabId, agentId = null, { isOwner = false } = {}) {
+    if (!tabId) return;
+    if (!(this.agentLastTabIds instanceof Map)) this.agentLastTabIds = new Map();
+    if (!(this.tabOwners instanceof Map)) this.tabOwners = new Map();
+
+    if (agentId && typeof agentId === "string") {
+      const existingOwner = this.tabOwners.get(tabId);
+      if (existingOwner && existingOwner !== agentId) {
+        // Tab is already owned by another active agent; do not overwrite ownership or hijack its affinity
+        return;
+      }
+      this.agentLastTabIds.set(agentId, tabId);
+      if (isOwner || !existingOwner) {
+        this.tabOwners.set(tabId, agentId);
+      }
+      const currentGlobalOwner = this.lastAgentTabId ? this.tabOwners.get(this.lastAgentTabId) : null;
+      if (!this.lastAgentTabId || !currentGlobalOwner || currentGlobalOwner === agentId) {
+        this.lastAgentTabId = tabId;
+      }
+    } else {
       this.lastAgentTabId = tabId;
-      this.markTabAsAgentControlled(tabId).catch((err) => console.debug("[AgentPilot] markTabAsAgentControlled error", err));
+    }
+  },
+
+  clearAgentTab(tabId) {
+    if (!tabId) return;
+    if (this.lastAgentTabId === tabId) {
+      this.lastAgentTabId = null;
+    }
+    if (this.tabOwners instanceof Map) {
+      this.tabOwners.delete(tabId);
+    }
+    if (this.agentLastTabIds instanceof Map) {
+      for (const [aid, tid] of this.agentLastTabIds.entries()) {
+        if (tid === tabId) {
+          this.agentLastTabIds.delete(aid);
+        }
+      }
+    }
+  },
+
+  async getTargetTabId(requestedTabId, agentId = null, options = {}) {
+    const effectiveLastTabId = this.getAgentLastTabId(agentId);
+    const tabId = await getTargetTabId(requestedTabId, effectiveLastTabId, {
+      ...options,
+      tabOwners: this.tabOwners,
+      agentId
+    });
+    if (tabId) {
+      this.markTabAsAgentControlled(tabId, agentId).catch((err) => console.debug("[AgentPilot] markTabAsAgentControlled error", err));
     }
     return tabId;
   },
@@ -50,9 +102,9 @@ export const commandMethods = {
     return await getAgentGroupTabs();
   },
 
-  async markTabAsAgentControlled(tabId) {
+  async markTabAsAgentControlled(tabId, agentId = null, options = {}) {
     if (!tabId) return;
-    this.lastAgentTabId = tabId;
+    this.recordAgentTab(tabId, agentId, options);
     return await markTabAsAgentControlled(tabId);
   },
 

@@ -239,3 +239,46 @@ func TestWaitForFeedbackContextCancellation(t *testing.T) {
 		t.Fatalf("WaitForFeedbackWithContext did not abort on context cancellation")
 	}
 }
+
+func TestSaveFeedbackSessionStripsInlineBase64AndSavesDiagnostics(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "ap_test_feedback_diag_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	_ = os.Setenv("AGENT_PILOT_HOME", tempDir)
+	defer os.Unsetenv("AGENT_PILOT_HOME")
+
+	samplePngBase64 := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+	payload := map[string]interface{}{
+		"timestamp": "1789234569999",
+		"url":       "http://localhost:3000/checkout",
+		"title":     "Checkout Page",
+		"prompt":    "### Bug Report\n![Mục 1](" + samplePngBase64 + ")\n",
+		"diagnostics": map[string]interface{}{
+			"environment": map[string]interface{}{"viewport": "1440x900"},
+		},
+		"items": []interface{}{
+			map[string]interface{}{
+				"id":                "item_1",
+				"mode":              "element",
+				"title":             "Pay Button",
+				"screenshotDataUrl": samplePngBase64,
+			},
+		},
+	}
+
+	saveRes, err := SaveFeedbackSession(payload)
+	if err != nil {
+		t.Fatalf("SaveFeedbackSession failed: %v", err)
+	}
+
+	promptMD, _ := saveRes["promptMd"].(string)
+	if strings.Contains(promptMD, "data:image/png;base64") {
+		t.Fatalf("expected SaveFeedbackSession to strip raw base64 from promptMd, got: %s", promptMD)
+	}
+	if !strings.Contains(promptMD, "item_1.png") {
+		t.Fatalf("expected promptMd to reference item_1.png, got: %s", promptMD)
+	}
+}

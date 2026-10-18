@@ -35,9 +35,21 @@ export const observationHandlers = {
   devtools: devtoolsAction
 };
 
+async function resolveStepTabId(ctx, act) {
+  if (!act.tabId) return ctx.currentTabId;
+  const agentId = act.agentId || ctx.params?.agentId || null;
+  if (ctx.bridgeClient && typeof ctx.bridgeClient.getTargetTabId === "function") {
+    return await ctx.bridgeClient.getTargetTabId(act.tabId, agentId);
+  }
+  return await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId, {
+    tabOwners: ctx.bridgeClient?.tabOwners,
+    agentId
+  });
+}
+
 /** wait_for_selector — poll the content script until the selector matches. */
 async function waitForSelectorAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for wait_for_selector");
   await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
@@ -53,7 +65,7 @@ async function waitForSelectorAction(ctx, act) {
 
 /** wait_for — wait for a selector/text/state via the content script. */
 async function waitForAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for wait_for");
   await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
@@ -87,7 +99,7 @@ async function sleepAction(ctx, act) {
  * `omitDataUrls` RAM guard (only a byte length is returned in that case).
  */
 async function screenshotAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for screenshot");
   const shotRes = await captureTabScreenshot(targetTabId, act);
   ctx.stepResult.success = true;
@@ -102,7 +114,7 @@ async function screenshotAction(ctx, act) {
 
 /** snapshot / page.snapshot — fetch a text/DOM snapshot from the content script. */
 async function snapshotAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for snapshot");
   await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
@@ -116,7 +128,7 @@ async function snapshotAction(ctx, act) {
 
 /** get_element / page.getelement — retrieve element details by selector/point. */
 async function getElementAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for get_element");
   await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
@@ -133,7 +145,7 @@ async function getElementAction(ctx, act) {
 
 /** evaluate / eval — run an expression in the page via shared evaluateInTab helper. */
 async function evaluateAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for evaluate");
   const script = act.expression || act.script || act.code || "";
   const val = await evaluateInTab(targetTabId, script, ctx.bridgeClient?.broadcastFn);
@@ -143,7 +155,7 @@ async function evaluateAction(ctx, act) {
 
 /** cdp — escape hatch to send an arbitrary CDP method on the target tab. */
 async function cdpAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for cdp");
   await attachDebugger(targetTabId).catch((err) => logDebug("batch attachDebugger cdp", err));
   const cdpRes = await sendCdpCommand(targetTabId, act.cdpMethod || act.method, act.cdpParams || act.params || {});
@@ -156,7 +168,7 @@ async function cdpAction(ctx, act) {
  * data for a tab (optionally clearing the buffers) via shared collectDevtoolsData.
  */
 async function devtoolsAction(ctx, act) {
-  const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
+  const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for devtools");
   const devType = act.devtoolsType || (["all", "console", "network", "performance"].includes(act.source) ? act.source : "all");
   const payload = await collectDevtoolsData(

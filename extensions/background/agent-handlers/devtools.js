@@ -112,7 +112,7 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
 
 export const devtoolsHandlers = {
   "devtools.getData": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) {
       respond(null, new Error("No target tab available for DevTools"));
       return;

@@ -10,6 +10,9 @@ export class FeedbackPanel {
     this.isActive = false;
     this.currentMode = "element";
     this.items = [];
+    this.flowRecording = false;
+    this.flowReplaying = false;
+    this.flowSteps = [];
 
     this.initElements();
     this.bindEvents();
@@ -32,6 +35,23 @@ export class FeedbackPanel {
     this.btnModeRegion = document.getElementById("btn-panel-mode-region");
     this.btnModeScreen = document.getElementById("btn-panel-mode-screen");
     this.btnModeFullpage = document.getElementById("btn-panel-mode-fullpage");
+
+    this.btnRefreshQaDiag = document.getElementById("btn-refresh-qa-diag");
+    this.qaFlowRecordBadge = document.getElementById("qa-flow-record-badge");
+    this.qaConsoleErrCount = document.getElementById("qa-console-err-count");
+    this.qaNetErrCount = document.getElementById("qa-net-err-count");
+    this.qaReproStepCount = document.getElementById("qa-repro-step-count");
+    this.qaDiagSummaryBox = document.getElementById("qa-diag-summary-box");
+
+    this.btnToggleFlowRecord = document.getElementById("btn-toggle-flow-record");
+    this.btnReplayFlow = document.getElementById("btn-replay-flow");
+    this.qaFlowTimelineWrap = document.getElementById("qa-flow-timeline-wrap");
+    this.qaFlowTimeline = document.getElementById("qa-flow-timeline");
+    this.btnClearFlowSteps = document.getElementById("btn-clear-flow-steps");
+
+    this.btnCopyReproBatch = document.getElementById("btn-copy-repro-batch");
+    this.btnCopyPlaywright = document.getElementById("btn-copy-playwright");
+    this.btnResetSiteStorage = document.getElementById("btn-reset-site-storage");
   }
 
   bindEvents() {
@@ -68,13 +88,42 @@ export class FeedbackPanel {
       this.btnModeFullpage.onclick = () => this.setMode("fullpage");
     }
 
-    // Listen to messages from content script
+    if (this.btnRefreshQaDiag) {
+      this.btnRefreshQaDiag.onclick = () => this.refreshDiagnostics({ silent: false });
+    }
+    if (this.btnToggleFlowRecord) {
+      this.btnToggleFlowRecord.onclick = () => this.toggleFlowRecording();
+    }
+    if (this.btnReplayFlow) {
+      this.btnReplayFlow.onclick = () => this.replayRecordedFlow();
+    }
+    if (this.btnClearFlowSteps) {
+      this.btnClearFlowSteps.onclick = () => this.clearFlowSteps();
+    }
+    if (this.btnCopyReproBatch) {
+      this.btnCopyReproBatch.onclick = () => this.copyReproBatch();
+    }
+    if (this.btnCopyPlaywright) {
+      this.btnCopyPlaywright.onclick = () => this.copyPlaywrightScript();
+    }
+    if (this.btnResetSiteStorage) {
+      this.btnResetSiteStorage.onclick = () => this.resetSiteStorage();
+    }
+
+    // Listen to messages from content script and background flow recorder
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg.action === "FEEDBACK_MODE_CHANGED") {
         this.updateActiveState(msg.active);
       } else if (msg.action === "FEEDBACK_ITEMS_UPDATED") {
         this.items = msg.items || [];
         this.renderItemsList();
+        this.refreshDiagnostics({ silent: true });
+      } else if (msg.type === "FLOW_RECORDER_UPDATED") {
+        this.getActiveTabId().then((activeTabId) => {
+          if (!msg.tabId || !activeTabId || msg.replaying || msg.tabId === activeTabId) {
+            this.applyFlowRecorderState(msg);
+          }
+        });
       }
     });
   }
@@ -99,12 +148,9 @@ export class FeedbackPanel {
       const webTab = tabs && tabs.find(isWeb);
       if (webTab?.id) return webTab.id;
 
-      const allTabs = await chrome.tabs.query({});
-      const activeWeb = allTabs && allTabs.find(t => t.active && isWeb(t));
+      const allTabs = await chrome.tabs.query({ active: true });
+      const activeWeb = allTabs && allTabs.find(isWeb);
       if (activeWeb?.id) return activeWeb.id;
-
-      const candidate = allTabs && allTabs.find(isWeb);
-      if (candidate?.id) return candidate.id;
     } catch (_) {}
 
     return null;
@@ -118,8 +164,17 @@ export class FeedbackPanel {
     }
     try {
       return await chrome.tabs.sendMessage(tabId, msg);
-    } catch (e) {
-      console.warn("[AgentPilot] Tab message warning:", tabId, msg, e);
+    } catch (_) {
+      // Tab may have been open before extension reload — auto-inject content script and retry once
+      try {
+        const injected = await chrome.runtime.sendMessage({ action: "ensure_content_script", tabId });
+        if (injected && injected.success) {
+          return await chrome.tabs.sendMessage(tabId, msg);
+        }
+      } catch (_) {}
+      if (!silent) {
+        this.ui.showToast("Vui lòng làm mới (F5) trang web để sử dụng tính năng này!", "warning");
+      }
       return null;
     }
   }
@@ -130,6 +185,355 @@ export class FeedbackPanel {
       this.updateActiveState(res.active);
       this.items = res.items || [];
       this.renderItemsList();
+    }
+    await this.refreshDiagnostics({ silent: true });
+  }
+
+  applyFlowRecorderState(state) {
+    if (!state) return;
+    this.flowRecording = Boolean(state.recording);
+    this.flowReplaying = Boolean(state.replaying);
+    if (Array.isArray(state.steps)) {
+      this.flowSteps = state.steps;
+    }
+    const stepCount = this.flowSteps.length;
+
+    if (this.qaReproStepCount) {
+      this.qaReproStepCount.textContent = String(stepCount);
+      this.qaReproStepCount.style.color = stepCount > 0 ? "#38bdf8" : "";
+    }
+
+    if (this.qaFlowRecordBadge) {
+      if (this.flowReplaying) {
+        this.qaFlowRecordBadge.textContent = "▶ Đang chạy lại";
+        this.qaFlowRecordBadge.className = "card-badge badge-info";
+      } else if (this.flowRecording) {
+        this.qaFlowRecordBadge.textContent = "🔴 Đang ghi";
+        this.qaFlowRecordBadge.className = "card-badge badge-active";
+      } else {
+        this.qaFlowRecordBadge.textContent = "Tự động";
+        this.qaFlowRecordBadge.title = "Tự động ghi tối đa 100 bước gần nhất";
+        this.qaFlowRecordBadge.className = "card-badge";
+      }
+    }
+
+    if (this.btnToggleFlowRecord) {
+      if (this.flowRecording) {
+        this.btnToggleFlowRecord.textContent = "⏸ Dừng Ghi Kịch Bản";
+        this.btnToggleFlowRecord.className = "btn btn-danger btn-sm";
+      } else {
+        this.btnToggleFlowRecord.textContent = "🔴 Bắt Đầu Ghi";
+        this.btnToggleFlowRecord.className = "btn btn-outline btn-sm";
+      }
+      this.btnToggleFlowRecord.disabled = this.flowReplaying;
+    }
+
+    if (this.btnReplayFlow) {
+      this.btnReplayFlow.disabled = this.flowReplaying || stepCount === 0;
+      this.btnReplayFlow.textContent = this.flowReplaying ? "⏳ Đang Replay..." : `▶ Chạy Lại (${stepCount})`;
+    }
+
+    this.renderFlowTimeline(state.currentReplayStepId || null);
+  }
+
+  renderFlowTimeline(activeStepId = null) {
+    if (!this.qaFlowTimelineWrap || !this.qaFlowTimeline) return;
+    if (!this.flowSteps || this.flowSteps.length === 0) {
+      this.qaFlowTimelineWrap.style.display = "none";
+      this.qaFlowTimeline.innerHTML = "";
+      return;
+    }
+
+    this.qaFlowTimelineWrap.style.display = "block";
+    const rows = this.flowSteps.map((step, idx) => {
+      const isCurrent = activeStepId && step.id === activeStepId;
+      let icon = "🖱️";
+      let color = "#e2e8f0";
+      if (step.action === "navigate") {
+        icon = "🌐";
+        color = "#38bdf8";
+      } else if (step.action === "type" || step.action === "select") {
+        icon = "⌨️";
+        color = "#a7f3d0";
+      } else if (step.action === "press_key") {
+        icon = "⏎";
+        color = "#fde68a";
+      }
+
+      const bgStyle = isCurrent
+        ? "background:rgba(56,189,248,0.18);border-left:2px solid #38bdf8;"
+        : "border-bottom:1px solid rgba(148,163,184,0.12);";
+
+      const subLocator = step.playwrightLocator || step.selector || step.url || "";
+      return `
+        <div class="flow-step-row" data-step-id="${this.escapeHtml(step.id || "")}" style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:4px 4px;${bgStyle}">
+          <div style="flex:1;min-width:0;word-break:break-word;">
+            <div style="color:${color};line-height:1.35;">
+              <strong>${idx + 1}.</strong> ${icon} ${this.escapeHtml(step.description || step.action)}
+            </div>
+            ${subLocator ? `<div class="font-mono" style="font-size:10px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(subLocator)}</div>` : ""}
+          </div>
+          <button class="btn btn-icon btn-xs btn-del-flow-step" data-step-id="${this.escapeHtml(step.id || "")}" title="Xóa bước này" style="padding:0 4px;font-size:11px;line-height:1;opacity:0.75;">×</button>
+        </div>
+      `;
+    });
+
+    this.qaFlowTimeline.innerHTML = rows.join("");
+    this.qaFlowTimeline.scrollTop = this.qaFlowTimeline.scrollHeight;
+
+    this.qaFlowTimeline.querySelectorAll(".btn-del-flow-step").forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const stepId = btn.getAttribute("data-step-id");
+        if (stepId) this.deleteSingleFlowStep(stepId);
+      };
+    });
+  }
+
+  async toggleFlowRecording() {
+    const tabId = await this.getActiveTabId();
+    const targetEnabled = !this.flowRecording;
+    if (!tabId && !targetEnabled) {
+      this.flowRecording = false;
+      this.applyFlowRecorderState({ recording: false, replaying: false, steps: this.flowSteps });
+      return;
+    }
+
+    let currentUrl = "";
+    if (tabId) {
+      try {
+        const tab = await chrome.tabs.get(tabId);
+        currentUrl = tab?.url || "";
+      } catch (_) {}
+    }
+
+    const res = await chrome.runtime.sendMessage({
+      action: "set_flow_recording",
+      tabId,
+      enabled: targetEnabled,
+      url: currentUrl
+    });
+
+    if (res && res.success) {
+      this.applyFlowRecorderState(res);
+      if (targetEnabled) {
+        if (res.createdNewTab) {
+          this.ui.showToast(`🆕 Đã tự mở Tab mới (#${res.tabId}) và bắt đầu ghi kịch bản!`);
+        } else {
+          this.ui.showToast("🔴 Đã bắt đầu ghi kịch bản xuyên trang! Hãy thao tác trên web.");
+        }
+      } else {
+        this.ui.showToast(`⏸ Đã dừng ghi kịch bản (${this.flowSteps.length} bước).`);
+      }
+    } else {
+      this.ui.showToast(`⚠️ Không thể bật ghi kịch bản: ${res?.error || "Lỗi không xác định"}`, "warning");
+    }
+  }
+
+  async deleteSingleFlowStep(stepId) {
+    const tabId = await this.getActiveTabId();
+    const res = await chrome.runtime.sendMessage({
+      action: "delete_flow_step",
+      tabId,
+      stepId
+    });
+    if (res && res.success) {
+      this.applyFlowRecorderState(res);
+    }
+  }
+
+  async clearFlowSteps() {
+    const tabId = await this.getActiveTabId();
+    if (tabId) {
+      await this.sendTabMessage({ action: "get_page_diagnostics", clear: true }, { silent: true });
+    }
+    const res = await chrome.runtime.sendMessage({
+      action: "clear_flow_steps",
+      tabId
+    });
+    if (res && res.success) {
+      this.applyFlowRecorderState(res);
+      this.ui.showToast("🗑️ Đã xóa danh sách bước kịch bản.");
+    }
+  }
+
+  async replayRecordedFlow() {
+    if (this.flowSteps.length === 0) {
+      this.ui.showToast("Chưa có bước nào được ghi nhận!", "warning");
+      return;
+    }
+
+    const tabId = await this.getActiveTabId();
+    if (!tabId) {
+      this.ui.showToast(`🆕 Tab cũ không tồn tại — đang tự mở Tab mới và chạy Replay (${this.flowSteps.length} bước)...`);
+    } else {
+      this.ui.showToast(`▶ Đang chạy lại kịch bản (${this.flowSteps.length} bước)...`);
+    }
+
+    const res = await chrome.runtime.sendMessage({
+      action: "replay_flow_recorder",
+      tabId,
+      steps: this.flowSteps
+    });
+    if (res && res.success) {
+      if (res.createdNewTab) {
+        this.ui.showToast(`🆕 Đã tự mở Tab mới (#${res.tabId}) và Replay thành công (${res.executedSteps}/${res.totalSteps} bước)!`);
+      } else {
+        this.ui.showToast(`✅ Hoàn tất Replay thành công (${res.executedSteps}/${res.totalSteps} bước)!`);
+      }
+    } else {
+      this.ui.showToast(`⚠️ Replay dừng tại bước ${(res?.executedSteps || 0) + 1}: ${res?.error || "Lỗi không xác định"}`, "warning");
+    }
+    await this.refreshDiagnostics({ silent: true });
+  }
+
+  async refreshDiagnostics({ silent = true } = {}) {
+    const tabId = await this.getActiveTabId();
+    try {
+      const flowRes = await chrome.runtime.sendMessage({
+        action: "get_flow_recorder_state",
+        tabId
+      });
+      if (flowRes && flowRes.success) {
+        this.applyFlowRecorderState(flowRes);
+      }
+    } catch (_) {}
+
+    if (!tabId) return;
+    const res = await this.sendTabMessage({ action: "get_page_diagnostics" }, { silent });
+    if (!res || !res.success || !res.diagnostics) return;
+    const diag = res.diagnostics;
+    const cCount = Array.isArray(diag.consoleErrors) ? diag.consoleErrors.length : 0;
+    const nCount = Array.isArray(diag.networkErrors) ? diag.networkErrors.length : 0;
+    const sCount = this.flowSteps.length || (Array.isArray(diag.reproSteps) ? diag.reproSteps.length : 0);
+
+    if (this.qaConsoleErrCount) {
+      this.qaConsoleErrCount.textContent = String(cCount);
+      this.qaConsoleErrCount.style.color = cCount > 0 ? "#f87171" : "";
+    }
+    if (this.qaNetErrCount) {
+      this.qaNetErrCount.textContent = String(nCount);
+      this.qaNetErrCount.style.color = nCount > 0 ? "#fbbf24" : "";
+    }
+    if (this.qaReproStepCount) {
+      this.qaReproStepCount.textContent = String(sCount);
+      this.qaReproStepCount.style.color = sCount > 0 ? "#38bdf8" : "";
+    }
+
+    if (this.qaDiagSummaryBox) {
+      const lines = [];
+      if (cCount > 0) {
+        diag.consoleErrors.slice(-3).forEach((err) => {
+          lines.push(`<div style="color:#f87171;margin-bottom:3px;">🚨 <strong>[${this.escapeHtml(err.type || "error")}]</strong> ${this.escapeHtml(err.message.slice(0, 120))}</div>`);
+        });
+      }
+      if (nCount > 0) {
+        diag.networkErrors.slice(-3).forEach((net) => {
+          lines.push(`<div style="color:#fbbf24;margin-bottom:3px;">🌐 <strong>[${this.escapeHtml(String(net.status || "ERR"))}]</strong> ${this.escapeHtml(net.method)} ${this.escapeHtml(net.url.slice(0, 90))}</div>`);
+        });
+      }
+      if (lines.length > 0) {
+        const headerHtml = `<div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:4px;border-bottom:1px dashed rgba(148,163,184,0.2);padding-bottom:2px;">📡 Lỗi của trang web đang mở (Website Console / Network):</div>`;
+        this.qaDiagSummaryBox.innerHTML = headerHtml + lines.join("");
+        this.qaDiagSummaryBox.style.display = "block";
+      } else {
+        this.qaDiagSummaryBox.innerHTML = "";
+        this.qaDiagSummaryBox.style.display = "none";
+      }
+    }
+
+    if (!silent) {
+      this.ui.showToast(`🩺 Đã cập nhật: ${cCount} lỗi Console, ${nCount} lỗi mạng, ${sCount} bước kịch bản.`);
+    }
+  }
+
+  async copyReproBatch() {
+    const tabId = await this.getActiveTabId();
+    let tabUrl = "";
+    let tabTitle = "";
+    if (tabId) {
+      try {
+        const tab = await chrome.tabs.get(tabId);
+        tabUrl = tab?.url || "";
+        tabTitle = tab?.title || "";
+      } catch (_) {}
+    }
+
+    const res = await chrome.runtime.sendMessage({
+      action: "export_flow_recorder",
+      tabId,
+      url: tabUrl,
+      title: tabTitle,
+      steps: this.flowSteps
+    });
+
+    if (!res || !res.success || !res.batch || !Array.isArray(res.batch.actions) || res.batch.actions.length === 0) {
+      this.ui.showToast("Chưa có bước thao tác nào để xuất kịch bản Batch JSON!", "warning");
+      return;
+    }
+    const jsonText = JSON.stringify(res.batch, null, 2);
+    try {
+      await navigator.clipboard.writeText(jsonText);
+      this.ui.showToast(`📋 Đã copy kịch bản Batch JSON (${res.batch.actions.length} bước) vào Clipboard!`);
+    } catch (_) {
+      this.ui.showToast("Không thể sao chép kịch bản vào Clipboard!", "warning");
+    }
+  }
+
+  async copyPlaywrightScript() {
+    const tabId = await this.getActiveTabId();
+    let tabUrl = "";
+    if (tabId) {
+      try {
+        const tab = await chrome.tabs.get(tabId);
+        tabUrl = tab?.url || "";
+      } catch (_) {}
+    }
+
+    const res = await chrome.runtime.sendMessage({
+      action: "export_flow_recorder",
+      tabId,
+      url: tabUrl,
+      steps: this.flowSteps
+    });
+
+    if (!res || !res.success || !res.playwright || !Array.isArray(res.steps) || res.steps.length === 0) {
+      this.ui.showToast("Chưa có bước thao tác nào để xuất Playwright script!", "warning");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(res.playwright);
+      this.ui.showToast(`🎭 Đã copy kịch bản Playwright (${res.steps.length} bước) vào Clipboard!`);
+    } catch (_) {
+      this.ui.showToast("Không thể sao chép vào Clipboard!", "warning");
+    }
+  }
+
+  async resetSiteStorage() {
+    const tabId = await this.getActiveTabId();
+    if (!tabId) {
+      this.ui.showToast("Không tìm thấy tab web đang hoạt động!", "warning");
+      return;
+    }
+    const res = await this.sendTabMessage({
+      action: "get_page_diagnostics",
+      clear: true,
+      clearStorage: true
+    });
+    await chrome.runtime.sendMessage({ action: "clear_flow_steps", tabId }).catch(() => {});
+    if (res && res.success) {
+      if (this.qaConsoleErrCount) this.qaConsoleErrCount.textContent = "0";
+      if (this.qaNetErrCount) this.qaNetErrCount.textContent = "0";
+      if (this.qaReproStepCount) this.qaReproStepCount.textContent = "0";
+      try {
+        await chrome.tabs.reload(tabId);
+      } catch (_) {}
+      setTimeout(() => {
+        this.refreshDiagnostics({ silent: true });
+      }, 600);
+      this.ui.showToast("🧹 Đã xóa sạch Storage/Cookies của trang và tải lại phiên mới!");
+    } else {
+      this.ui.showToast("Không thể xóa dữ liệu trên trang này.", "warning");
     }
   }
 
@@ -375,7 +779,8 @@ export class FeedbackPanel {
         btn.onclick = (e) => {
           e.stopPropagation();
           const id = btn.dataset.id;
-          const textarea = document.querySelector(`#side-comment-edit-${id} textarea`);
+          const editBox = document.getElementById("side-comment-edit-" + id);
+          const textarea = editBox ? editBox.querySelector("textarea") : null;
           const newText = textarea ? textarea.value.trim() : "";
           this.updateComment(id, newText);
         };

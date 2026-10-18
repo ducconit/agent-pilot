@@ -163,7 +163,6 @@
     get_cursor_pos: () => cursor.getCursorPosition(),
     is_busy: () => shield.isBusy(),
     is_agent_tab: () => isAgentTab,
-    set_agent_tab: (d) => { isAgentTab = Boolean(d.enabled); return isAgentTab; },
     set_busy: (d) => {
       shield.setAgentBusyState(d.busy, d.action);
       return { success: true, isAgentBusy: shield.isBusy() };
@@ -175,11 +174,10 @@
     add_feedback_item: (d) => feedback.addItem(d.item),
     clear_feedback_items: () => { feedback.clearAll(); return { success: true }; },
     copy_feedback_prompt: () => feedback.copyPrompt(),
-    generate_feedback_prompt: (d) => feedback.generateMarkdownPrompt(d.items),
-    save_feedback_inbox: () => feedback.saveToInbox(),
-    push_feedback_agent: () => feedback.pushToAgent()
+    generate_feedback_prompt: (d) => feedback.generateMarkdownPrompt(d.items)
   };
 
+  // Listen for bridge requests from Main World (main-world-bridge.js)
   window.addEventListener("__AGENT_PILOT_REQ__", async (e) => {
     if (!e.detail) return;
     const { reqId, action, data = {} } = e.detail;
@@ -189,6 +187,8 @@
       const handler = BRIDGE_ACTION_HANDLERS[action];
       if (handler) {
         result = await handler(data);
+      } else {
+        error = `Unsupported or restricted bridge action: ${action}`;
       }
     } catch (err) {
       console.warn("[AgentPilot] Bridge request error:", action, err);
@@ -202,8 +202,8 @@
 
   // Shared handlers for Background & Side Panel runtime messages
   const moveCursorHandler = (req) => cursor.moveVirtualMouse(req.x, req.y, req.duration || MOUSE_MOVE_DEFAULT_MS);
-  const clickCursorHandler = (req) => cursor.virtualClick(req.x, req.y, req.selector);
-  const typeTextHandler = (req) => cursor.virtualType(req.selector, req.text, req.clear, req.pressEnter);
+  const clickCursorHandler = (req) => cursor.virtualClick(req.x, req.y, req.selector, req.fallbackHints || null);
+  const typeTextHandler = (req) => cursor.virtualType(req.selector, req.text, req.clear, req.pressEnter, req.fallbackHints || null);
   const pressKeyHandler = (req) => cursor.dispatchKey(req.key, req.code, req.keyCode, req.selector);
   const hoverHandler = (req) => cursor.virtualHover(req.selector, { dispatchSynthetic: req.dispatchSynthetic });
   const dragHandler = (req) => cursor.virtualDrag(req.fromSelector || req.from, req.toSelector || req.to, req.steps);
@@ -358,6 +358,20 @@
     },
     save_feedback_inbox_tab: () => feedback.saveToInbox(),
     push_feedback_agent_tab: () => feedback.pushToAgent(),
+    get_page_diagnostics: async (req) => {
+      if (!inspector.queryPageDiagnostics) {
+        return { success: false, error: "Diagnostics unavailable" };
+      }
+      const diagnostics = await inspector.queryPageDiagnostics({
+        clear: Boolean(req.clear),
+        clearStorage: Boolean(req.clearStorage)
+      });
+      return { success: true, diagnostics };
+    },
+    export_repro_batch: () => ({
+      success: true,
+      batch: inspector.exportReproBatchJson ? inspector.exportReproBatchJson() : { actions: [] }
+    }),
     set_agent_tab_status: (req) => {
       isAgentTab = Boolean(req.isAgentTab);
       return { success: true, isAgentTab };

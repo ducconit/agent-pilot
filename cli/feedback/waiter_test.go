@@ -87,3 +87,56 @@ func TestFeedbackWaiterDelivery(t *testing.T) {
 		t.Fatalf("waiter did not resolve")
 	}
 }
+
+func TestFeedbackWaiterTabIDFiltering(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "ap_test_wait_tab_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+	_ = os.Setenv(config.FeedbackHomeEnvVar, tempDir)
+	defer os.Unsetenv(config.FeedbackHomeEnvVar)
+
+	doneTab42 := make(chan map[string]interface{}, 1)
+	go func() {
+		doneTab42 <- WaitForFeedbackWithContext(context.Background(), 5, 42)
+	}()
+
+	time.Sleep(80 * time.Millisecond)
+
+	// Submission for tab 99 must NOT wake the waiter for tab 42.
+	_, err = SaveFeedbackSession(map[string]interface{}{
+		"timestamp": "1789234568001",
+		"tabId":     99,
+		"items":     []interface{}{},
+	})
+	if err != nil {
+		t.Fatalf("SaveFeedbackSession failed: %v", err)
+	}
+
+	select {
+	case res := <-doneTab42:
+		t.Fatalf("waiter for tab 42 should not have resolved for tab 99 submission, got: %#v", res)
+	case <-time.After(100 * time.Millisecond):
+		// Expected: still waiting
+	}
+
+	// Submission for tab 42 MUST wake the waiter for tab 42.
+	saveRes, err := SaveFeedbackSession(map[string]interface{}{
+		"timestamp": "1789234568002",
+		"tabId":     42,
+		"items":     []interface{}{},
+	})
+	if err != nil {
+		t.Fatalf("SaveFeedbackSession failed: %v", err)
+	}
+
+	select {
+	case res := <-doneTab42:
+		if res["sessionId"] != saveRes["sessionId"] {
+			t.Fatalf("expected sessionId %v, got %#v", saveRes["sessionId"], res)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("waiter for tab 42 did not resolve")
+	}
+}

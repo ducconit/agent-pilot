@@ -1,7 +1,11 @@
 {
-  "description": "End the active AI Agent session. Fades out and dismisses the virtual cursor and lock shield.",
+  "description": "End the active AI Agent session. Fades out and dismisses the virtual cursor and lock shield, and optionally closes the tab to free RAM.",
   "inputSchema": {
     "properties": {
+      "closeTab": {
+        "description": "Close the Agent tab after ending the session to free RAM (default: false)",
+        "type": "boolean"
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
@@ -12,6 +16,10 @@
   "name": "browser_end_session",
   "parameters": {
     "properties": {
+      "closeTab": {
+        "description": "Close the Agent tab after ending the session to free RAM (default: false)",
+        "type": "boolean"
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"

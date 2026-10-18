@@ -54,38 +54,54 @@ export async function getAgentGroupIds() {
 export async function isTabInAgentGroup(tabOrId) {
   if (!tabOrId) return false;
   let tab = typeof tabOrId === "object" ? tabOrId : null;
-  if (!tab || typeof tab.groupId === "undefined") {
-    const tid = typeof tabOrId === "number" ? tabOrId : tabOrId?.id;
-    if (!tid) return false;
-    try {
-      tab = await chrome.tabs.get(tid);
-    } catch (_) {
-      return false;
-    }
+  const tid = tab ? tab.id : Number(tabOrId);
+  if (!tid || isNaN(tid)) return false;
+
+  if ((!tab || typeof tab.groupId === "undefined") && chrome.tabs?.get) {
+    tab = await chrome.tabs.get(tid).catch(() => null);
   }
   if (!tab || !tab.id) return false;
 
-  // Check if chrome.tabGroups API is supported in this browser runtime
-  if (chrome.tabGroups && chrome.tabGroups.query) {
-    const agentGroupIds = await getAgentGroupIds();
-
-    // 1. If tab has a valid groupId
-    if (tab.groupId !== undefined && tab.groupId !== null && tab.groupId !== -1 && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-      return agentGroupIds.has(tab.groupId);
+  // 1. If the tab belongs to a Chrome Tab Group, verify that the group is actually '🤖 Agent Pilot'
+  const hasGroup = tab.groupId !== undefined && tab.groupId !== null && tab.groupId !== -1 && tab.groupId !== chrome.tabGroups?.TAB_GROUP_ID_NONE && tab.groupId > 0;
+  if (hasGroup) {
+    if (chrome.tabGroups?.get) {
+      try {
+        const group = await chrome.tabGroups.get(tab.groupId);
+        if (group && (group.title === AGENT_GROUP_TITLE || group.title === "Agent Pilot")) {
+          agentControlledTabs.add(tab.id);
+          return true;
+        }
+        agentControlledTabs.delete(tid);
+        return false;
+      } catch (err) {
+        logDebug("isTabInAgentGroup tabGroups.get error", err);
+      }
     }
-
-    // 2. Tab is not in any group (groupId === -1):
-    // Only permit if it was actively created/controlled by the agent
-    if (agentControlledTabs.has(tab.id)) {
-      return true;
+    if (chrome.tabGroups?.query) {
+      const agentGroupIds = await getAgentGroupIds();
+      if (agentGroupIds.has(tab.groupId)) {
+        agentControlledTabs.add(tab.id);
+        return true;
+      }
+      agentControlledTabs.delete(tid);
+      return false;
     }
-
-    // Tab is an unassigned user tab -> strictly prohibited
-    return false;
   }
 
-  // Fallback if tabGroups API is not available in current browser environment
-  return agentControlledTabs.has(tab.id);
+  // 2. Tab is not in any group (groupId === -1): only permit if actively created/controlled by the agent
+  return agentControlledTabs.has(tid);
+}
+
+function isTabAllowedForAgent(tid, options = {}) {
+  const { tabOwners = null, agentId = null } = options || {};
+  if (tabOwners instanceof Map && agentId) {
+    const owner = tabOwners.get(tid);
+    if (owner && owner !== agentId) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -120,7 +136,7 @@ export async function getAgentGroupTabs() {
   for (const tid of agentControlledTabs) {
     try {
       const tab = await chrome.tabs.get(tid);
-      if (tab && tab.id) agentTabs.push(tab);
+      if (tab && tab.id && (await isTabInAgentGroup(tab))) agentTabs.push(tab);
     } catch (_) {
       agentControlledTabs.delete(tid);
     }
@@ -129,14 +145,49 @@ export async function getAgentGroupTabs() {
 }
 
 /**
- * Resolve target tab ID strictly within the Agent Pilot tab group.
- * Operations on any other group or outside tabs are rejected.
+ * Find any open tab belonging to the Agent Pilot group (re-hydrating from
+ * Chrome Tab Groups if the MV3 service worker restarted).
+ * When `tabOwners` and `agentId` are provided, tabs owned by a *different*
+ * agent session are skipped so concurrent agents never hijack each other's tabs.
  */
-export async function getTargetTabId(requestedTabId, lastAgentTabId = null) {
+export async function findAnyAgentGroupTab(options = {}) {
+  const { tabOwners = null } = options || {};
+
+  const groupTabs = await getAgentGroupTabs();
+  if (groupTabs.length > 0) {
+    const allowed = groupTabs.filter((t) => t && t.id && isTabAllowedForAgent(t.id, options));
+    if (allowed.length > 0) {
+      const activeAllowed = allowed.find((t) => t.active);
+      return activeAllowed ? activeAllowed.id : allowed[allowed.length - 1].id;
+    }
+    return null;
+  }
+
+  for (const tid of agentControlledTabs) {
+    try {
+      const tab = await chrome.tabs.get(tid);
+      if (tab && tab.id && (await isTabInAgentGroup(tab))) {
+        if (isTabAllowedForAgent(tab.id, options)) return tab.id;
+      }
+    } catch (_) {
+      agentControlledTabs.delete(tid);
+      if (tabOwners instanceof Map) tabOwners.delete(tid);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolve target tab ID strictly within the Agent Pilot tab group.
+ * Never falls back to or hijacks a user's personal active tab outside the group,
+ * nor hijacks a tab owned by another concurrent agent session.
+ */
+export async function getTargetTabId(requestedTabId, lastAgentTabId = null, options = {}) {
   // 1. If explicit tab ID was requested by the agent
-  if (requestedTabId !== undefined && requestedTabId !== null) {
+  if (requestedTabId !== undefined && requestedTabId !== null && requestedTabId !== "") {
     const numId = Number(requestedTabId);
-    if (isNaN(numId)) return null;
+    if (isNaN(numId) || numId <= 0) return null;
 
     try {
       const tab = await chrome.tabs.get(numId);
@@ -149,7 +200,7 @@ export async function getTargetTabId(requestedTabId, lastAgentTabId = null) {
       }
       return tab.id;
     } catch (err) {
-      if (err.message && err.message.startsWith("Access denied")) {
+      if (err && err.message && err.message.startsWith("Access denied")) {
         throw err;
       }
       return null;
@@ -157,11 +208,10 @@ export async function getTargetTabId(requestedTabId, lastAgentTabId = null) {
   }
 
   // 2. If no tab ID requested, find the most appropriate tab strictly within the Agent Pilot group
-  // 2a. Check lastAgentTabId if still valid and within the agent group
   if (lastAgentTabId) {
     try {
       const tab = await chrome.tabs.get(lastAgentTabId);
-      if (tab && tab.id && (await isTabInAgentGroup(tab))) {
+      if (tab && tab.id && (await isTabInAgentGroup(tab)) && isTabAllowedForAgent(tab.id, options)) {
         return tab.id;
       }
     } catch (err) {
@@ -169,20 +219,11 @@ export async function getTargetTabId(requestedTabId, lastAgentTabId = null) {
     }
   }
 
-  // 2b. Query all tabs in the Agent Pilot group
-  const agentTabs = await getAgentGroupTabs();
-  if (agentTabs.length > 0) {
-    // Prefer the active tab within the agent group
-    const activeAgentTab = agentTabs.find((t) => t.active);
-    if (activeAgentTab) return activeAgentTab.id;
-
-    // Otherwise return the most recently opened tab in the agent group
-    return agentTabs[agentTabs.length - 1].id;
+  if (options && options.allowFallback === false) {
+    return null;
   }
 
-  // 3. Strictest isolation: NEVER fall back to getActiveTabId().
-  // If no tab exists in Agent Pilot group, return null.
-  return null;
+  return await findAnyAgentGroupTab(options);
 }
 
 /**

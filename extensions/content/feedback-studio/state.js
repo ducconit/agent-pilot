@@ -52,7 +52,7 @@
     updateComment: (id, newComment) => {
       const item = feedbackItems.find((it) => it.id === id);
       if (item) {
-        item.comment = newComment;
+        item.comment = String(newComment ?? "").slice(0, 4000);
         return true;
       }
       return false;

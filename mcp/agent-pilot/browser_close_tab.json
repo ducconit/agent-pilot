@@ -1,0 +1,22 @@
+{
+  "description": "Close a tab belonging to the Agent Pilot tab group to free RAM after testing is complete.",
+  "inputSchema": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID in the Agent Pilot group (defaults to last agent-controlled tab)",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_close_tab",
+  "parameters": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID in the Agent Pilot group (defaults to last agent-controlled tab)",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

@@ -5,6 +5,7 @@
 
 import {
   attachedTabs,
+  agentControlledTabs,
   tabLockStates,
   normalizeUrl,
   getBuffer,
@@ -23,9 +24,28 @@ import {
   initCdpEventListeners
 } from "./background/cdp-manager.js";
 
+import {
+  getActiveTabId,
+  markTabAsAgentControlled,
+  runWithTabLock
+} from "./background/tab-manager.js";
+
 import { captureTabScreenshot } from "./background/screenshot-service.js";
 import { AgentBridgeClient } from "./background/bridge-client.js";
 import { sanitizeData } from "./background/secret-sanitizer.js";
+import {
+  initFlowRecorder,
+  removeFlowSession,
+  recordTabNavigation,
+  getFlowState,
+  appendFlowStep,
+  setFlowRecording,
+  deleteFlowStep,
+  clearFlowSteps,
+  exportFlowAsBatch,
+  exportFlowAsPlaywright,
+  replayRecordedFlow
+} from "./background/flow-recorder.js";
 // Side-effect import: exposes globalThis.__AP_FEEDBACK_ITEM_SCHEMA__ for payload validation
 import "./content/feedback-studio/item-schema.js";
 
@@ -35,14 +55,28 @@ function validateFeedbackRequest(sender, payload) {
   if (!sender || sender.id !== chrome.runtime.id) {
     return { ok: false, error: "Rejected: untrusted sender" };
   }
-  if (!sender.tab) {
-    return { ok: false, error: "Rejected: feedback actions must originate from a content script" };
-  }
   if (!feedbackItemSchema) {
     return { ok: false, error: "Rejected: feedback validation module unavailable" };
   }
   return { ok: true, payload: feedbackItemSchema.sanitizeFeedbackPayload(payload) };
 }
+
+const PRIVILEGED_EXTENSION_ONLY_ACTIONS = new Set([
+  "set_secret_filter_status",
+  "set_agent_bridge_port",
+  "set_agent_bridge_api_key",
+  "toggle_agent_bridge",
+  "reconnect_agent_bridge",
+  "attach_debugger",
+  "detach_debugger",
+  "close_tab",
+  "new_tab",
+  "navigate",
+  "reload_tab",
+  "set_flow_recording",
+  "delete_flow_step",
+  "replay_flow_recorder"
+]);
 
 // Broadcast helper for extension views and agent bridge
 export function broadcastToExtension(message) {
@@ -57,6 +91,7 @@ export const agentBridge = new AgentBridgeClient(broadcastToExtension);
 
 // Initialize CDP event listeners (Console, Network, Runtime)
 initCdpEventListeners(broadcastToExtension);
+initFlowRecorder(broadcastToExtension);
 
 // Enable Side Panel behavior on icon click natively
 function enableSidePanelBehavior() {
@@ -123,8 +158,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // Clean up memory when tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
   cleanupTabResources(tabId);
-  if (agentBridge && agentBridge.lastAgentTabId === tabId) {
-    agentBridge.lastAgentTabId = null;
+  removeFlowSession(tabId);
+  if (agentBridge) {
+    if (typeof agentBridge.clearAgentTab === "function") {
+      agentBridge.clearAgentTab(tabId);
+    } else if (agentBridge.lastAgentTabId === tabId) {
+      agentBridge.lastAgentTabId = null;
+    }
   }
 });
 
@@ -150,9 +190,33 @@ if (chrome.runtime && chrome.runtime.onConnect) {
 }
 
 // Re-notify agent tabs and restore lock state when navigation completes
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (agentBridge && !agentBridge.connected && agentBridge.enabled) {
     agentBridge.requestReconnect();
+  }
+  if (changeInfo.url) {
+    recordTabNavigation(tabId, changeInfo.url);
+  } else if (changeInfo.status === "complete" && tab?.url) {
+    recordTabNavigation(tabId, tab.url);
+  }
+  // If user manually ungroups a tab or moves it into a non-Agent tab group, revoke agent access
+  if (changeInfo.groupId !== undefined && agentControlledTabs.has(tabId)) {
+    if (changeInfo.groupId <= 0) {
+      agentControlledTabs.delete(tabId);
+      if (agentBridge && typeof agentBridge.clearAgentTab === "function") {
+        agentBridge.clearAgentTab(tabId);
+      }
+    } else if (chrome.tabGroups?.get) {
+      try {
+        const grp = await chrome.tabGroups.get(changeInfo.groupId);
+        if (!grp || (grp.title !== "🤖 Agent Pilot" && grp.title !== "Agent Pilot")) {
+          agentControlledTabs.delete(tabId);
+          if (agentBridge && typeof agentBridge.clearAgentTab === "function") {
+            agentBridge.clearAgentTab(tabId);
+          }
+        }
+      } catch (_) {}
+    }
   }
   if (changeInfo.status === "complete") {
     const lockState = tabLockStates.get(tabId);
@@ -244,7 +308,13 @@ const BACKGROUND_ACTION_HANDLERS = {
   close_tab: (request) => runChromeTabOp((done) => chrome.tabs.remove(request.tabId, () => done({ success: true }))),
 
   // 2. Debugger & CDP Operations
-  attach_debugger: (request) => attachDebugger(request.tabId, broadcastToExtension),
+  attach_debugger: async (request) => {
+    const res = await attachDebugger(request.tabId, broadcastToExtension);
+    if (res && res.success && request.tabId) {
+      await markTabAsAgentControlled(request.tabId).catch(() => {});
+    }
+    return res;
+  },
 
   detach_debugger: (request) => detachDebugger(request.tabId, broadcastToExtension),
 
@@ -284,9 +354,9 @@ const BACKGROUND_ACTION_HANDLERS = {
     return { success: true, metrics: metricsMap };
   },
 
-  // 3. Screenshot Capture Operations
+  // 3. Screenshot Capture Operations (Human UI: Sidepanel, Popup, Content Script)
   capture_screenshot: async (request, sender) => {
-    const targetTabId = request.tabId || sender.tab?.id || (agentBridge ? await agentBridge.getTargetTabId() : null);
+    const targetTabId = request.tabId || sender.tab?.id || (await getActiveTabId());
     if (!targetTabId) return { success: false, error: "No target tab found" };
     return await captureTabScreenshot(targetTabId, request);
   },
@@ -365,6 +435,53 @@ const BACKGROUND_ACTION_HANDLERS = {
     const check = validateFeedbackRequest(sender, request.payload);
     if (!check.ok) return { success: false, error: check.error };
     return await agentBridge.pushFeedbackLive(check.payload);
+  },
+
+  // 9. Persistent Cross-Page Flow Recorder Actions
+  record_flow_step: (request, sender) => {
+    const tabId = sender?.tab?.id || request.tabId;
+    const step = appendFlowStep(tabId, request.step);
+    return { success: Boolean(step), step, state: getFlowState(tabId) };
+  },
+
+  get_flow_recorder_state: (request, sender) => {
+    const tabId = sender?.tab?.id || request.tabId;
+    return { success: true, ...getFlowState(tabId) };
+  },
+
+  set_flow_recording: async (request, sender) => {
+    const tabId = sender?.tab?.id || request.tabId || (await getActiveTabId());
+    return await setFlowRecording(tabId, request.enabled, request.url);
+  },
+
+  delete_flow_step: (request, sender) => {
+    const tabId = sender?.tab?.id || request.tabId;
+    return deleteFlowStep(tabId, request.stepId);
+  },
+
+  clear_flow_steps: (request, sender) => {
+    const tabId = sender?.tab?.id || request.tabId;
+    return clearFlowSteps(tabId);
+  },
+
+  export_flow_recorder: (request, sender) => {
+    const tabId = sender?.tab?.id || request.tabId || null;
+    const batch = exportFlowAsBatch(tabId, request.url, request.title, request.steps || null);
+    const playwright = exportFlowAsPlaywright(tabId, request.url, request.steps || null);
+    return {
+      success: true,
+      batch,
+      playwright,
+      ...getFlowState(tabId)
+    };
+  },
+
+  replay_flow_recorder: async (request, sender) => {
+    const tabId = sender?.tab?.id || request.tabId || (await getActiveTabId());
+    const runReplay = () => replayRecordedFlow(tabId, request.steps || null);
+    return tabId
+      ? await runWithTabLock(tabId, "flow.replay", runReplay)
+      : await runReplay();
   }
 };
 
@@ -372,7 +489,16 @@ const BACKGROUND_ACTION_HANDLERS = {
  * Main Message Router for Sidepanel, Popup, Content Script
  */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (!sender || sender.id !== chrome.runtime.id) {
+    sendResponse({ success: false, error: "Rejected: untrusted sender" });
+    return false;
+  }
   const { action, type } = request || {};
+
+  if (sender.tab && action && PRIVILEGED_EXTENSION_ONLY_ACTIONS.has(action)) {
+    sendResponse({ success: false, error: `Rejected: privileged action '${action}' is not allowed from content scripts` });
+    return false;
+  }
 
   if (type === "REGION_CROP_REQUESTED" || type === "ELEMENT_SNAP_REQUESTED") {
     broadcastToExtension(request);

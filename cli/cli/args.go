@@ -164,7 +164,7 @@ func parseEvalArgs(args []string) (string, interface{}, error) {
 		// Check stdin
 		stat, err := os.Stdin.Stat()
 		if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
-			data, err := io.ReadAll(os.Stdin)
+			data, err := io.ReadAll(io.LimitReader(os.Stdin, config.MaxAPIBodyBytes))
 			if err != nil {
 				return "", nil, fmt.Errorf("lỗi đọc stdin: %w", err)
 			}
@@ -235,7 +235,7 @@ func parseFillArgs(args []string) ([]map[string]interface{}, string, bool, inter
 		// Check stdin
 		stat, err := os.Stdin.Stat()
 		if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
-			data, err := io.ReadAll(os.Stdin)
+			data, err := io.ReadAll(io.LimitReader(os.Stdin, config.MaxAPIBodyBytes))
 			if err != nil {
 				return nil, "", false, nil, fmt.Errorf("lỗi đọc stdin: %w", err)
 			}

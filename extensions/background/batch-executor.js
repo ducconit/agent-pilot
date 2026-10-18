@@ -27,9 +27,15 @@ export async function executeBatchActions(params, bridgeClient = null) {
   // stopOnError defaults to TRUE: an error halts the batch. Callers must pass
   // an explicit `stopOnError: false` to keep running and collect every failure.
   const stopOnError = params.stopOnError !== false;
+  const agentId = params.agentId || null;
   let currentTabId = null;
   try {
-    currentTabId = await getTargetTabId(params.tabId, bridgeClient?.lastAgentTabId);
+    currentTabId = bridgeClient && typeof bridgeClient.getTargetTabId === "function"
+      ? await bridgeClient.getTargetTabId(params.tabId, agentId)
+      : await getTargetTabId(params.tabId, bridgeClient?.lastAgentTabId, {
+          tabOwners: bridgeClient?.tabOwners,
+          agentId
+        });
   } catch (err) {
     if (stopOnError) throw err;
   }

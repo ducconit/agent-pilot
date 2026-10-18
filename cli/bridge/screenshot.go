@@ -11,8 +11,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 )
+
+var screenshotSeq int64
 
 var forbiddenSystemPrefixes = []string{
 	"/etc", "/proc", "/sys", "/dev", "/boot", "/root",
@@ -127,7 +130,8 @@ func SaveScreenshotDataURL(dataURL, outputPath string) (string, int, error) {
 	}
 
 	if outputPath == "" {
-		outputPath = fmt.Sprintf("screenshot_%d.%s", time.Now().UnixMilli(), ext)
+		seq := atomic.AddInt64(&screenshotSeq, 1)
+		outputPath = filepath.Join(os.TempDir(), fmt.Sprintf("screenshot_%d_%d_%d.%s", time.Now().UnixMilli(), os.Getpid(), seq, ext))
 	}
 
 	if dir := filepath.Dir(outputPath); dir != "" && dir != "." {

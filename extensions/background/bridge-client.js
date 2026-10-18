@@ -23,6 +23,18 @@ export class AgentBridgeClient {
     const { id, method, params = {} } = msg;
     const respond = this.createResponder(id, method, params);
 
+    if (params && typeof params.agentId === "string" && params.agentId) {
+      const hintId = Number(params.agentLastTabId);
+      const existingOwner = this.tabOwners instanceof Map ? this.tabOwners.get(hintId) : null;
+      if (
+        hintId > 0 &&
+        (!existingOwner || existingOwner === params.agentId) &&
+        !(this.agentLastTabIds instanceof Map && this.agentLastTabIds.has(params.agentId))
+      ) {
+        this.recordAgentTab(hintId, params.agentId, { isOwner: !existingOwner });
+      }
+    }
+
     const handler = AGENT_COMMAND_HANDLERS[method];
     if (!handler) {
       respond(null, new Error(`Unknown method: ${method}`));

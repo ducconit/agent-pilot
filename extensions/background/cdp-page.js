@@ -28,6 +28,32 @@ export function getActiveDialog(tabId) {
   return activeDialogs.get(tabId) || null;
 }
 
+const FORBIDDEN_UPLOAD_PATH_SEGMENTS = [
+  "/.ssh/",
+  "/.aws/",
+  "/.gnupg/",
+  "/.kube/",
+  "/.config/gcloud/",
+  "/etc/shadow",
+  "/etc/passwd",
+  "/proc/",
+  "/sys/"
+];
+
+function validateUploadFilePaths(filePaths) {
+  for (const rawPath of filePaths) {
+    if (typeof rawPath !== "string" || !rawPath.trim()) {
+      throw new Error("Each file path must be a non-empty string");
+    }
+    const normalized = rawPath.replace(/\\/g, "/").toLowerCase();
+    for (const seg of FORBIDDEN_UPLOAD_PATH_SEGMENTS) {
+      if (normalized.includes(seg)) {
+        throw new Error(`Upload rejected: access to sensitive path (${seg}) is forbidden`);
+      }
+    }
+  }
+}
+
 /**
  * Upload files to an <input type="file"> element via CDP DOM.setFileInputFiles
  */
@@ -38,6 +64,7 @@ export async function uploadFileInput(tabId, selector, filePaths) {
   if (!Array.isArray(filePaths) || filePaths.length === 0) {
     throw new Error("filePaths must be a non-empty array of file paths");
   }
+  validateUploadFilePaths(filePaths);
 
   // 1. Ask isolated content script to resolve selector/@ref and tag the element with a temporary data marker
   let resolvedSelector = selector;

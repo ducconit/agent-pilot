@@ -177,6 +177,9 @@ func TestDarwinServiceManager_Install_XMLEscaping(t *testing.T) {
 	if !strings.Contains(content, expectedEscapedString) {
 		t.Errorf("expected plist to contain escaped XML %q, got:\n%s", expectedEscapedString, content)
 	}
+	if !strings.Contains(content, "/Users/testuser/Library/Logs/agent-pilot.log") || strings.Contains(content, "/tmp/agent-pilot.log") {
+		t.Errorf("expected plist to log to ~/Library/Logs instead of /tmp, got:\n%s", content)
+	}
 
 	// Verify launchctl load -w command was called
 	foundLoad := false

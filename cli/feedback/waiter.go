@@ -106,16 +106,32 @@ func WaitForFeedback(timeoutSec int, tabID interface{}) map[string]interface{} {
 	return WaitForFeedbackWithContext(context.Background(), timeoutSec, tabID)
 }
 
-// CheckAndNotifyFeedbackWaiters delivers a saved session to every waiting
-// long-poll and clears the list. The buffered channels guarantee this never
-// blocks even if a waiter is concurrently timing out.
+func tabIDMatches(waiterTabID interface{}, payloadTabID interface{}) bool {
+	if waiterTabID == nil {
+		return true
+	}
+	if payloadTabID == nil {
+		// Unscoped submission (e.g. from direct HTTP API without tabId) satisfies waiters unless both specify mismatched IDs.
+		return false
+	}
+	return fmt.Sprintf("%v", waiterTabID) == fmt.Sprintf("%v", payloadTabID)
+}
+
+// CheckAndNotifyFeedbackWaiters delivers a saved session to matching waiting
+// long-polls and keeps non-matching tab-scoped waiters queued.
 func CheckAndNotifyFeedbackWaiters(data map[string]interface{}) {
 	waitersLock.Lock()
 	defer waitersLock.Unlock()
 
+	payloadTabID := data["tabId"]
+	var remaining []*FeedbackWaiter
 	for _, w := range pendingWaiters {
+		if !tabIDMatches(w.TabID, payloadTabID) {
+			remaining = append(remaining, w)
+			continue
+		}
 		w.Timer.Stop()
-		payload := make(map[string]interface{}, len(data)+2)
+		payload := make(map[string]interface{}, len(data)+3)
 		for k, v := range data {
 			payload[k] = v
 		}
@@ -124,5 +140,5 @@ func CheckAndNotifyFeedbackWaiters(data map[string]interface{}) {
 		payload["channel"] = "reactive_channel_a"
 		w.Channel <- payload
 	}
-	pendingWaiters = nil
+	pendingWaiters = remaining
 }

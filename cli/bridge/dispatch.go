@@ -53,6 +53,17 @@ func DispatchCommand(method string, params map[string]interface{}, port int) (in
 	// Master bridge is NOT running -> start embedded bridge in background
 	ensureEmbeddedBridgeRunning(port, addr)
 
+	// Give the Chrome Extension a brief window to connect to the newly started
+	// embedded server before failing with "no Chrome Extension connected".
+	instanceID, _ := params["instanceId"].(string)
+	clientDeadline := time.Now().Add(config.EmbeddedClientWaitBudget)
+	for time.Now().Before(clientDeadline) {
+		if getClientByID(instanceID) != nil {
+			break
+		}
+		time.Sleep(config.EmbeddedReadyRetryInterval)
+	}
+
 	// Now try dispatching
 	return SendCommandToExtension(method, params, DeriveCommandTimeout(method, params, config.DefaultCommandTimeoutMs))
 }

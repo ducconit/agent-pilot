@@ -88,6 +88,7 @@ func TestSaveScreenshotDataURLUsesDetectedExtensionAnd0600Perm(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected SaveScreenshotDataURL error: %v", err)
 	}
+	t.Cleanup(func() { _ = os.Remove(savedPath) })
 	if !strings.HasSuffix(savedPath, ".jpg") || n <= 0 {
 		t.Fatalf("expected default filename with .jpg extension, got %q (%d bytes)", savedPath, n)
 	}

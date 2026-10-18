@@ -18,7 +18,7 @@ type secretPattern struct {
 	replacer func(string) string
 }
 
-var sensitivePropRegex = regexp.MustCompile(`(?i)^(?:password|passwd|secret|api_?key|x-api-key|access_?token|auth_?token|private_?key|client_?secret|authorization|proxy-authorization|cookie|set-cookie|credentials|token)$`)
+var sensitivePropRegex = regexp.MustCompile(`(?i)^(?:password|passwd|passcode|pin|otp|secret|api_?key|x-api-key|access_?token|auth_?token|private_?key|client_?secret|authorization|proxy-authorization|cookie|set-cookie|credentials|token)$`)
 var sensitiveKvRegex = regexp.MustCompile(`(?i)(["']?(?:password|passwd|secret|client_?secret|access_?token|auth_?token|api_?key|authorization|proxy-authorization|cookie|set-cookie|x-api-key|credentials|token)["']?\s*[:=]\s*["'])([^"'\\,]{4,}?)(["'])`)
 
 var secretPatterns = []secretPattern{
@@ -171,6 +171,9 @@ var secretPatterns = []secretPattern{
 				prefix := sub[1]
 				secretVal := sub[2]
 				suffix := sub[3]
+				if isAlreadyMaskedValue(secretVal) {
+					return match
+				}
 				p := ""
 				if len(secretVal) >= 2 {
 					p = secretVal[:2]
@@ -182,9 +185,15 @@ var secretPatterns = []secretPattern{
 	},
 }
 
+var alreadyMaskedRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]{0,10}\*{20} \[MASKED_SECRET: [^\]]+\]$`)
+
+func isAlreadyMaskedValue(val string) bool {
+	return alreadyMaskedRegex.MatchString(strings.TrimSpace(val))
+}
+
 // MaskString inspects a single string and masks any secret patterns found.
 func MaskString(text string) (string, bool, []string) {
-	if len(text) < 6 || strings.HasPrefix(text, "data:image/") || strings.Contains(text, "[MASKED_SECRET") {
+	if len(text) < 6 || strings.HasPrefix(text, "data:image/") || isAlreadyMaskedValue(text) {
 		return text, false, nil
 	}
 
@@ -194,9 +203,15 @@ func MaskString(text string) (string, bool, []string) {
 
 	for _, p := range secretPatterns {
 		result = p.regex.ReplaceAllStringFunc(result, func(m string) string {
-			masked = true
-			types = append(types, p.name)
-			return p.replacer(m)
+			if isAlreadyMaskedValue(m) {
+				return m
+			}
+			replaced := p.replacer(m)
+			if replaced != m {
+				masked = true
+				types = append(types, p.name)
+			}
+			return replaced
 		})
 	}
 
@@ -226,10 +241,7 @@ func SanitizeData(data interface{}, isEnabled bool) interface{} {
 
 		switch v := val.(type) {
 		case string:
-			if strings.Contains(v, "[MASKED_SECRET") {
-				return v
-			}
-			if keyContext != "" && sensitivePropRegex.MatchString(keyContext) && len(v) >= 1 {
+			if keyContext != "" && sensitivePropRegex.MatchString(keyContext) && len(v) >= 1 && !isAlreadyMaskedValue(v) {
 				totalMasked++
 				allTypes["Field:"+keyContext] = true
 				prefix := v
@@ -245,6 +257,14 @@ func SanitizeData(data interface{}, isEnabled bool) interface{} {
 					allTypes[t] = true
 				}
 				return maskedText
+			}
+			return v
+
+		case int, int64, float64:
+			if keyContext != "" && sensitivePropRegex.MatchString(keyContext) {
+				totalMasked++
+				allTypes["Field:"+keyContext] = true
+				return fmt.Sprintf("******************** [MASKED_SECRET: %s]", keyContext)
 			}
 			return v
 

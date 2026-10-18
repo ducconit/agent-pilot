@@ -25,6 +25,8 @@ export function initializeTransport(client, broadcastFn) {
   client.maxReconnectDelay = BRIDGE.RECONNECT_MAX_MS;
   client.enabled = true;
   client.lastAgentTabId = null;
+  client.agentLastTabIds = new Map();
+  client.tabOwners = new Map();
   client.apiKey = "";
   client.broadcastFn = broadcastFn;
   client.outboundQueue = [];

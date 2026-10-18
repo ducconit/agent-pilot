@@ -1045,7 +1045,7 @@ code {
 .info-label {
   color: var(--text-muted);
   flex-shrink: 0;
-  width: 92px;
+  min-width: 92px;
   white-space: nowrap;
 }
 
@@ -1056,6 +1056,30 @@ code {
   min-width: 0;
   word-break: break-word;
   line-height: 1.4;
+}
+
+#card-qa-diagnostics .info-row {
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+#card-qa-diagnostics .info-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#card-qa-diagnostics .info-val {
+  flex: 0 0 auto;
+  min-width: 26px;
+  text-align: center;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
 }
 
 .log-counter {
@@ -1189,10 +1213,25 @@ code {
   flex-shrink: 0;
 }
 
-.card-badge.badge-warning {
+.card-badge.badge-warning,
+.card-badge.badge-active {
   background: rgba(244, 63, 94, 0.15);
   color: var(--accent-red);
-  border: 1px solid rgba(244, 63, 94, 0.3);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+}
+
+.card-badge.badge-info {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.btn-danger {
+  background: var(--accent-red);
+  color: #fff;
+}
+.btn-danger:hover {
+  background: #e11d48;
 }
 
 /* ==========================================================================

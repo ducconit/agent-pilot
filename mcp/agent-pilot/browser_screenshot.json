@@ -43,7 +43,7 @@
         "type": "string"
       },
       "path": {
-        "description": "Output file path to save PNG image (default: auto-generated filename)",
+        "description": "Output file path to save PNG image (default: OS temp directory screenshot_\u003cts\u003e.png)",
         "type": "string"
       },
       "selector": {
@@ -113,7 +113,7 @@
         "type": "string"
       },
       "path": {
-        "description": "Output file path to save PNG image (default: auto-generated filename)",
+        "description": "Output file path to save PNG image (default: OS temp directory screenshot_\u003cts\u003e.png)",
         "type": "string"
       },
       "selector": {

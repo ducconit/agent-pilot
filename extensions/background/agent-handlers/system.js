@@ -29,42 +29,46 @@ const RELOAD_RESPONSE_DELAY_MS = 150;
 
 export const systemHandlers = {
   "emulation.set": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
-    if (!attachedTabs.has(tabId)) {
-      await attachDebugger(tabId, client.broadcastFn);
-    }
-    setEmulation(tabId, params)
+    client.runWithTabLock(tabId, "emulation.set", async () => {
+      if (!attachedTabs.has(tabId)) {
+        await attachDebugger(tabId, client.broadcastFn);
+      }
+      return await setEmulation(tabId, params);
+    })
       .then(res => respond(res))
       .catch(err => respond(null, err));
   },
 
   "emulation.resize": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     const width = Number(params.width);
     const height = Number(params.height);
     if (isNaN(width) || width <= 0 || isNaN(height) || height <= 0) {
       return respond(null, new Error(`Invalid dimensions: width and height must be positive numbers (got width=${params.width}, height=${params.height})`));
     }
-    if (!attachedTabs.has(tabId)) {
-      await attachDebugger(tabId, client.broadcastFn);
-    }
     const scale = Number(params.deviceScaleFactor);
-    setEmulation(tabId, {
-      viewport: {
-        width: Math.floor(width),
-        height: Math.floor(height),
-        deviceScaleFactor: !isNaN(scale) && scale > 0 ? scale : 1,
-        mobile: !!params.mobile
+    client.runWithTabLock(tabId, "emulation.resize", async () => {
+      if (!attachedTabs.has(tabId)) {
+        await attachDebugger(tabId, client.broadcastFn);
       }
+      return await setEmulation(tabId, {
+        viewport: {
+          width: Math.floor(width),
+          height: Math.floor(height),
+          deviceScaleFactor: !isNaN(scale) && scale > 0 ? scale : 1,
+          mobile: !!params.mobile
+        }
+      });
     })
       .then(res => respond(res))
       .catch(err => respond(null, err));
   },
 
   "network.listRequests": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     const buffer = getBuffer(tabId);
     let requests = Array.from(buffer.network.values());
@@ -90,7 +94,7 @@ export const systemHandlers = {
   },
 
   "network.getResponseBody": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     if (!attachedTabs.has(tabId)) {
       await attachDebugger(tabId, client.broadcastFn);
@@ -101,7 +105,7 @@ export const systemHandlers = {
   },
 
   "performance.trace": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     if (!attachedTabs.has(tabId)) {
       await attachDebugger(tabId, client.broadcastFn);
@@ -115,7 +119,7 @@ export const systemHandlers = {
   },
 
   "performance.metrics": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     if (!attachedTabs.has(tabId)) {
       await attachDebugger(tabId, client.broadcastFn);
@@ -126,7 +130,7 @@ export const systemHandlers = {
   },
 
   "memory.heapSnapshot": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     if (!attachedTabs.has(tabId)) {
       await attachDebugger(tabId, client.broadcastFn);
@@ -137,7 +141,7 @@ export const systemHandlers = {
   },
 
   "memory.collectGarbage": async (client, params, respond) => {
-    const tabId = await client.getTargetTabId(params.tabId);
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error("No target tab found"));
     if (!attachedTabs.has(tabId)) {
       await attachDebugger(tabId, client.broadcastFn);
@@ -211,6 +215,12 @@ export const systemHandlers = {
   "config.setSecretFilter": async (client, params, respond) => {
     if (params.enabled !== undefined) {
       setSecretFilterEnabled(Boolean(params.enabled));
+      if (typeof client.broadcastFn === "function") {
+        client.broadcastFn({
+          type: "SECRET_FILTER_STATUS_CHANGED",
+          enabled: getSecretFilterEnabled()
+        });
+      }
     }
     respond({ enabled: getSecretFilterEnabled() });
   },

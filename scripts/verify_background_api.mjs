@@ -226,7 +226,7 @@ const { evaluateInTab } = await import("../extensions/background/agent-handlers/
 let cdpEvalCalled = 0;
 globalThis.chrome = {
   scripting: {
-    executeScript: async () => [{ result: { __eval_err: true, message: "ReferenceError: foo is not defined" } }]
+    executeScript: async () => [{ result: { __eval_err: true, name: "ReferenceError", message: "ReferenceError: foo is not defined" } }]
   },
   debugger: {
     sendCommand: (_target, _method, _params, cb) => {
@@ -256,6 +256,173 @@ record(
   "9. evaluateInTab avoids duplicate CDP execution on runtime error and unwraps undefined CDP result",
   Boolean(caughtEvalErr) && cdpEvalCalled === 0 && undefinedCdpResult === undefined,
   `caught=${caughtEvalErr?.message}, cdpEvalCalled=${cdpEvalCalled}, undefinedResult=${String(undefinedCdpResult)}`
+);
+
+const { getTargetTabId, isTabInAgentGroup } = await import("../extensions/background/tab-manager.js");
+const { commandMethods } = await import("../extensions/background/bridge-commands.js");
+
+// 10. Strict Tab Group Isolation: getTargetTabId must reject non-group tabs and never hijack active user tab
+globalThis.chrome = {
+  tabs: {
+    get: async (id) => {
+      if (id === 101) return { id: 101, groupId: 7 };
+      if (id === 102) return { id: 102, groupId: 7 };
+      if (id === 103) return { id: 103, groupId: 9 }; // Moved to user's personal tab group
+      if (id === 202) return { id: 202, groupId: -1 };
+      throw new Error("No tab");
+    },
+    query: async () => [
+      { id: 202, active: true, groupId: -1 }
+    ]
+  },
+  tabGroups: {
+    get: async (gid) => {
+      if (gid === 7) return { id: 7, title: "🤖 Agent Pilot" };
+      if (gid === 9) return { id: 9, title: "Personal Work" };
+      throw new Error("No group");
+    }
+  }
+};
+agentControlledTabs.clear();
+agentControlledTabs.add(103); // Stale entry moved into Personal Work group
+const inGroup101 = await isTabInAgentGroup(101);
+const inGroup202 = await isTabInAgentGroup(202);
+const inGroup103Moved = await isTabInAgentGroup(103);
+const rejectedNonGroup = (await getTargetTabId(202, null).catch(() => null)) === null;
+agentControlledTabs.clear();
+const rejectedWhenNoAgentTabs = (await getTargetTabId(null, null)) === null;
+const resolvedGroupTab = await getTargetTabId(101, null);
+record(
+  "10. Strict Tab Group Isolation (never hijacks personal tabs or foreign tab groups)",
+  inGroup101 === true &&
+    inGroup202 === false &&
+    inGroup103Moved === false &&
+    !agentControlledTabs.has(103) &&
+    rejectedNonGroup &&
+    rejectedWhenNoAgentTabs &&
+    resolvedGroupTab === 101,
+  `inGroup(101)=${inGroup101}, inGroup(202)=${inGroup202}, movedToPersonal(103)=${inGroup103Moved}, rejectedNonGroup=${rejectedNonGroup}, rejectedEmpty=${rejectedWhenNoAgentTabs}`
+);
+
+// 11. Multi-Agent Concurrent Tab Affinity & Ownership Isolation (including rehydration steal protection)
+const mockBridge = Object.assign({
+  lastAgentTabId: null,
+  agentLastTabIds: new Map(),
+  tabOwners: new Map()
+}, commandMethods);
+agentControlledTabs.clear();
+agentControlledTabs.add(101);
+agentControlledTabs.add(102);
+mockBridge.recordAgentTab(101, "agent_conv_A", { isOwner: true });
+mockBridge.recordAgentTab(102, "agent_conv_B", { isOwner: true });
+
+// Attempt by Agent C to steal Agent A's Tab 101 via recordAgentTab / rehydration hint must be ignored:
+mockBridge.recordAgentTab(101, "agent_conv_C", { isOwner: true });
+const ownerOf101AfterStealAttempt = mockBridge.tabOwners.get(101);
+const targetCAfterStealAttempt = await mockBridge.getTargetTabId(undefined, "agent_conv_C");
+
+const targetA = await mockBridge.getTargetTabId(undefined, "agent_conv_A");
+const targetB = await mockBridge.getTargetTabId(undefined, "agent_conv_B");
+// Simulate Agent B closing its own tab (102), then calling an implicit command or close again:
+mockBridge.clearAgentTab(102);
+agentControlledTabs.delete(102);
+const targetBAfterClose = await mockBridge.getTargetTabId(undefined, "agent_conv_B", { allowFallback: false });
+const targetBFallbackBlocked = await mockBridge.getTargetTabId(undefined, "agent_conv_B");
+const targetAStillIntact = await mockBridge.getTargetTabId(undefined, "agent_conv_A");
+
+record(
+  "11. Multi-Agent Concurrent Tab Affinity (no cross-conversation tab hijacking, steal, or accidental close)",
+  ownerOf101AfterStealAttempt === "agent_conv_A" &&
+    targetCAfterStealAttempt === null &&
+    targetA === 101 &&
+    targetB === 102 &&
+    targetBAfterClose === null &&
+    targetBFallbackBlocked === null &&
+    targetAStillIntact === 101,
+  `owner101=${ownerOf101AfterStealAttempt}, C=${targetCAfterStealAttempt}, A=${targetA}, B=${targetB}, B_afterClose=${targetBAfterClose}, B_fallback=${targetBFallbackBlocked}, A_after=${targetAStillIntact}`
+);
+
+const {
+  setFlowRecording,
+  appendFlowStep,
+  recordTabNavigation,
+  deleteFlowStep,
+  getFlowState,
+  removeFlowSession,
+  exportFlowAsBatch,
+  exportFlowAsPlaywright,
+  clearFlowSteps
+} = await import("../extensions/background/flow-recorder.js");
+
+// 12. Persistent Cross-Page Flow Recorder (navigation persistence, deduplication, Batch & Playwright export)
+clearFlowSteps(101);
+await setFlowRecording(101, true, "https://example.com/login");
+appendFlowStep(101, {
+  action: "type",
+  tagName: "input",
+  selector: "[data-testid=\"username\"]",
+  playwrightLocator: "page.getByTestId(\"username\")",
+  value: "tester_01",
+  url: "https://example.com/login",
+  description: "Nhập \"tester_01\" vào <input>"
+});
+// Consecutive typing on same input updates in place instead of duplicating
+appendFlowStep(101, {
+  action: "type",
+  tagName: "input",
+  selector: "[data-testid=\"username\"]",
+  playwrightLocator: "page.getByTestId(\"username\")",
+  value: "tester_admin",
+  url: "https://example.com/login",
+  description: "Nhập \"tester_admin\" vào <input>"
+});
+appendFlowStep(101, {
+  action: "click",
+  tagName: "button",
+  selector: "[data-testid=\"submit-btn\"]",
+  playwrightLocator: "page.getByRole(\"button\", { name: \"Đăng nhập\" })",
+  label: "Đăng nhập",
+  url: "https://example.com/login",
+  description: "Click <button> \"Đăng nhập\""
+});
+// Simulate full-page navigation to /dashboard
+recordTabNavigation(101, "https://example.com/dashboard");
+const extraStep = appendFlowStep(101, {
+  action: "click",
+  tagName: "a",
+  selector: "a.logout",
+  url: "https://example.com/dashboard",
+  description: "Click <a> \"Thoát\""
+});
+// Delete the accidental step
+deleteFlowStep(101, extraStep.id);
+
+const flowState = getFlowState(101);
+const exportedBatch = exportFlowAsBatch(101);
+const exportedPw = exportFlowAsPlaywright(101);
+
+// Simulate original tab #101 closing -> flow should remain preserved in lastRecordedFlow for auto-new-tab Replay
+removeFlowSession(101);
+const fallbackAfterClose = getFlowState(null);
+const fallbackBatchAfterClose = exportFlowAsBatch(null);
+
+record(
+  "12. Persistent Cross-Page Flow Recorder (MPA navigation, deduplication, Batch & Playwright export, closed-tab survival)",
+  flowState.recording === true &&
+    flowState.steps.length === 4 &&
+    flowState.steps[0].action === "navigate" &&
+    flowState.steps[1].value === "tester_admin" &&
+    flowState.steps[2].action === "click" &&
+    flowState.steps[3].action === "navigate" &&
+    flowState.steps[3].url === "https://example.com/dashboard" &&
+    exportedBatch.actions.length === 4 &&
+    exportedPw.includes("await page.goto(\"https://example.com/login\");") &&
+    exportedPw.includes("await page.getByTestId(\"username\").fill(\"tester_admin\");") &&
+    exportedPw.includes("await page.getByRole(\"button\", { name: \"Đăng nhập\" }).click();") &&
+    exportedPw.includes("await page.goto(\"https://example.com/dashboard\");") &&
+    fallbackAfterClose.steps.length === 4 &&
+    fallbackBatchAfterClose.actions.length === 4,
+  `steps=${flowState.steps.length}, batchActions=${exportedBatch.actions.length}, survivedTabClose=${fallbackAfterClose.steps.length === 4}`
 );
 
 recorder.summarize();

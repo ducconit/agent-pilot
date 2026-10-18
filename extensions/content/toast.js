@@ -13,13 +13,18 @@
   const TOAST_DURATION = T.toastMs || 3200;
   const TOAST_FADE_MS = T.toastFadeMs || 400;
 
-  function showToast(htmlMessage) {
+  function showToast(message) {
     const existing = document.querySelector(".agent-pilot-toast");
     if (existing) existing.remove();
 
     const toast = document.createElement("div");
     toast.className = "agent-pilot-toast";
-    toast.innerHTML = `<span>🚀</span><div>${htmlMessage}</div>`;
+    const icon = document.createElement("span");
+    icon.textContent = "🚀";
+    const text = document.createElement("div");
+    text.textContent = String(message ?? "");
+    toast.appendChild(icon);
+    toast.appendChild(text);
     (document.body || document.documentElement).appendChild(toast);
 
     setTimeout(() => {

@@ -50,29 +50,47 @@ export class ScreenshotPanel {
     }
 
     if (this.btnCaptureRegion) {
-      this.btnCaptureRegion.onclick = () => {
+      this.btnCaptureRegion.onclick = async () => {
         const activeTabId = this.getActiveTabId();
         if (!activeTabId) return;
-        chrome.tabs.sendMessage(activeTabId, { action: "start_region_crop" }, () => {
+        try {
+          await chrome.tabs.sendMessage(activeTabId, { action: "start_region_crop" });
           showToast("Kéo chuột trên trang để chọn vùng cần chụp.");
-        });
+        } catch (_) {
+          try {
+            const injected = await chrome.runtime.sendMessage({ action: "ensure_content_script", tabId: activeTabId });
+            if (injected && injected.success) {
+              await chrome.tabs.sendMessage(activeTabId, { action: "start_region_crop" });
+              showToast("Kéo chuột trên trang để chọn vùng cần chụp.");
+              return;
+            }
+          } catch (_) {}
+          showToast("Vui lòng làm mới (F5) trang web trước khi chụp!");
+        }
       };
     }
 
     if (this.btnCaptureElement) {
-      this.btnCaptureElement.onclick = () => {
+      this.btnCaptureElement.onclick = async () => {
         const activeTabId = this.getActiveTabId();
         if (!activeTabId) {
           showToast("Không tìm thấy tab hoạt động.");
           return;
         }
-        chrome.tabs.sendMessage(activeTabId, { action: "start_element_snap" }, () => {
-          if (chrome.runtime.lastError) {
-            showToast("Vui lòng làm mới trang web trước khi chụp!");
-          } else {
-            showToast("📸 Di chuột và click chọn phần tử trên trang web để chụp • Esc để hủy");
-          }
-        });
+        try {
+          await chrome.tabs.sendMessage(activeTabId, { action: "start_element_snap" });
+          showToast("📸 Di chuột và click chọn phần tử trên trang web để chụp • Esc để hủy");
+        } catch (_) {
+          try {
+            const injected = await chrome.runtime.sendMessage({ action: "ensure_content_script", tabId: activeTabId });
+            if (injected && injected.success) {
+              await chrome.tabs.sendMessage(activeTabId, { action: "start_element_snap" });
+              showToast("📸 Di chuột và click chọn phần tử trên trang web để chụp • Esc để hủy");
+              return;
+            }
+          } catch (_) {}
+          showToast("Vui lòng làm mới (F5) trang web trước khi chụp!");
+        }
       };
     }
 
@@ -186,8 +204,13 @@ export class ScreenshotPanel {
   }
 
   captureVisibleScreenshot() {
+    const activeTabId = this.getActiveTabId();
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: "capture_screenshot", mode: "visible" }, (res) => {
+      chrome.runtime.sendMessage({
+        action: "capture_screenshot",
+        mode: "visible",
+        ...(activeTabId ? { tabId: activeTabId } : {})
+      }, (res) => {
         if (res && res.success && res.dataUrl) {
           this.displayScreenshot(res.dataUrl, "Đã chụp toàn bộ khung nhìn!");
           resolve(res.dataUrl);

@@ -10,7 +10,6 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import puppeteer from "puppeteer-core";
 
 import { LOCAL_HOST, ROOT_DIR, EXTENSIONS_DIR, TIMEOUTS, SEPARATOR } from "./config.mjs";
 import { resolveChromiumBin, getChromiumLaunchArgs } from "../browser_resolver.mjs";
@@ -146,6 +145,7 @@ function installExitHook() {
  * safe to call from a `finally` block even if the browser was already closed.
  */
 export async function launchExtensionBrowser({ headless = false, extensionsDir = EXTENSIONS_DIR } = {}) {
+  const { default: puppeteer } = await import("puppeteer-core");
   const executablePath = resolveChromiumBin();
   const browser = await puppeteer.launch({
     executablePath,

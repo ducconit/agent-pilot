@@ -132,6 +132,56 @@ try {
     "Only base64 raster images pass"
   );
 
+  // 16. QA DOM fields (Playwright locator, Test ID, selectorMatches, WCAG a11y) preserved
+  const qaItem = schema.validateFeedbackItem({
+    mode: "element",
+    dom: {
+      selector: '[data-testid="checkout-btn"]',
+      selectorMatches: 1,
+      playwrightLocator: 'page.getByTestId("checkout-btn")',
+      testId: "checkout-btn",
+      testIdAttr: "data-testid",
+      role: "button",
+      accessibleName: "Thanh toán",
+      a11y: {
+        contrastRatio: 7.42,
+        wcagLevel: "AAA",
+        warnings: ["Kích thước vùng bấm nhỏ"]
+      }
+    }
+  });
+  record(
+    "16. QA DOM locators & WCAG a11y preserved",
+    qaItem.dom.playwrightLocator === 'page.getByTestId("checkout-btn")'
+      && qaItem.dom.testId === "checkout-btn"
+      && qaItem.dom.selectorMatches === 1
+      && qaItem.dom.a11y.contrastRatio === 7.42
+      && qaItem.dom.a11y.wcagLevel === "AAA"
+      && qaItem.dom.a11y.warnings.length === 1,
+    `locator=${qaItem.dom.playwrightLocator}, contrast=${qaItem.dom.a11y.contrastRatio}`
+  );
+
+  // 17. Payload QA diagnostics (environment, consoleErrors, networkErrors, reproSteps) sanitized
+  const diagPayload = schema.sanitizeFeedbackPayload({
+    url: "https://example.test/checkout",
+    title: "Checkout",
+    items: [],
+    diagnostics: {
+      environment: { viewport: "1440×900", devicePixelRatio: 2, language: "vi-VN" },
+      consoleErrors: [{ type: "uncaught_error", message: "TypeError: Cannot read x", count: 2 }],
+      networkErrors: [{ method: "POST", url: "https://example.test/api/pay", status: 500, statusText: "Internal Server Error", durationMs: 120 }],
+      reproSteps: [{ action: "click", selector: "#pay", description: 'Click <button> "Pay" (`#pay`)' }]
+    }
+  });
+  record(
+    "17. Payload QA diagnostics sanitized & preserved",
+    diagPayload.diagnostics.environment.viewport === "1440×900"
+      && diagPayload.diagnostics.consoleErrors.length === 1
+      && diagPayload.diagnostics.networkErrors[0].status === 500
+      && diagPayload.diagnostics.reproSteps.length === 1,
+    `console=${diagPayload.diagnostics.consoleErrors.length}, net=${diagPayload.diagnostics.networkErrors.length}, steps=${diagPayload.diagnostics.reproSteps.length}`
+  );
+
   recorder.summarize();
   recorder.exitIfFailed();
 } catch (err) {

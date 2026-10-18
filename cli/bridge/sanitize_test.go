@@ -242,3 +242,31 @@ func TestSanitizeDataDepthCap(t *testing.T) {
 		t.Fatalf("expected depth-cap marker at depth > %d", maxSanitizeDepth)
 	}
 }
+
+func TestSanitizeDataBypassPrevention(t *testing.T) {
+	// A string containing "[MASKED_SECRET" decoy text alongside a real secret must still mask the real secret.
+	decoyPlusSecret := "Decoy [MASKED_SECRET: fake] and real key sk-proj-1234567890abcdefghijklmnopqrstuvwxyz"
+	maskedStr, changed, _ := MaskString(decoyPlusSecret)
+	if !changed {
+		t.Fatalf("expected real secret alongside decoy marker to be masked")
+	}
+	if strings.Contains(maskedStr, "sk-proj-1234567890abcdefghijklmnopqrstuvwxyz") {
+		t.Fatalf("real OpenAI key leaked when decoy marker was present: %s", maskedStr)
+	}
+	if !strings.Contains(maskedStr, "[MASKED_SECRET: OpenAI API Key]") {
+		t.Fatalf("expected OpenAI API Key mask marker, got: %s", maskedStr)
+	}
+
+	// Sensitive keyContext with decoy marker or numeric PIN must be masked.
+	payload := map[string]interface{}{
+		"password": "my_real_password [MASKED_SECRET",
+		"pin":      948321,
+	}
+	sanitized := SanitizeData(payload, true).(map[string]interface{})
+	if strings.Contains(sanitized["password"].(string), "my_real_password") {
+		t.Fatalf("password with decoy substring leaked: %v", sanitized["password"])
+	}
+	if !strings.Contains(sanitized["pin"].(string), "[MASKED_SECRET: pin]") {
+		t.Fatalf("numeric pin was not masked: %v", sanitized["pin"])
+	}
+}

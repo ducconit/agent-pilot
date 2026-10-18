@@ -40,7 +40,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   btnQuickScreenshot.onclick = () => {
-    chrome.runtime.sendMessage({ action: "capture_screenshot", mode: "visible" }, (res) => {
+    chrome.runtime.sendMessage({
+      action: "capture_screenshot",
+      mode: "visible",
+      ...(activeTab && activeTab.id ? { tabId: activeTab.id } : {})
+    }, (res) => {
       if (chrome.runtime.lastError) {
         console.warn("[AgentPilot Popup] capture_screenshot error:", chrome.runtime.lastError.message);
         return;
