@@ -824,7 +824,7 @@
   // QA User Action Breadcrumbs ("Steps to Reproduce") & Page Diagnostics
   // =========================================================================
 
-  const MAX_REPRO_STEPS = 15;
+  const MAX_REPRO_STEPS = 100;
   const SENSITIVE_FIELD_RE = /pass(word)?|passcode|secret|token|api[-_]?key|auth|cvv|cvc|pin|otp|one[-_]?time|credit|card/i;
   const reproSteps = [];
 
@@ -847,53 +847,101 @@
 
   function recordReproStep(entry) {
     if (!entry || !entry.action) return;
-    const prev = reproSteps[reproSteps.length - 1];
-    if (prev && prev.action === entry.action && prev.selector === entry.selector && prev.value === entry.value && (Date.now() - prev.timestamp < 800)) {
-      prev.timestamp = Date.now();
-      return;
-    }
-    if (reproSteps.length >= MAX_REPRO_STEPS) {
-      reproSteps.shift();
-    }
-    reproSteps.push({
+    const stepPayload = {
       ...entry,
+      url: entry.url || window.location.href,
       timestamp: Date.now()
-    });
+    };
+
+    const prev = reproSteps[reproSteps.length - 1];
+    if (
+      prev &&
+      prev.action === stepPayload.action &&
+      prev.selector === stepPayload.selector &&
+      ((stepPayload.action === "type" || stepPayload.action === "select") ||
+        (prev.value === stepPayload.value && (Date.now() - prev.timestamp < 800)))
+    ) {
+      prev.value = stepPayload.value;
+      prev.description = stepPayload.description || prev.description;
+      prev.playwrightLocator = stepPayload.playwrightLocator || prev.playwrightLocator;
+      prev.timestamp = Date.now();
+    } else {
+      if (reproSteps.length >= MAX_REPRO_STEPS) {
+        reproSteps.shift();
+      }
+      reproSteps.push(stepPayload);
+    }
+
+    try {
+      chrome.runtime.sendMessage({
+        action: "record_flow_step",
+        step: stepPayload
+      }).catch(() => {});
+    } catch (_) {}
   }
+
+  function isRecordableInteractionEvent(e) {
+    return Boolean(e && (e.isTrusted || window.__AP_INTERNAL__.shield?.isDispatching?.()));
+  }
+
+  let lastEnterTimestamp = 0;
 
   document.addEventListener("click", (e) => {
     try {
-      if (!e.isTrusted || isOverlayModeBusy() || isInternalAgentPilotNode(e.target)) return;
-      const target = e.target.closest("button, a, input, select, textarea, summary, label, [role='button'], [role='link'], [role='tab'], [role='menuitem'], [role='checkbox'], [role='radio']") || e.target;
+      if (!isRecordableInteractionEvent(e) || isOverlayModeBusy() || isInternalAgentPilotNode(e.target)) return;
+      const interactiveTarget = e.target.closest("button, a, input, select, textarea, summary, label, [role='button'], [role='link'], [role='tab'], [role='menuitem'], [role='checkbox'], [role='radio']");
+      if (!interactiveTarget && e.target.closest && e.target.closest("pre, code")) {
+        return;
+      }
+      const target = interactiveTarget || e.target;
       if (!target || target === document.body || target === document.documentElement) return;
       const tag = target.tagName.toLowerCase();
-      const selector = getElementSelector(target);
-      const label = (selectorUtils?.getAccessibleName ? selectorUtils.getAccessibleName(target) : (target.innerText || "").trim())
+      // Ignore plain clicks on text inputs/textareas/selects since typing/change is recorded separately
+      if ((tag === "input" && !["button", "submit", "reset", "checkbox", "radio"].includes((target.getAttribute("type") || "text").toLowerCase())) || tag === "textarea" || tag === "select" || target.isContentEditable) {
+        return;
+      }
+      // Ignore clicks on non-semantic wrapper div/span that simply contain an input/textarea (e.g. Google AI Mode div.esoFne)
+      if ((tag === "div" || tag === "span" || tag === "form") && !target.getAttribute("role") && !target.getAttribute("data-testid")) {
+        if (target.querySelector && target.querySelector("input, textarea, select, [contenteditable='true']")) {
+          return;
+        }
+      }
+      const locators = selectorUtils?.getTestLocators ? selectorUtils.getTestLocators(target) : null;
+      const selector = locators?.selector || getElementSelector(target);
+      const label = (locators?.accessibleName || (target.innerText || "").trim())
         .replace(/\s+/g, " ")
         .slice(0, 50);
       recordReproStep({
         action: "click",
         tagName: tag,
         selector,
+        playwrightLocator: locators?.playwrightLocator || undefined,
         label: label || undefined,
         description: `Click <${tag}>${label ? ` "${label}"` : ""} (\`${selector}\`)`
       });
     } catch (_) {}
   }, true);
 
-  document.addEventListener("change", (e) => {
+  function handleFieldValueEvent(e) {
     try {
-      if (!e.isTrusted || isOverlayModeBusy() || isInternalAgentPilotNode(e.target)) return;
+      if (!isRecordableInteractionEvent(e) || isOverlayModeBusy() || isInternalAgentPilotNode(e.target)) return;
       const target = e.target;
       if (!target || !target.tagName) return;
       const tag = target.tagName.toLowerCase();
-      if (!["input", "textarea", "select"].includes(tag)) return;
+      const isEditable = target.isContentEditable;
+      if (!["input", "textarea", "select"].includes(tag) && !isEditable) return;
 
       const type = (target.getAttribute("type") || "text").toLowerCase();
+      // For checkbox/radio/select, record on change; for text inputs, record on both input and change
+      if (e.type === "input" && (tag === "select" || type === "checkbox" || type === "radio")) {
+        return;
+      }
+
       const nameAttr = `${target.name || ""} ${target.id || ""} ${target.getAttribute("autocomplete") || ""}`;
       const isSensitive = type === "password" || SENSITIVE_FIELD_RE.test(nameAttr);
-      const selector = getElementSelector(target);
-      const label = (selectorUtils?.getAccessibleName ? selectorUtils.getAccessibleName(target) : "").slice(0, 40);
+      const locators = selectorUtils?.getTestLocators ? selectorUtils.getTestLocators(target) : null;
+      const selector = locators?.selector || getElementSelector(target);
+      const label = (locators?.accessibleName || "").slice(0, 40);
 
       let displayVal = "";
       if (type === "checkbox" || type === "radio") {
@@ -901,7 +949,13 @@
       } else if (isSensitive) {
         displayVal = "[REDACTED]";
       } else {
-        displayVal = String(target.value || "").replace(/\s+/g, " ").slice(0, 40);
+        const rawText = isEditable ? (target.innerText || target.textContent || "") : (target.value || "");
+        displayVal = String(rawText).replace(/\s+/g, " ").slice(0, 80);
+      }
+
+      // Do not record empty value events (e.g. when a chat box clears its textarea right after pressing Enter)
+      if (!displayVal && type !== "checkbox" && type !== "radio") {
+        return;
       }
 
       const verb = tag === "select" ? "Chọn" : (type === "checkbox" || type === "radio" ? "Đánh dấu" : "Nhập");
@@ -909,9 +963,43 @@
         action: tag === "select" ? "select" : "type",
         tagName: tag,
         selector,
+        playwrightLocator: locators?.playwrightLocator || undefined,
         label: label || undefined,
         value: displayVal,
         description: `${verb} "${displayVal}" vào <${tag}>${label ? ` "${label}"` : ""} (\`${selector}\`)`
+      });
+    } catch (_) {}
+  }
+
+  document.addEventListener("input", handleFieldValueEvent, true);
+  document.addEventListener("change", handleFieldValueEvent, true);
+
+  document.addEventListener("keydown", (e) => {
+    try {
+      if (!isRecordableInteractionEvent(e) || e.key !== "Enter" || e.shiftKey || e.isComposing || isOverlayModeBusy() || isInternalAgentPilotNode(e.target)) return;
+      const target = e.target;
+      if (!target || !target.tagName) return;
+      const tag = target.tagName.toLowerCase();
+      if (tag !== "input" && tag !== "textarea" && !target.isContentEditable) return;
+
+      // Ensure any pending non-empty text in the input/textarea is recorded before Enter clears it
+      const rawText = target.isContentEditable ? (target.innerText || target.textContent || "") : (target.value || "");
+      if (String(rawText).trim()) {
+        handleFieldValueEvent({ type: "change", target, isTrusted: true });
+      }
+      lastEnterTimestamp = Date.now();
+
+      const locators = selectorUtils?.getTestLocators ? selectorUtils.getTestLocators(target) : null;
+      const selector = locators?.selector || getElementSelector(target);
+      const label = (locators?.accessibleName || "").slice(0, 40);
+      recordReproStep({
+        action: "press_key",
+        tagName: tag,
+        selector,
+        playwrightLocator: locators?.playwrightLocator || undefined,
+        label: label || undefined,
+        key: "Enter",
+        description: `Nhấn phím Enter tại <${tag}>${label ? ` "${label}"` : ""} (\`${selector}\`)`
       });
     } catch (_) {}
   }, true);
@@ -922,15 +1010,32 @@
 
   function clearReproSteps() {
     reproSteps.length = 0;
+    try {
+      chrome.runtime.sendMessage({ action: "clear_flow_steps" }).catch(() => {});
+    } catch (_) {}
   }
 
   function exportReproBatchJson() {
     const actions = reproSteps.map((step) => {
+      if (step.action === "navigate") {
+        return {
+          action: "navigate",
+          url: step.url
+        };
+      }
       if (step.action === "type" || step.action === "select") {
         return {
           action: "type",
           selector: step.selector,
-          text: step.value === "[REDACTED]" ? "<SENSITIVE_VALUE>" : (step.value || "")
+          text: step.value === "[REDACTED]" ? "<SENSITIVE_VALUE>" : (step.value || ""),
+          clear: true
+        };
+      }
+      if (step.action === "press_key") {
+        return {
+          action: "press_key",
+          selector: step.selector,
+          key: step.key || "Enter"
         };
       }
       return {
@@ -946,6 +1051,16 @@
     };
   }
 
+  async function fetchPersistentFlowSteps() {
+    try {
+      const res = await chrome.runtime.sendMessage({ action: "get_flow_recorder_state" });
+      if (res && res.success && Array.isArray(res.steps) && res.steps.length > 0) {
+        return res.steps;
+      }
+    } catch (_) {}
+    return getReproSteps();
+  }
+
   function queryPageDiagnostics({ clear = false, clearStorage = false } = {}) {
     return new Promise((resolve) => {
       const reqId = "diag_" + Math.random().toString(36).slice(2, 10);
@@ -958,31 +1073,32 @@
         timestamp: new Date().toISOString()
       };
 
-      const timeout = setTimeout(() => {
-        window.removeEventListener("__AP_DIAGNOSTICS_RESP__", onResp);
+      const finish = async (consoleErrors, networkErrors, clearedStorage) => {
+        const stepsSnapshot = await fetchPersistentFlowSteps();
         if (clear || clearStorage) clearReproSteps();
         resolve({
           environment,
-          consoleErrors: [],
-          networkErrors: [],
-          reproSteps: getReproSteps(),
-          clearedStorage: null
+          consoleErrors,
+          networkErrors,
+          reproSteps: stepsSnapshot,
+          clearedStorage
         });
+      };
+
+      const timeout = setTimeout(() => {
+        window.removeEventListener("__AP_DIAGNOSTICS_RESP__", onResp);
+        finish([], [], null);
       }, 250);
 
       function onResp(e) {
         if (e.detail && e.detail.reqId === reqId) {
           clearTimeout(timeout);
           window.removeEventListener("__AP_DIAGNOSTICS_RESP__", onResp);
-          const stepsSnapshot = getReproSteps();
-          if (clear || clearStorage) clearReproSteps();
-          resolve({
-            environment,
-            consoleErrors: Array.isArray(e.detail.consoleErrors) ? e.detail.consoleErrors : [],
-            networkErrors: Array.isArray(e.detail.networkErrors) ? e.detail.networkErrors : [],
-            reproSteps: stepsSnapshot,
-            clearedStorage: e.detail.clearedStorage || null
-          });
+          finish(
+            Array.isArray(e.detail.consoleErrors) ? e.detail.consoleErrors : [],
+            Array.isArray(e.detail.networkErrors) ? e.detail.networkErrors : [],
+            e.detail.clearedStorage || null
+          );
         }
       }
 

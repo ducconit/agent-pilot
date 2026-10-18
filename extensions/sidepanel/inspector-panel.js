@@ -54,37 +54,55 @@ export class InspectorPanel {
     this.loadColorHistory();
   }
 
+  async sendTabMessage(tabId, msg) {
+    if (!tabId) return null;
+    try {
+      return await chrome.tabs.sendMessage(tabId, msg);
+    } catch (_) {
+      try {
+        const injected = await chrome.runtime.sendMessage({ action: "ensure_content_script", tabId });
+        if (injected && injected.success) {
+          return await chrome.tabs.sendMessage(tabId, msg);
+        }
+      } catch (_) {}
+      showToast("Vui lòng làm mới (F5) trang web để sử dụng tính năng này!");
+      return null;
+    }
+  }
+
   bindEvents() {
     if (this.btnToggleInspector) {
-      this.btnToggleInspector.onclick = () => {
+      this.btnToggleInspector.onclick = async () => {
         const activeTabId = this.getActiveTabId();
         if (!activeTabId) return;
         this.isInspectorActive = !this.isInspectorActive;
-        chrome.tabs.sendMessage(activeTabId, { action: "toggle_inspector", enabled: this.isInspectorActive }, () => {
-          this.updateInspectorButton();
-        });
+        const res = await this.sendTabMessage(activeTabId, { action: "toggle_inspector", enabled: this.isInspectorActive });
+        if (!res) {
+          this.isInspectorActive = false;
+        }
+        this.updateInspectorButton(Boolean(res));
       };
     }
 
     if (this.btnMoveToElement) {
-      this.btnMoveToElement.onclick = () => {
+      this.btnMoveToElement.onclick = async () => {
         const activeTabId = this.getActiveTabId();
         if (!this.selectedElementDetails || !activeTabId) return;
         const cx = this.selectedElementDetails.rect.x + Math.round(this.selectedElementDetails.rect.width / 2);
         const cy = this.selectedElementDetails.rect.y + Math.round(this.selectedElementDetails.rect.height / 2);
-        chrome.tabs.sendMessage(activeTabId, { action: "virtual_mouse_move", x: cx, y: cy });
-        showToast(`Chuột ảo đang bay tới phần tử (${cx}, ${cy})`);
+        const res = await this.sendTabMessage(activeTabId, { action: "virtual_mouse_move", x: cx, y: cy });
+        if (res) showToast(`Chuột ảo đang bay tới phần tử (${cx}, ${cy})`);
       };
     }
 
     if (this.btnClickElement) {
-      this.btnClickElement.onclick = () => {
+      this.btnClickElement.onclick = async () => {
         const activeTabId = this.getActiveTabId();
         if (!this.selectedElementDetails || !activeTabId) return;
         const cx = this.selectedElementDetails.rect.x + Math.round(this.selectedElementDetails.rect.width / 2);
         const cy = this.selectedElementDetails.rect.y + Math.round(this.selectedElementDetails.rect.height / 2);
-        chrome.tabs.sendMessage(activeTabId, { action: "virtual_mouse_click", x: cx, y: cy });
-        showToast(`Đã click phần tử tại (${cx}, ${cy})`);
+        const res = await this.sendTabMessage(activeTabId, { action: "virtual_mouse_click", x: cx, y: cy });
+        if (res) showToast(`Đã click phần tử tại (${cx}, ${cy})`);
       };
     }
 
@@ -128,21 +146,19 @@ export class InspectorPanel {
     }
 
     if (this.btnPickColor) {
-      this.btnPickColor.onclick = () => {
+      this.btnPickColor.onclick = async () => {
         const activeTabId = this.getActiveTabId();
         if (!activeTabId) return;
         if (this.isEyedropperActive) {
-          chrome.tabs.sendMessage(activeTabId, { action: "stop_eyedropper" }, () => {
-            this.setEyedropperActiveState(false);
-          });
+          await this.sendTabMessage(activeTabId, { action: "stop_eyedropper" });
+          this.setEyedropperActiveState(false);
         } else {
           this.setEyedropperActiveState(true);
-          chrome.tabs.sendMessage(activeTabId, { action: "pick_color" }, (res) => {
-            if (res && res.color) {
-              this.addColorToPalette(res.color);
-            }
-            this.setEyedropperActiveState(false);
-          });
+          const res = await this.sendTabMessage(activeTabId, { action: "pick_color" });
+          if (res && res.color) {
+            this.addColorToPalette(res.color);
+          }
+          this.setEyedropperActiveState(false);
         }
       };
     }

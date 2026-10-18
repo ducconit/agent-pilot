@@ -256,5 +256,88 @@ record(
   `owner101=${ownerOf101AfterStealAttempt}, C=${targetCAfterStealAttempt}, A=${targetA}, B=${targetB}, B_afterClose=${targetBAfterClose}, B_fallback=${targetBFallbackBlocked}, A_after=${targetAStillIntact}`
 );
 
+import {
+  setFlowRecording,
+  appendFlowStep,
+  recordTabNavigation,
+  deleteFlowStep,
+  getFlowState,
+  removeFlowSession,
+  exportFlowAsBatch,
+  exportFlowAsPlaywright,
+  clearFlowSteps
+} from "../extensions/background/flow-recorder.js";
+
+// 9. Persistent Cross-Page Flow Recorder (navigation persistence, deduplication, Batch & Playwright export)
+clearFlowSteps(101);
+await setFlowRecording(101, true, "https://example.com/login");
+appendFlowStep(101, {
+  action: "type",
+  tagName: "input",
+  selector: "[data-testid=\"username\"]",
+  playwrightLocator: "page.getByTestId(\"username\")",
+  value: "tester_01",
+  url: "https://example.com/login",
+  description: "Nhập \"tester_01\" vào <input>"
+});
+// Consecutive typing on same input updates in place instead of duplicating
+appendFlowStep(101, {
+  action: "type",
+  tagName: "input",
+  selector: "[data-testid=\"username\"]",
+  playwrightLocator: "page.getByTestId(\"username\")",
+  value: "tester_admin",
+  url: "https://example.com/login",
+  description: "Nhập \"tester_admin\" vào <input>"
+});
+appendFlowStep(101, {
+  action: "click",
+  tagName: "button",
+  selector: "[data-testid=\"submit-btn\"]",
+  playwrightLocator: "page.getByRole(\"button\", { name: \"Đăng nhập\" })",
+  label: "Đăng nhập",
+  url: "https://example.com/login",
+  description: "Click <button> \"Đăng nhập\""
+});
+// Simulate full-page navigation to /dashboard
+recordTabNavigation(101, "https://example.com/dashboard");
+const extraStep = appendFlowStep(101, {
+  action: "click",
+  tagName: "a",
+  selector: "a.logout",
+  url: "https://example.com/dashboard",
+  description: "Click <a> \"Thoát\""
+});
+// Delete the accidental step
+deleteFlowStep(101, extraStep.id);
+
+const flowState = getFlowState(101);
+const exportedBatch = exportFlowAsBatch(101);
+const exportedPw = exportFlowAsPlaywright(101);
+
+// Simulate original tab #101 closing -> flow should remain preserved in lastRecordedFlow for auto-new-tab Replay
+removeFlowSession(101);
+const fallbackAfterClose = getFlowState(null);
+const fallbackBatchAfterClose = exportFlowAsBatch(null);
+
+record(
+  "9. Persistent Cross-Page Flow Recorder (MPA navigation, deduplication, Batch & Playwright export, closed-tab survival)",
+  flowState.recording === true &&
+    flowState.steps.length === 4 &&
+    flowState.steps[0].action === "navigate" &&
+    flowState.steps[1].value === "tester_admin" &&
+    flowState.steps[2].action === "click" &&
+    flowState.steps[3].action === "navigate" &&
+    flowState.steps[3].url === "https://example.com/dashboard" &&
+    exportedBatch.actions.length === 4 &&
+    exportedPw.includes("await page.goto(\"https://example.com/login\");") &&
+    exportedPw.includes("await page.getByTestId(\"username\").fill(\"tester_admin\");") &&
+    exportedPw.includes("await page.getByRole(\"button\", { name: \"Đăng nhập\" }).click();") &&
+    exportedPw.includes("await page.goto(\"https://example.com/dashboard\");") &&
+    fallbackAfterClose.steps.length === 4 &&
+    fallbackBatchAfterClose.actions.length === 4,
+  `steps=${flowState.steps.length}, batchActions=${exportedBatch.actions.length}, survivedTabClose=${fallbackAfterClose.steps.length === 4}`
+);
+
 recorder.summarize();
 recorder.exitIfFailed();

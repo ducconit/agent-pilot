@@ -102,19 +102,85 @@
         if (getSelectorMatchCount(tagTestSel) === 1) return tagTestSel;
       }
 
-      // 2. Element ID
-      if (el.id && !el.id.startsWith("agent-pilot")) {
+      // Helper to detect auto-generated / obfuscated IDs (e.g. Google's #ti6dpd, #APjFqb, React :r0:, Reka/Radix/Vue useId)
+      const isGeneratedId = (id) => {
+        if (
+          !id ||
+          id.startsWith("agent-pilot") ||
+          id.startsWith(":") ||
+          id.startsWith("reka-") ||
+          id.startsWith("radix-") ||
+          id.startsWith("headlessui-") ||
+          /(?:^|-)v-\d+(?:-\d+)+(?:-|$)/.test(id)
+        ) {
+          return true;
+        }
+        if (!/[-_]/.test(id)) {
+          // Random mixed-case short hash like APjFqb or alphanumeric hash with embedded digits like ti6dpd
+          if (/^[a-zA-Z0-9]{5,12}$/.test(id) && /[a-z]/.test(id) && /\d/.test(id) && !/^(h[1-6]|step\d+|tab\d+|page\d+|item\d+|btn\d+|row\d+|col\d+)$/i.test(id)) {
+            return true;
+          }
+          if (/^[a-zA-Z]{5,8}$/.test(id) && /[a-z][A-Z]/.test(id) && (id.match(/[A-Z]/g) || []).length >= 2) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      // Convert framework hydration IDs like `reka-tabs-v-0-1-7-0-1-2-0-0-trigger-yarn` into stable prefix+suffix selector `[id^="reka-tabs-"][id$="-trigger-yarn"]`
+      const getStableFrameworkIdSelector = (id, tagPrefix = "") => {
+        if (!id) return null;
+        const m = id.match(/^([a-zA-Z0-9_-]+?)-(?:v-\d+(?:-\d+)*|r[0-9a-z]+)-([a-zA-Z0-9_-]+)$/);
+        if (m && m[1] && m[2]) {
+          const sel = `${tagPrefix}[id^="${escapeAttrValue(m[1] + "-")}"][id$="${escapeAttrValue("-" + m[2])}"]`;
+          if (getSelectorMatchCount(sel) === 1) return sel;
+        }
+        return null;
+      };
+
+      // 2. Clean human-authored Element ID
+      if (el.id && !isGeneratedId(el.id)) {
         const idSelector = `#${escapeSelectorToken(el.id)}`;
         if (getSelectorMatchCount(idSelector) === 1) return idSelector;
       }
 
-      // 3. Semantic attributes (name, aria-label, placeholder)
-      for (const attr of ["name", "aria-label", "placeholder"]) {
+      // 3. Semantic attributes (name, aria-label, placeholder, title, and href for links)
+      for (const attr of ["name", "aria-label", "placeholder", "title"]) {
         const val = el.getAttribute && el.getAttribute(attr);
         if (val && val.trim() && val.length <= 80 && !val.includes("\n")) {
           const attrSel = `${tag}[${attr}="${escapeAttrValue(val.trim())}"]`;
           if (getSelectorMatchCount(attrSel) === 1) return attrSel;
         }
+      }
+
+      if (tag === "a") {
+        const href = el.getAttribute("href");
+        if (href && href.trim() && !href.startsWith("#") && !href.startsWith("javascript:") && href.length <= 120) {
+          const hrefSel = `a[href="${escapeAttrValue(href.trim())}"]`;
+          const count = getSelectorMatchCount(hrefSel);
+          if (count === 1) return hrefSel;
+          if (count > 1) {
+            for (const landmark of ["aside", "nav", "main", "header", "footer"]) {
+              if (el.closest(landmark)) {
+                const scopedHref = `${landmark} ${hrefSel}`;
+                if (getSelectorMatchCount(scopedHref) === 1) return scopedHref;
+              }
+            }
+            return hrefSel;
+          }
+        }
+      }
+
+      // 3b. Stable prefix/suffix selector for Reka/Radix/Vue useId (e.g. [id^="reka-tabs-"][id$="-trigger-yarn"])
+      if (el.id) {
+        const stableFwSel = getStableFrameworkIdSelector(el.id, tag) || getStableFrameworkIdSelector(el.id, "");
+        if (stableFwSel) return stableFwSel;
+      }
+
+      // 3c. Fallback to generated ID if no semantic attribute matched uniquely
+      if (el.id && !el.id.startsWith("agent-pilot")) {
+        const idSelector = `#${escapeSelectorToken(el.id)}`;
+        if (getSelectorMatchCount(idSelector) === 1) return idSelector;
       }
 
       // 4. Ancestor chain with early uniqueness check
@@ -131,16 +197,19 @@
             }
           }
           if (node.id && !node.id.startsWith("agent-pilot")) {
-            const idAnchor = `#${escapeSelectorToken(node.id)}`;
-            if (getSelectorMatchCount(idAnchor) === 1) {
-              const candidate = [idAnchor, ...path].join(" > ");
+            const stableAnchor = getStableFrameworkIdSelector(node.id, "") || `#${escapeSelectorToken(node.id)}`;
+            if (getSelectorMatchCount(stableAnchor) === 1) {
+              const candidate = [stableAnchor, ...path].join(" > ");
               if (getSelectorMatchCount(candidate) === 1) return candidate;
             }
           }
         }
         let segment = node.nodeName.toLowerCase();
         if (node.className && typeof node.className === "string") {
-          const classes = node.className.trim().split(/\s+/).filter((c) => c && !c.startsWith("agent-pilot"));
+          const classes = node.className
+            .trim()
+            .split(/\s+/)
+            .filter((c) => c && !c.startsWith("agent-pilot") && !["hidden", "sr-only", "invisible"].includes(c) && !c.includes(":"));
           if (classes.length) segment += "." + classes.slice(0, 2).map(escapeSelectorToken).join(".");
         }
         path.unshift(segment);

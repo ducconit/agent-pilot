@@ -184,12 +184,12 @@
     }
 
     if (req.action === "virtual_mouse_click" || req.action === "click_cursor") {
-      cursor.virtualClick(req.x, req.y, req.selector).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
+      cursor.virtualClick(req.x, req.y, req.selector, req.fallbackHints || null).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 
     if (req.action === "virtual_type" || req.action === "type_text") {
-      cursor.virtualType(req.selector, req.text, req.clear, req.pressEnter).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
+      cursor.virtualType(req.selector, req.text, req.clear, req.pressEnter, req.fallbackHints || null).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
       return true;
     }
 

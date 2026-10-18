@@ -118,8 +118,8 @@
   function handleCaptureInput(e) {
     if (!isAgentBusy) return;
 
-    // Allow synthetic events dispatched by Agent Pilot
-    if (isAgentDispatching || !e.isTrusted) {
+    // Allow synthetic events dispatched by Agent Pilot or trusted CDP input events during active CDP input commands
+    if (isAgentDispatching || !e.isTrusted || isCdpInputAction(currentBusyAction)) {
       return;
     }
 
@@ -139,6 +139,20 @@
     // Block human interactions during automated actions
     e.stopImmediatePropagation();
     e.preventDefault();
+  }
+
+  let currentBusyAction = "";
+
+  function isCdpInputAction(action) {
+    if (!action) return false;
+    return (
+      action === "page.click" ||
+      action === "page.drag" ||
+      action === "page.pressKey" ||
+      action === "page.key" ||
+      action === "cdp.send" ||
+      action === "batch.run"
+    );
   }
 
   function attachInputBlockers() {
@@ -170,12 +184,14 @@
       showLockOverlay(sessionName);
     } else {
       isAgentBusy = false;
+      currentBusyAction = "";
       detachInputBlockers();
       hideLockOverlay();
     }
   }
 
   function setAgentBusyState(busy, action = "") {
+    currentBusyAction = busy ? String(action || "") : "";
     if (isSessionActive) {
       // During active session, lock shield remains visible continuously.
       // Granular actions update description, then revert to session standby on completion.

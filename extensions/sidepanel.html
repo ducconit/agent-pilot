@@ -329,14 +329,17 @@
         </div>
       </div>
 
-      <!-- QA Diagnostics, Repro Steps & Quick State Reset Card -->
+      <!-- QA Diagnostics, Flow Recorder, Live Timeline & Replay Card -->
       <div class="card mt-3" id="card-qa-diagnostics">
         <div class="card-header">
           <div class="card-header-title-group">
-            <span class="card-title">🩺 Chẩn Đoán QA &amp; Tái Hiện Lỗi</span>
-            <span class="tooltip-icon" tabindex="0" title="Tự động thu thập lỗi Console, lỗi API 4xx/5xx và các bước thao tác (Steps to Reproduce) để đính kèm vào báo cáo lỗi hoặc xuất thành kịch bản replay.">?</span>
+            <span class="card-title">🎬 Ghi Kịch Bản &amp; Chẩn Đoán QA</span>
+            <span class="tooltip-icon" tabindex="0" title="Ghi lại toàn bộ các bước thao tác xuyên trang (Click, Nhập liệu, Chuyển trang), chạy lại (Replay) trực tiếp với con trỏ ảo, hoặc xuất ra Playwright / Batch JSON.">?</span>
           </div>
-          <button class="btn btn-icon btn-xs" id="btn-refresh-qa-diag" title="Làm mới dữ liệu chẩn đoán trên trang hiện tại">🔄</button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="card-badge" id="qa-flow-record-badge">Tự động</span>
+            <button class="btn btn-icon btn-xs" id="btn-refresh-qa-diag" title="Làm mới dữ liệu chẩn đoán trên trang hiện tại">🔄</button>
+          </div>
         </div>
         <div class="card-body">
           <div class="agent-info-grid">
@@ -349,14 +352,33 @@
               <span class="info-val font-mono" id="qa-net-err-count">0</span>
             </div>
             <div class="info-row">
-              <span class="info-label">👣 Bước thao tác ghi nhận:</span>
+              <span class="info-label">👣 Bước kịch bản (Xuyên trang):</span>
               <span class="info-val font-mono" id="qa-repro-step-count">0</span>
             </div>
           </div>
-          <div class="inspector-details mt-2" id="qa-diag-summary-box" style="max-height:140px;overflow-y:auto;font-size:11px;display:none;"></div>
+
+          <div class="inspector-details mt-2" id="qa-diag-summary-box" style="max-height:95px;overflow-y:auto;font-size:11px;display:none;"></div>
+
           <div class="btn-grid mt-2">
-            <button class="btn btn-outline btn-sm" id="btn-copy-repro-batch" title="Sao chép các bước thao tác thành kịch bản JSON (agent-pilot batch) để chạy lại kiểm thử">📋 Copy Replay JSON</button>
-            <button class="btn btn-danger-outline btn-sm" id="btn-reset-site-storage" title="Xóa sạch localStorage, sessionStorage, Cookies và tải lại trang để test phiên mới">🧹 Reset Storage &amp; Reload</button>
+            <button class="btn btn-outline btn-sm" id="btn-toggle-flow-record" title="Bật chế độ chủ động ghi kịch bản xuyên trang (tối đa 100 bước)">🔴 Bắt Đầu Ghi</button>
+            <button class="btn btn-primary btn-sm" id="btn-replay-flow" disabled title="Chạy lại toàn bộ các bước đã ghi trên tab hiện tại với con trỏ ảo">▶ Chạy Lại (Replay)</button>
+          </div>
+
+          <!-- Live Step Timeline -->
+          <div id="qa-flow-timeline-wrap" class="mt-2" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:11px;font-weight:600;color:#94a3b8;">📜 Dòng thời gian các bước (Timeline):</span>
+              <button class="btn btn-icon btn-xs" id="btn-clear-flow-steps" title="Xóa toàn bộ các bước đã ghi">🗑️</button>
+            </div>
+            <div class="inspector-details" id="qa-flow-timeline" style="max-height:170px;overflow-y:auto;font-size:11px;padding:6px;"></div>
+          </div>
+
+          <div class="btn-grid mt-2">
+            <button class="btn btn-outline btn-sm" id="btn-copy-repro-batch" title="Sao chép kịch bản dạng JSON (agent-pilot batch)">📋 Copy Batch JSON</button>
+            <button class="btn btn-outline btn-sm" id="btn-copy-playwright" title="Sao chép kịch bản kiểm thử Playwright (.spec.ts)">🎭 Copy Playwright</button>
+          </div>
+          <div class="mt-2">
+            <button class="btn btn-danger-outline btn-sm" id="btn-reset-site-storage" style="width:100%;" title="Xóa sạch localStorage, sessionStorage, Cookies và tải lại trang để test phiên mới">🧹 Reset Storage &amp; Reload</button>
           </div>
         </div>
       </div>

@@ -160,8 +160,7 @@
     });
   }
 
-  function resolveElement(selector) {
-    if (!selector) return null;
+  function resolveElement(selector, fallbackHints = null) {
     if (selector instanceof Element) return selector;
     if (typeof selector === "string" && selector.startsWith("@")) {
       const idx = parseInt(selector.slice(1), 10);
@@ -171,18 +170,86 @@
       }
       return null;
     }
-    try {
-      return document.querySelector(selector);
-    } catch (err) {
-      console.warn("[AgentPilot] querySelector error for selector:", selector, err);
-      return null;
+
+    let hiddenFallback = null;
+    if (selector && typeof selector === "string") {
+      try {
+        const allMatches = Array.from(document.querySelectorAll(selector));
+        if (allMatches.length > 0) {
+          const visibleMatch = allMatches.find(isElementVisible);
+          if (visibleMatch) return visibleMatch;
+          hiddenFallback = allMatches[0];
+        }
+      } catch (err) {
+        console.warn("[AgentPilot] querySelector error for selector:", selector, err);
+      }
+
+      // Generalize dynamic SSR/hydration IDs (e.g. #reka-tabs-v-0-1-7-0-1-2-0-0-trigger-yarn -> [id^="reka-tabs-"][id$="-trigger-yarn"])
+      const generalized = selector.replace(
+        /#([a-zA-Z0-9_-]+?)-(?:v-\d+(?:-\d+)*|r[0-9a-z]+)-([a-zA-Z0-9_-]+)/g,
+        '[id^="$1-"][id$="-$2"]'
+      );
+      if (generalized !== selector) {
+        try {
+          const genMatches = Array.from(document.querySelectorAll(generalized));
+          if (genMatches.length > 0) {
+            const visibleGen = genMatches.find(isElementVisible);
+            if (visibleGen) return visibleGen;
+            if (!hiddenFallback) hiddenFallback = genMatches[0];
+          }
+        } catch (_) {}
+      }
     }
+
+    // Fallback resolution when a dynamic/obfuscated selector (e.g. #ti6dpd, button.plR5qb) changed across page loads
+    if (fallbackHints && typeof fallbackHints === "object") {
+      const wantLabel = String(fallbackHints.label || "").trim().toLowerCase();
+      const wantTag = String(fallbackHints.tagName || "").trim().toLowerCase();
+      const wantAction = String(fallbackHints.action || "").trim().toLowerCase();
+
+      if (wantLabel) {
+        const candidateQuery = wantTag && /^[a-z0-9-]+$/.test(wantTag)
+          ? `${wantTag}, button, a, input, textarea, select, [role='button'], [role='tab'], [role='link']`
+          : "button, a, input, textarea, select, [role='button'], [role='tab'], [role='link']";
+        const candidates = Array.from(document.querySelectorAll(candidateQuery)).filter(isElementVisible);
+
+        const getCandTexts = (c) => [
+          c.getAttribute("aria-label"),
+          c.getAttribute("placeholder"),
+          c.getAttribute("name"),
+          c.getAttribute("title"),
+          (c.innerText || c.textContent || "").trim()
+        ]
+          .filter(Boolean)
+          .map((s) => String(s).replace(/\s+/g, " ").trim().toLowerCase());
+
+        const exact = candidates.find((c) => getCandTexts(c).some((t) => t === wantLabel));
+        if (exact) return exact;
+        const partial = candidates.find((c) => getCandTexts(c).some((t) => t.includes(wantLabel) || wantLabel.includes(t)));
+        if (partial) return partial;
+      }
+
+      if (wantAction === "type" || wantAction === "press_key" || wantTag === "textarea" || wantTag === "input") {
+        const editables = Array.from(
+          document.querySelectorAll(
+            "textarea, input[type='search'], input[type='text'], input:not([type]), [contenteditable='true']"
+          )
+        ).filter(isElementVisible);
+        if (wantTag === "textarea") {
+          const ta = editables.find((e) => e.tagName === "TEXTAREA");
+          if (ta) return ta;
+        }
+        if (editables.length > 0) return editables[0];
+      }
+    }
+
+    return hiddenFallback;
   }
 
-  function getElementCenter(selector) {
-    if (!selector) return null;
+  function getElementCenter(selector, fallbackHints = null) {
+    if (!selector && !fallbackHints) return null;
     try {
-      const el = resolveElement(selector);
+      const el = resolveElement(selector, fallbackHints);
       if (!el) return null;
       const r = el.getBoundingClientRect();
       const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
@@ -219,14 +286,14 @@
   /**
    * Trigger click animation & dispatch synthetic events on DOM element
    */
-  async function virtualClick(x, y, selector = null) {
+  async function virtualClick(x, y, selector = null, fallbackHints = null) {
     let el = null;
-    if (selector) {
-      el = resolveElement(selector);
+    if (selector || fallbackHints) {
+      el = resolveElement(selector, { ...fallbackHints, action: "click" });
       if (!el) {
         return { success: false, error: `Element not found for selector: ${selector}` };
       }
-      const center = getElementCenter(selector);
+      const center = getElementCenter(el);
       if (center) {
         x = center.x;
         y = center.y;
@@ -289,7 +356,11 @@
         el.dispatchEvent(new MouseEvent("mousedown", eventInit));
         el.dispatchEvent(new PointerEvent("pointerup", eventInit));
         el.dispatchEvent(new MouseEvent("mouseup", eventInit));
-        el.dispatchEvent(new MouseEvent("click", eventInit));
+        if (typeof el.click === "function") {
+          el.click();
+        } else {
+          el.dispatchEvent(new MouseEvent("click", eventInit));
+        }
       } finally {
         setDispatching(false);
       }
@@ -311,11 +382,11 @@
   /**
    * Virtual Type text into an element with human-like typing
    */
-  async function virtualType(selector, text, clear = false, pressEnter = false) {
+  async function virtualType(selector, text, clear = false, pressEnter = false, fallbackHints = null) {
     activateCursor();
     let el = null;
-    if (selector) {
-      el = resolveElement(selector);
+    if (selector || fallbackHints) {
+      el = resolveElement(selector, { ...fallbackHints, action: pressEnter && !text ? "press_key" : "type" });
       if (el) {
         const r = el.getBoundingClientRect();
         const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
@@ -463,6 +534,7 @@
         setDispatching(true);
         el.dispatchEvent(new Event("change", { bubbles: true }));
         if (pressEnter) {
+          const valBeforeEnter = el.isContentEditable ? (el.innerText || "") : (el.value || "");
           const keyCode = 13;
           const enterEvent = { key: "Enter", code: "Enter", keyCode, which: keyCode, bubbles: true, cancelable: true };
           el.dispatchEvent(new KeyboardEvent("keydown", enterEvent));
@@ -473,6 +545,25 @@
               el.form.requestSubmit();
             } catch (submitErr) {
               console.debug("[AgentPilot] form.requestSubmit failed:", submitErr);
+            }
+          } else {
+            // For SPA chat boxes (e.g. Google AI Mode textarea[aria-label="Ask anything"]) that ignore untrusted Enter keydown:
+            // look for an adjacent enabled submit/send button in the surrounding container
+            const valAfterEnter = el.isContentEditable ? (el.innerText || "") : (el.value || "");
+            if (valBeforeEnter && valAfterEnter === valBeforeEnter) {
+              let container = el.parentElement;
+              for (let depth = 0; depth < 5 && container && container !== document.body; depth++) {
+                const submitBtn = Array.from(
+                  container.querySelectorAll(
+                    "button[type='submit'], button[aria-label*='Send' i], button[aria-label*='Submit' i], button[aria-label*='Gửi' i], button[aria-label*='Ask' i], button[aria-label*='Search' i], button[aria-label*='Tìm' i], [role='button'][aria-label*='Send' i], [role='button'][aria-label*='Gửi' i]"
+                  )
+                ).find((b) => isElementVisible(b) && !b.disabled && b.getAttribute("aria-disabled") !== "true");
+                if (submitBtn) {
+                  submitBtn.click();
+                  break;
+                }
+                container = container.parentElement;
+              }
             }
           }
         }

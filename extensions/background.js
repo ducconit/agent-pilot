@@ -27,12 +27,26 @@ import {
   getActiveTabId,
   getTargetTabId,
   markTabAsAgentControlled,
-  ensureContentScript
+  ensureContentScript,
+  runWithTabLock
 } from "./background/tab-manager.js";
 
 import { captureTabScreenshot } from "./background/screenshot-service.js";
 import { AgentBridgeClient } from "./background/bridge-client.js";
 import { sanitizeData } from "./background/secret-sanitizer.js";
+import {
+  initFlowRecorder,
+  removeFlowSession,
+  recordTabNavigation,
+  getFlowState,
+  appendFlowStep,
+  setFlowRecording,
+  deleteFlowStep,
+  clearFlowSteps,
+  exportFlowAsBatch,
+  exportFlowAsPlaywright,
+  replayRecordedFlow
+} from "./background/flow-recorder.js";
 // Side-effect import: exposes globalThis.__AP_FEEDBACK_ITEM_SCHEMA__ for payload validation
 import "./content/feedback-studio/item-schema.js";
 
@@ -59,7 +73,10 @@ const PRIVILEGED_EXTENSION_ONLY_ACTIONS = new Set([
   "close_tab",
   "new_tab",
   "navigate",
-  "reload_tab"
+  "reload_tab",
+  "set_flow_recording",
+  "delete_flow_step",
+  "replay_flow_recorder"
 ]);
 
 // Broadcast helper for extension views and agent bridge
@@ -75,6 +92,7 @@ export const agentBridge = new AgentBridgeClient(broadcastToExtension);
 
 // Initialize CDP event listeners (Console, Network, Runtime)
 initCdpEventListeners(broadcastToExtension);
+initFlowRecorder(broadcastToExtension);
 
 // Enable Side Panel behavior on icon click natively
 function enableSidePanelBehavior() {
@@ -143,6 +161,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   attachedTabs.delete(tabId);
   devtoolsBuffers.delete(tabId);
   agentControlledTabs.delete(tabId);
+  removeFlowSession(tabId);
   const state = tabLockStates.get(tabId);
   if (state && state.unlockTimer) clearTimeout(state.unlockTimer);
   tabLockStates.delete(tabId);
@@ -177,9 +196,14 @@ if (chrome.runtime && chrome.runtime.onConnect) {
 }
 
 // Re-notify agent tabs and restore lock state when navigation completes
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (agentBridge && !agentBridge.connected && agentBridge.enabled) {
     agentBridge.requestReconnect();
+  }
+  if (changeInfo.url) {
+    recordTabNavigation(tabId, changeInfo.url);
+  } else if (changeInfo.status === "complete" && tab?.url) {
+    recordTabNavigation(tabId, tab.url);
   }
   // If user manually ungroups a tab or moves it into a non-Agent tab group, revoke agent access
   if (changeInfo.groupId !== undefined && agentControlledTabs.has(tabId)) {
@@ -534,6 +558,66 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } catch (err) {
         sendResponse({ success: false, error: err.message });
       }
+    })();
+    return true;
+  }
+
+  // 9. Persistent Cross-Page Flow Recorder Actions
+  if (action === "record_flow_step") {
+    const tabId = sender?.tab?.id || request.tabId;
+    const step = appendFlowStep(tabId, request.step);
+    sendResponse({ success: Boolean(step), step, state: getFlowState(tabId) });
+    return true;
+  }
+
+  if (action === "get_flow_recorder_state") {
+    const tabId = sender?.tab?.id || request.tabId;
+    sendResponse({ success: true, ...getFlowState(tabId) });
+    return true;
+  }
+
+  if (action === "set_flow_recording") {
+    (async () => {
+      const tabId = sender?.tab?.id || request.tabId || (await getActiveTabId());
+      const res = await setFlowRecording(tabId, request.enabled, request.url);
+      sendResponse(res);
+    })();
+    return true;
+  }
+
+  if (action === "delete_flow_step") {
+    const tabId = sender?.tab?.id || request.tabId;
+    sendResponse(deleteFlowStep(tabId, request.stepId));
+    return true;
+  }
+
+  if (action === "clear_flow_steps") {
+    const tabId = sender?.tab?.id || request.tabId;
+    sendResponse(clearFlowSteps(tabId));
+    return true;
+  }
+
+  if (action === "export_flow_recorder") {
+    const tabId = sender?.tab?.id || request.tabId || null;
+    const batch = exportFlowAsBatch(tabId, request.url, request.title, request.steps || null);
+    const playwright = exportFlowAsPlaywright(tabId, request.url, request.steps || null);
+    sendResponse({
+      success: true,
+      batch,
+      playwright,
+      ...getFlowState(tabId)
+    });
+    return true;
+  }
+
+  if (action === "replay_flow_recorder") {
+    (async () => {
+      const tabId = sender?.tab?.id || request.tabId || (await getActiveTabId());
+      const runReplay = () => replayRecordedFlow(tabId, request.steps || null);
+      const res = tabId
+        ? await runWithTabLock(tabId, "flow.replay", runReplay)
+        : await runReplay();
+      sendResponse(res);
     })();
     return true;
   }
