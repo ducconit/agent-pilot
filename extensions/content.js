@@ -11,6 +11,8 @@
   const modules = window.__AP_INTERNAL__ || {};
   const shield = modules.shield || {
     setAgentBusyState: () => {},
+    setSessionActive: () => {},
+    isSessionActive: () => false,
     isBusy: () => false,
     isDispatching: () => false,
     setIsDispatching: () => {},
@@ -19,12 +21,18 @@
   const cursor = modules.cursor || {
     moveVirtualMouse: () => Promise.resolve({ success: false }),
     virtualClick: () => Promise.resolve({ success: false }),
+    animateCursorClick: () => Promise.resolve({ success: false }),
     virtualType: () => Promise.resolve({ success: false }),
     virtualScroll: () => ({ success: false }),
     virtualFillForm: () => Promise.resolve({ success: false }),
+    virtualHover: () => Promise.resolve({ success: false }),
+    virtualDrag: () => Promise.resolve({ success: false }),
+    waitFor: () => Promise.resolve({ success: false }),
     dispatchKey: () => ({ success: false }),
     resolveElement: () => null,
-    getCursorPosition: () => ({ x: 0, y: 0 })
+    getCursorPosition: () => ({ x: 0, y: 0 }),
+    activateCursor: () => {},
+    setSessionActive: () => {}
   };
   const inspector = modules.inspector || {
     toggleInspector: () => {},
@@ -71,7 +79,12 @@
 
   const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
     ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
-    : "1.0.7-beta";
+    : "1.0.8-beta";
+
+  function resolveTargetElement(selector) {
+    if (!selector) return null;
+    return cursor.resolveElement ? cursor.resolveElement(selector) : document.querySelector(selector);
+  }
 
   // =========================================================================
   // Antigravity-First Global Bridge API (`window.__AGENT_PILOT__`)
@@ -86,8 +99,7 @@
     scroll: (deltaX, deltaY) => cursor.virtualScroll(deltaX, deltaY),
     toggleInspector: (enabled) => inspector.toggleInspector(enabled),
     getElement: (selector, includeStyles = false) => {
-      const el = cursor.resolveElement ? cursor.resolveElement(selector) : document.querySelector(selector);
-      return inspector.getDetailedElementInfo(el, includeStyles);
+      return inspector.getDetailedElementInfo(resolveTargetElement(selector), includeStyles);
     },
     snapshot: (maxElements, format) => inspector.getInteractiveSnapshot(maxElements, format),
     fillForm: (fields, submitSelector, pressEnter) => cursor.virtualFillForm(fields, submitSelector, pressEnter),
@@ -121,147 +133,63 @@
     }
   };
 
-  // Bridge to Main World so page scripts, DevTools Console and Agents can access window.__AGENT_PILOT__
-  try {
-    const bridgeScript = document.createElement("script");
-    bridgeScript.textContent = `
-      (() => {
-        function sendBridgeRequest(action, data = {}, customTimeout = null) {
-          let timeoutMs = ${BRIDGE_REQUEST_MS};
-          if (customTimeout && Number(customTimeout) > 0) {
-            timeoutMs = Number(customTimeout);
-          } else if (action === "wait_for") {
-            const waitDur = (data && (data.timeout || data.timeoutMs)) ? Number(data.timeout || data.timeoutMs) : 10000;
-            timeoutMs = waitDur + ${WAIT_FOR_EXTRA_MS};
-          }
-          if (!Number.isFinite(timeoutMs) || timeoutMs > ${BRIDGE_MAX_DELAY_MS}) {
-            timeoutMs = ${BRIDGE_MAX_DELAY_MS};
-          } else if (timeoutMs <= 0) {
-            timeoutMs = ${BRIDGE_REQUEST_MS};
-          }
-          return new Promise((resolve, reject) => {
-            const reqId = "ap_" + Math.random().toString(36).substr(2, ${UNIQUE_ID_SALT_LEN});
-            const timer = setTimeout(() => {
-              window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
-              resolve(null);
-            }, timeoutMs);
-            function onResponse(e) {
-              if (e.detail && e.detail.reqId === reqId) {
-                clearTimeout(timer);
-                window.removeEventListener("__AGENT_PILOT_RESP__", onResponse);
-                if (e.detail.error) {
-                  reject(new Error(String(e.detail.error)));
-                } else {
-                  resolve(e.detail.result);
-                }
-              }
-            }
-            window.addEventListener("__AGENT_PILOT_RESP__", onResponse);
-            window.dispatchEvent(new CustomEvent("__AGENT_PILOT_REQ__", {
-              detail: { reqId, action, data }
-            }));
-          });
-        }
+  // Table-driven dispatcher for Main World bridge requests (__AGENT_PILOT_REQ__)
+  const BRIDGE_ACTION_HANDLERS = {
+    virtual_mouse_move: (d) => cursor.moveVirtualMouse(d.x, d.y, d.duration),
+    virtual_mouse_click: (d) => cursor.virtualClick(d.x, d.y),
+    animate_cursor_click: (d) => cursor.animateCursorClick(d.x, d.y, d.selector),
+    virtual_type: (d) => cursor.virtualType(d.selector, d.text),
+    virtual_scroll: (d) => cursor.virtualScroll(d.deltaX, d.deltaY),
+    virtual_hover: (d) => cursor.virtualHover(d.selector),
+    virtual_drag: (d) => cursor.virtualDrag(d.from, d.to, d.steps),
+    press_key: (d) => cursor.dispatchKey(d.key, d.code, d.keyCode, d.selector),
+    wait_for: (d) => cursor.waitFor(d),
+    toggle_inspector: (d) => {
+      inspector.toggleInspector(d.enabled);
+      return { success: true, active: inspector.isInspectorActive() };
+    },
+    is_inspector_active: () => inspector.isInspectorActive(),
+    get_element_info: (d) => inspector.getDetailedElementInfo(resolveTargetElement(d.selector), Boolean(d.includeStyles)),
+    get_locked_element: () => inspector.getLockedElement(),
+    get_snapshot: (d) => inspector.getInteractiveSnapshot(d.maxElements, d.format),
+    fill_form: (d) => cursor.virtualFillForm(d.fields, d.submitSelector, d.pressEnter),
+    start_element_snap: () => { inspector.startElementSnap(); return { success: true }; },
+    stop_element_snap: () => { inspector.stopElementSnap(); return { success: true }; },
+    is_element_snap_active: () => inspector.isElementSnapActive(),
+    start_region_crop: () => { inspector.startRegionCrop(); return { success: true }; },
+    pick_color: (d) => eyedropper.pickColor(d.x, d.y),
+    stop_eyedropper: () => { eyedropper.stopEyedropper(); return { success: true }; },
+    is_eyedropper_active: () => eyedropper.isEyedropperActive(),
+    get_cursor_pos: () => cursor.getCursorPosition(),
+    is_busy: () => shield.isBusy(),
+    is_agent_tab: () => isAgentTab,
+    set_agent_tab: (d) => { isAgentTab = Boolean(d.enabled); return isAgentTab; },
+    set_busy: (d) => {
+      shield.setAgentBusyState(d.busy, d.action);
+      return { success: true, isAgentBusy: shield.isBusy() };
+    },
+    start_feedback_studio: () => { feedback.start(); return { success: true, active: feedback.isActive() }; },
+    stop_feedback_studio: () => { feedback.stop(); return { success: true, active: feedback.isActive() }; },
+    is_feedback_studio_active: () => feedback.isActive(),
+    get_feedback_items: () => feedback.getItems(),
+    add_feedback_item: (d) => feedback.addItem(d.item),
+    clear_feedback_items: () => { feedback.clearAll(); return { success: true }; },
+    copy_feedback_prompt: () => feedback.copyPrompt(),
+    generate_feedback_prompt: (d) => feedback.generateMarkdownPrompt(d.items),
+    save_feedback_inbox: () => feedback.saveToInbox(),
+    push_feedback_agent: () => feedback.pushToAgent()
+  };
 
-        const pageApi = {
-          version: "${EXTENSION_VERSION}",
-          moveMouse: (x, y, duration) => sendBridgeRequest("virtual_mouse_move", { x, y, duration }),
-          click: (x, y) => sendBridgeRequest("virtual_mouse_click", { x, y }),
-          animateClick: (x, y, selector) => sendBridgeRequest("animate_cursor_click", { x, y, selector }),
-          type: (selector, text) => sendBridgeRequest("virtual_type", { selector, text }),
-          scroll: (deltaX, deltaY) => sendBridgeRequest("virtual_scroll", { deltaX, deltaY }),
-          hover: (selector) => sendBridgeRequest("virtual_hover", { selector }),
-          drag: (from, to, steps) => sendBridgeRequest("virtual_drag", { from, to, steps }),
-          pressKey: (key, selector) => sendBridgeRequest("press_key", { key, selector }),
-          waitFor: (options) => sendBridgeRequest("wait_for", options),
-          toggleInspector: (enabled) => sendBridgeRequest("toggle_inspector", { enabled }),
-          getElement: (selector, includeStyles) => sendBridgeRequest("get_element_info", { selector, includeStyles }),
-          snapshot: (maxElements, format) => sendBridgeRequest("get_snapshot", { maxElements, format }),
-          fillForm: (fields, submitSelector, pressEnter) => sendBridgeRequest("fill_form", { fields, submitSelector, pressEnter }),
-          startElementSnap: () => sendBridgeRequest("start_element_snap", {}),
-          stopElementSnap: () => sendBridgeRequest("stop_element_snap", {}),
-          isElementSnapActive: () => sendBridgeRequest("is_element_snap_active", {}),
-          startRegionCrop: () => sendBridgeRequest("start_region_crop", {}),
-          getLockedElement: () => sendBridgeRequest("get_locked_element", {}),
-          pickColor: (x, y) => sendBridgeRequest("pick_color", { x, y }),
-          stopEyedropper: () => sendBridgeRequest("stop_eyedropper", {}),
-          isEyedropperActive: () => sendBridgeRequest("is_eyedropper_active", {}),
-          getCursorPosition: () => sendBridgeRequest("get_cursor_pos", {}),
-          isBusy: () => sendBridgeRequest("is_busy", {}),
-          isAgentTab: () => sendBridgeRequest("is_agent_tab", {}),
-          setAgentTab: (enabled) => sendBridgeRequest("set_agent_tab", { enabled }),
-          setBusy: (busy, action) => sendBridgeRequest("set_busy", { busy, action }),
-          startFeedbackStudio: () => sendBridgeRequest("start_feedback_studio", {}),
-          stopFeedbackStudio: () => sendBridgeRequest("stop_feedback_studio", {}),
-          isFeedbackStudioActive: () => sendBridgeRequest("is_feedback_studio_active", {}),
-          getFeedbackItems: () => sendBridgeRequest("get_feedback_items", {}),
-          addFeedbackItem: (item) => sendBridgeRequest("add_feedback_item", { item }),
-          clearFeedbackItems: () => sendBridgeRequest("clear_feedback_items", {}),
-          copyFeedbackPrompt: () => sendBridgeRequest("copy_feedback_prompt", {}),
-          generateFeedbackPrompt: (items) => sendBridgeRequest("generate_feedback_prompt", { items }),
-          saveFeedbackToInbox: () => sendBridgeRequest("save_feedback_inbox", {}),
-          pushFeedbackToAgent: () => sendBridgeRequest("push_feedback_agent", {})
-        };
-
-        window.__AGENT_PILOT__ = window.__AGENT_PILOT__ || {};
-        for (const [name, fn] of Object.entries(pageApi)) {
-          if (typeof window.__AGENT_PILOT__[name] === "undefined") {
-            window.__AGENT_PILOT__[name] = fn;
-          }
-        }
-      })();
-    `;
-    (document.head || document.documentElement).appendChild(bridgeScript);
-    bridgeScript.remove();
-  } catch (e) {}
-
-  // Listen for bridge requests from Main World
   window.addEventListener("__AGENT_PILOT_REQ__", async (e) => {
     if (!e.detail) return;
     const { reqId, action, data = {} } = e.detail;
     let result = null;
     let error = null;
     try {
-      if (action === "virtual_mouse_move") result = await cursor.moveVirtualMouse(data.x, data.y, data.duration);
-      else if (action === "virtual_mouse_click") result = await cursor.virtualClick(data.x, data.y);
-      else if (action === "animate_cursor_click") result = await cursor.animateCursorClick(data.x, data.y, data.selector);
-      else if (action === "virtual_type") result = await cursor.virtualType(data.selector, data.text);
-      else if (action === "virtual_scroll") result = cursor.virtualScroll(data.deltaX, data.deltaY);
-      else if (action === "virtual_hover") result = await cursor.virtualHover(data.selector);
-      else if (action === "virtual_drag") result = await cursor.virtualDrag(data.from, data.to, data.steps);
-      else if (action === "press_key") result = cursor.dispatchKey(data.key, data.code, data.keyCode, data.selector);
-      else if (action === "wait_for") result = await cursor.waitFor(data);
-      else if (action === "toggle_inspector") { inspector.toggleInspector(data.enabled); result = { success: true, active: inspector.isInspectorActive() }; }
-      else if (action === "is_inspector_active") result = inspector.isInspectorActive();
-      else if (action === "get_element_info") {
-        const el = cursor.resolveElement ? cursor.resolveElement(data.selector) : document.querySelector(data.selector);
-        result = inspector.getDetailedElementInfo(el, Boolean(data.includeStyles));
+      const handler = BRIDGE_ACTION_HANDLERS[action];
+      if (handler) {
+        result = await handler(data);
       }
-      else if (action === "get_locked_element") result = inspector.getLockedElement();
-      else if (action === "get_snapshot") result = inspector.getInteractiveSnapshot(data.maxElements, data.format);
-      else if (action === "fill_form") result = await cursor.virtualFillForm(data.fields, data.submitSelector, data.pressEnter);
-      else if (action === "start_element_snap") { inspector.startElementSnap(); result = { success: true }; }
-      else if (action === "stop_element_snap") { inspector.stopElementSnap(); result = { success: true }; }
-      else if (action === "is_element_snap_active") result = inspector.isElementSnapActive();
-      else if (action === "start_region_crop") { inspector.startRegionCrop(); result = { success: true }; }
-      else if (action === "pick_color") result = await eyedropper.pickColor(data.x, data.y);
-      else if (action === "stop_eyedropper") { eyedropper.stopEyedropper(); result = { success: true }; }
-      else if (action === "is_eyedropper_active") result = eyedropper.isEyedropperActive();
-      else if (action === "get_cursor_pos") result = cursor.getCursorPosition();
-      else if (action === "is_busy") result = shield.isBusy();
-      else if (action === "is_agent_tab") result = isAgentTab;
-      else if (action === "set_agent_tab") { isAgentTab = Boolean(data.enabled); result = isAgentTab; }
-      else if (action === "set_busy") { shield.setAgentBusyState(data.busy, data.action); result = { success: true, isAgentBusy: shield.isBusy() }; }
-      else if (action === "start_feedback_studio") { feedback.start(); result = { success: true, active: feedback.isActive() }; }
-      else if (action === "stop_feedback_studio") { feedback.stop(); result = { success: true, active: feedback.isActive() }; }
-      else if (action === "is_feedback_studio_active") result = feedback.isActive();
-      else if (action === "get_feedback_items") result = feedback.getItems();
-      else if (action === "add_feedback_item") result = feedback.addItem(data.item);
-      else if (action === "clear_feedback_items") { feedback.clearAll(); result = { success: true }; }
-      else if (action === "copy_feedback_prompt") result = await feedback.copyPrompt();
-      else if (action === "generate_feedback_prompt") result = feedback.generateMarkdownPrompt(data.items);
-      else if (action === "save_feedback_inbox") result = await feedback.saveToInbox();
-      else if (action === "push_feedback_agent") result = await feedback.pushToAgent();
     } catch (err) {
       console.warn("[AgentPilot] Bridge request error:", action, err);
       error = err?.message || String(err);
@@ -272,67 +200,41 @@
     }));
   });
 
-  // Listen for messages from Background & Side Panel
-  chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
-    if (req.action === "virtual_mouse_move" || req.action === "move_cursor") {
-      cursor.moveVirtualMouse(req.x, req.y, req.duration || MOUSE_MOVE_DEFAULT_MS).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
-      return true;
-    }
+  // Shared handlers for Background & Side Panel runtime messages
+  const moveCursorHandler = (req) => cursor.moveVirtualMouse(req.x, req.y, req.duration || MOUSE_MOVE_DEFAULT_MS);
+  const clickCursorHandler = (req) => cursor.virtualClick(req.x, req.y, req.selector);
+  const typeTextHandler = (req) => cursor.virtualType(req.selector, req.text, req.clear, req.pressEnter);
+  const pressKeyHandler = (req) => cursor.dispatchKey(req.key, req.code, req.keyCode, req.selector);
+  const hoverHandler = (req) => cursor.virtualHover(req.selector, { dispatchSynthetic: req.dispatchSynthetic });
+  const dragHandler = (req) => cursor.virtualDrag(req.fromSelector || req.from, req.toSelector || req.to, req.steps);
+  const scrollHandler = (req) => cursor.virtualScroll(req.deltaX, req.deltaY);
 
-    if (req.action === "virtual_mouse_click" || req.action === "click_cursor") {
-      cursor.virtualClick(req.x, req.y, req.selector).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
-      return true;
-    }
-
-    if (req.action === "animate_cursor_click") {
-      cursor.animateCursorClick(req.x, req.y, req.selector).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
-      return true;
-    }
-
-    if (req.action === "virtual_type" || req.action === "type_text") {
-      cursor.virtualType(req.selector, req.text, req.clear, req.pressEnter).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
-      return true;
-    }
-
-    if (req.action === "press_key" || req.action === "dispatch_key") {
-      sendResponse(cursor.dispatchKey(req.key, req.code, req.keyCode, req.selector));
-      return true;
-    }
-
-    if (req.action === "virtual_hover" || req.action === "hover") {
-      cursor.virtualHover(req.selector, { dispatchSynthetic: req.dispatchSynthetic }).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
-      return true;
-    }
-
-    if (req.action === "virtual_drag" || req.action === "drag") {
-      cursor.virtualDrag(req.fromSelector || req.from, req.toSelector || req.to, req.steps).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
-      return true;
-    }
-
-    if (req.action === "wait_for") {
-      cursor.waitFor(req).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
-      return true;
-    }
-
-    if (req.action === "focus_element") {
-      const el = cursor.resolveElement ? cursor.resolveElement(req.selector) : document.querySelector(req.selector);
-      if (!el) {
-        sendResponse({ success: false, error: "Element not found for selector: " + req.selector });
-        return true;
-      }
-      if (typeof el.focus === "function") {
-        el.focus();
-      }
-      sendResponse({ success: true });
-      return true;
-    }
-
-    if (req.action === "mark_upload_target") {
-      const el = cursor.resolveElement ? cursor.resolveElement(req.selector) : document.querySelector(req.selector);
-      if (!el) {
-        sendResponse({ success: false, error: "Element not found for selector: " + req.selector });
-        return true;
-      }
+  const RUNTIME_ACTION_HANDLERS = {
+    virtual_mouse_move: moveCursorHandler,
+    move_cursor: moveCursorHandler,
+    virtual_mouse_click: clickCursorHandler,
+    click_cursor: clickCursorHandler,
+    animate_cursor_click: (req) => cursor.animateCursorClick(req.x, req.y, req.selector),
+    virtual_type: typeTextHandler,
+    type_text: typeTextHandler,
+    press_key: pressKeyHandler,
+    dispatch_key: pressKeyHandler,
+    virtual_hover: hoverHandler,
+    hover: hoverHandler,
+    virtual_drag: dragHandler,
+    drag: dragHandler,
+    virtual_scroll: scrollHandler,
+    scroll_page: scrollHandler,
+    wait_for: (req) => cursor.waitFor(req),
+    focus_element: (req) => {
+      const el = resolveTargetElement(req.selector);
+      if (!el) return { success: false, error: "Element not found for selector: " + req.selector };
+      if (typeof el.focus === "function") el.focus();
+      return { success: true };
+    },
+    mark_upload_target: (req) => {
+      const el = resolveTargetElement(req.selector);
+      if (!el) return { success: false, error: "Element not found for selector: " + req.selector };
       let target = el;
       if (target.tagName !== "INPUT" || (target.type && target.type.toLowerCase() !== "file")) {
         const fileInput = target.querySelector ? target.querySelector("input[type=file]") : null;
@@ -340,66 +242,41 @@
       }
       const marker = "ap-upload-" + Math.random().toString(36).slice(2, UNIQUE_ID_SALT_LEN);
       target.setAttribute("data-agent-pilot-upload", marker);
-      sendResponse({ success: true, marker });
-      return true;
-    }
-
-    if (req.action === "unmark_upload_target") {
+      return { success: true, marker };
+    },
+    unmark_upload_target: (req) => {
       const target = document.querySelector(`[data-agent-pilot-upload="${req.marker}"]`);
-      if (target) {
-        target.removeAttribute("data-agent-pilot-upload");
-      }
-      sendResponse({ success: true });
-      return true;
-    }
-
-    if (req.action === "virtual_scroll" || req.action === "scroll_page") {
-      sendResponse(cursor.virtualScroll(req.deltaX, req.deltaY));
-      return true;
-    }
-
-    if (req.action === "scroll_into_view") {
-      const el = req.selector ? (cursor.resolveElement ? cursor.resolveElement(req.selector) : document.querySelector(req.selector)) : null;
-      if (!el) {
-        sendResponse({ success: false, error: `Selector '${req.selector}' not found` });
-        return true;
-      }
+      if (target) target.removeAttribute("data-agent-pilot-upload");
+      return { success: true };
+    },
+    scroll_into_view: (req) => {
+      const el = resolveTargetElement(req.selector);
+      if (!el) return { success: false, error: `Selector '${req.selector}' not found` };
       el.scrollIntoView({ behavior: req.behavior || "auto", block: req.block || "center", inline: req.inline || "center" });
       const rect = el.getBoundingClientRect();
-      sendResponse({ success: true, rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) } });
-      return true;
-    }
-
-    if (req.action === "wait_for_selector") {
+      return {
+        success: true,
+        rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) }
+      };
+    },
+    wait_for_selector: async (req) => {
       const selector = req.selector;
       const timeoutMs = Number(req.timeoutMs || req.timeout || WAIT_FOR_SELECTOR_DEFAULT_MS);
-      const startTime = Date.now();
-      const checkInterval = 100;
-
-      const check = () => {
-        const el = document.querySelector(selector);
+      const waited = await cursor.waitFor({ selector, state: "attached", timeoutMs });
+      if (waited && waited.success) {
+        const el = resolveTargetElement(selector);
         if (el) {
-          sendResponse({ success: true, found: true, details: inspector.getDetailedElementInfo(el) });
-          return;
+          return { success: true, found: true, details: inspector.getDetailedElementInfo(el) };
         }
-        if (Date.now() - startTime >= timeoutMs) {
-          sendResponse({ success: false, found: false, error: `Selector '${selector}' not found within ${timeoutMs}ms` });
-          return;
-        }
-        setTimeout(check, checkInterval);
-      };
-      check();
-      return true;
-    }
-
-    if (req.action === "toggle_inspector") {
+      }
+      return { success: false, found: false, error: `Selector '${selector}' not found within ${timeoutMs}ms` };
+    },
+    toggle_inspector: (req) => {
       inspector.toggleInspector(req.enabled);
-      sendResponse({ success: true, active: inspector.isInspectorActive() });
-      return true;
-    }
-
-    if (req.action === "get_element_info") {
-      const el = req.selector ? (cursor.resolveElement ? cursor.resolveElement(req.selector) : document.querySelector(req.selector)) : null;
+      return { success: true, active: inspector.isInspectorActive() };
+    },
+    get_element_info: (req) => {
+      const el = resolveTargetElement(req.selector);
       if (req.scrollIntoView && el && el.scrollIntoView) {
         const r = el.getBoundingClientRect();
         const inView = r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
@@ -408,7 +285,7 @@
         }
       }
       const details = el ? inspector.getDetailedElementInfo(el, Boolean(req.includeStyles)) : inspector.getLockedElement();
-      sendResponse({
+      return {
         success: !!(el || details),
         ...(details || {}),
         details,
@@ -417,179 +294,115 @@
           height: window.innerHeight,
           devicePixelRatio: window.devicePixelRatio || 1
         }
-      });
-      return true;
-    }
-
-    if (req.action === "get_snapshot") {
-      const result = inspector.getInteractiveSnapshot(req.maxElements, req.format);
-      sendResponse({ success: true, result });
-      return true;
-    }
-
-    if (req.action === "fill_form") {
-      cursor.virtualFillForm(req.fields, req.submitSelector, req.pressEnter).then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
-      return true;
-    }
-
-    if (req.action === "start_region_crop") {
-      inspector.startRegionCrop();
-      sendResponse({ success: true });
-      return true;
-    }
-
-    if (req.action === "start_element_snap") {
-      inspector.startElementSnap();
-      sendResponse({ success: true });
-      return true;
-    }
-
-    if (req.action === "stop_element_snap") {
-      inspector.stopElementSnap();
-      sendResponse({ success: true });
-      return true;
-    }
-
-    if (req.action === "copy_image_to_clipboard" && req.dataUrl) {
-      (async () => {
-        try {
-          if (!navigator.clipboard || !navigator.clipboard.write) {
-            throw new Error("Tính năng sao chép yêu cầu trang web chạy trong bối cảnh an toàn (HTTPS/Localhost)");
-          }
-          const parts = req.dataUrl.split(",");
-          const binStr = atob(parts[1]);
-          const u8arr = new Uint8Array(binStr.length);
-          for (let i = 0; i < binStr.length; i++) u8arr[i] = binStr.charCodeAt(i);
-          const blob = new Blob([u8arr], { type: "image/png" });
-          await navigator.clipboard.write([
-            new ClipboardItem({ "image/png": blob })
-          ]);
-          if (req.showInPageToast) {
-            window.__AP_INTERNAL__.showToast?.("📋 Đã sao chép ảnh vào clipboard!");
-          }
-          sendResponse({ success: true });
-        } catch (e) {
-          console.warn("[AgentPilot] Content script clipboard copy error:", e);
-          sendResponse({ success: false, error: e.message });
-        }
-      })();
-      return true;
-    }
-
-    if (req.action === "pick_color") {
-      eyedropper.pickColor(req.x, req.y).then((color) => sendResponse({ success: !!color, color }));
-      return true;
-    }
-
-    if (req.action === "stop_eyedropper") {
-      eyedropper.stopEyedropper();
-      sendResponse({ success: true });
-      return true;
-    }
-
-    if (req.action === "is_eyedropper_active") {
-      sendResponse({ active: eyedropper.isEyedropperActive() });
-      return true;
-    }
-
-    if (req.action === "toggle_feedback_studio") {
-      if (req.enabled) {
-        feedback.start();
-      } else {
-        feedback.stop();
+      };
+    },
+    get_snapshot: (req) => ({
+      success: true,
+      result: inspector.getInteractiveSnapshot(req.maxElements, req.format)
+    }),
+    fill_form: (req) => cursor.virtualFillForm(req.fields, req.submitSelector, req.pressEnter),
+    start_region_crop: () => { inspector.startRegionCrop(); return { success: true }; },
+    start_element_snap: () => { inspector.startElementSnap(); return { success: true }; },
+    stop_element_snap: () => { inspector.stopElementSnap(); return { success: true }; },
+    copy_image_to_clipboard: async (req) => {
+      if (!req.dataUrl) return { success: false, error: "Missing dataUrl" };
+      if (!navigator.clipboard || !navigator.clipboard.write) {
+        throw new Error("Tính năng sao chép yêu cầu trang web chạy trong bối cảnh an toàn (HTTPS/Localhost)");
       }
-      sendResponse({ success: true, active: feedback.isActive(), items: feedback.getItems() });
-      return true;
-    }
-
-    if (req.action === "get_feedback_studio_state") {
-      sendResponse({
-        success: true,
-        active: feedback.isActive(),
-        items: feedback.getItems()
-      });
-      return true;
-    }
-
-    if (req.action === "set_feedback_mode") {
+      const parts = req.dataUrl.split(",");
+      const binStr = atob(parts[1]);
+      const u8arr = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i++) u8arr[i] = binStr.charCodeAt(i);
+      const blob = new Blob([u8arr], { type: "image/png" });
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      if (req.showInPageToast) {
+        window.__AP_INTERNAL__.showToast?.("📋 Đã sao chép ảnh vào clipboard!");
+      }
+      return { success: true };
+    },
+    pick_color: async (req) => {
+      const color = await eyedropper.pickColor(req.x, req.y);
+      return { success: !!color, color };
+    },
+    stop_eyedropper: () => { eyedropper.stopEyedropper(); return { success: true }; },
+    is_eyedropper_active: () => ({ active: eyedropper.isEyedropperActive() }),
+    toggle_feedback_studio: (req) => {
+      if (req.enabled) feedback.start();
+      else feedback.stop();
+      return { success: true, active: feedback.isActive(), items: feedback.getItems() };
+    },
+    get_feedback_studio_state: () => ({
+      success: true,
+      active: feedback.isActive(),
+      items: feedback.getItems()
+    }),
+    set_feedback_mode: (req) => {
       feedback.setMode(req.mode);
-      sendResponse({ success: true, mode: req.mode });
-      return true;
-    }
-
-    if (req.action === "copy_feedback_prompt") {
-      feedback.copyPrompt().then(() => sendResponse({ success: true }));
-      return true;
-    }
-
-    if (req.action === "update_feedback_comment") {
+      return { success: true, mode: req.mode };
+    },
+    copy_feedback_prompt: async () => {
+      await feedback.copyPrompt();
+      return { success: true };
+    },
+    update_feedback_comment: (req) => {
       feedback.updateComment(req.id, req.comment);
-      sendResponse({ success: true, items: feedback.getItems() });
-      return true;
-    }
-
-    if (req.action === "delete_feedback_item") {
+      return { success: true, items: feedback.getItems() };
+    },
+    delete_feedback_item: (req) => {
       feedback.deleteItem(req.id);
-      sendResponse({ success: true, items: feedback.getItems() });
-      return true;
-    }
-
-    if (req.action === "clear_feedback_items") {
+      return { success: true, items: feedback.getItems() };
+    },
+    clear_feedback_items: () => {
       feedback.clearAll();
-      sendResponse({ success: true, items: feedback.getItems() });
-      return true;
-    }
-
-    if (req.action === "save_feedback_inbox_tab") {
-      feedback.saveToInbox().then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
-      return true;
-    }
-
-    if (req.action === "push_feedback_agent_tab") {
-      feedback.pushToAgent().then(sendResponse).catch((err) => sendResponse({ success: false, error: err?.message || String(err) }));
-      return true;
-    }
-
-    if (req.action === "set_agent_tab_status") {
+      return { success: true, items: feedback.getItems() };
+    },
+    save_feedback_inbox_tab: () => feedback.saveToInbox(),
+    push_feedback_agent_tab: () => feedback.pushToAgent(),
+    set_agent_tab_status: (req) => {
       isAgentTab = Boolean(req.isAgentTab);
-      sendResponse({ success: true, isAgentTab });
-      return true;
-    }
-
-    if (req.action === "set_agent_session") {
+      return { success: true, isAgentTab };
+    },
+    set_agent_session: (req) => {
       const active = Boolean(req.active);
       shield.setSessionActive(active, req.sessionName || "");
       cursor.setSessionActive(active);
-      sendResponse({
+      return {
         success: true,
         sessionActive: active,
         sessionName: req.sessionName || "",
         isAgentBusy: shield.isBusy()
-      });
-      return true;
-    }
-
-    if (req.action === "set_agent_busy") {
+      };
+    },
+    set_agent_busy: (req) => {
       shield.setAgentBusyState(req.busy, req.currentAction || "");
       if (req.busy) {
         cursor.activateCursor(CURSOR_BUSY_MS);
       }
-      sendResponse({ success: true, isAgentBusy: shield.isBusy(), isSessionActive: shield.isSessionActive() });
+      return { success: true, isAgentBusy: shield.isBusy(), isSessionActive: shield.isSessionActive() };
+    },
+    ping: () => ({
+      success: true,
+      status: "ready",
+      isAgentTab,
+      isAgentBusy: shield.isBusy(),
+      isSessionActive: shield.isSessionActive()
+    })
+  };
+
+  // Listen for messages from Background & Side Panel
+  chrome.runtime.onMessage.addListener((req, _sender, sendResponse) => {
+    const handler = req && RUNTIME_ACTION_HANDLERS[req.action];
+    if (!handler) {
+      sendResponse({ success: false, error: `Unknown action: ${req?.action || req?.type || "unnamed"}` });
       return true;
     }
-
-    if (req.action === "ping") {
-      sendResponse({
-        success: true,
-        status: "ready",
-        isAgentTab,
-        isAgentBusy: shield.isBusy(),
-        isSessionActive: shield.isSessionActive()
+    Promise.resolve()
+      .then(() => handler(req))
+      .then(sendResponse)
+      .catch((err) => {
+        console.warn("[AgentPilot] Content script action error:", req.action, err);
+        sendResponse({ success: false, error: err?.message || String(err) });
       });
-      return true;
-    }
-
-    sendResponse({ success: false, error: `Unknown action: ${req.action || req.type || "unnamed"}` });
     return true;
   });
 

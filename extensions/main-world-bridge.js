@@ -42,13 +42,14 @@
 
   const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
     ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
-    : "1.0.1-beta";
+    : "1.0.8-beta";
 
   window.__AGENT_PILOT__ = window.__AGENT_PILOT__ || {};
   const pageApi = {
     version: EXTENSION_VERSION,
     moveMouse: (x, y, duration) => sendBridgeRequest("virtual_mouse_move", { x, y, duration }),
     click: (x, y) => sendBridgeRequest("virtual_mouse_click", { x, y }),
+    animateClick: (x, y, selector) => sendBridgeRequest("animate_cursor_click", { x, y, selector }),
     type: (selector, text) => sendBridgeRequest("virtual_type", { selector, text }),
     scroll: (deltaX, deltaY) => sendBridgeRequest("virtual_scroll", { deltaX, deltaY }),
     hover: (selector) => sendBridgeRequest("virtual_hover", { selector }),
@@ -178,18 +179,22 @@
     return null;
   }
 
-  // Handle source inspection requests from isolated content script
-  window.addEventListener("__AP_INSPECT_SOURCE_REQ__", (e) => {
-    const reqId = e.detail?.reqId;
-    const inspectAttr = "data-ap-inspect-target";
-    const el = document.querySelector(`[${inspectAttr}="${reqId}"]`);
-    let source = null;
-    if (el) {
-      source = extractFrameworkSource(el);
-      el.removeAttribute(inspectAttr);
-    }
-    window.dispatchEvent(new CustomEvent("__AP_INSPECT_SOURCE_RESP__", {
-      detail: { reqId, source }
-    }));
-  });
+  // Handle source inspection requests from isolated content script (guard against duplicate injection)
+  if (!window.__AP_MAIN_BRIDGE_LISTENER__) {
+    window.__AP_MAIN_BRIDGE_LISTENER__ = true;
+    window.addEventListener("__AP_INSPECT_SOURCE_REQ__", (e) => {
+      const reqId = e.detail?.reqId;
+      if (!reqId || typeof reqId !== "string" || !/^[\w-]+$/.test(reqId)) return;
+      const inspectAttr = "data-ap-inspect-target";
+      const el = document.querySelector(`[${inspectAttr}="${reqId}"]`);
+      let source = null;
+      if (el) {
+        source = extractFrameworkSource(el);
+        el.removeAttribute(inspectAttr);
+      }
+      window.dispatchEvent(new CustomEvent("__AP_INSPECT_SOURCE_RESP__", {
+        detail: { reqId, source }
+      }));
+    });
+  }
 })();

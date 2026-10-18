@@ -12,13 +12,11 @@
  */
 
 import {
-  attachedTabs,
-  devtoolsBuffers,
   activeTracingSessions,
   activeDialogs,
-  agentControlledTabs,
   LIMITS,
-  getBuffer
+  getBuffer,
+  cleanupDebuggerState
 } from "./constants.js";
 
 /**
@@ -28,10 +26,7 @@ export function initCdpEventListeners(broadcastFn) {
   // Clean up when debugger detached by user or system
   chrome.debugger.onDetach.addListener((source, reason) => {
     if (source && source.tabId) {
-      attachedTabs.delete(source.tabId);
-      devtoolsBuffers.delete(source.tabId);
-      activeTracingSessions.delete(source.tabId);
-      activeDialogs.delete(source.tabId);
+      cleanupDebuggerState(source.tabId);
       if (typeof broadcastFn === "function") {
         broadcastFn({
           type: "DEBUGGER_STATUS_CHANGED",
@@ -42,16 +37,6 @@ export function initCdpEventListeners(broadcastFn) {
       }
     }
   });
-
-  if (chrome.tabs && chrome.tabs.onRemoved) {
-    chrome.tabs.onRemoved.addListener((tabId) => {
-      attachedTabs.delete(tabId);
-      devtoolsBuffers.delete(tabId);
-      activeTracingSessions.delete(tabId);
-      activeDialogs.delete(tabId);
-      agentControlledTabs.delete(tabId);
-    });
-  }
 
   // Listen for CDP events (Console, Network, Runtime)
   chrome.debugger.onEvent.addListener((source, method, params) => {

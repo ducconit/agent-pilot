@@ -22,6 +22,7 @@ import {
 } from "./tab-manager.js";
 import { captureTabScreenshot } from "./screenshot-service.js";
 import { executeBatchActions } from "./batch-executor.js";
+import { normalizeVia, resolvePoint } from "./batch-validation.js";
 
 export const commandMethods = {
   async getActiveTabId() {
@@ -84,29 +85,11 @@ export const commandMethods = {
   },
 
   normalizeVia(params) {
-    const via = String((params && params.via) || "synthetic").toLowerCase();
-    return via === "cdp" || via === "auto" ? via : "synthetic";
+    return normalizeVia(params);
   },
 
-  async resolveCdpPoint(tabId, params, label = "point") {
-    const hasX = params.x !== undefined && params.x !== null && params.x !== "";
-    const hasY = params.y !== undefined && params.y !== null && params.y !== "";
-    if (hasX && hasY) {
-      return { x: Number(params.x), y: Number(params.y) };
-    }
-    if (!params.selector) {
-      throw new Error(`Cannot resolve ${label}: provide x/y coordinates or a selector`);
-    }
-    const res = await this.sendTabMessageWithRetry(tabId, {
-      action: "virtual_hover",
-      selector: params.selector,
-      dispatchSynthetic: false
-    });
-    const coords = res && (res.coords || (res.x !== undefined && res.y !== undefined ? { x: res.x, y: res.y } : null));
-    if (!coords || !Number.isFinite(Number(coords.x)) || !Number.isFinite(Number(coords.y))) {
-      throw new Error(`Cannot resolve ${label} coordinates for selector: ${params.selector}`);
-    }
-    return { x: Number(coords.x), y: Number(coords.y) };
+  async resolveCdpPoint(tabId, params = {}, label = "point") {
+    return await resolvePoint(tabId, params.x, params.y, params.selector, label);
   },
 
   async executeBatchActions(params) {

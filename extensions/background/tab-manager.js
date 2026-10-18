@@ -311,6 +311,9 @@ async function ensureContentScriptInner(tabId) {
       ];
       const cssFiles = isolatedEntry?.css || ["content.css"];
 
+      const mainEntry = manifest?.content_scripts?.find(cs => cs.js && cs.world === "MAIN");
+      const mainFiles = mainEntry?.js || ["main-world-bridge.js"];
+
       if (cssFiles.length) {
         await chrome.scripting.insertCSS({ target: { tabId }, files: cssFiles }).catch((err) => {
           logDebug(`insertCSS on tab ${tabId}`, err);
@@ -324,6 +327,15 @@ async function ensureContentScriptInner(tabId) {
       } catch (err) {
         logDebug(`dynamic script injection on tab ${tabId}`, err);
         return false;
+      }
+      if (mainFiles.length) {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          world: "MAIN",
+          files: mainFiles
+        }).catch((err) => {
+          logDebug(`main world script injection on tab ${tabId}`, err);
+        });
       }
       await new Promise(r => setTimeout(r, 80));
     }
@@ -457,18 +469,11 @@ export async function runWithTabLock(tabId, actionName, runner) {
   }
 }
 
-// Clean up agentControlledTabs when tabs are removed or ungrouped
-if (typeof chrome !== "undefined" && chrome.tabs) {
-  if (chrome.tabs.onRemoved) {
-    chrome.tabs.onRemoved.addListener((tabId) => {
+// Clean up agentControlledTabs when tabs are ungrouped
+if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.onUpdated) {
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.groupId !== undefined && changeInfo.groupId === -1) {
       agentControlledTabs.delete(tabId);
-    });
-  }
-  if (chrome.tabs.onUpdated) {
-    chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-      if (changeInfo.groupId !== undefined && changeInfo.groupId === -1) {
-        agentControlledTabs.delete(tabId);
-      }
-    });
-  }
+    }
+  });
 }

@@ -7,8 +7,6 @@
  */
 
 import {
-  attachedTabs,
-  getBuffer,
   logDebug,
   TIMEOUTS,
   LIMITS,
@@ -22,6 +20,8 @@ import {
 } from "./tab-manager.js";
 import { captureTabScreenshot } from "./screenshot-service.js";
 import { getPositiveNumber } from "./batch-validation.js";
+import { collectDevtoolsData } from "./agent-handlers/devtools.js";
+import { evaluateInTab } from "./agent-handlers/page-input.js";
 
 export const observationHandlers = {
   wait_for_selector: waitForSelectorAction,
@@ -34,8 +34,6 @@ export const observationHandlers = {
   cdp: cdpAction,
   devtools: devtoolsAction
 };
-
-
 
 /** wait_for_selector — poll the content script until the selector matches. */
 async function waitForSelectorAction(ctx, act) {
@@ -76,20 +74,7 @@ async function waitForAction(ctx, act) {
  */
 async function sleepAction(ctx, act) {
   if (act.selector || act.text) {
-    const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
-    if (!targetTabId) throw new Error("No active tab for wait");
-    await ensureContentScript(targetTabId);
-    const res = await sendTabMessageWithRetry(targetTabId, {
-      action: "wait_for",
-      selector: act.selector,
-      text: act.text,
-      state: act.state || "visible",
-      timeoutMs: getPositiveNumber(act.timeoutMs, act.timeout) || DEFAULTS.WAIT_FOR_TIMEOUT_MS
-    });
-    if (!res || !res.success) throw new Error(res?.error || "Wait timed out");
-    ctx.stepResult.success = true;
-    ctx.stepResult.waited = res;
-    return;
+    return await waitForAction(ctx, act);
   }
   const ms = getPositiveNumber(act.ms, act.duration) || TIMEOUTS.BATCH_SLEEP_MS;
   await new Promise(r => setTimeout(r, ms));
@@ -146,18 +131,14 @@ async function getElementAction(ctx, act) {
   ctx.stepResult.element = res.details || res;
 }
 
-/** evaluate / eval — run an expression in the page via CDP Runtime.evaluate. */
+/** evaluate / eval — run an expression in the page via shared evaluateInTab helper. */
 async function evaluateAction(ctx, act) {
   const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
   if (!targetTabId) throw new Error("No active tab for evaluate");
-  await attachDebugger(targetTabId).catch((err) => logDebug("batch attachDebugger evaluate", err));
-  const evalRes = await sendCdpCommand(targetTabId, "Runtime.evaluate", {
-    expression: act.expression,
-    returnByValue: true,
-    awaitPromise: true
-  });
+  const script = act.expression || act.script || act.code || "";
+  const val = await evaluateInTab(targetTabId, script, ctx.bridgeClient?.broadcastFn);
   ctx.stepResult.success = true;
-  ctx.stepResult.value = evalRes?.result?.value;
+  ctx.stepResult.value = val;
 }
 
 /** cdp — escape hatch to send an arbitrary CDP method on the target tab. */
@@ -172,60 +153,21 @@ async function cdpAction(ctx, act) {
 
 /**
  * devtools / get_devtools_data — read the buffered console/network/performance
- * data for a tab (optionally clearing the buffers).
+ * data for a tab (optionally clearing the buffers) via shared collectDevtoolsData.
  */
 async function devtoolsAction(ctx, act) {
   const targetTabId = act.tabId ? await getTargetTabId(act.tabId, ctx.bridgeClient?.lastAgentTabId) : ctx.currentTabId;
   if (!targetTabId) throw new Error("No active tab for devtools");
-  if (!attachedTabs.has(targetTabId)) {
-    await attachDebugger(targetTabId).catch((err) => {
-      console.warn("[AgentPilot] Batch auto-attach failed:", err);
-    });
-  }
-  const buffer = getBuffer(targetTabId);
-  // `source` only selects a specific devtools stream when it is one of the known
-  // types; any other value (or only devtoolsType) falls back to "all".
   const devType = act.devtoolsType || (["all", "console", "network", "performance"].includes(act.source) ? act.source : "all");
-  const limit = Math.min(Math.max(Number(act.limit) || LIMITS.DEVTOOLS_FETCH_DEFAULT, 1), LIMITS.DEVTOOLS_FETCH_MAX);
-
-  let consoleData = undefined;
-  let networkData = undefined;
-  let perfData = undefined;
-
-  if (devType === "all" || devType === "console") {
-    consoleData = buffer.console.slice(-limit);
-    if (act.clear) buffer.console = [];
-  }
-  if (devType === "all" || devType === "network") {
-    networkData = Array.from(buffer.network.values()).slice(-limit);
-    if (act.clear) buffer.network.clear();
-  }
-  if (devType === "all" || devType === "performance") {
-    try {
-      const pRes = await sendCdpCommand(targetTabId, "Performance.getMetrics");
-      const mMap = {};
-      (pRes.metrics || []).forEach(m => { mMap[m.name] = m.value; });
-      perfData = {
-        metrics: mMap,
-        jsHeapUsedMB: mMap.JSHeapUsedSize ? +(mMap.JSHeapUsedSize / (1024 * 1024)).toFixed(2) : undefined,
-        domNodes: mMap.Nodes,
-        timestamp: Date.now()
-      };
-    } catch (pErr) {
-      perfData = { error: pErr.message };
-    }
-  }
-
-  ctx.stepResult.success = true;
-  ctx.stepResult.tabId = targetTabId;
-  ctx.stepResult.attached = attachedTabs.has(targetTabId);
-  ctx.stepResult.summary = {
-    consoleEntries: consoleData ? consoleData.length : 0,
-    networkRequests: networkData ? networkData.length : 0,
-    jsHeapUsedMB: perfData?.jsHeapUsedMB,
-    domNodes: perfData?.domNodes
-  };
-  if (consoleData !== undefined) ctx.stepResult.console = consoleData;
-  if (networkData !== undefined) ctx.stepResult.network = networkData;
-  if (perfData !== undefined) ctx.stepResult.performance = perfData;
+  const payload = await collectDevtoolsData(
+    targetTabId,
+    {
+      type: devType,
+      limit: act.limit,
+      clear: act.clear,
+      filterOrigin: act.filterOrigin
+    },
+    ctx.bridgeClient?.broadcastFn
+  );
+  Object.assign(ctx.stepResult, payload, { success: true });
 }

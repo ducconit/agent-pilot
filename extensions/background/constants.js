@@ -112,6 +112,29 @@ export function getTabLockState(tabId) {
 }
 
 /**
+ * Drop per-tab CDP session state (attached flag, devtools buffer, active trace, active dialog).
+ */
+export function cleanupDebuggerState(tabId) {
+  attachedTabs.delete(tabId);
+  devtoolsBuffers.delete(tabId);
+  activeTracingSessions.delete(tabId);
+  activeDialogs.delete(tabId);
+}
+
+/**
+ * Drop all per-tab state when a tab is closed.
+ */
+export function cleanupTabResources(tabId) {
+  cleanupDebuggerState(tabId);
+  agentControlledTabs.delete(tabId);
+  const lockState = tabLockStates.get(tabId);
+  if (lockState && lockState.unlockTimer) {
+    clearTimeout(lockState.unlockTimer);
+  }
+  tabLockStates.delete(tabId);
+}
+
+/**
  * Cross-platform URL normalizer supporting Windows/Mac/Linux local file URLs
  * as well as edge://, chrome://, brave://, and standard web protocols.
  */

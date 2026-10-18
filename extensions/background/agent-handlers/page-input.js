@@ -19,6 +19,59 @@ import {
   dispatchCdpKeyEvent,
   uploadFileInput
 } from "../cdp-manager.js";
+import { getPositiveNumber } from "../batch-validation.js";
+
+/**
+ * Shared page evaluation helper (MAIN world scripting first, CDP Runtime.evaluate fallback).
+ */
+export async function evaluateInTab(tabId, script, broadcastFn = null) {
+  // Attempt 1: Execute in MAIN world for direct window/DOM framework access
+  if (typeof chrome !== "undefined" && chrome.scripting && chrome.scripting.executeScript) {
+    let mainWorldResult = null;
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: "MAIN",
+        func: async (code) => {
+          try {
+            const rawVal = window.eval(code);
+            const value = await Promise.resolve(rawVal);
+            return { __eval_ok: true, value };
+          } catch (e) {
+            return { __eval_err: true, message: e?.message || String(e), stack: e?.stack };
+          }
+        },
+        args: [script]
+      });
+      if (results && results[0] && results[0].result) {
+        mainWorldResult = results[0].result;
+      }
+    } catch (scriptingErr) {
+      logDebug("evaluate in MAIN world fallback to CDP", scriptingErr);
+    }
+
+    if (mainWorldResult) {
+      if (mainWorldResult.__eval_err) {
+        throw new Error(mainWorldResult.message);
+      }
+      return mainWorldResult.value;
+    }
+  }
+
+  // Attempt 2: Fallback to CDP Runtime.evaluate
+  if (!attachedTabs.has(tabId)) {
+    await attachDebugger(tabId, broadcastFn).catch((err) => logDebug("evaluate attachDebugger", err));
+  }
+  const evalRes = await sendCdpCommand(tabId, "Runtime.evaluate", {
+    expression: script,
+    returnByValue: true,
+    awaitPromise: true
+  });
+  if (evalRes?.exceptionDetails) {
+    throw new Error(evalRes.exceptionDetails.exception?.description || evalRes.exceptionDetails.text);
+  }
+  return evalRes && evalRes.result ? evalRes.result.value : evalRes;
+}
 
 export const pageInputHandlers = {
   "page.evaluate": async (client, params, respond) => {
@@ -27,48 +80,7 @@ export const pageInputHandlers = {
     const script = params.script || params.expression || params.code || "";
     if (!script) return respond(null, new Error("Missing script or expression to evaluate"));
 
-    client.runWithTabLock(tabId, "page.evaluate", async () => {
-      // Attempt 1: Execute in MAIN world for direct window/DOM framework access
-      try {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId },
-          world: "MAIN",
-          func: async (code) => {
-            try {
-              const rawVal = window.eval(code);
-              const value = await Promise.resolve(rawVal);
-              return { __eval_ok: true, value };
-            } catch (e) {
-              return { __eval_err: true, message: e?.message || String(e), stack: e?.stack };
-            }
-          },
-          args: [script]
-        });
-        if (results && results[0] && results[0].result) {
-          const resObj = results[0].result;
-          if (resObj.__eval_err) {
-            throw new Error(resObj.message);
-          }
-          return resObj.value;
-        }
-      } catch (scriptingErr) {
-        logDebug("evaluate in MAIN world fallback to CDP", scriptingErr);
-      }
-
-      // Attempt 2: Fallback to CDP Runtime.evaluate
-      if (!attachedTabs.has(tabId)) {
-        await attachDebugger(tabId, client.broadcastFn).catch((err) => logDebug("evaluate attachDebugger", err));
-      }
-      const evalRes = await sendCdpCommand(tabId, "Runtime.evaluate", {
-        expression: script,
-        returnByValue: true,
-        awaitPromise: true
-      });
-      if (evalRes?.exceptionDetails) {
-        throw new Error(evalRes.exceptionDetails.exception?.description || evalRes.exceptionDetails.text);
-      }
-      return evalRes?.result?.value ?? evalRes;
-    })
+    client.runWithTabLock(tabId, "page.evaluate", () => evaluateInTab(tabId, script, client.broadcastFn))
       .then(res => respond(res !== undefined ? res : null))
       .catch(err => respond(null, err));
   },
@@ -287,17 +299,11 @@ export const pageInputHandlers = {
   "page.waitFor": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId);
     if (!tabId) return respond(null, new Error("No target tab found"));
-    let timeoutMs = DEFAULTS.WAIT_FOR_TIMEOUT_MS;
-    let candidate = params.timeoutMs;
-    if (candidate === undefined || candidate === null || candidate === "") {
-      candidate = params.timeout;
-    }
-    if (candidate !== undefined && candidate !== null && candidate !== "") {
-      const num = Number(candidate);
-      if (!Number.isFinite(num) || num <= 0 || num > DEFAULTS.MAX_TIMER_DELAY_MS) {
-        return respond(null, new Error(`Invalid timeout '${candidate}': must be a positive finite number <= ${DEFAULTS.MAX_TIMER_DELAY_MS}ms`));
-      }
-      timeoutMs = num;
+    let timeoutMs;
+    try {
+      timeoutMs = getPositiveNumber(params.timeoutMs, params.timeout) || DEFAULTS.WAIT_FOR_TIMEOUT_MS;
+    } catch (err) {
+      return respond(null, err);
     }
     client.sendTabMessageWithRetry(tabId, {
       action: "wait_for",

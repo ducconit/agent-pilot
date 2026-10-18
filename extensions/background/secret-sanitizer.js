@@ -125,7 +125,7 @@ const SENSITIVE_KEY_REGEX = /^(?:password|passwd|secret|api_?key|x-api-key|acces
  * Returns { text: string, masked: boolean, types: string[] }
  */
 export function maskString(text) {
-  if (typeof text !== "string" || text.length === 0) {
+  if (typeof text !== "string" || text.length === 0 || text.startsWith("data:image/")) {
     return { text, masked: false, types: [] };
   }
 
@@ -134,16 +134,15 @@ export function maskString(text) {
   const types = new Set();
 
   for (const pattern of SECRET_PATTERNS) {
-    // Reset regex index for global regexes
     pattern.regex.lastIndex = 0;
-    if (pattern.regex.test(result)) {
-      pattern.regex.lastIndex = 0;
-      result = result.replace(pattern.regex, (...args) => {
+    result = result.replace(pattern.regex, (...args) => {
+      const replaced = pattern.replacer(...args);
+      if (replaced !== args[0]) {
         masked = true;
         types.add(pattern.name);
-        return pattern.replacer(...args);
-      });
-    }
+      }
+      return replaced;
+    });
   }
 
   return { text: result, masked, types: Array.from(types) };

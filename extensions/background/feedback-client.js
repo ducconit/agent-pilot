@@ -33,18 +33,23 @@ export async function saveFeedbackInbox(client, payload) {
     const sanitizedPayload = sanitizeData(payload, getSecretFilterEnabled());
     await new Promise((resolve) => {
       if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        const pruneExcessKeys = (allKeys) => {
+          const feedbackKeys = (allKeys || []).filter((k) => k.startsWith("ap_feedback_"));
+          if (feedbackKeys.length > LIMITS.FALLBACK_FEEDBACK_SESSIONS) {
+            // Timestamp keys share the same length, so lexical sort == chronological
+            feedbackKeys.sort();
+            const excess = feedbackKeys.slice(0, feedbackKeys.length - LIMITS.FALLBACK_FEEDBACK_SESSIONS);
+            chrome.storage.local.remove(excess, () => resolve());
+          } else {
+            resolve();
+          }
+        };
         chrome.storage.local.set({ [key]: sanitizedPayload }, () => {
-          chrome.storage.local.get(null, (all) => {
-            const feedbackKeys = Object.keys(all || {}).filter((k) => k.startsWith("ap_feedback_"));
-            if (feedbackKeys.length > LIMITS.FALLBACK_FEEDBACK_SESSIONS) {
-              // Timestamp keys share the same length, so lexical sort == chronological
-              feedbackKeys.sort();
-              const excess = feedbackKeys.slice(0, feedbackKeys.length - LIMITS.FALLBACK_FEEDBACK_SESSIONS);
-              chrome.storage.local.remove(excess, () => resolve());
-            } else {
-              resolve();
-            }
-          });
+          if (typeof chrome.storage.local.getKeys === "function") {
+            chrome.storage.local.getKeys((keys) => pruneExcessKeys(keys));
+          } else {
+            chrome.storage.local.get(null, (all) => pruneExcessKeys(Object.keys(all || {})));
+          }
         });
       } else {
         resolve();

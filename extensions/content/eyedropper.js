@@ -203,6 +203,22 @@
     }
   }
 
+  function buildColorSample(r, g, b, sx = 0, sy = 0, fromFallback = false) {
+    return {
+      r,
+      g,
+      b,
+      hex: rgbToHex(r, g, b),
+      rgb: `rgb(${r}, ${g}, ${b})`,
+      rgba: rgbToRgba(r, g, b, 1),
+      hsl: rgbToHsl(r, g, b),
+      oklch: rgbToOklch(r, g, b),
+      sx,
+      sy,
+      fromFallback
+    };
+  }
+
   function sampleFallbackColor(clientX, clientY) {
     let color = "rgb(255, 255, 255)";
     try {
@@ -224,12 +240,7 @@
     const r = match ? parseInt(match[0], 10) : 255;
     const g = match ? parseInt(match[1], 10) : 255;
     const b = match ? parseInt(match[2], 10) : 255;
-    const hex = rgbToHex(r, g, b);
-    const rgb = `rgb(${r}, ${g}, ${b})`;
-    const rgba = rgbToRgba(r, g, b, 1);
-    const hsl = rgbToHsl(r, g, b);
-    const oklch = rgbToOklch(r, g, b);
-    return { r, g, b, hex, rgb, rgba, hsl, oklch, sx: 0, sy: 0, fromFallback: true };
+    return buildColorSample(r, g, b, 0, 0, true);
   }
 
   function samplePixelAt(clientX, clientY) {
@@ -238,15 +249,7 @@
       const sy = Math.max(0, Math.min(snapshotCanvas.height - 1, Math.round(clientY * snapshotScaleY)));
       try {
         const pixel = snapshotCtx.getImageData(sx, sy, 1, 1).data;
-        const r = pixel[0];
-        const g = pixel[1];
-        const b = pixel[2];
-        const hex = rgbToHex(r, g, b);
-        const rgb = `rgb(${r}, ${g}, ${b})`;
-        const rgba = rgbToRgba(r, g, b, 1);
-        const hsl = rgbToHsl(r, g, b);
-        const oklch = rgbToOklch(r, g, b);
-        return { r, g, b, hex, rgb, rgba, hsl, oklch, sx, sy, fromFallback: false };
+        return buildColorSample(pixel[0], pixel[1], pixel[2], sx, sy, false);
       } catch (_) {}
     }
     return sampleFallbackColor(clientX, clientY);
@@ -409,29 +412,31 @@
     }, SNAPSHOT_REFRESH_DEBOUNCE_MS);
   }
 
-  function selectAndFinish(sample) {
-    const finalSample = sample || currentSample || sampleFallbackColor(0, 0);
-
-    // Copy to clipboard
+  function emitPickedColor(sample) {
     try {
-      navigator.clipboard.writeText(finalSample.hex).catch(() => {});
+      navigator.clipboard.writeText(sample.hex).catch(() => {});
     } catch (_) {}
-
-    showToast(`🎨 Đã chọn màu: <b>${finalSample.hex}</b> (đã copy vào clipboard)`);
 
     chrome.runtime.sendMessage({
       type: "COLOR_PICKED",
       color: {
-        hex: finalSample.hex,
-        rgb: finalSample.rgb,
-        rgba: finalSample.rgba,
-        hsl: finalSample.hsl,
-        oklch: finalSample.oklch,
+        hex: sample.hex,
+        rgb: sample.rgb,
+        rgba: sample.rgba,
+        hsl: sample.hsl,
+        oklch: sample.oklch,
         timestamp: Date.now()
       }
     }).catch((err) => {
       console.debug("[AgentPilot Eyedropper] notify color picked error:", err);
     });
+  }
+
+  function selectAndFinish(sample) {
+    const finalSample = sample || currentSample || sampleFallbackColor(0, 0);
+
+    emitPickedColor(finalSample);
+    showToast(`🎨 Đã chọn màu: <b>${finalSample.hex}</b> (đã copy vào clipboard)`);
 
     chrome.runtime.sendMessage({
       type: "EYEDROPPER_STATUS_CHANGED",
@@ -491,24 +496,7 @@
     if (typeof x === "number" && typeof y === "number") {
       await refreshSnapshot();
       const sample = samplePixelAt(x, y);
-      try {
-        navigator.clipboard.writeText(sample.hex).catch(() => {});
-      } catch (_) {}
-
-      chrome.runtime.sendMessage({
-        type: "COLOR_PICKED",
-        color: {
-          hex: sample.hex,
-          rgb: sample.rgb,
-          rgba: sample.rgba,
-          hsl: sample.hsl,
-          oklch: sample.oklch,
-          timestamp: Date.now()
-        }
-      }).catch((err) => {
-        console.debug("[AgentPilot Eyedropper] notify color picked error:", err);
-      });
-
+      emitPickedColor(sample);
       return { hex: sample.hex, rgb: sample.rgb, rgba: sample.rgba, hsl: sample.hsl, oklch: sample.oklch };
     }
 

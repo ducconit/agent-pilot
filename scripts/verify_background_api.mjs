@@ -15,7 +15,16 @@ import { clampCdpDragSteps } from "../extensions/background/cdp-input.js";
 import { executeBatchActions } from "../extensions/background/batch-executor.js";
 import { BATCH_ACTION_HANDLERS } from "../extensions/background/batch-actions.js";
 import { AGENT_COMMAND_HANDLERS } from "../extensions/background/agent-handlers/index.js";
-import { DEFAULTS } from "../extensions/background/constants.js";
+import {
+  DEFAULTS,
+  attachedTabs,
+  devtoolsBuffers,
+  activeTracingSessions,
+  activeDialogs,
+  agentControlledTabs,
+  tabLockStates,
+  cleanupTabResources
+} from "../extensions/background/constants.js";
 import { transportMethods } from "../extensions/background/bridge-transport.js";
 
 const recorder = createRecorder({
@@ -169,6 +178,84 @@ record(
   "6. Outbound queue preserves frames across send failure",
   preservedAfterFailure && transportClient.outboundQueue.length === 0 && transportClient.sent.join(",") === "1,2",
   `preserved=${preservedAfterFailure}, sent=${transportClient.sent.join(",")}`
+);
+
+// 7. cleanupTabResources purges all per-tab Maps/Sets and clears pending unlockTimer
+const testTabId = 9999;
+attachedTabs.add(testTabId);
+devtoolsBuffers.set(testTabId, { console: [], network: new Map() });
+activeTracingSessions.set(testTabId, { buffer: [] });
+activeDialogs.set(testTabId, { type: "alert" });
+agentControlledTabs.add(testTabId);
+const dummyTimer = setTimeout(() => {}, 60000);
+tabLockStates.set(testTabId, { manualLock: true, autoCount: 1, unlockTimer: dummyTimer });
+cleanupTabResources(testTabId);
+const tabCleaned =
+  !attachedTabs.has(testTabId) &&
+  !devtoolsBuffers.has(testTabId) &&
+  !activeTracingSessions.has(testTabId) &&
+  !activeDialogs.has(testTabId) &&
+  !agentControlledTabs.has(testTabId) &&
+  !tabLockStates.has(testTabId);
+record(
+  "7. cleanupTabResources clears all per-tab Maps/Sets and timers",
+  tabCleaned,
+  `all 6 state stores cleared=${tabCleaned}`
+);
+
+// 8. reconcileDebuggerState resets its in-flight promise after completion
+let getTargetsCount = 0;
+globalThis.chrome = {
+  debugger: {
+    getTargets: (cb) => {
+      getTargetsCount++;
+      cb([]);
+    }
+  }
+};
+await cdpManager.reconcileDebuggerState();
+await cdpManager.reconcileDebuggerState();
+record(
+  "8. reconcileDebuggerState resets promise after completion",
+  getTargetsCount === 2,
+  `getTargets invocations=${getTargetsCount} (expected 2 across 2 sequential calls)`
+);
+
+// 9. evaluateInTab does not double-execute user script on MAIN world runtime error and unwraps undefined CDP results
+const { evaluateInTab } = await import("../extensions/background/agent-handlers/page-input.js");
+let cdpEvalCalled = 0;
+globalThis.chrome = {
+  scripting: {
+    executeScript: async () => [{ result: { __eval_err: true, message: "ReferenceError: foo is not defined" } }]
+  },
+  debugger: {
+    sendCommand: (_target, _method, _params, cb) => {
+      cdpEvalCalled++;
+      cb({ result: { type: "undefined" } });
+    }
+  }
+};
+let caughtEvalErr = null;
+try {
+  await evaluateInTab(101, "foo()");
+} catch (err) {
+  caughtEvalErr = err;
+}
+attachedTabs.add(102);
+globalThis.chrome = {
+  runtime: { lastError: null },
+  debugger: {
+    sendCommand: (_target, _method, _params, cb) => {
+      cb({ result: { type: "undefined" } });
+    }
+  }
+};
+const undefinedCdpResult = await evaluateInTab(102, "void 0");
+attachedTabs.delete(102);
+record(
+  "9. evaluateInTab avoids duplicate CDP execution on runtime error and unwraps undefined CDP result",
+  Boolean(caughtEvalErr) && cdpEvalCalled === 0 && undefinedCdpResult === undefined,
+  `caught=${caughtEvalErr?.message}, cdpEvalCalled=${cdpEvalCalled}, undefinedResult=${String(undefinedCdpResult)}`
 );
 
 recorder.summarize();

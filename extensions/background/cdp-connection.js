@@ -11,36 +11,24 @@
 
 import {
   attachedTabs,
-  devtoolsBuffers,
-  activeDialogs,
-  activeTracingSessions,
   CDP_PROTOCOL_VERSION,
   TIMEOUTS,
   logDebug,
-  getBuffer
+  getBuffer,
+  cleanupDebuggerState
 } from "./constants.js";
-
-/**
- * Drop every per-tab map entry we keep for a session. Called from the detach
- * success path (and only there) so no stale buffer/trace/dialog survives.
- */
-function cleanupDebuggerState(tabId) {
-  attachedTabs.delete(tabId);
-  devtoolsBuffers.delete(tabId);
-  activeTracingSessions.delete(tabId);
-  activeDialogs.delete(tabId);
-}
 
 /**
  * Best-effort enablement of the CDP domains the extension listens to.
  * Enables run in parallel and each failure is swallowed individually: some
  * domains/methods are unavailable on certain targets, and one failing enable
  * must not tear down the session we just attached.
+ * Note: `Console.enable` is intentionally omitted because `Runtime.enable`
+ * already emits `Runtime.consoleAPICalled` (enabling both duplicates every log).
  */
 async function enableCdpDomains(tabId) {
   try {
     await Promise.all([
-      sendCdpCommand(tabId, "Console.enable", {}, TIMEOUTS.CDP_DOMAIN_ENABLE_MS).catch((e) => logDebug("Console.enable", e)),
       sendCdpCommand(tabId, "Runtime.enable", {}, TIMEOUTS.CDP_DOMAIN_ENABLE_MS).catch((e) => logDebug("Runtime.enable", e)),
       sendCdpCommand(tabId, "Network.enable", {}, TIMEOUTS.CDP_DOMAIN_ENABLE_MS).catch((e) => logDebug("Network.enable", e)),
       sendCdpCommand(tabId, "Performance.enable", {}, TIMEOUTS.CDP_DOMAIN_ENABLE_MS).catch((e) => logDebug("Performance.enable", e)),
@@ -121,6 +109,8 @@ export async function reconcileDebuggerState() {
       }
     } catch (err) {
       logDebug("reconcileDebuggerState", err);
+    } finally {
+      reconcilePromise = null;
     }
   })();
   return reconcilePromise;

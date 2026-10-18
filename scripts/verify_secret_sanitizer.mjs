@@ -384,6 +384,15 @@ try {
     "Idempotent masking keeps the specific secret type marker"
   );
 
+  // 27. Image Data URLs (data:image/...) bypass regex scanning for performance and integrity
+  const fakeDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA_sk-proj-1234567890abcdef1234567890";
+  const dataUrlRes = maskString(fakeDataUrl);
+  record(
+    "27. Image Data URL Bypass (data:image/...)",
+    !dataUrlRes.masked && dataUrlRes.text === fakeDataUrl,
+    "Base64 screenshot payloads bypass regex scanning"
+  );
+
   recorder.summarize();
   recorder.exitIfFailed();
 

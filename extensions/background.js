@@ -5,29 +5,23 @@
 
 import {
   attachedTabs,
-  devtoolsBuffers,
-  agentControlledTabs,
   tabLockStates,
   normalizeUrl,
   getBuffer,
   DEFAULT_AGENT_PORT,
   BRIDGE,
   getSecretFilterEnabled,
-  setSecretFilterEnabled
+  setSecretFilterEnabled,
+  cleanupTabResources
 } from "./background/constants.js";
 
 import {
   attachDebugger,
   detachDebugger,
   sendCdpCommand,
+  dispatchCdpMouseClick,
   initCdpEventListeners
 } from "./background/cdp-manager.js";
-
-import {
-  getActiveTabId,
-  getTargetTabId,
-  ensureContentScript
-} from "./background/tab-manager.js";
 
 import { captureTabScreenshot } from "./background/screenshot-service.js";
 import { AgentBridgeClient } from "./background/bridge-client.js";
@@ -128,12 +122,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 // Clean up memory when tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
-  attachedTabs.delete(tabId);
-  devtoolsBuffers.delete(tabId);
-  agentControlledTabs.delete(tabId);
-  const state = tabLockStates.get(tabId);
-  if (state && state.unlockTimer) clearTimeout(state.unlockTimer);
-  tabLockStates.delete(tabId);
+  cleanupTabResources(tabId);
   if (agentBridge && agentBridge.lastAgentTabId === tabId) {
     agentBridge.lastAgentTabId = null;
   }
@@ -196,18 +185,22 @@ if (chrome.alarms) {
 }
 
 /**
- * Main Message Router for Sidepanel, Popup, Content Script
+ * Promisified chrome.tabs callback wrapper for background action handlers.
  */
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  const { action, type } = request;
+function runChromeTabOp(executor) {
+  return new Promise((resolve) => {
+    executor((res) => {
+      if (chrome.runtime.lastError) {
+        resolve({ success: false, error: chrome.runtime.lastError.message });
+      } else {
+        resolve(res);
+      }
+    });
+  });
+}
 
-  if (type === "REGION_CROP_REQUESTED" || type === "ELEMENT_SNAP_REQUESTED") {
-    broadcastToExtension(request);
-    sendResponse({ success: true });
-    return true;
-  }
-
-  if (action === "agent_emergency_unlocked") {
+const BACKGROUND_ACTION_HANDLERS = {
+  agent_emergency_unlocked: (_request, sender) => {
     const tabId = sender?.tab?.id;
     if (tabId && tabLockStates.has(tabId)) {
       const state = tabLockStates.get(tabId);
@@ -226,270 +219,179 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       details: `Người dùng đã chiếm quyền điều khiển trên Tab ${tabId || ""}`,
       timestamp: Date.now()
     });
-    sendResponse({ success: true });
-    return true;
-  }
+    return { success: true };
+  },
 
   // 1. Tab Operations
-  if (action === "list_tabs") {
-    chrome.tabs.query({}, (tabs) => sendResponse({ tabs }));
-    return true;
-  }
+  list_tabs: () => runChromeTabOp((done) => chrome.tabs.query({}, (tabs) => done({ tabs: tabs || [] }))),
 
-  if (action === "get_active_tab") {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      sendResponse({ tab: tabs[0] || null });
-    });
-    return true;
-  }
+  get_active_tab: () => runChromeTabOp((done) => chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    done({ tab: tabs?.[0] || null });
+  })),
 
-  if (action === "new_tab") {
+  new_tab: (request) => {
     const url = normalizeUrl(request.url || "https://google.com");
-    chrome.tabs.create({ url }, (tab) => {
-      if (chrome.runtime.lastError) {
-        sendResponse({ success: false, error: chrome.runtime.lastError.message });
-      } else {
-        sendResponse({ success: true, tab });
-      }
-    });
-    return true;
-  }
+    return runChromeTabOp((done) => chrome.tabs.create({ url }, (tab) => done({ success: true, tab })));
+  },
 
-  if (action === "navigate") {
-    const tabId = request.tabId;
+  navigate: (request) => {
     const url = normalizeUrl(request.url || "");
-    chrome.tabs.update(tabId, { url }, (tab) => {
-      if (chrome.runtime.lastError) {
-        sendResponse({ success: false, error: chrome.runtime.lastError.message });
-      } else {
-        sendResponse({ success: true, tab });
-      }
-    });
-    return true;
-  }
+    return runChromeTabOp((done) => chrome.tabs.update(request.tabId, { url }, (tab) => done({ success: true, tab })));
+  },
 
-  if (action === "reload_tab") {
-    chrome.tabs.reload(request.tabId, () => {
-      if (chrome.runtime.lastError) {
-        sendResponse({ success: false, error: chrome.runtime.lastError.message });
-      } else {
-        sendResponse({ success: true });
-      }
-    });
-    return true;
-  }
+  reload_tab: (request) => runChromeTabOp((done) => chrome.tabs.reload(request.tabId, () => done({ success: true }))),
 
-  if (action === "close_tab") {
-    chrome.tabs.remove(request.tabId, () => {
-      if (chrome.runtime.lastError) {
-        sendResponse({ success: false, error: chrome.runtime.lastError.message });
-      } else {
-        sendResponse({ success: true });
-      }
-    });
-    return true;
-  }
+  close_tab: (request) => runChromeTabOp((done) => chrome.tabs.remove(request.tabId, () => done({ success: true }))),
 
   // 2. Debugger & CDP Operations
-  if (action === "attach_debugger") {
-    attachDebugger(request.tabId, broadcastToExtension).then(sendResponse);
-    return true;
-  }
+  attach_debugger: (request) => attachDebugger(request.tabId, broadcastToExtension),
 
-  if (action === "detach_debugger") {
-    detachDebugger(request.tabId, broadcastToExtension).then(sendResponse);
-    return true;
-  }
+  detach_debugger: (request) => detachDebugger(request.tabId, broadcastToExtension),
 
-  if (action === "get_debugger_status") {
-    sendResponse({ attached: attachedTabs.has(request.tabId) });
-    return true;
-  }
+  get_debugger_status: (request) => ({ attached: attachedTabs.has(request.tabId) }),
 
-  if (action === "get_devtools_data") {
+  get_devtools_data: (request) => {
     const buffer = getBuffer(request.tabId);
-    sendResponse({
+    return {
       console: buffer.console,
       network: Array.from(buffer.network.values()).slice(-100),
       attached: attachedTabs.has(request.tabId)
-    });
-    return true;
-  }
+    };
+  },
 
-  if (action === "clear_console") {
+  clear_console: (request) => {
     const buffer = getBuffer(request.tabId);
     buffer.console = [];
-    sendResponse({ success: true });
-    return true;
-  }
+    return { success: true };
+  },
 
-  if (action === "clear_network") {
+  clear_network: (request) => {
     const buffer = getBuffer(request.tabId);
     buffer.network.clear();
-    sendResponse({ success: true });
-    return true;
-  }
+    return { success: true };
+  },
 
-  if (action === "get_performance_metrics") {
+  get_performance_metrics: async (request) => {
     const tabId = request.tabId;
     if (!attachedTabs.has(tabId)) {
-      sendResponse({ success: false, error: "Debugger not attached" });
-      return true;
+      return { success: false, error: "Debugger not attached" };
     }
-    sendCdpCommand(tabId, "Performance.getMetrics")
-      .then((res) => {
-        const metricsMap = {};
-        (res.metrics || []).forEach((m) => {
-          metricsMap[m.name] = m.value;
-        });
-        sendResponse({ success: true, metrics: metricsMap });
-      })
-      .catch((err) => sendResponse({ success: false, error: err.message }));
-    return true;
-  }
+    const res = await sendCdpCommand(tabId, "Performance.getMetrics");
+    const metricsMap = {};
+    (res.metrics || []).forEach((m) => {
+      metricsMap[m.name] = m.value;
+    });
+    return { success: true, metrics: metricsMap };
+  },
 
   // 3. Screenshot Capture Operations
-  if (action === "capture_screenshot") {
-    (async () => {
-      try {
-        const targetTabId = request.tabId || sender.tab?.id || (agentBridge ? await agentBridge.getTargetTabId() : null);
-        if (!targetTabId) return sendResponse({ success: false, error: "No target tab found" });
-        const res = await captureTabScreenshot(targetTabId, request);
-        sendResponse(res);
-      } catch (err) {
-        sendResponse({ success: false, error: err?.message || String(err) });
-      }
-    })();
-    return true;
-  }
+  capture_screenshot: async (request, sender) => {
+    const targetTabId = request.tabId || sender.tab?.id || (agentBridge ? await agentBridge.getTargetTabId() : null);
+    if (!targetTabId) return { success: false, error: "No target tab found" };
+    return await captureTabScreenshot(targetTabId, request);
+  },
 
   // 4. Input Emulation via CDP
-  if (action === "cdp_mouse_click") {
+  cdp_mouse_click: async (request) => {
     const { tabId, x, y, button = "left" } = request;
     if (!attachedTabs.has(tabId)) {
-      sendResponse({ success: false, error: "CDP not attached" });
-      return true;
+      return { success: false, error: "CDP not attached" };
     }
-
-    (async () => {
-      try {
-        await sendCdpCommand(tabId, "Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-        await sendCdpCommand(tabId, "Input.dispatchMouseEvent", { type: "mousePressed", x, y, button, clickCount: 1 });
-        await sendCdpCommand(tabId, "Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button, clickCount: 1 });
-        sendResponse({ success: true });
-      } catch (err) {
-        sendResponse({ success: false, error: err.message });
-      }
-    })();
-    return true;
-  }
+    await dispatchCdpMouseClick(tabId, x, y, { button, clickCount: 1 });
+    return { success: true };
+  },
 
   // 5. Open Side Panel Programmatically
-  if (action === "open_sidepanel") {
-    if (chrome.sidePanel && chrome.sidePanel.open) {
-      chrome.sidePanel.open({ tabId: request.tabId }).then(() => {
-        sendResponse({ success: true });
-      }).catch((err) => sendResponse({ success: false, error: err.message }));
-    } else {
-      sendResponse({ success: false, error: "Side Panel API not supported" });
+  open_sidepanel: async (request) => {
+    if (!chrome.sidePanel || !chrome.sidePanel.open) {
+      return { success: false, error: "Side Panel API not supported" };
     }
-    return true;
-  }
+    await chrome.sidePanel.open({ tabId: request.tabId });
+    return { success: true };
+  },
 
   // 6. AI Agent Bridge Status & Settings
-  if (action === "get_agent_bridge_status") {
-    sendResponse(agentBridge ? agentBridge.getStatus() : { connected: false, port: DEFAULT_AGENT_PORT, enabled: true });
-    return true;
-  }
+  get_agent_bridge_status: () => (agentBridge ? agentBridge.getStatus() : { connected: false, port: DEFAULT_AGENT_PORT, enabled: true }),
 
-  if (action === "set_agent_bridge_port") {
+  set_agent_bridge_port: (request) => {
     if (agentBridge) agentBridge.setPort(request.port);
-    sendResponse({ success: true });
-    return true;
-  }
+    return { success: true };
+  },
 
-  if (action === "set_agent_bridge_api_key") {
+  set_agent_bridge_api_key: (request) => {
     if (agentBridge) agentBridge.setApiKey(request.apiKey);
-    sendResponse({ success: true, authConfigured: Boolean(request.apiKey && String(request.apiKey).trim()) });
-    return true;
-  }
+    return { success: true, authConfigured: Boolean(request.apiKey && String(request.apiKey).trim()) };
+  },
 
-  if (action === "reconnect_agent_bridge") {
+  reconnect_agent_bridge: () => {
     if (agentBridge) agentBridge.reconnect();
-    sendResponse({ success: true });
-    return true;
-  }
+    return { success: true };
+  },
 
-  if (action === "toggle_agent_bridge") {
+  toggle_agent_bridge: (request) => {
     if (agentBridge) agentBridge.setEnabled(request.enabled);
-    sendResponse({ success: true });
-    return true;
-  }
+    return { success: true };
+  },
 
-  if (action === "ensure_content_script") {
-    (async () => {
-      const targetId = request.tabId || (agentBridge ? await agentBridge.getActiveTabId() : null);
-      if (!targetId) {
-        return sendResponse({ success: false, error: "Không tìm thấy tab mục tiêu" });
-      }
-      const ok = agentBridge ? await agentBridge.ensureContentScript(targetId) : false;
-      sendResponse({ success: ok });
-    })();
-    return true;
-  }
+  ensure_content_script: async (request) => {
+    const targetId = request.tabId || (agentBridge ? await agentBridge.getActiveTabId() : null);
+    if (!targetId) {
+      return { success: false, error: "Không tìm thấy tab mục tiêu" };
+    }
+    const ok = agentBridge ? await agentBridge.ensureContentScript(targetId) : false;
+    return { success: ok };
+  },
 
   // 7. Secret Filter Status & Settings
-  if (action === "get_secret_filter_status") {
-    sendResponse({ enabled: getSecretFilterEnabled() });
-    return true;
-  }
+  get_secret_filter_status: () => ({ enabled: getSecretFilterEnabled() }),
 
-  if (action === "set_secret_filter_status") {
+  set_secret_filter_status: (request) => {
     setSecretFilterEnabled(request.enabled);
     broadcastToExtension({
       type: "SECRET_FILTER_STATUS_CHANGED",
       enabled: getSecretFilterEnabled()
     });
-    sendResponse({ success: true, enabled: getSecretFilterEnabled() });
-    return true;
-  }
+    return { success: true, enabled: getSecretFilterEnabled() };
+  },
 
   // 8. Visual Feedback Actions (Channel B & A)
-  if (action === "save_feedback_inbox") {
+  save_feedback_inbox: async (request, sender) => {
     const check = validateFeedbackRequest(sender, request.payload);
-    if (!check.ok) {
-      sendResponse({ success: false, error: check.error });
-      return true;
-    }
-    (async () => {
-      try {
-        const res = await agentBridge.saveFeedbackInbox(check.payload);
-        sendResponse(res);
-      } catch (err) {
-        sendResponse({ success: false, error: err.message });
-      }
-    })();
+    if (!check.ok) return { success: false, error: check.error };
+    return await agentBridge.saveFeedbackInbox(check.payload);
+  },
+
+  push_feedback_live: async (request, sender) => {
+    const check = validateFeedbackRequest(sender, request.payload);
+    if (!check.ok) return { success: false, error: check.error };
+    return await agentBridge.pushFeedbackLive(check.payload);
+  }
+};
+
+/**
+ * Main Message Router for Sidepanel, Popup, Content Script
+ */
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  const { action, type } = request || {};
+
+  if (type === "REGION_CROP_REQUESTED" || type === "ELEMENT_SNAP_REQUESTED") {
+    broadcastToExtension(request);
+    sendResponse({ success: true });
     return true;
   }
 
-  if (action === "push_feedback_live") {
-    const check = validateFeedbackRequest(sender, request.payload);
-    if (!check.ok) {
-      sendResponse({ success: false, error: check.error });
-      return true;
-    }
-    (async () => {
-      try {
-        const res = await agentBridge.pushFeedbackLive(check.payload);
-        sendResponse(res);
-      } catch (err) {
-        sendResponse({ success: false, error: err.message });
-      }
-    })();
+  const handler = action && BACKGROUND_ACTION_HANDLERS[action];
+  if (!handler) {
+    sendResponse({ success: false, error: `Unknown action: ${action || type || "unnamed"}` });
     return true;
   }
 
-  sendResponse({ success: false, error: `Unknown action: ${action || type || "unnamed"}` });
+  Promise.resolve()
+    .then(() => handler(request, sender))
+    .then(sendResponse)
+    .catch((err) => {
+      sendResponse({ success: false, error: err?.message || String(err) });
+    });
   return true;
 });
 
