@@ -16,13 +16,24 @@ import { attachDebugger } from "./cdp-manager.js";
 import {
   getActiveTabId,
   getTargetTabId,
-  assignTabToAgentGroup
+  assignTabToAgentGroup,
+  waitForTabComplete,
+  navigateTabAndWait
 } from "./tab-manager.js";
 import { getPositiveNumber } from "./batch-validation.js";
 
 export const navigationHandlers = { open: openAction, navigate: navigateAction, close: closeAction };
 
-
+async function resolveBatchTargetTab(bridgeClient, requestedTabId, agentId, options = {}) {
+  if (bridgeClient && typeof bridgeClient.getTargetTabId === "function") {
+    return await bridgeClient.getTargetTabId(requestedTabId, agentId, options);
+  }
+  return await getTargetTabId(requestedTabId, bridgeClient?.lastAgentTabId, {
+    tabOwners: bridgeClient?.tabOwners,
+    agentId,
+    ...options
+  });
+}
 
 /**
  * open / open_tab / tabs.create — create a tab (optionally background), attach
@@ -65,32 +76,7 @@ async function openAction(ctx, act) {
   // Wait for tab load completion if requested (default true)
   if (act.waitUntil !== false) {
     const loadTimeout = getPositiveNumber(act.loadTimeout, act.timeoutMs, act.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
-    await new Promise((resolve) => {
-      let done = false;
-      const finish = () => {
-        if (!done) {
-          done = true;
-          clearTimeout(timeout);
-          chrome.tabs.onUpdated.removeListener(onUpdated);
-          resolve();
-        }
-      };
-
-      const timeout = setTimeout(finish, loadTimeout);
-
-      const onUpdated = (tId, changeInfo) => {
-        if (tId === tab.id && changeInfo.status === "complete") {
-          finish();
-        }
-      };
-      chrome.tabs.onUpdated.addListener(onUpdated);
-
-      chrome.tabs.get(tab.id, (cur) => {
-        if (!chrome.runtime.lastError && cur && cur.status === "complete") {
-          finish();
-        }
-      });
-    });
+    await waitForTabComplete(tab.id, loadTimeout);
   }
 
   ctx.stepResult.success = true;
@@ -106,45 +92,14 @@ async function navigateAction(ctx, act) {
   const { bridgeClient } = ctx;
   const agentId = act.agentId || ctx.params?.agentId || null;
   const targetTabId = act.tabId
-    ? (bridgeClient && typeof bridgeClient.getTargetTabId === "function"
-        ? await bridgeClient.getTargetTabId(act.tabId, agentId)
-        : await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId, { tabOwners: bridgeClient?.tabOwners, agentId }))
+    ? await resolveBatchTargetTab(bridgeClient, act.tabId, agentId)
     : ctx.currentTabId;
   if (!targetTabId) throw new Error("No active tab for navigate");
   const url = normalizeUrl(act.url);
 
   if (act.waitUntil !== false) {
     const loadTimeout = getPositiveNumber(act.loadTimeout, act.timeoutMs, act.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
-    await new Promise((resolve, reject) => {
-      let resolved = false;
-      const done = () => {
-        if (resolved) return;
-        resolved = true;
-        clearTimeout(timeout);
-        chrome.tabs.onUpdated.removeListener(onUpdated);
-        resolve();
-      };
-
-      const timeout = setTimeout(done, loadTimeout);
-
-      const onUpdated = (tId, changeInfo) => {
-        if (tId === targetTabId && changeInfo.status === "complete") {
-          done();
-        }
-      };
-      chrome.tabs.onUpdated.addListener(onUpdated);
-
-      chrome.tabs.update(targetTabId, { url }, (t) => {
-        if (chrome.runtime.lastError) {
-          clearTimeout(timeout);
-          chrome.tabs.onUpdated.removeListener(onUpdated);
-          return reject(new Error(chrome.runtime.lastError.message));
-        }
-        if (t && t.status === "complete") {
-          done();
-        }
-      });
-    });
+    await navigateTabAndWait(targetTabId, url, loadTimeout);
   } else {
     await new Promise((resolve, reject) => {
       chrome.tabs.update(targetTabId, { url }, (t) => {
@@ -166,11 +121,15 @@ async function navigateAction(ctx, act) {
 async function closeAction(ctx, act) {
   const { bridgeClient } = ctx;
   const agentId = act.agentId || ctx.params?.agentId || null;
-  const targetTabId = act.tabId
-    ? (bridgeClient && typeof bridgeClient.getTargetTabId === "function"
-        ? await bridgeClient.getTargetTabId(act.tabId, agentId)
-        : await getTargetTabId(act.tabId, bridgeClient?.lastAgentTabId, { tabOwners: bridgeClient?.tabOwners, agentId }))
-    : ctx.currentTabId;
+  const hasExplicitTab = act.tabId !== undefined && act.tabId !== null && act.tabId !== "";
+  let targetTabId;
+  if (hasExplicitTab || agentId) {
+    targetTabId = await resolveBatchTargetTab(bridgeClient, act.tabId, agentId, {
+      allowFallback: hasExplicitTab || !agentId
+    });
+  } else {
+    targetTabId = ctx.currentTabId;
+  }
   if (!targetTabId) throw new Error("No active tab to close");
   await new Promise((resolve, reject) => {
     chrome.tabs.remove(targetTabId, () => {

@@ -15,6 +15,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ducconit/agent-pilot-extension/cli/config"
@@ -30,13 +31,14 @@ type FeedbackWaiter struct {
 var (
 	waitersLock    sync.Mutex
 	pendingWaiters []*FeedbackWaiter
+	waiterSeq      atomic.Uint64
 )
 
 func WaitForFeedbackWithContext(ctx context.Context, timeoutSec int, tabID interface{}) map[string]interface{} {
 	if timeoutSec <= 0 {
 		timeoutSec = config.DefaultFeedbackTimeoutSec
 	}
-	waiterID := fmt.Sprintf("wait_%d", time.Now().UnixNano())
+	waiterID := fmt.Sprintf("wait_%d_%d", time.Now().UnixNano(), waiterSeq.Add(1))
 	ch := make(chan map[string]interface{}, 1)
 
 	timer := time.NewTimer(time.Duration(timeoutSec) * time.Second)

@@ -62,27 +62,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   };
 
+  function sendTabActionWithEnsure(tabId, message) {
+    chrome.tabs.sendMessage(tabId, message, () => {
+      if (chrome.runtime.lastError) {
+        chrome.runtime.sendMessage({ action: "ensure_content_script", tabId }, (injected) => {
+          if (!chrome.runtime.lastError && injected && injected.success) {
+            chrome.tabs.sendMessage(tabId, message, () => window.close());
+          } else {
+            console.warn("[AgentPilot Popup] tab action error:", message.action);
+            window.close();
+          }
+        });
+        return;
+      }
+      window.close();
+    });
+  }
+
   btnQuickInspect.onclick = () => {
     if (activeTab && activeTab.id) {
-      chrome.tabs.sendMessage(activeTab.id, { action: "toggle_inspector", enabled: true }, () => {
-        if (chrome.runtime.lastError) {
-          console.warn("[AgentPilot Popup] toggle_inspector error:", chrome.runtime.lastError.message);
-          return;
-        }
-        window.close();
-      });
+      sendTabActionWithEnsure(activeTab.id, { action: "toggle_inspector", enabled: true });
     }
   };
 
   btnQuickColor.onclick = () => {
     if (activeTab && activeTab.id) {
-      chrome.tabs.sendMessage(activeTab.id, { action: "pick_color" }, () => {
-        if (chrome.runtime.lastError) {
-          console.warn("[AgentPilot Popup] pick_color error:", chrome.runtime.lastError.message);
-          return;
-        }
-        window.close();
-      });
+      sendTabActionWithEnsure(activeTab.id, { action: "pick_color" });
     }
   };
 

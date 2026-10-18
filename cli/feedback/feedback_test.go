@@ -2,6 +2,7 @@ package feedback
 
 import (
 	"context"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
@@ -280,5 +281,61 @@ func TestSaveFeedbackSessionStripsInlineBase64AndSavesDiagnostics(t *testing.T) 
 	}
 	if !strings.Contains(promptMD, "item_1.png") {
 		t.Fatalf("expected promptMd to reference item_1.png, got: %s", promptMD)
+	}
+}
+
+func TestSaveFeedbackSessionWebPAndFallbackDiagnostics(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "ap_test_feedback_webp_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	_ = os.Setenv("AGENT_PILOT_HOME", tempDir)
+	defer os.Unsetenv("AGENT_PILOT_HOME")
+
+	// Minimal valid WebP RIFF header ("RIFF" + 4 bytes size + "WEBP" + "VP8 ")
+	webpHeader := []byte{'R', 'I', 'F', 'F', 0x08, 0x00, 0x00, 0x00, 'W', 'E', 'B', 'P', 'V', 'P', '8', ' '}
+	sampleWebpDataURL := "data:image/webp;base64," + base64.StdEncoding.EncodeToString(webpHeader)
+
+	payload := map[string]interface{}{
+		"timestamp": "1789234570000",
+		"url":       "http://localhost:3000/cart",
+		"title":     "Cart Page",
+		"diagnostics": map[string]interface{}{
+			"reproSteps": []interface{}{
+				map[string]interface{}{"description": "Click <button> \"Checkout\""},
+			},
+			"consoleErrors": []interface{}{
+				map[string]interface{}{"type": "error", "message": "TypeError: cart is null"},
+			},
+			"networkErrors": []interface{}{
+				map[string]interface{}{"method": "POST", "url": "/api/cart", "status": 500},
+			},
+		},
+		"items": []interface{}{
+			map[string]interface{}{
+				"id":                "item_1",
+				"mode":              "element",
+				"title":             "Cart Icon",
+				"screenshotDataUrl": sampleWebpDataURL,
+			},
+		},
+	}
+
+	saveRes, err := SaveFeedbackSession(payload)
+	if err != nil {
+		t.Fatalf("SaveFeedbackSession failed: %v", err)
+	}
+	if _, hasErr := saveRes["imageErrors"]; hasErr {
+		t.Fatalf("expected WebP image to be accepted without imageErrors, got: %v", saveRes["imageErrors"])
+	}
+
+	promptMD, _ := saveRes["promptMd"].(string)
+	if !strings.Contains(promptMD, "item_1.webp") {
+		t.Fatalf("expected fallback promptMd to reference item_1.webp, got: %s", promptMD)
+	}
+	if !strings.Contains(promptMD, "Steps to Reproduce") || !strings.Contains(promptMD, "TypeError: cart is null") || !strings.Contains(promptMD, "POST /api/cart") {
+		t.Fatalf("expected fallback promptMd to include diagnostics sections, got: %s", promptMD)
 	}
 }

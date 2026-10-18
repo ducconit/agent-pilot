@@ -9,10 +9,15 @@
  *  - Export to Agent Pilot Batch JSON and Playwright (.spec.ts) test scripts
  */
 
-import { DEFAULT_LOAD_TIMEOUT_MS, normalizeUrl } from "./constants.js";
-import { ensureContentScript, markTabAsAgentControlled, sendTabMessageWithRetry } from "./tab-manager.js";
+import { normalizeUrl } from "./constants.js";
+import {
+  markTabAsAgentControlled,
+  sendTabMessageWithRetry,
+  waitForTabComplete,
+  navigateTabAndWait
+} from "./tab-manager.js";
 
-const MAX_PASSIVE_STEPS = 100;
+const MAX_PASSIVE_STEPS = 20;
 const MAX_ACTIVE_STEPS = 100;
 const STEP_DEDUPE_WINDOW_MS = 800;
 
@@ -26,7 +31,8 @@ export const tabFlowSessions = new Map();
  */
 const lastRecordedFlow = {
   steps: [],
-  lastUrl: ""
+  lastUrl: "",
+  fromActiveRecording: false
 };
 
 let broadcastFn = null;
@@ -38,15 +44,22 @@ export function initFlowRecorder(broadcastCallback) {
 function syncLastRecordedSnapshot(session) {
   if (!session) return;
   if (Array.isArray(session.steps) && session.steps.length > 0) {
+    // Do not let passive breadcrumb steps from an unrelated tab overwrite an active recording snapshot
+    if (lastRecordedFlow.fromActiveRecording && !session.recording) {
+      return;
+    }
     lastRecordedFlow.steps = session.steps.map((s) => ({ ...s }));
     lastRecordedFlow.lastUrl = session.lastUrl || session.steps.find((s) => s.url)?.url || lastRecordedFlow.lastUrl || "";
+    if (session.recording) {
+      lastRecordedFlow.fromActiveRecording = true;
+    }
   }
 }
 
 function notifyFlowUpdate(tabId, extra = {}) {
-  if (!broadcastFn) return;
   const session = tabId ? getOrCreateFlowSession(tabId) : { recording: false, replaying: false, steps: lastRecordedFlow.steps };
   syncLastRecordedSnapshot(session);
+  if (!broadcastFn) return;
   broadcastFn({
     type: "FLOW_RECORDER_UPDATED",
     tabId,
@@ -422,6 +435,7 @@ export function deleteFlowStep(tabId, stepId) {
 export function clearFlowSteps(tabId) {
   lastRecordedFlow.steps = [];
   lastRecordedFlow.lastUrl = "";
+  lastRecordedFlow.fromActiveRecording = false;
   if (!tabId) {
     return { success: true, recording: false, steps: [] };
   }
@@ -541,74 +555,6 @@ export function exportFlowAsPlaywright(tabId, fallbackUrl = "", fallbackSteps = 
   return lines.join("\n");
 }
 
-function navigateAndWaitForComplete(tabId, targetUrl, timeoutMs = DEFAULT_LOAD_TIMEOUT_MS) {
-  return new Promise((resolve, reject) => {
-    let finished = false;
-    let sawLoading = false;
-    const done = (err = null) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      if (chrome.tabs?.onUpdated) {
-        chrome.tabs.onUpdated.removeListener(onUpdated);
-      }
-      if (err) reject(err);
-      else resolve();
-    };
-    const timer = setTimeout(() => done(), timeoutMs);
-    const onUpdated = (tId, changeInfo, tab) => {
-      if (tId !== tabId) return;
-      if (changeInfo.status === "loading") {
-        sawLoading = true;
-      }
-      if (changeInfo.status === "complete" && (sawLoading || !tab?.url || normalizeUrl(tab.url) === normalizeUrl(targetUrl))) {
-        done();
-      }
-    };
-    if (chrome.tabs?.onUpdated) {
-      chrome.tabs.onUpdated.addListener(onUpdated);
-    }
-    chrome.tabs.update(tabId, { url: targetUrl }, () => {
-      if (chrome.runtime.lastError) {
-        done(new Error(chrome.runtime.lastError.message));
-      }
-    });
-  });
-}
-
-function waitForTabComplete(tabId, timeoutMs = DEFAULT_LOAD_TIMEOUT_MS) {
-  return new Promise((resolve) => {
-    let finished = false;
-    const done = () => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      if (chrome.tabs?.onUpdated) {
-        chrome.tabs.onUpdated.removeListener(onUpdated);
-      }
-      resolve();
-    };
-    const timer = setTimeout(done, timeoutMs);
-    const onUpdated = (tId, changeInfo) => {
-      if (tId === tabId && changeInfo.status === "complete") {
-        done();
-      }
-    };
-    if (chrome.tabs?.onUpdated) {
-      chrome.tabs.onUpdated.addListener(onUpdated);
-    }
-    if (chrome.tabs?.get) {
-      chrome.tabs.get(tabId, (tab) => {
-        if (!chrome.runtime.lastError && tab && tab.status === "complete") {
-          done();
-        }
-      });
-    } else {
-      done();
-    }
-  });
-}
-
 function delay(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -621,7 +567,6 @@ async function sendStepMessageWithAutoWait(tabId, payload, maxWaitMs = 4500) {
   const start = Date.now();
   let lastRes = null;
   while (Date.now() - start < maxWaitMs) {
-    await ensureContentScript(tabId);
     lastRes = await sendTabMessageWithRetry(tabId, payload);
     if (lastRes && lastRes.success) {
       return lastRes;
@@ -727,7 +672,7 @@ export async function replayRecordedFlow(tabId, fallbackSteps = null) {
 
         // Skip redundant SPA query-token or link-triggered navigations if the page already reached targetUrl
         if (!alreadyLoadedOnNewTab && (!sameCanonical || (i === 0 && !createdNewTab && currentUrl !== targetUrl))) {
-          await navigateAndWaitForComplete(activeTabId, targetUrl, 12000);
+          await navigateTabAndWait(activeTabId, targetUrl, 12000, { requireNewLoad: true });
           await delay(350);
         } else {
           await delay(250);
@@ -767,11 +712,6 @@ export async function replayRecordedFlow(tabId, fallbackSteps = null) {
           3500
         );
         if (!res || !res.success) {
-          // If there are remaining steps and this was an obfuscated intermediate click, continue gracefully
-          if (i < steps.length - 1) {
-            executed++;
-            continue;
-          }
           throw new Error(res?.error || `Không tìm thấy phần tử để click: ${step.selector}`);
         }
         executed++;
@@ -783,18 +723,6 @@ export async function replayRecordedFlow(tabId, fallbackSteps = null) {
           continue;
         }
 
-        // Check if this `type` step should auto-press Enter (e.g. when consecutive `type` steps target the same chat/search box without an explicit press_key step)
-        const nextInteractive = steps.slice(i + 1).find((s) => s.action !== "navigate");
-        const isSearchOrChatBox =
-          step.tagName === "textarea" ||
-          /ask anything|search|tìm kiếm|name="q"/i.test( `${step.selector || ""} ${step.label || ""}`);
-        const autoPressEnter =
-          step.action === "type" &&
-          (!nextInteractive ||
-            (nextInteractive.action === "type" && nextInteractive.selector === step.selector)) &&
-          isSearchOrChatBox &&
-          steps[i + 1]?.action !== "press_key";
-
         const res = await sendStepMessageWithAutoWait(
           activeTabId,
           {
@@ -802,7 +730,7 @@ export async function replayRecordedFlow(tabId, fallbackSteps = null) {
             selector: step.selector,
             text: textVal,
             clear: true,
-            pressEnter: autoPressEnter,
+            pressEnter: false,
             fallbackHints
           },
           4500
@@ -811,7 +739,7 @@ export async function replayRecordedFlow(tabId, fallbackSteps = null) {
           throw new Error(res?.error || `Không thể nhập dữ liệu vào: ${step.selector}`);
         }
         executed++;
-        await delay(autoPressEnter ? 1200 : 300);
+        await delay(300);
       } else if (step.action === "press_key") {
         const res = await sendStepMessageWithAutoWait(
           activeTabId,

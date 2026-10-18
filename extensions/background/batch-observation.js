@@ -15,7 +15,6 @@ import {
 import { attachDebugger, sendCdpCommand } from "./cdp-manager.js";
 import {
   getTargetTabId,
-  ensureContentScript,
   sendTabMessageWithRetry
 } from "./tab-manager.js";
 import { captureTabScreenshot } from "./screenshot-service.js";
@@ -51,7 +50,6 @@ async function resolveStepTabId(ctx, act) {
 async function waitForSelectorAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for wait_for_selector");
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "wait_for_selector",
     selector: act.selector,
@@ -67,7 +65,6 @@ async function waitForSelectorAction(ctx, act) {
 async function waitForAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for wait_for");
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "wait_for",
     selector: act.selector,
@@ -116,7 +113,6 @@ async function screenshotAction(ctx, act) {
 async function snapshotAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for snapshot");
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "get_snapshot",
     maxElements: act.maxElements || LIMITS.SNAPSHOT_MAX_ELEMENTS_DEFAULT,
@@ -130,7 +126,6 @@ async function snapshotAction(ctx, act) {
 async function getElementAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for get_element");
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "get_element_info",
     selector: act.selector,

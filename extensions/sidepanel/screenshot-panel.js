@@ -3,7 +3,7 @@
  * Manages full viewport capture, element capture, region crop via Canvas, download and copy
  */
 
-import { showToast } from "./ui-helpers.js";
+import { showToast, sendTabMessageWithEnsure } from "./ui-helpers.js";
 
 export class ScreenshotPanel {
   constructor(options = {}) {
@@ -53,19 +53,11 @@ export class ScreenshotPanel {
       this.btnCaptureRegion.onclick = async () => {
         const activeTabId = this.getActiveTabId();
         if (!activeTabId) return;
-        try {
-          await chrome.tabs.sendMessage(activeTabId, { action: "start_region_crop" });
+        const res = await sendTabMessageWithEnsure(activeTabId, { action: "start_region_crop" }, {
+          failMessage: "Vui lòng làm mới (F5) trang web trước khi chụp!"
+        });
+        if (res) {
           showToast("Kéo chuột trên trang để chọn vùng cần chụp.");
-        } catch (_) {
-          try {
-            const injected = await chrome.runtime.sendMessage({ action: "ensure_content_script", tabId: activeTabId });
-            if (injected && injected.success) {
-              await chrome.tabs.sendMessage(activeTabId, { action: "start_region_crop" });
-              showToast("Kéo chuột trên trang để chọn vùng cần chụp.");
-              return;
-            }
-          } catch (_) {}
-          showToast("Vui lòng làm mới (F5) trang web trước khi chụp!");
         }
       };
     }
@@ -77,19 +69,11 @@ export class ScreenshotPanel {
           showToast("Không tìm thấy tab hoạt động.");
           return;
         }
-        try {
-          await chrome.tabs.sendMessage(activeTabId, { action: "start_element_snap" });
+        const res = await sendTabMessageWithEnsure(activeTabId, { action: "start_element_snap" }, {
+          failMessage: "Vui lòng làm mới (F5) trang web trước khi chụp!"
+        });
+        if (res) {
           showToast("📸 Di chuột và click chọn phần tử trên trang web để chụp • Esc để hủy");
-        } catch (_) {
-          try {
-            const injected = await chrome.runtime.sendMessage({ action: "ensure_content_script", tabId: activeTabId });
-            if (injected && injected.success) {
-              await chrome.tabs.sendMessage(activeTabId, { action: "start_element_snap" });
-              showToast("📸 Di chuột và click chọn phần tử trên trang web để chụp • Esc để hủy");
-              return;
-            }
-          } catch (_) {}
-          showToast("Vui lòng làm mới (F5) trang web trước khi chụp!");
         }
       };
     }

@@ -6,7 +6,7 @@
  * and hold no reference to the executor loop state.
  */
 
-import { ensureContentScript, sendTabMessageWithRetry } from "./tab-manager.js";
+import { sendTabMessageWithRetry } from "./tab-manager.js";
 import { DEFAULTS } from "./constants.js";
 
 /**
@@ -65,7 +65,6 @@ export async function resolvePoint(targetTabId, x, y, selector, label) {
   if (!selector) {
     throw new Error(`Cannot resolve ${label}: provide coordinates or a selector`);
   }
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "virtual_hover",
     selector,

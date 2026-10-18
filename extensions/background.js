@@ -78,9 +78,14 @@ const PRIVILEGED_EXTENSION_ONLY_ACTIONS = new Set([
   "replay_flow_recorder"
 ]);
 
+// Broadcast helper for internal extension views (Side Panel / Popup) only
+export function broadcastToMonitors(message) {
+  chrome.runtime.sendMessage(message).catch(() => {});
+}
+
 // Broadcast helper for extension views and agent bridge
 export function broadcastToExtension(message) {
-  chrome.runtime.sendMessage(message).catch(() => {});
+  broadcastToMonitors(message);
   if (typeof agentBridge !== "undefined" && agentBridge && agentBridge.connected) {
     agentBridge.send(sanitizeData(message, getSecretFilterEnabled()));
   }
@@ -91,7 +96,7 @@ export const agentBridge = new AgentBridgeClient(broadcastToExtension);
 
 // Initialize CDP event listeners (Console, Network, Runtime)
 initCdpEventListeners(broadcastToExtension);
-initFlowRecorder(broadcastToExtension);
+initFlowRecorder(broadcastToMonitors);
 
 // Enable Side Panel behavior on icon click natively
 function enableSidePanelBehavior() {
@@ -149,9 +154,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       }
     }
   } else if (info.menuItemId === "agent_pilot_inspect_element") {
-    if (tab.id) chrome.tabs.sendMessage(tab.id, { action: "toggle_inspector", enabled: true }).catch(() => {});
+    if (tab.id && agentBridge) {
+      agentBridge.sendTabMessageWithRetry(tab.id, { action: "toggle_inspector", enabled: true })
+        .catch((err) => console.warn("[AgentPilot] Failed to toggle inspector via context menu:", err));
+    }
   } else if (info.menuItemId === "agent_pilot_pick_color") {
-    if (tab.id) chrome.tabs.sendMessage(tab.id, { action: "pick_color" }).catch(() => {});
+    if (tab.id && agentBridge) {
+      agentBridge.sendTabMessageWithRetry(tab.id, { action: "pick_color" })
+        .catch((err) => console.warn("[AgentPilot] Failed to pick color via context menu:", err));
+    }
   }
 });
 

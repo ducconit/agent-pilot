@@ -186,6 +186,25 @@
     }
   }
 
+  async function buildFeedbackPayload(items) {
+    const diagnostics = await collectDiagnosticsSafe();
+    const promptMd = generateMarkdownPrompt(items, { diagnostics, includeBase64Images: false });
+    return {
+      timestamp: Date.now(),
+      url: window.location.href,
+      title: document.title,
+      items,
+      diagnostics,
+      prompt: promptMd
+    };
+  }
+
+  function dispatchFeedbackAction(action, payload) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action, payload }, (res) => resolve(res || { success: false }));
+    });
+  }
+
   // =========================================================================
   // Channel B: Save feedback items to ~/.agent-pilot/inbox/feedback/<timestamp>/*
   // =========================================================================
@@ -199,28 +218,14 @@
     }
 
     showToast("💾 Đang lưu chú thích & dữ liệu chẩn đoán vào inbox...");
-    const diagnostics = await collectDiagnosticsSafe();
-    const promptMd = generateMarkdownPrompt(items, { diagnostics, includeBase64Images: false });
-    const payload = {
-      timestamp: Date.now(),
-      url: window.location.href,
-      title: document.title,
-      items,
-      diagnostics,
-      prompt: promptMd
-    };
+    const payload = await buildFeedbackPayload(items);
 
     try {
-      const resp = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({
-          action: "save_feedback_inbox",
-          payload
-        }, (res) => resolve(res || { success: false }));
-      });
-
+      const resp = await dispatchFeedbackAction("save_feedback_inbox", payload);
       if (resp && resp.success) {
+        const sid = resp.sessionId || resp.result?.sessionId || payload.timestamp;
         if (resp.storage === "filesystem") {
-          showToast(`✓ Đã lưu ${items.length} vị trí vào ~/.agent-pilot/inbox/feedback/${resp.sessionId}/`);
+          showToast(`✓ Đã lưu ${items.length} vị trí vào ~/.agent-pilot/inbox/feedback/${sid}/`);
         } else {
           showToast(`✓ Đã lưu ${items.length} vị trí vào bộ nhớ Extension!`);
         }
@@ -248,25 +253,10 @@
     }
 
     showToast("🚀 Đang gửi chú thích & chẩn đoán trực tiếp cho Agent...");
-    const diagnostics = await collectDiagnosticsSafe();
-    const promptMd = generateMarkdownPrompt(items, { diagnostics, includeBase64Images: false });
-    const payload = {
-      timestamp: Date.now(),
-      url: window.location.href,
-      title: document.title,
-      items,
-      diagnostics,
-      prompt: promptMd
-    };
+    const payload = await buildFeedbackPayload(items);
 
     try {
-      const resp = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({
-          action: "push_feedback_live",
-          payload
-        }, (res) => resolve(res || { success: false }));
-      });
-
+      const resp = await dispatchFeedbackAction("push_feedback_live", payload);
       if (resp && resp.success) {
         showToast(`✓ Đã truyền trực tiếp ${items.length} vị trí cần sửa cho AI Agent!`);
         return resp;

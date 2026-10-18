@@ -144,17 +144,17 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 		if dataURL, ok := itemMap["screenshotDataUrl"].(string); ok && strings.HasPrefix(dataURL, "data:image/") {
 			parts := strings.SplitN(dataURL, ",", 2)
 			if len(parts) == 2 {
-				if imgBytes, err := base64.StdEncoding.DecodeString(parts[1]); err == nil && isValidImageBytes(imgBytes) {
-					ext := "png"
-					if len(imgBytes) >= 3 && imgBytes[0] == 0xff && imgBytes[1] == 0xd8 && imgBytes[2] == 0xff {
-						ext = "jpg"
-					}
-					imageFileName = fmt.Sprintf("item_%d.%s", itemNum, ext)
-					imageAbsolutePath = filepath.Join(sessionDir, imageFileName)
-					if writeErr := os.WriteFile(imageAbsolutePath, imgBytes, config.FeedbackFilePerm); writeErr != nil {
+				if imgBytes, err := base64.StdEncoding.DecodeString(parts[1]); err == nil {
+					if ext, valid := detectImageExtension(imgBytes); valid {
+						imageFileName = fmt.Sprintf("item_%d.%s", itemNum, ext)
+						imageAbsolutePath = filepath.Join(sessionDir, imageFileName)
+						if writeErr := os.WriteFile(imageAbsolutePath, imgBytes, config.FeedbackFilePerm); writeErr != nil {
+							imageErrors++
+							imageFileName = ""
+							imageAbsolutePath = ""
+						}
+					} else {
 						imageErrors++
-						imageFileName = ""
-						imageAbsolutePath = ""
 					}
 				} else {
 					imageErrors++
@@ -274,6 +274,7 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 			}
 			sb.WriteString("---\n\n")
 		}
+		appendDiagnosticsMarkdown(&sb, diagMap)
 		promptMD = sb.String()
 	}
 
@@ -299,17 +300,71 @@ func SaveFeedbackSession(payload map[string]interface{}) (map[string]interface{}
 	return res, nil
 }
 
-func isValidImageBytes(b []byte) bool {
+func appendDiagnosticsMarkdown(sb *strings.Builder, diagMap map[string]interface{}) {
+	if diagMap == nil {
+		return
+	}
+	if steps, ok := diagMap["reproSteps"].([]interface{}); ok && len(steps) > 0 {
+		sb.WriteString("#### 👣 Các bước thao tác tái hiện (Steps to Reproduce)\n")
+		for idx, rawStep := range steps {
+			if sm, ok := rawStep.(map[string]interface{}); ok {
+				desc, _ := sm["description"].(string)
+				if desc != "" {
+					sb.WriteString(fmt.Sprintf("%d. %s\n", idx+1, desc))
+				}
+			}
+		}
+		sb.WriteString("\n")
+	}
+	if consoleErrs, ok := diagMap["consoleErrors"].([]interface{}); ok && len(consoleErrs) > 0 {
+		sb.WriteString(fmt.Sprintf("#### 🚨 Lỗi Console / Runtime ghi nhận trên trang (%d)\n", len(consoleErrs)))
+		for _, rawErr := range consoleErrs {
+			if em, ok := rawErr.(map[string]interface{}); ok {
+				eType, _ := em["type"].(string)
+				if eType == "" {
+					eType = "error"
+				}
+				msg, _ := em["message"].(string)
+				sb.WriteString(fmt.Sprintf("- **[%s]** `%s`\n", eType, strings.ReplaceAll(msg, "`", "'")))
+			}
+		}
+		sb.WriteString("\n")
+	}
+	if netErrs, ok := diagMap["networkErrors"].([]interface{}); ok && len(netErrs) > 0 {
+		sb.WriteString(fmt.Sprintf("#### 🌐 Request Mạng / API thất bại (%d)\n", len(netErrs)))
+		for _, rawNet := range netErrs {
+			if nm, ok := rawNet.(map[string]interface{}); ok {
+				method, _ := nm["method"].(string)
+				urlStr, _ := nm["url"].(string)
+				status := nm["status"]
+				sb.WriteString(fmt.Sprintf("- **[HTTP %v]** `%s %s`\n", status, method, urlStr))
+			}
+		}
+		sb.WriteString("\n")
+	}
+}
+
+func detectImageExtension(b []byte) (string, bool) {
 	// PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A
 	if len(b) >= 8 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4e && b[3] == 0x47 &&
 		b[4] == 0x0d && b[5] == 0x0a && b[6] == 0x1a && b[7] == 0x0a {
-		return true
+		return "png", true
 	}
 	// JPEG magic bytes: FF D8 FF
 	if len(b) >= 3 && b[0] == 0xff && b[1] == 0xd8 && b[2] == 0xff {
-		return true
+		return "jpg", true
 	}
-	return false
+	// WebP magic bytes: RIFF....WEBP
+	if len(b) >= 12 && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F' &&
+		b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P' {
+		return "webp", true
+	}
+	return "", false
+}
+
+func isValidImageBytes(b []byte) bool {
+	_, ok := detectImageExtension(b)
+	return ok
 }
 
 func GetPendingFeedback(limit int, sessionID string, clear bool) (map[string]interface{}, error) {

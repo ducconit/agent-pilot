@@ -3,7 +3,7 @@
  * Manages element inspection, subtabs (Overview & CSS Styles), coordinates, and color palette
  */
 
-import { showToast, escapeHtml } from "./ui-helpers.js";
+import { showToast, escapeHtml, sendTabMessageWithEnsure } from "./ui-helpers.js";
 import { normalizeColorData } from "./color-utils.js";
 
 export class InspectorPanel {
@@ -55,19 +55,7 @@ export class InspectorPanel {
   }
 
   async sendTabMessage(tabId, msg) {
-    if (!tabId) return null;
-    try {
-      return await chrome.tabs.sendMessage(tabId, msg);
-    } catch (_) {
-      try {
-        const injected = await chrome.runtime.sendMessage({ action: "ensure_content_script", tabId });
-        if (injected && injected.success) {
-          return await chrome.tabs.sendMessage(tabId, msg);
-        }
-      } catch (_) {}
-      showToast("Vui lòng làm mới (F5) trang web để sử dụng tính năng này!");
-      return null;
-    }
+    return await sendTabMessageWithEnsure(tabId, msg);
   }
 
   bindEvents() {

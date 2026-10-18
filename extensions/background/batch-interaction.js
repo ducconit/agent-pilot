@@ -21,7 +21,6 @@ import {
 } from "./cdp-manager.js";
 import {
   getTargetTabId,
-  ensureContentScript,
   sendTabMessageWithRetry
 } from "./tab-manager.js";
 import { normalizeVia, resolvePoint } from "./batch-validation.js";
@@ -55,7 +54,6 @@ async function resolveStepTabId(ctx, act) {
 async function scrollIntoViewAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for scroll_into_view");
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "scroll_into_view",
     selector: act.selector,
@@ -96,7 +94,6 @@ async function clickAction(ctx, act) {
       logDebug("batch CDP click fallback", err);
     }
   }
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "click_cursor",
     selector: act.selector,
@@ -112,7 +109,6 @@ async function clickAction(ctx, act) {
 async function typeAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for type");
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "type_text",
     selector: act.selector,
@@ -129,8 +125,7 @@ async function typeAction(ctx, act) {
 async function pressKeyAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for press_key");
-  await ensureContentScript(targetTabId);
-  const res = await sendTabMessageWithRetry(targetTabId, {
+  await sendTabMessageWithRetry(targetTabId, {
     action: "press_key",
     key: act.key || "Enter",
     selector: act.selector
@@ -143,7 +138,6 @@ async function pressKeyAction(ctx, act) {
 async function scrollAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for scroll");
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "scroll_page",
     deltaX: act.deltaX || 0,
@@ -157,7 +151,6 @@ async function scrollAction(ctx, act) {
 async function hoverAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for hover");
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "virtual_hover",
     selector: act.selector
@@ -198,7 +191,6 @@ async function dragAction(ctx, act) {
       logDebug("batch CDP drag fallback", err);
     }
   }
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "virtual_drag",
     fromSelector,
@@ -239,7 +231,6 @@ async function dialogAction(ctx, act) {
 async function fillFormAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for fill_form");
-  await ensureContentScript(targetTabId);
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "fill_form",
     fields: act.fields || [],

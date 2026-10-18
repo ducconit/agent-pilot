@@ -5,7 +5,7 @@
 
 import { attachedTabs, CDP_SCREENSHOT_TIMEOUT_MS, logDebug } from "./constants.js";
 import { attachDebugger, sendCdpCommand } from "./cdp-manager.js";
-import { sendTabMessageWithRetry, ensureContentScript } from "./tab-manager.js";
+import { sendTabMessageWithRetry } from "./tab-manager.js";
 
 /**
  * OffscreenCanvas-based image cropping utility for Service Workers
@@ -100,7 +100,6 @@ export async function captureTabScreenshot(tabId, params = {}) {
     if (!params.selector) {
       throw new Error(`Screenshot mode 'element' requires a 'selector' parameter`);
     }
-    await ensureContentScript(tabId);
     const elRes = await sendTabMessageWithRetry(tabId, {
       action: "get_element_info",
       selector: params.selector,

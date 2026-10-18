@@ -9,6 +9,8 @@ import {
   getTabLockState,
   AGENT_GROUP_TITLE,
   AGENT_GROUP_COLOR,
+  DEFAULT_LOAD_TIMEOUT_MS,
+  normalizeUrl,
   logDebug
 } from "./constants.js";
 
@@ -516,5 +518,85 @@ if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.onUpdated) {
     if (changeInfo.groupId !== undefined && changeInfo.groupId === -1) {
       agentControlledTabs.delete(tabId);
     }
+  });
+}
+
+/**
+ * Wait until the given tab reports status === "complete" or timeout elapses.
+ */
+export function waitForTabComplete(tabId, timeoutMs = DEFAULT_LOAD_TIMEOUT_MS) {
+  return new Promise((resolve) => {
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      if (chrome.tabs?.onUpdated) {
+        chrome.tabs.onUpdated.removeListener(onUpdated);
+      }
+      resolve();
+    };
+    const timer = setTimeout(done, timeoutMs);
+    const onUpdated = (tId, changeInfo) => {
+      if (tId === tabId && changeInfo.status === "complete") {
+        done();
+      }
+    };
+    if (chrome.tabs?.onUpdated) {
+      chrome.tabs.onUpdated.addListener(onUpdated);
+    }
+    if (chrome.tabs?.get) {
+      chrome.tabs.get(tabId, (tab) => {
+        if (!chrome.runtime.lastError && tab && tab.status === "complete") {
+          done();
+        }
+      });
+    } else {
+      done();
+    }
+  });
+}
+
+/**
+ * Navigate tabId to targetUrl via chrome.tabs.update and wait for load completion.
+ */
+export function navigateTabAndWait(tabId, targetUrl, timeoutMs = DEFAULT_LOAD_TIMEOUT_MS, { requireNewLoad = false } = {}) {
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    let sawLoading = false;
+    const done = (err = null) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      if (chrome.tabs?.onUpdated) {
+        chrome.tabs.onUpdated.removeListener(onUpdated);
+      }
+      if (err) reject(err);
+      else resolve();
+    };
+    const timer = setTimeout(() => done(), timeoutMs);
+    const onUpdated = (tId, changeInfo, tab) => {
+      if (tId !== tabId) return;
+      if (changeInfo.status === "loading") {
+        sawLoading = true;
+      }
+      if (changeInfo.status === "complete") {
+        if (!requireNewLoad || sawLoading || !tab?.url || normalizeUrl(tab.url) === normalizeUrl(targetUrl)) {
+          done();
+        }
+      }
+    };
+    if (chrome.tabs?.onUpdated) {
+      chrome.tabs.onUpdated.addListener(onUpdated);
+    }
+    chrome.tabs.update(tabId, { url: targetUrl }, (t) => {
+      if (chrome.runtime.lastError) {
+        done(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (!requireNewLoad && t && t.status === "complete") {
+        done();
+      }
+    });
   });
 }

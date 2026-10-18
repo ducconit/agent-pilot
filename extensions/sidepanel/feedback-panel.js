@@ -3,6 +3,8 @@
  * Coordinates Feedback Studio state, selection modes, and Channel C/B/A export actions.
  */
 
+import { escapeHtml, sendTabMessageWithEnsure } from "./ui-helpers.js";
+
 export class FeedbackPanel {
   constructor(options = {}) {
     this.ui = options.showToast ? { showToast: options.showToast } : options;
@@ -162,21 +164,10 @@ export class FeedbackPanel {
       if (!silent) this.ui.showToast("Không tìm thấy tab web đang hoạt động!", "warning");
       return null;
     }
-    try {
-      return await chrome.tabs.sendMessage(tabId, msg);
-    } catch (_) {
-      // Tab may have been open before extension reload — auto-inject content script and retry once
-      try {
-        const injected = await chrome.runtime.sendMessage({ action: "ensure_content_script", tabId });
-        if (injected && injected.success) {
-          return await chrome.tabs.sendMessage(tabId, msg);
-        }
-      } catch (_) {}
-      if (!silent) {
-        this.ui.showToast("Vui lòng làm mới (F5) trang web để sử dụng tính năng này!", "warning");
-      }
-      return null;
-    }
+    return await sendTabMessageWithEnsure(tabId, msg, {
+      silent,
+      toastFn: (m, t) => this.ui.showToast(m, t)
+    });
   }
 
   async refreshState({ silent = false } = {}) {
@@ -789,12 +780,6 @@ export class FeedbackPanel {
   }
 
   escapeHtml(str) {
-    if (!str) return "";
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+    return escapeHtml(str);
   }
 }

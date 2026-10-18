@@ -876,19 +876,37 @@
       chrome.runtime.sendMessage({
         action: "record_flow_step",
         step: stepPayload
-      }).catch(() => {});
-    } catch (_) {}
+      }).catch((err) => {
+        if (window.__AP_DEBUG__) console.debug("[AgentPilot] record_flow_step send error:", err);
+      });
+    } catch (err) {
+      if (window.__AP_DEBUG__) console.debug("[AgentPilot] record_flow_step dispatch error:", err);
+    }
   }
 
   function isRecordableInteractionEvent(e) {
     return Boolean(e && (e.isTrusted || window.__AP_INTERNAL__.shield?.isDispatching?.()));
   }
 
-  let lastEnterTimestamp = 0;
+  let inputDebounceTimer = null;
+  let pendingInputTarget = null;
+
+  function flushPendingInputEvent() {
+    if (inputDebounceTimer) {
+      clearTimeout(inputDebounceTimer);
+      inputDebounceTimer = null;
+    }
+    if (pendingInputTarget) {
+      const target = pendingInputTarget;
+      pendingInputTarget = null;
+      handleFieldValueEvent({ type: "change", target, isTrusted: true });
+    }
+  }
 
   document.addEventListener("click", (e) => {
     try {
       if (!isRecordableInteractionEvent(e) || isOverlayModeBusy() || isInternalAgentPilotNode(e.target)) return;
+      flushPendingInputEvent();
       const interactiveTarget = e.target.closest("button, a, input, select, textarea, summary, label, [role='button'], [role='link'], [role='tab'], [role='menuitem'], [role='checkbox'], [role='radio']");
       if (!interactiveTarget && e.target.closest && e.target.closest("pre, code")) {
         return;
@@ -919,7 +937,9 @@
         label: label || undefined,
         description: `Click <${tag}>${label ? ` "${label}"` : ""} (\`${selector}\`)`
       });
-    } catch (_) {}
+    } catch (err) {
+      if (window.__AP_DEBUG__) console.debug("[AgentPilot] Flow click listener error:", err);
+    }
   }, true);
 
   function handleFieldValueEvent(e) {
@@ -968,11 +988,37 @@
         value: displayVal,
         description: `${verb} "${displayVal}" vào <${tag}>${label ? ` "${label}"` : ""} (\`${selector}\`)`
       });
-    } catch (_) {}
+    } catch (err) {
+      if (window.__AP_DEBUG__) console.debug("[AgentPilot] Flow field value listener error:", err);
+    }
   }
 
-  document.addEventListener("input", handleFieldValueEvent, true);
-  document.addEventListener("change", handleFieldValueEvent, true);
+  document.addEventListener("input", (e) => {
+    if (!isRecordableInteractionEvent(e) || isOverlayModeBusy() || isInternalAgentPilotNode(e.target)) return;
+    if (window.__AP_INTERNAL__.shield?.isDispatching?.()) {
+      handleFieldValueEvent(e);
+      return;
+    }
+    pendingInputTarget = e.target;
+    if (inputDebounceTimer) clearTimeout(inputDebounceTimer);
+    inputDebounceTimer = setTimeout(() => {
+      inputDebounceTimer = null;
+      const target = pendingInputTarget;
+      pendingInputTarget = null;
+      if (target) {
+        handleFieldValueEvent({ type: "input", target, isTrusted: true });
+      }
+    }, 250);
+  }, true);
+
+  document.addEventListener("change", (e) => {
+    if (inputDebounceTimer && pendingInputTarget === e.target) {
+      clearTimeout(inputDebounceTimer);
+      inputDebounceTimer = null;
+      pendingInputTarget = null;
+    }
+    handleFieldValueEvent(e);
+  }, true);
 
   document.addEventListener("keydown", (e) => {
     try {
@@ -982,12 +1028,17 @@
       const tag = target.tagName.toLowerCase();
       if (tag !== "input" && tag !== "textarea" && !target.isContentEditable) return;
 
+      if (inputDebounceTimer) {
+        clearTimeout(inputDebounceTimer);
+        inputDebounceTimer = null;
+        pendingInputTarget = null;
+      }
+
       // Ensure any pending non-empty text in the input/textarea is recorded before Enter clears it
       const rawText = target.isContentEditable ? (target.innerText || target.textContent || "") : (target.value || "");
       if (String(rawText).trim()) {
         handleFieldValueEvent({ type: "change", target, isTrusted: true });
       }
-      lastEnterTimestamp = Date.now();
 
       const locators = selectorUtils?.getTestLocators ? selectorUtils.getTestLocators(target) : null;
       const selector = locators?.selector || getElementSelector(target);
@@ -1001,7 +1052,9 @@
         key: "Enter",
         description: `Nhấn phím Enter tại <${tag}>${label ? ` "${label}"` : ""} (\`${selector}\`)`
       });
-    } catch (_) {}
+    } catch (err) {
+      if (window.__AP_DEBUG__) console.debug("[AgentPilot] Flow keydown listener error:", err);
+    }
   }, true);
 
   function getReproSteps() {

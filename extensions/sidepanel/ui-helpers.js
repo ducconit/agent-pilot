@@ -45,3 +45,32 @@ export function formatParams(params) {
     return String(params);
   }
 }
+
+/**
+ * Send a message to a tab's content script, automatically requesting background
+ * script re-injection once if the content script is not yet loaded.
+ */
+export async function sendTabMessageWithEnsure(tabId, msg, options = {}) {
+  if (!tabId) return null;
+  const {
+    silent = false,
+    toastFn = showToast,
+    failMessage = "Vui lòng làm mới (F5) trang web để sử dụng tính năng này!"
+  } = options;
+  try {
+    return await chrome.tabs.sendMessage(tabId, msg);
+  } catch (_) {
+    try {
+      const injected = await chrome.runtime.sendMessage({ action: "ensure_content_script", tabId });
+      if (injected && injected.success) {
+        return await chrome.tabs.sendMessage(tabId, msg);
+      }
+    } catch (err) {
+      console.debug("[AgentPilot] Content script ensure/retry fallback failed:", err);
+    }
+    if (!silent && typeof toastFn === "function") {
+      toastFn(failMessage, "warning");
+    }
+    return null;
+  }
+}

@@ -25,7 +25,8 @@ export async function saveFeedbackInbox(client, payload) {
     });
     const data = await resp.json();
     if (data && data.success) {
-      return { success: true, ...data, storage: "filesystem" };
+      const inner = data.result && typeof data.result === "object" ? data.result : {};
+      return { success: true, ...inner, ...data, storage: "filesystem" };
     }
     throw new Error(data?.error || "Bridge server returned failure");
   } catch (err) {
@@ -81,7 +82,8 @@ export async function pushFeedbackLive(client, payload) {
     });
     const data = await resp.json();
     if (data && data.success) {
-      return { success: true, ...data, channel: "http_push" };
+      const inner = data.result && typeof data.result === "object" ? data.result : {};
+      return { success: true, ...inner, ...data, channel: "http_push" };
     }
     throw new Error(data?.error || "Push failed");
   } catch (httpErr) {

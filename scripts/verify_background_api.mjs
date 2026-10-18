@@ -403,6 +403,14 @@ const exportedPw = exportFlowAsPlaywright(101);
 
 // Simulate original tab #101 closing -> flow should remain preserved in lastRecordedFlow for auto-new-tab Replay
 removeFlowSession(101);
+// Simulate passive click on an unrelated personal tab #999 -> must NOT overwrite the active recording snapshot!
+appendFlowStep(999, {
+  action: "click",
+  tagName: "button",
+  selector: "#unrelated-btn",
+  url: "https://unrelated.example.com",
+  description: "Passive click on unrelated tab"
+});
 const fallbackAfterClose = getFlowState(null);
 const fallbackBatchAfterClose = exportFlowAsBatch(null);
 
