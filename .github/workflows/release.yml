@@ -106,27 +106,28 @@ jobs:
 
           ---
 
-          ### 📦 Tài Nguyên Bản Phát Hành (Release Assets)
+          ### 📦 Tài Nguyên Bản Phát Hành Theo 3 Hệ Điều Hành (Release Assets)
 
-          | Tài Nguyên | Nền Tảng | Nội Dung |
-          | :--- | :--- | :--- |
-          | `agent-pilot-$VERSION-linux-amd64.zip` | Linux x86_64 | extensions/ + binary + README.md + skills/ |
-          | `agent-pilot-$VERSION-linux-arm64.zip` | Linux ARM64 | extensions/ + binary + README.md + skills/ |
-          | `agent-pilot-$VERSION-darwin-amd64.zip` | macOS Intel | extensions/ + binary + README.md + skills/ |
-          | `agent-pilot-$VERSION-darwin-arm64.zip` | macOS Apple Silicon | extensions/ + binary + README.md + skills/ |
-          | `agent-pilot-$VERSION-windows-amd64.zip` | Windows x86_64 | extensions/ + binary + README.md + skills/ |
-          | `agent-pilot-$VERSION-windows-arm64.zip` | Windows ARM64 | extensions/ + binary + README.md + skills/ |
-          | `agent-pilot-$VERSION.zip` | Mọi nền tảng | Chỉ Chrome Extension (dùng cho Chrome Web Store) |
-          | `bundles/checksums.txt` | Mọi nền tảng | SHA-256 để xác minh tính toàn vẹn |
+          | Bản Hệ Điều Hành | Tài Nguyên | Kiến Trúc | Nội Dung Trong Gói |
+          | :--- | :--- | :--- | :--- |
+          | 🐧 **Ubuntu / Linux** | `agent-pilot-$VERSION-linux-amd64.zip` | Linux x86_64 | `extensions/` + `agent-pilot` + `install.sh` + `README.md` (Ubuntu) + `skills/` |
+          | 🐧 **Ubuntu / Linux** | `agent-pilot-$VERSION-linux-arm64.zip` | Linux ARM64 | `extensions/` + `agent-pilot` + `install.sh` + `README.md` (Ubuntu) + `skills/` |
+          | 🍎 **macOS** | `agent-pilot-$VERSION-darwin-arm64.zip` | Apple Silicon (M1-M4) | `extensions/` + `agent-pilot` + `install.sh` (tự gỡ Gatekeeper) + `README.md` (macOS) + `skills/` |
+          | 🍎 **macOS** | `agent-pilot-$VERSION-darwin-amd64.zip` | macOS Intel | `extensions/` + `agent-pilot` + `install.sh` (tự gỡ Gatekeeper) + `README.md` (macOS) + `skills/` |
+          | 🪟 **Windows** | `agent-pilot-$VERSION-windows-amd64.zip` | Windows x86_64 | `extensions/` + `agent-pilot.exe` + `install.ps1` + `README.md` (Windows) + `skills/` |
+          | 🪟 **Windows** | `agent-pilot-$VERSION-windows-arm64.zip` | Windows ARM64 | `extensions/` + `agent-pilot.exe` + `install.ps1` + `README.md` (Windows) + `skills/` |
+          | 🌐 **Mọi nền tảng** | `agent-pilot-$VERSION.zip` | All | Chỉ Chrome Extension (dùng cho Chrome Web Store) |
+          | 🔐 **Checksums** | `bundles/checksums.txt` | All | SHA-256 để xác minh tính toàn vẹn |
 
-          Mỗi gói bundle đã bao gồm **mọi thứ cần thiết**:
+          Mỗi gói bundle đã được tối ưu riêng cho từng hệ điều hành:
 
           ```
           agent-pilot-$VERSION-<platform>/
           ├── extensions/            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome
           ├── agent-pilot(|.exe)     Standalone CLI / MCP Server (binary tĩnh, zero-dep)
+          ├── install.sh / .ps1      Script cài đặt 1 lệnh theo đúng hệ điều hành
           ├── skills/agent-pilot/    Agent Skill (SKILL.md + references + examples)
-          └── README.md              Hướng dẫn cài đặt & sử dụng với AI Agent
+          └── README.md              Hướng dẫn cài đặt & cấu hình MCP chuyên biệt cho OS đó
           ```
 
           ---
@@ -134,21 +135,19 @@ jobs:
           ### 🚀 Hướng Dẫn Cài Đặt Nhanh (từ bundle)
 
           **1. Chrome Extension**
-          1. Giải nén gói bundle cho đúng nền tảng của bạn.
+          1. Giải nén gói bundle của hệ điều hành bạn đang dùng.
           2. Mở `chrome://extensions` → bật **Developer mode** → **Load unpacked** → chọn thư mục `extensions/`.
           3. Ghim icon **Agent Pilot (📌)**; mở Side Panel bằng click icon hoặc <kbd>Ctrl+Shift+P</kbd> / <kbd>Cmd+Shift+P</kbd>.
 
-          **2. CLI / MCP Server**
+          **2. CLI / MCP Server & Dịch Vụ Chạy Ngầm (1 Lệnh)**
           ```bash
-          # Linux / macOS
-          chmod +x ./agent-pilot
-          sudo mv ./agent-pilot /usr/local/bin/agent-pilot
-          agent-pilot --help
-
-          # Chạy bridge như service chạy ngầm (khuyên dùng)
-          agent-pilot service install
+          # 🐧 Ubuntu / Linux & 🍎 macOS (tự gỡ Gatekeeper xattr, cài vào ~/.local/bin, kích hoạt systemd/launchd):
+          chmod +x ./install.sh && ./install.sh
           ```
-          Windows: giữ `agent-pilot.exe`, thêm thư mục chứa nó vào `PATH`.
+          ```powershell
+          # 🪟 Windows PowerShell (tự gỡ SmartScreen, cài vào %LOCALAPPDATA%\Programs\agent-pilot, thêm PATH & Task Scheduler):
+          powershell -ExecutionPolicy Bypass -File .\install.ps1
+          ```
 
           **3. Agent Skill (tùy chọn)**
           ```bash

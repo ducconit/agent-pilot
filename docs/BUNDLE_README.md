@@ -1,126 +1,43 @@
-# 🚀 Agent Pilot {{VERSION}} — Gói cài đặt tổng hợp ({{PLATFORM}})
+# 🚀 Agent Pilot — Tài Liệu Gói Cài Đặt Theo Hệ Điều Hành (OS Bundles)
 
-Gói này chứa mọi thứ cần thiết để AI Agent quan sát và điều khiển trình duyệt:
+Mỗi gói phát hành (Release Bundle) của **Agent Pilot** được đóng gói riêng biệt cho từng hệ điều hành với **binary tĩnh (`CGO_ENABLED=0`)**, **script cài đặt tự động 1 lệnh** và **hướng dẫn cấu hình MCP Server / Background Service** chuyên biệt cho hệ điều hành đó:
 
-```
+## 📚 Chọn Tài Liệu Theo Hệ Điều Hành Của Bạn
+
+| Hệ Điều Hành | Kiến Trúc Hỗ Trợ | Tài Liệu Hướng Dẫn Chuyên Biệt | Script Cài Đặt Đi Kèm | Dịch Vụ Chạy Ngầm |
+| :--- | :--- | :--- | :--- | :--- |
+| 🐧 **Ubuntu / Linux** | `linux-amd64`, `linux-arm64` | [**docs/bundles/README.ubuntu.md**](bundles/README.ubuntu.md) | `install.sh` | `systemd --user` (`~/.config/systemd/user/agent-pilot.service`) |
+| 🍎 **macOS** | `darwin-arm64` (M1-M4), `darwin-amd64` (Intel) | [**docs/bundles/README.macos.md**](bundles/README.macos.md) | `install.sh` | `launchd` (`~/Library/LaunchAgents/com.agentpilot.bridge.plist`) |
+| 🪟 **Windows** | `windows-amd64`, `windows-arm64` | [**docs/bundles/README.windows.md**](bundles/README.windows.md) | `install.ps1` | `Task Scheduler` (`AgentPilotBridge`) |
+
+---
+
+## 📦 Cấu Trúc Của Mỗi Gói Bundle
+
+Khi chạy `npm run pack:bundle` (hoặc `npm run pack:bundle:ubuntu`, `npm run pack:bundle:macos`, `npm run pack:bundle:windows`), hệ thống tạo ra gói `.zip` tại `dist/bundles/` với cấu trúc:
+
+```text
 agent-pilot-{{VERSION}}-{{PLATFORM}}/
-├── extensions/            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome
-├── {{BINARY_NAME}}        Agent Pilot CLI / MCP Server (binary tĩnh, zero-dependency)
+├── extensions/            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome (Load unpacked)
+├── {{BINARY_NAME}}        Agent Pilot CLI & MCP Server (agent-pilot hoặc agent-pilot.exe)
+├── install.sh / .ps1      Script cài đặt 1 lệnh theo đúng hệ điều hành
 ├── skills/agent-pilot/    Agent Skill (SKILL.md + references + examples)
-└── README.md              Tài liệu này
+└── README.md              Bản hướng dẫn đã được biên dịch riêng cho {{PLATFORM}}
 ```
 
-## Yêu cầu
-- Google Chrome 116+ (hoặc Chromium / Edge / Brave tương đương, hỗ trợ Side Panel API)
-- Không cần Node.js hay Go — binary đã được biên dịch tĩnh (`CGO_ENABLED=0`)
+---
 
-## 1) Cài Chrome Extension
-1. Mở `chrome://extensions` → bật **Developer mode** (góc phải trên).
-2. Bấm **Load unpacked** → chọn thư mục `extensions/` trong gói này.
-3. Ghim icon **Agent Pilot (📌)** lên thanh công cụ Chrome.
-4. Mở Side Panel: click icon, hoặc chuột phải trên trang → **Mở Agent Pilot (Side Panel)**,
-   hoặc dùng phím tắt gợi ý <kbd>Ctrl+Shift+P</kbd> (macOS: <kbd>Cmd+Shift+P</kbd>).
+## 🛠️ Lệnh Đóng Gói Từng Bản Từ Mã Nguồn
 
-## 2) Cài CLI / MCP Server
-
-**Linux / macOS**
 ```bash
-chmod +x ./{{BINARY_NAME}}
-sudo mv ./{{BINARY_NAME}} /usr/local/bin/agent-pilot
-agent-pilot --help
+# Đóng gói toàn bộ 3 hệ điều hành (6 kiến trúc):
+npm run pack:bundle
+
+# Hoặc đóng gói riêng từng bản theo hệ điều hành:
+npm run pack:bundle:ubuntu    # Chỉ đóng gói bản Ubuntu/Linux (amd64 + arm64)
+npm run pack:bundle:macos     # Chỉ đóng gói bản macOS (arm64 + amd64)
+npm run pack:bundle:windows   # Chỉ đóng gói bản Windows (amd64 + arm64)
 ```
-
-**Windows**
-- Giữ nguyên `agent-pilot.exe`, thêm thư mục chứa nó vào biến môi trường `PATH`
-  (hoặc chạy trực tiếp bằng đường dẫn đầy đủ).
-
-**Chạy bridge như service chạy ngầm (khuyên dùng)** — tự khởi động cùng máy:
-```bash
-agent-pilot service install     # Linux: systemd --user · macOS: launchd · Windows: Task Scheduler
-agent-pilot service status
-# agent-pilot service restart | stop | uninstall
-```
-Hoặc chạy thủ công: `agent-pilot server`
-- Mặc định lắng nghe `127.0.0.1:58765`
-- Đổi cổng: `AGENT_PILOT_PORT=<port>` (áp dụng cho cả server lẫn CLI) hoặc `--port <port>` cho lệnh `server`
-
-## 3) Kết nối với AI Agent (MCP)
-Thêm vào file cấu hình MCP của agent:
-```json
-{
-  "mcpServers": {
-    "agent-pilot": { "command": "agent-pilot", "args": ["mcp"] }
-  }
-}
-```
-Vị trí thường gặp:
-- **Antigravity**: `~/.gemini/config/mcp_config.json`
-- **Claude Desktop**: `claude_desktop_config.json`
-- **Cursor**: Settings → MCP → Add server
-- **Codex / OpenCode / Claude Code**: mục MCP trong config tương ứng
-
-Kiểm tra nhanh: `agent-pilot tabs` (liệt kê tab đang mở qua bridge).
-
-## 4) Cài Agent Skill (tùy chọn, cho Antigravity/Claude Code/Cursor…)
-```bash
-agent-pilot skill install          # ~/.agents/skills/agent-pilot
-agent-pilot skill install --agy    # ~/.gemini/config/skills/agent-pilot (Antigravity)
-agent-pilot skill install --path ~/my-skills --force
-```
-Hoặc cài từ repo: `npx skills add https://github.com/ducconit/agent-pilot-extension`
-
-## 5) Ví dụ sử dụng nhanh
-```bash
-agent-pilot open "https://example.com" --active
-agent-pilot click "#login-button"
-agent-pilot type "#username" "testuser" --enter
-agent-pilot inspect "h1"
-agent-pilot screenshot -o page.png --mode visible
-agent-pilot batch flow.json
-agent-pilot feedback list
-```
-Kịch bản batch (1 tool call chạy nhiều bước):
-```json
-[
-  { "action": "mouse_move", "x": 320, "y": 210, "duration": 400 },
-  { "action": "mouse_click", "x": 320, "y": 210 },
-  { "action": "type", "selector": "#test-search-input", "text": "hello" },
-  { "action": "scroll", "deltaY": 250 },
-  { "action": "screenshot", "mode": "visible" }
-]
-```
-
-## 6) MCP Tools (35 công cụ)
-- **Tab**: `browser_open_tab`, `browser_list_tabs`, `browser_navigate`, `browser_list_instances`, `browser_select_instance`
-- **Tương tác**: `browser_click`, `browser_drag`, `browser_type`, `browser_scroll`, `browser_hover`, `browser_press_key`, `browser_fill_form`, `browser_upload_file`
-- **Đọc trang / CDP**: `browser_get_element`, `browser_screenshot`, `browser_pick_color`, `browser_get_devtools_data`, `browser_list_network_requests`, `browser_get_network_request`, `browser_performance_metrics`, `browser_performance_trace`, `browser_take_heapsnapshot`, `browser_evaluate`
-- **Batch & phiên làm việc**: `browser_run_actions`, `browser_set_busy`, `browser_handle_dialog`, `browser_emulate`
-- **Feedback người dùng**: `browser_wait_for_feedback`, `browser_get_pending_feedback`
-- **Hệ thống**: `browser_manage_extensions`, `browser_end_session`, …
-
-Bảng đầy đủ: `docs/API_REFERENCE.md` trong repository.
-
-## 7) Bảo mật
-- **Secret Redaction**: tự động che API key / private key / JWT / Bearer token trước khi gửi cho LLM
-  (bật/tắt trong Side Panel — mặc định bật).
-- **Bridge cục bộ**: chỉ lắng nghe `127.0.0.1:58765`, allowlist origin localhost + extension.
-  Mặc định **không yêu cầu auth** để tương thích ngược; nếu cần, bật API key:
-  ```bash
-  export AGENT_PILOT_API_KEY="your-long-random-key"
-  agent-pilot server
-  ```
-  rồi nhập cùng key vào Side Panel → **API key (tuỳ chọn)**. Key được dùng cho HTTP/WebSocket,
-  không truyền qua URL và không hiển thị trong UI/log.
-
-## 8) Xử lý sự cố
-| Vấn đề | Cách xử lý |
-|---|---|
-| `Another debugger is already attached` | Đóng DevTools của tab đó rồi thử lại |
-| `no Chrome Extension connected` | Kiểm tra extension đang bật và bridge đang chạy (`agent-pilot service status`) |
-| Cổng 58765 bị chiếm | Đặt `AGENT_PILOT_PORT=<port>` (server + CLI dùng chung biến này) |
-| macOS chặn binary | `xattr -d com.apple.quarantine ./agent-pilot` hoặc System Settings → Privacy & Security → Allow |
-| Không chụp được tab nền | Chrome chặn `captureVisibleTab` cho tab không active — dùng `browser_screenshot` (mặc định qua CDP) |
-| Side Panel không mở | Kiểm tra Chrome ≥ 116 và extension đã được Load unpacked |
 
 ---
 MIT License · Tác giả **DNT** ([@ducconit](https://github.com/ducconit)) · https://github.com/ducconit/agent-pilot-extension

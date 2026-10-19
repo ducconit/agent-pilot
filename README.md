@@ -56,7 +56,11 @@ agent-pilot-extension/
 │   ├── ARCHITECTURE.md                 # Kiến trúc chi tiết Manifest V3 & IPC
 │   ├── CDP_GUIDE.md                    # Hướng dẫn Chrome DevTools Protocol (CDP)
 │   ├── API_REFERENCE.md                # Danh mục tin nhắn & đặc tả JSON Action
-│   ├── BUNDLE_README.md                # README hướng dẫn cài đặt đóng gói kèm bundle phát hành
+│   ├── BUNDLE_README.md                # Chỉ mục tài liệu cho 3 gói phát hành theo OS
+│   ├── bundles/                        # Tài liệu hướng dẫn cài đặt & MCP riêng từng OS
+│   │   ├── README.ubuntu.md            # Hướng dẫn bản Ubuntu / Linux (systemd, ~/.local/bin)
+│   │   ├── README.macos.md             # Hướng dẫn bản macOS (Gatekeeper xattr, launchd, full-path MCP)
+│   │   └── README.windows.md           # Hướng dẫn bản Windows (PowerShell, Task Scheduler, %LOCALAPPDATA%)
 │   └── USAGE_GUIDE.md                  # Sổ tay hướng dẫn sử dụng từng tính năng
 ├── skills/                             # Kỹ năng chuẩn Agent Skills Ecosystem (skills.sh)
 │   └── agent-pilot/
@@ -174,7 +178,7 @@ flowchart LR
 ### 1. Cài Đặt Chrome Extension
 
 #### Cách A: Cài đặt từ Bản Phát Hành (Khuyên dùng)
-1. Tải **gói bundle** cho đúng nền tảng của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) — ví dụ `agent-pilot-v1.0.8-beta-linux-amd64.zip` (đã gồm sẵn extension + CLI + skills + README hướng dẫn), hoặc tệp chỉ-chứa-extension `agent-pilot-v1.0.8-beta.zip` nếu bạn chỉ cần phần Chrome.
+1. Tải **gói bundle** cho đúng nền tảng của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) — ví dụ `agent-pilot-v1.0.9-beta-linux-amd64.zip` (đã gồm sẵn extension + CLI + skills + README hướng dẫn), hoặc tệp chỉ-chứa-extension `agent-pilot-v1.0.9-beta.zip` nếu bạn chỉ cần phần Chrome.
 2. Giải nén tệp `.zip` ra một thư mục cố định.
 3. Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
 4. Gạt bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải.
@@ -188,8 +192,11 @@ flowchart LR
 git clone https://github.com/ducconit/agent-pilot-extension.git
 cd agent-pilot-extension
 npm ci
-npm run pack          # Chỉ extension -> dist/agent-pilot-v*.zip
-npm run pack:bundle   # Bundle từng nền tảng -> dist/bundles/agent-pilot-v*-<os>-<arch>.zip
+npm run pack                  # Chỉ extension -> dist/agent-pilot-v*.zip
+npm run pack:bundle           # Đóng gói cả 3 OS -> dist/bundles/agent-pilot-v*-<os>-<arch>.zip
+npm run pack:bundle:ubuntu    # Chỉ đóng gói bản Ubuntu/Linux (amd64 + arm64)
+npm run pack:bundle:macos     # Chỉ đóng gói bản macOS (arm64 + amd64)
+npm run pack:bundle:windows   # Chỉ đóng gói bản Windows (amd64 + arm64)
 ```
 Sau đó nạp thư mục `extensions/` trực tiếp vào `chrome://extensions`.
 
@@ -199,19 +206,16 @@ Sau đó nạp thư mục `extensions/` trực tiếp vào `chrome://extensions`
 
 Bản binary độc lập viết bằng **Golang** tích hợp sẵn máy chủ **WebSocket/REST Bridge Server (cổng 58765)**, **MCP Server (stdio)** và **bộ lệnh CLI** điều khiển trình duyệt trực tiếp (khởi động `<5ms`, RAM `~12MB` — số liệu tham khảo, có thể thay đổi theo nền tảng, đóng gói tĩnh pure static `CGO_ENABLED=0`, không phụ thuộc Node.js hay thư viện hệ thống).
 
-#### Cách A: Tải Bundle Biên Dịch Sẵn (GitHub Releases)
-Mỗi bundle chứa sẵn `extensions/` + binary đúng nền tảng + `skills/` + `README.md`:
+#### Cách A: Tải Bundle Biên Dịch Sẵn Theo 3 Hệ Điều Hành (GitHub Releases)
+Mỗi bundle chứa sẵn `extensions/` + binary đúng nền tảng + script cài đặt 1 lệnh (`install.sh` / `install.ps1`) + `skills/` + `README.md` chuyên biệt cho hệ điều hành đó:
 
-| Nền Tảng | Kiến Trúc | Tên Tệp Tải Về | Cài Đặt |
+| Bản Hệ Điều Hành | Kiến Trúc | Tên Tệp Tải Về | Cài Đặt 1 Lệnh & Tài Liệu Riêng |
 | :--- | :--- | :--- | :--- |
-| **Linux** | x86_64 (amd64) | `agent-pilot-v1.0.8-beta-linux-amd64.zip` | `chmod +x agent-pilot && sudo mv agent-pilot /usr/local/bin/` |
-| **Linux** | ARM64 (aarch64) | `agent-pilot-v1.0.8-beta-linux-arm64.zip` | như trên |
-| **macOS** | Apple Silicon (M1-M4) | `agent-pilot-v1.0.8-beta-darwin-arm64.zip` | như trên |
-| **macOS** | Intel (x86_64) | `agent-pilot-v1.0.8-beta-darwin-amd64.zip` | như trên |
-| **Windows** | x86_64 (amd64) | `agent-pilot-v1.0.8-beta-windows-amd64.zip` | Giữ `agent-pilot.exe`, thêm thư mục vào `PATH` |
-| **Windows** | ARM64 | `agent-pilot-v1.0.8-beta-windows-arm64.zip` | như trên |
+| 🐧 **Ubuntu / Linux** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.9-beta-linux-amd64.zip`<br/>`agent-pilot-v1.0.9-beta-linux-arm64.zip` | `./install.sh` • [📄 Tài liệu Ubuntu](docs/bundles/README.ubuntu.md) |
+| 🍎 **macOS** | Apple Silicon (`arm64`) / Intel (`amd64`) | `agent-pilot-v1.0.9-beta-darwin-arm64.zip`<br/>`agent-pilot-v1.0.9-beta-darwin-amd64.zip` | `./install.sh` *(tự gỡ `xattr`)* • [📄 Tài liệu macOS](docs/bundles/README.macos.md) |
+| 🪟 **Windows** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.9-beta-windows-amd64.zip`<br/>`agent-pilot-v1.0.9-beta-windows-arm64.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` • [📄 Tài liệu Windows](docs/bundles/README.windows.md) |
 
-Trong bundle, binary nằm ngay cạnh thư mục `extensions/` — cài xong extension theo mục 1 là dùng được ngay.
+Trong mỗi bundle, binary và script cài đặt nằm ngay cạnh thư mục `extensions/` — chạy script cài đặt xong và nạp extension theo mục 1 là sẵn sàng kết nối MCP.
 
 #### Cách B: Tự Biên Dịch Từ Nguồn (Yêu cầu Go 1.21+)
 ```bash

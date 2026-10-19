@@ -1,6 +1,6 @@
 {
   "name": "agent-pilot",
-  "version": "1.0.8-beta",
+  "version": "1.0.9-beta",
   "description": "Agent Pilot (Beta) - Universal AI Agent Browser Controller (Antigravity First)",
   "type": "module",
   "scripts": {
@@ -23,6 +23,9 @@
     "lint": "node scripts/lint.mjs",
     "pack": "node scripts/pack_extension.mjs",
     "pack:bundle": "node scripts/pack_bundle.mjs",
+    "pack:bundle:ubuntu": "node scripts/pack_bundle.mjs --os ubuntu",
+    "pack:bundle:macos": "node scripts/pack_bundle.mjs --os macos",
+    "pack:bundle:windows": "node scripts/pack_bundle.mjs --os windows",
     "pack:release": "node scripts/pack_extension.mjs && node scripts/pack_bundle.mjs",
     "export:mcp": "node scripts/export_mcp.mjs",
     "sync:mcp": "npm run export:mcp && npm run sync:agk",

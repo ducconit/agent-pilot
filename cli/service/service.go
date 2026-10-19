@@ -126,32 +126,81 @@ HỖ TRỢ NỀN TẢNG:
   • Windows: Task Scheduler background task (AgentPilotBridge)`)
 }
 
-func getTargetBinaryPath() string {
-	// First check if installed in standard user/system PATH
-	home, err := os.UserHomeDir()
-	if err == nil {
-		stdPaths := []string{
-			filepath.Join(home, ".local", "bin", "agent-pilot"),
-			filepath.Join(home, ".agk", "bin", "agent-pilot"),
-			"/usr/local/bin/agent-pilot",
+func candidateBinaryPaths(goos, homeDir, localAppData string) []string {
+	trimmedHome := strings.TrimSpace(homeDir)
+	trimmedAppData := strings.TrimSpace(localAppData)
+
+	switch goos {
+	case "windows":
+		var paths []string
+		if trimmedAppData != "" {
+			paths = append(paths, filepath.Join(trimmedAppData, "Programs", "agent-pilot", "agent-pilot.exe"))
 		}
-		for _, p := range stdPaths {
-			if info, err := os.Stat(p); err == nil && !info.IsDir() {
-				return p
-			}
+		if trimmedHome != "" {
+			paths = append(
+				paths,
+				filepath.Join(trimmedHome, ".local", "bin", "agent-pilot.exe"),
+				filepath.Join(trimmedHome, ".agk", "bin", "agent-pilot.exe"),
+			)
+		}
+		return paths
+	case "darwin":
+		var paths []string
+		if trimmedHome != "" {
+			paths = append(
+				paths,
+				filepath.Join(trimmedHome, ".local", "bin", "agent-pilot"),
+				filepath.Join(trimmedHome, ".agk", "bin", "agent-pilot"),
+			)
+		}
+		paths = append(paths, "/opt/homebrew/bin/agent-pilot", "/usr/local/bin/agent-pilot")
+		return paths
+	default:
+		var paths []string
+		if trimmedHome != "" {
+			paths = append(
+				paths,
+				filepath.Join(trimmedHome, ".local", "bin", "agent-pilot"),
+				filepath.Join(trimmedHome, ".agk", "bin", "agent-pilot"),
+			)
+		}
+		paths = append(paths, "/usr/local/bin/agent-pilot")
+		return paths
+	}
+}
+
+func resolveTargetBinaryPath(goos, homeDir, localAppData, fallbackExec string, isFile func(string) bool) string {
+	for _, p := range candidateBinaryPaths(goos, homeDir, localAppData) {
+		if isFile != nil && isFile(p) {
+			return p
 		}
 	}
-
-	// Fallback to current executable path
-	execPath, err := os.Executable()
-	if err == nil {
-		if realPath, err := filepath.EvalSymlinks(execPath); err == nil {
-			return realPath
-		}
-		return execPath
+	if strings.TrimSpace(fallbackExec) != "" {
+		return fallbackExec
 	}
-
+	if goos == "windows" {
+		return "agent-pilot.exe"
+	}
 	return "agent-pilot"
+}
+
+func getTargetBinaryPath() string {
+	home, _ := os.UserHomeDir()
+	localAppData := os.Getenv("LOCALAPPDATA")
+
+	var fallbackExec string
+	if execPath, err := os.Executable(); err == nil {
+		if realPath, symErr := filepath.EvalSymlinks(execPath); symErr == nil {
+			fallbackExec = realPath
+		} else {
+			fallbackExec = execPath
+		}
+	}
+
+	return resolveTargetBinaryPath(runtime.GOOS, home, localAppData, fallbackExec, func(p string) bool {
+		info, err := os.Stat(p)
+		return err == nil && !info.IsDir()
+	})
 }
 
 // NewServiceManager constructs an OS-specific ServiceManager instance

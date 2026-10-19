@@ -60,7 +60,7 @@ Download the pre-compiled binary for your operating system from GitHub Releases 
 
 ```bash
 # Build from source (run from the repository root)
-go build -ldflags "-s -w -X github.com/ducconit/agent-pilot-extension/cli/version.Version=1.0.8-beta" -o cli/agent-pilot ./cli/cmd/agent-pilot
+go build -ldflags "-s -w -X github.com/ducconit/agent-pilot-extension/cli/version.Version=1.0.9-beta" -o cli/agent-pilot ./cli/cmd/agent-pilot
 sudo cp cli/agent-pilot /usr/local/bin/   # or copy to ~/.local/bin/
 ```
 
@@ -141,7 +141,7 @@ In Cursor Settings -> Features -> MCP Servers -> Add New MCP Server:
   Verify port 58765 is active:
   ```bash
   curl http://127.0.0.1:58765/health
-  # Expected: {"status":"ok","name":"Agent Pilot Go Bridge Server","port":58765,"extensionConnected":true,"clientCount":1,"version":"1.0.8-beta","clients":[{"instanceId":"<id>","browser":"Chromium","os":"linux","isActive":true,"connectedAt":1789295000000}]}
+  # Expected: {"status":"ok","name":"Agent Pilot Go Bridge Server","port":58765,"extensionConnected":true,"clientCount":1,"version":"1.0.9-beta","clients":[{"instanceId":"<id>","browser":"Chromium","os":"linux","isActive":true,"connectedAt":1789295000000}]}
   # NOTE: `clients` is an ARRAY of connected extension client objects (may be empty).
   ```
 

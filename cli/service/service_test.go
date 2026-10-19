@@ -36,6 +36,100 @@ func TestGetTargetBinaryPath(t *testing.T) {
 	}
 }
 
+func TestCandidateBinaryPaths_ByOS(t *testing.T) {
+	linuxPaths := candidateBinaryPaths("linux", "/home/ubuntu", "")
+	expectedLinux := []string{
+		"/home/ubuntu/.local/bin/agent-pilot",
+		"/home/ubuntu/.agk/bin/agent-pilot",
+		"/usr/local/bin/agent-pilot",
+	}
+	if strings.Join(linuxPaths, "|") != strings.Join(expectedLinux, "|") {
+		t.Errorf("unexpected linux candidate paths: got %v, want %v", linuxPaths, expectedLinux)
+	}
+
+	darwinPaths := candidateBinaryPaths("darwin", "/Users/dev", "")
+	expectedDarwin := []string{
+		"/Users/dev/.local/bin/agent-pilot",
+		"/Users/dev/.agk/bin/agent-pilot",
+		"/opt/homebrew/bin/agent-pilot",
+		"/usr/local/bin/agent-pilot",
+	}
+	if strings.Join(darwinPaths, "|") != strings.Join(expectedDarwin, "|") {
+		t.Errorf("unexpected darwin candidate paths: got %v, want %v", darwinPaths, expectedDarwin)
+	}
+
+	winPaths := candidateBinaryPaths("windows", `C:\Users\Alice`, `C:\Users\Alice\AppData\Local`)
+	if len(winPaths) != 3 {
+		t.Fatalf("expected 3 windows candidate paths, got %d: %v", len(winPaths), winPaths)
+	}
+	if !strings.HasSuffix(winPaths[0], `Programs\agent-pilot\agent-pilot.exe`) && !strings.HasSuffix(winPaths[0], `Programs/agent-pilot/agent-pilot.exe`) {
+		t.Errorf("expected first windows path to be under Programs/agent-pilot/agent-pilot.exe, got %s", winPaths[0])
+	}
+	for _, p := range winPaths {
+		if !strings.HasSuffix(p, "agent-pilot.exe") {
+			t.Errorf("expected windows candidate path %q to end with agent-pilot.exe", p)
+		}
+	}
+
+	// Windows without LOCALAPPDATA should omit the LocalAppData entry gracefully
+	winNoAppData := candidateBinaryPaths("windows", `C:\Users\Alice`, "   ")
+	if len(winNoAppData) != 2 {
+		t.Errorf("expected 2 windows candidate paths when LOCALAPPDATA is empty, got %d: %v", len(winNoAppData), winNoAppData)
+	}
+}
+
+func TestResolveTargetBinaryPath_ByOS(t *testing.T) {
+	// 1. Matches first existing candidate on Windows
+	winResolved := resolveTargetBinaryPath(
+		"windows",
+		`C:\Users\Alice`,
+		`C:\Users\Alice\AppData\Local`,
+		`D:\Downloads\agent-pilot.exe`,
+		func(p string) bool {
+			return strings.Contains(p, "AppData") && strings.HasSuffix(p, "agent-pilot.exe")
+		},
+	)
+	if !strings.Contains(winResolved, "AppData") || !strings.HasSuffix(winResolved, "agent-pilot.exe") {
+		t.Errorf("expected Windows LocalAppData binary path, got %s", winResolved)
+	}
+
+	// 2. Matches /opt/homebrew/bin/agent-pilot on macOS when ~/.local/bin doesn't exist
+	macResolved := resolveTargetBinaryPath(
+		"darwin",
+		"/Users/dev",
+		"",
+		"/private/var/folders/agent-pilot",
+		func(p string) bool {
+			return p == "/opt/homebrew/bin/agent-pilot"
+		},
+	)
+	if macResolved != "/opt/homebrew/bin/agent-pilot" {
+		t.Errorf("expected /opt/homebrew/bin/agent-pilot, got %s", macResolved)
+	}
+
+	// 3. Falls back to fallbackExec when no candidate exists
+	fallbackResolved := resolveTargetBinaryPath(
+		"linux",
+		"/home/ubuntu",
+		"",
+		"/custom/path/agent-pilot",
+		func(string) bool { return false },
+	)
+	if fallbackResolved != "/custom/path/agent-pilot" {
+		t.Errorf("expected /custom/path/agent-pilot, got %s", fallbackResolved)
+	}
+
+	// 4. Default binary name when fallbackExec is empty
+	winDefault := resolveTargetBinaryPath("windows", "", "", "", func(string) bool { return false })
+	if winDefault != "agent-pilot.exe" {
+		t.Errorf("expected default windows binary name agent-pilot.exe, got %s", winDefault)
+	}
+	unixDefault := resolveTargetBinaryPath("linux", "", "", "", func(string) bool { return false })
+	if unixDefault != "agent-pilot" {
+		t.Errorf("expected default unix binary name agent-pilot, got %s", unixDefault)
+	}
+}
+
 func TestLinuxServiceManager_Install_EscapesSpacesAndQuotes(t *testing.T) {
 	var executedCommands [][]string
 	mockRunner := func(name string, args ...string) (string, error) {
