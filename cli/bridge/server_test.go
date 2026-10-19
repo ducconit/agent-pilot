@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -22,5 +23,25 @@ func TestHealthReportsActiveBridgePort(t *testing.T) {
 	}
 	if got, ok := payload["port"].(float64); !ok || int(got) != 12345 {
 		t.Fatalf("expected /health to report the bound port 12345, got %#v", payload["port"])
+	}
+}
+
+func TestHandleHTTPAPIAcceptsActionAndPayloadAliases(t *testing.T) {
+	body := bytes.NewBufferString(`{"action":"ping","payload":{}}`)
+	req := httptest.NewRequest(http.MethodPost, "/api", body)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handleHTTPAPI(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200 for action alias, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON response: %v", err)
+	}
+	if ok, _ := resp["success"].(bool); !ok {
+		t.Fatalf("expected success=true, got %#v", resp)
 	}
 }

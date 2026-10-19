@@ -3,27 +3,27 @@
  * Moved verbatim from bridge-client.js; behaviour must stay identical.
  */
 
-import { attachedTabs } from "../constants.js";
+import { attachedTabs, NO_TARGET_TAB_ERROR } from "../constants.js";
 import { attachDebugger, detachDebugger, sendCdpCommand } from "../cdp-manager.js";
 
 export const cdpHandlers = {
   "cdp.attach": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const res = await attachDebugger(tabId, client.broadcastFn);
     respond(res);
   },
 
   "cdp.detach": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const res = await detachDebugger(tabId, client.broadcastFn);
     respond(res);
   },
 
   "cdp.status": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const status = await attachDebugger(tabId, client.broadcastFn).catch((err) => ({
       success: false,
       error: err && err.message ? err.message : String(err)
@@ -43,7 +43,7 @@ export const cdpHandlers = {
 
   "cdp.send": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const cdpMethod = params.cdpMethod || params.method || params.action;
     if (!cdpMethod) return respond(null, new Error("Missing CDP method (cdpMethod or method)"));
     const cdpParams = params.cdpParams || params.commandParams || params.params || {};

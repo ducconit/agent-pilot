@@ -7,6 +7,7 @@
 
 import { activeDialogs } from "./constants.js";
 import { sendCdpCommand } from "./cdp-connection.js";
+import { sendTabMessageWithRetry } from "./tab-manager.js";
 
 /**
  * Handle JavaScript dialog (alert, confirm, prompt)
@@ -55,7 +56,8 @@ function validateUploadFilePaths(filePaths) {
 }
 
 /**
- * Upload files to an <input type="file"> element via CDP DOM.setFileInputFiles
+ * Upload files to an <input type="file"> element (or an upload trigger button/menuitem)
+ * via CDP DOM.setFileInputFiles.
  */
 export async function uploadFileInput(tabId, selector, filePaths) {
   if (!selector) {
@@ -70,15 +72,7 @@ export async function uploadFileInput(tabId, selector, filePaths) {
   let resolvedSelector = selector;
   let marker = null;
   try {
-    const markRes = await new Promise((resolve) => {
-      chrome.tabs.sendMessage(tabId, { action: "mark_upload_target", selector }, (resp) => {
-        if (chrome.runtime.lastError) {
-          resolve(null);
-        } else {
-          resolve(resp);
-        }
-      });
-    });
+    const markRes = await sendTabMessageWithRetry(tabId, { action: "mark_upload_target", selector });
     if (markRes && markRes.success && markRes.marker) {
       marker = markRes.marker;
       resolvedSelector = `[data-agent-pilot-upload="${marker}"]`;
@@ -87,15 +81,74 @@ export async function uploadFileInput(tabId, selector, filePaths) {
     console.debug("[AgentPilot] Could not mark upload target via content script:", err);
   }
 
-  // 2. Locate element via CDP Runtime.evaluate and set files
+  // 2. Locate element (or trigger lazy/ephemeral file input creation) via CDP Runtime.evaluate and set files
   let objectId = null;
   try {
     const evalScript = `(() => {
       const el = document.querySelector(${JSON.stringify(resolvedSelector)});
       if (!el) throw new Error("Element not found for selector: " + ${JSON.stringify(selector)});
-      if (el.tagName !== 'INPUT' || (el.type && el.type.toLowerCase() !== 'file')) {
-        const fileInput = el.querySelector ? el.querySelector('input[type=file]') : null;
-        if (fileInput) return fileInput;
+      const isFileInput = (node) =>
+        Boolean(node && node.tagName === 'INPUT' && (!node.type || node.type.toLowerCase() === 'file'));
+      const findFileInputInScope = (root) => {
+        if (!root) return null;
+        if (isFileInput(root)) return root;
+        if (root.querySelector) {
+          const nested = root.querySelector('input[type=file]');
+          if (nested) return nested;
+        }
+        if (root.parentElement && root.parentElement.querySelector) {
+          const sibling = root.parentElement.querySelector('input[type=file]');
+          if (sibling) return sibling;
+        }
+        return null;
+      };
+
+      let found = findFileInputInScope(el);
+      if (found) return found;
+
+      // Dispatch hover/focus in case a framework directive lazily attaches <input type="file"> (e.g. xapFileSelectorTrigger)
+      const beforeInputs = new Set(document.querySelectorAll('input[type=file]'));
+      for (const target of [el, el.parentElement].filter(Boolean)) {
+        target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+        target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false, cancelable: false }));
+        target.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+      }
+      found = findFileInputInScope(el);
+      if (found) return found;
+      for (const candidate of document.querySelectorAll('input[type=file]')) {
+        if (!beforeInputs.has(candidate)) return candidate;
+      }
+
+      // Intercept dynamic <input type="file">.click() when clicking a trigger button/menuitem
+      let capturedInput = null;
+      const origClick = HTMLInputElement.prototype.click;
+      HTMLInputElement.prototype.click = function(...args) {
+        if (isFileInput(this)) {
+          capturedInput = this;
+          if (!this.isConnected && document.body) {
+            this.style.display = 'none';
+            this.setAttribute('data-ap-temp-upload-input', '1');
+            document.body.appendChild(this);
+          }
+          return;
+        }
+        return origClick.apply(this, args);
+      };
+      try {
+        if (typeof el.click === 'function') {
+          el.click();
+        } else {
+          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        }
+      } finally {
+        HTMLInputElement.prototype.click = origClick;
+      }
+
+      if (capturedInput) return capturedInput;
+      found = findFileInputInScope(el);
+      if (found) return found;
+      for (const candidate of document.querySelectorAll('input[type=file]')) {
+        if (!beforeInputs.has(candidate)) return candidate;
       }
       return el;
     })()`;
@@ -115,15 +168,27 @@ export async function uploadFileInput(tabId, selector, filePaths) {
       throw new Error("Failed to obtain remote object ID for selector: " + selector);
     }
 
-    const nodeResult = await sendCdpCommand(tabId, "DOM.requestNode", { objectId });
-    if (!nodeResult || !nodeResult.nodeId) {
-      throw new Error("Failed to resolve DOM nodeId for file input element");
+    // Prefer passing objectId directly to DOM.setFileInputFiles so it works even when DOM.getDocument
+    // has not been called yet on this tab. Fall back to DOM.getDocument + DOM.requestNode if needed.
+    try {
+      await sendCdpCommand(tabId, "DOM.setFileInputFiles", {
+        files: filePaths,
+        objectId
+      });
+    } catch (directErr) {
+      console.debug("[AgentPilot] Direct objectId DOM.setFileInputFiles failed, trying DOM.getDocument + DOM.requestNode:", directErr);
+      await sendCdpCommand(tabId, "DOM.getDocument", { depth: 0 }).catch((docErr) => {
+        console.debug("[AgentPilot] DOM.getDocument fallback note:", docErr);
+      });
+      const nodeResult = await sendCdpCommand(tabId, "DOM.requestNode", { objectId });
+      if (!nodeResult || !nodeResult.nodeId) {
+        throw directErr || new Error("Failed to resolve DOM nodeId for file input element");
+      }
+      await sendCdpCommand(tabId, "DOM.setFileInputFiles", {
+        files: filePaths,
+        nodeId: nodeResult.nodeId
+      });
     }
-
-    await sendCdpCommand(tabId, "DOM.setFileInputFiles", {
-      files: filePaths,
-      nodeId: nodeResult.nodeId
-    });
 
     return {
       success: true,
@@ -138,12 +203,10 @@ export async function uploadFileInput(tabId, selector, filePaths) {
         console.debug("[AgentPilot] Runtime.releaseObject cleanup error ignored:", err);
       });
     }
-    if (marker) {
-      chrome.tabs.sendMessage(tabId, { action: "unmark_upload_target", marker }, () => {
-        if (chrome.runtime.lastError) {
-          console.debug("[AgentPilot] unmark_upload_target cleanup error ignored:", chrome.runtime.lastError);
-        }
-      });
-    }
+    chrome.tabs.sendMessage(tabId, { action: "unmark_upload_target", marker: marker || "" }, () => {
+      if (chrome.runtime.lastError) {
+        console.debug("[AgentPilot] unmark_upload_target cleanup error ignored:", chrome.runtime.lastError);
+      }
+    });
   }
 }

@@ -106,7 +106,7 @@ const EXPECTED_AGENT_METHODS = [
   "extensions.manage", "config.getSecretFilter", "config.setSecretFilter", "extension.reload"
 ];
 const LEGACY_ALIASES = [
-  "evaluate", "page.key", "page.wait", "page.upload",
+  "tabs.list", "evaluate", "page.key", "page.wait", "page.upload",
   "dialog.handle", "agent.setBusy", "session.stop", "batch.execute", "runtime.reload"
 ];
 const missingMethods = EXPECTED_AGENT_METHODS.filter((name) => typeof AGENT_COMMAND_HANDLERS[name] !== "function");
@@ -431,6 +431,96 @@ record(
     fallbackAfterClose.steps.length === 4 &&
     fallbackBatchAfterClose.actions.length === 4,
   `steps=${flowState.steps.length}, batchActions=${exportedBatch.actions.length}, survivedTabClose=${fallbackAfterClose.steps.length === 4}`
+);
+
+// 13. uploadFileInput uses direct objectId on DOM.setFileInputFiles and falls back to DOM.getDocument + DOM.requestNode
+attachedTabs.add(301);
+const cdpCommandsCalled = [];
+globalThis.chrome = {
+  runtime: { lastError: null },
+  tabs: {
+    sendMessage: (_tabId, msg, cb) => {
+      if (msg.action === "mark_upload_target") {
+        cb({ success: true, marker: "ap-upload-test1" });
+      } else {
+        cb({ success: true });
+      }
+    }
+  },
+  debugger: {
+    sendCommand: (_target, method, params, cb) => {
+      cdpCommandsCalled.push({ method, params });
+      if (method === "Runtime.evaluate") {
+        cb({ result: { objectId: "obj-file-123" } });
+      } else if (method === "DOM.setFileInputFiles") {
+        cb({});
+      } else if (method === "Runtime.releaseObject") {
+        cb({});
+      } else {
+        cb({});
+      }
+    }
+  }
+};
+const uploadRes = await cdpManager.uploadFileInput(301, "[xapfileselectortrigger]", ["/tmp/video.mp4"]);
+attachedTabs.delete(301);
+const setFilesCmd = cdpCommandsCalled.find((c) => c.method === "DOM.setFileInputFiles");
+const evalCmd = cdpCommandsCalled.find((c) => c.method === "Runtime.evaluate");
+record(
+  "13. uploadFileInput passes objectId directly to DOM.setFileInputFiles and intercepts dynamic triggers",
+  uploadRes.success === true &&
+    setFilesCmd?.params?.objectId === "obj-file-123" &&
+    Array.isArray(setFilesCmd?.params?.files) &&
+    setFilesCmd.params.files[0] === "/tmp/video.mp4" &&
+    evalCmd?.params?.expression?.includes("HTMLInputElement.prototype.click"),
+  `objectId=${setFilesCmd?.params?.objectId}, files=${JSON.stringify(setFilesCmd?.params?.files)}`
+);
+
+// 14. collectDevtoolsData supports errorsOnly, excludeStatic, and omits verbose headers by default
+const { collectDevtoolsData } = await import("../extensions/background/agent-handlers/devtools.js");
+attachedTabs.add(302);
+devtoolsBuffers.set(302, {
+  console: [
+    { id: "c1", type: "log", text: "info message" },
+    { id: "c2", type: "warning", text: "warn message" },
+    { id: "c3", type: "error", text: "Upload failed: 400 Bad Request" }
+  ],
+  network: new Map([
+    ["r1", { id: "r1", url: "https://example.com/logo.png", method: "GET", type: "Image", status: 200, headers: { "cache-control": "max-age=3600" } }],
+    ["r2", { id: "r2", url: "https://example.com/api/status", method: "GET", type: "Fetch", status: 200, headers: { "content-type": "application/json" } }],
+    ["r3", { id: "r3", url: "https://example.com/api/upload", method: "POST", type: "Fetch", status: 500, headers: { "x-err": "1" } }]
+  ])
+});
+globalThis.chrome = {
+  runtime: { lastError: null },
+  debugger: {
+    sendCommand: (_target, method, _params, cb) => {
+      if (method === "Performance.getMetrics") cb({ metrics: [] });
+      else cb({});
+    }
+  }
+};
+const filteredDevtools = await collectDevtoolsData(302, {
+  type: "all",
+  errorsOnly: true,
+  excludeStatic: true
+});
+const nonStaticDevtools = await collectDevtoolsData(302, {
+  type: "network",
+  excludeStatic: true,
+  includeHeaders: true
+});
+cleanupTabResources(302);
+record(
+  "14. collectDevtoolsData supports errorsOnly, excludeStatic, and strips verbose response headers by default",
+  filteredDevtools.console.length === 1 &&
+    filteredDevtools.console[0].id === "c3" &&
+    filteredDevtools.network.length === 1 &&
+    filteredDevtools.network[0].id === "r3" &&
+    filteredDevtools.network[0].headers === undefined &&
+    nonStaticDevtools.network.length === 2 &&
+    nonStaticDevtools.network[0].headers?.["content-type"] === "application/json",
+  `errConsole=${filteredDevtools.console.length}, errNet=${filteredDevtools.network.length}, headersStripped=${filteredDevtools.network[0]?.headers === undefined}, nonStaticCount=${nonStaticDevtools.network.length}`
 );
 
 recorder.summarize();

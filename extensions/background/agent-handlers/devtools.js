@@ -4,10 +4,12 @@
  * Moved verbatim from bridge-client.js; behaviour must stay identical.
  */
 
-import { attachedTabs, getBuffer, LIMITS } from "../constants.js";
+import { attachedTabs, getBuffer, LIMITS, NO_TARGET_TAB_ERROR } from "../constants.js";
 import { attachDebugger, sendCdpCommand } from "../cdp-manager.js";
 
 const BYTES_PER_MB = 1024 * 1024;
+const STATIC_RESOURCE_TYPES = new Set(["image", "media", "font", "stylesheet", "manifest"]);
+const STATIC_URL_RE = /\.(?:png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf|eot|css|mp4|webm|mp3|wav)(?:[?#]|$)/i;
 
 /**
  * Shared DevTools telemetry collector used by both `devtools.getData` and batch `devtools` steps.
@@ -23,6 +25,9 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
   const requestedType = params.type || "all";
   const limit = Math.min(Math.max(Number(params.limit) || LIMITS.DEVTOOLS_FETCH_DEFAULT, 1), LIMITS.DEVTOOLS_FETCH_MAX);
   const filterOrigin = params.filterOrigin !== false;
+  const errorsOnly = Boolean(params.errorsOnly);
+  const excludeStatic = Boolean(params.excludeStatic);
+  const includeHeaders = Boolean(params.includeHeaders);
 
   let consoleData = undefined;
   let networkData = undefined;
@@ -44,6 +49,12 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
         return true;
       });
     }
+    if (errorsOnly) {
+      logs = logs.filter(item => {
+        const level = String(item.type || "").toLowerCase();
+        return level === "error" || level === "assert";
+      });
+    }
     consoleData = logs.slice(-limit);
     if (params.clear) {
       buffer.console = [];
@@ -58,7 +69,27 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
         return !url.startsWith("chrome-extension://");
       });
     }
-    networkData = reqs.slice(-limit);
+    if (excludeStatic) {
+      reqs = reqs.filter(item => {
+        const rType = String(item.type || "").toLowerCase();
+        if (STATIC_RESOURCE_TYPES.has(rType)) return false;
+        const url = item.url || "";
+        if (url.startsWith("data:") || STATIC_URL_RE.test(url)) return false;
+        return true;
+      });
+    }
+    if (errorsOnly) {
+      reqs = reqs.filter(item =>
+        item.status === "failed" ||
+        Boolean(item.errorText) ||
+        (typeof item.status === "number" && item.status >= 400)
+      );
+    }
+    reqs = reqs.slice(-limit);
+    if (!includeHeaders) {
+      reqs = reqs.map(({ headers: _headers, ...rest }) => rest);
+    }
+    networkData = reqs;
     if (params.clear) {
       buffer.network.clear();
     }
@@ -114,7 +145,7 @@ export const devtoolsHandlers = {
   "devtools.getData": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) {
-      respond(null, new Error("No target tab available for DevTools"));
+      respond(null, new Error(NO_TARGET_TAB_ERROR));
       return;
     }
     const payload = await collectDevtoolsData(tabId, params, client.broadcastFn);

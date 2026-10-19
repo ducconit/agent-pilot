@@ -3,7 +3,7 @@
  * Moved verbatim from bridge-client.js; behaviour must stay identical.
  */
 
-import { LIMITS } from "../constants.js";
+import { LIMITS, NO_TARGET_TAB_ERROR } from "../constants.js";
 import {
   getFlowState,
   setFlowRecording,
@@ -16,7 +16,7 @@ import {
 export const pageQueryHandlers = {
   "page.getElement": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.getElement", () =>
       client.sendTabMessageWithRetry(tabId, {
         action: "get_element_info",
@@ -32,7 +32,7 @@ export const pageQueryHandlers = {
 
   "page.snapshot": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.snapshot", () =>
       client.sendTabMessageWithRetry(tabId, {
         action: "get_snapshot",
@@ -46,7 +46,7 @@ export const pageQueryHandlers = {
 
   "page.fillForm": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.fillForm", () =>
       client.sendTabMessageWithRetry(tabId, {
         action: "fill_form",
@@ -61,7 +61,7 @@ export const pageQueryHandlers = {
 
   "page.pickColor": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.pickColor", () =>
       client.sendTabMessageWithRetry(tabId, { action: "pick_color", x: params.x, y: params.y })
     )
@@ -71,7 +71,7 @@ export const pageQueryHandlers = {
 
   "page.screenshot": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.screenshot", () =>
       client.captureTabScreenshot(tabId, params)
     )

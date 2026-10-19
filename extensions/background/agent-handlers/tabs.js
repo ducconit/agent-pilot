@@ -8,6 +8,7 @@ import {
   agentControlledTabs,
   normalizeUrl,
   EXTENSION_VERSION,
+  NO_TARGET_TAB_ERROR,
   logDebug
 } from "../constants.js";
 import { attachDebugger } from "../cdp-manager.js";
@@ -116,7 +117,7 @@ export const tabsHandlers = {
     } catch (err) {
       return respond(null, err);
     }
-    if (!tabId) return respond(null, new Error("No target tab found in Agent Pilot group"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const updateProps = {};
     if (params.url) updateProps.url = normalizeUrl(params.url);
     if (params.active !== undefined) updateProps.active = Boolean(params.active);
@@ -151,7 +152,7 @@ export const tabsHandlers = {
     } catch (err) {
       return respond(null, err);
     }
-    if (!tabId) return respond(null, new Error("No target tab found in Agent Pilot group"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     chrome.tabs.remove(tabId, () => {
       if (chrome.runtime.lastError) {
         respond(null, chrome.runtime.lastError);

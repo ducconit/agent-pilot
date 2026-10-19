@@ -90,6 +90,32 @@ export function initCdpEventListeners(broadcastFn) {
           entry
         });
       }
+    } else if (method === "Runtime.exceptionThrown") {
+      const details = params.exceptionDetails || {};
+      const excDesc = details.exception?.description || details.exception?.value || "";
+      const baseText = details.text || "Uncaught exception";
+      const text = excDesc && ! String(excDesc).startsWith(baseText)
+        ? `${baseText}: ${excDesc}`
+        : (excDesc || baseText);
+      const entry = {
+        id: "console_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+        type: "error",
+        text,
+        url: details.url,
+        line: details.lineNumber,
+        stackTrace: details.stackTrace,
+        timestamp: details.timestamp || Date.now()
+      };
+      buffer.console.push(entry);
+      if (buffer.console.length > LIMITS.DEVTOOLS_CONSOLE_MAX) buffer.console.shift();
+
+      if (typeof broadcastFn === "function") {
+        broadcastFn({
+          type: "DEVTOOLS_CONSOLE_EVENT",
+          tabId,
+          entry
+        });
+      }
     }
 
     // 2. Network Events

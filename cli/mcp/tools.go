@@ -62,7 +62,7 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_list_tabs",
-		Description: "List all open tabs across all browser windows.",
+		Description: "List open tabs managed by Agent Pilot (inside the '🤖 Agent Pilot' tab group). Personal user tabs outside this group are isolated to prevent focus theft — call browser_open_tab to open a new Agent Pilot tab if empty.",
 		InputSchema: map[string]interface{}{
 			"type":       "object",
 			"properties": map[string]interface{}{},
@@ -203,15 +203,18 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_get_devtools_data",
-		Description: "Retrieve real-time DevTools logs (Console, Network requests, Performance metrics).",
+		Description: "Retrieve real-time DevTools logs (Console, Network requests, Performance metrics). Supports errorsOnly and excludeStatic for compact debugging.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"type":         map[string]interface{}{"type": "string", "description": "all, console, network, performance"},
-				"filterOrigin": map[string]interface{}{"type": "boolean", "description": "Filter out internal extension logs/warnings (chrome-extension://*). Default: true"},
-				"tabId":        map[string]interface{}{"type": "integer", "description": "Target tab ID"},
-				"limit":        map[string]interface{}{"type": "integer", "description": "Max entries to return"},
-				"clear":        map[string]interface{}{"type": "boolean", "description": "Clear buffer after reading"},
+				"type":           map[string]interface{}{"type": "string", "description": "all, console, network, performance"},
+				"filterOrigin":   map[string]interface{}{"type": "boolean", "description": "Filter out internal extension logs/warnings (chrome-extension://*). Default: true"},
+				"errorsOnly":     map[string]interface{}{"type": "boolean", "description": "Only return console errors/assertions and failed/4xx/5xx network requests (default: false)"},
+				"excludeStatic":  map[string]interface{}{"type": "boolean", "description": "Exclude static assets (images, fonts, media, stylesheets) from network requests (default: false)"},
+				"includeHeaders": map[string]interface{}{"type": "boolean", "description": "Include full HTTP response headers on network requests (default: false to save tokens)"},
+				"tabId":          map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"limit":          map[string]interface{}{"type": "integer", "description": "Max entries to return"},
+				"clear":          map[string]interface{}{"type": "boolean", "description": "Clear buffer after reading"},
 			},
 		},
 	},
@@ -318,11 +321,11 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_upload_file",
-		Description: "Upload local files into a file input element (<input type='file'>) using Chrome DevTools Protocol DOM.setFileInputFiles.",
+		Description: "Upload local files into a file input element (<input type='file'>) or an upload trigger button/menuitem using Chrome DevTools Protocol DOM.setFileInputFiles.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"selector": map[string]interface{}{"type": "string", "description": "CSS selector or @ref of the file input element"},
+				"selector": map[string]interface{}{"type": "string", "description": "CSS selector or @ref of the <input type='file'> element or upload trigger button/menuitem"},
 				"files": map[string]interface{}{
 					"type":        "array",
 					"items":       map[string]interface{}{"type": "string"},

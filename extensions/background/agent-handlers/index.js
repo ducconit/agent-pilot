@@ -23,6 +23,7 @@ export const AGENT_COMMAND_HANDLERS = Object.freeze({
   ...systemHandlers,
 
   // Legacy aliases (same implementation, different method name)
+  "tabs.list": tabsHandlers["tabs.listAll"],
   "evaluate": pageInputHandlers["page.evaluate"],
   "page.key": pageInputHandlers["page.pressKey"],
   "page.wait": pageInputHandlers["page.waitFor"],

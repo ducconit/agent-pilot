@@ -7,6 +7,7 @@
 import {
   attachedTabs,
   DEFAULTS,
+  NO_TARGET_TAB_ERROR,
   logDebug
 } from "../constants.js";
 import {
@@ -90,7 +91,7 @@ export async function evaluateInTab(tabId, script, broadcastFn = null) {
 export const pageInputHandlers = {
   "page.evaluate": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const script = params.script || params.expression || params.code || "";
     if (!script) return respond(null, new Error("Missing script or expression to evaluate"));
 
@@ -101,7 +102,7 @@ export const pageInputHandlers = {
 
   "page.moveMouse": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.moveMouse", () =>
       client.sendTabMessageWithRetry(tabId, {
         action: "move_cursor",
@@ -116,7 +117,7 @@ export const pageInputHandlers = {
 
   "page.click": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const via = client.normalizeVia(params);
     if (via === "synthetic") {
       client.runWithTabLock(tabId, "page.click", () =>
@@ -169,7 +170,7 @@ export const pageInputHandlers = {
 
   "page.type": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.type", () =>
       client.sendTabMessageWithRetry(tabId, {
         action: "type_text",
@@ -186,7 +187,7 @@ export const pageInputHandlers = {
 
   "page.scroll": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.scroll", () =>
       client.sendTabMessageWithRetry(tabId, {
         action: "scroll_page",
@@ -201,7 +202,7 @@ export const pageInputHandlers = {
 
   "page.hover": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.hover", async () => {
       // First locate coordinates, scroll into view and move visual cursor without dispatching duplicate DOM events
       const res = await client.sendTabMessageWithRetry(tabId, {
@@ -235,7 +236,7 @@ export const pageInputHandlers = {
 
   "page.drag": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const via = client.normalizeVia(params);
     const fromSelector = params.from || params.fromSelector;
     const toSelector = params.to || params.toSelector;
@@ -288,7 +289,7 @@ export const pageInputHandlers = {
 
   "page.pressKey": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.pressKey", async () => {
       try {
         if (!attachedTabs.has(tabId)) {
@@ -312,7 +313,7 @@ export const pageInputHandlers = {
 
   "page.waitFor": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     let timeoutMs;
     try {
       timeoutMs = getPositiveNumber(params.timeoutMs, params.timeout) || DEFAULTS.WAIT_FOR_TIMEOUT_MS;
@@ -332,7 +333,7 @@ export const pageInputHandlers = {
 
   "page.uploadFile": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const files = Array.isArray(params.files) ? params.files : (params.filePath ? [params.filePath] : (params.file ? [params.file] : []));
     client.runWithTabLock(tabId, "page.uploadFile", async () => {
       if (!attachedTabs.has(tabId)) {

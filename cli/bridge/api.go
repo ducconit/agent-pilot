@@ -121,14 +121,24 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 	method, _ := req["method"].(string)
 	method = strings.TrimSpace(method)
 	if method == "" {
+		action, _ := req["action"].(string)
+		method = strings.TrimSpace(action)
+	}
+	if method == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"success": false,
 			"error":   "Missing or empty 'method' field in request payload",
 		})
 		return
 	}
+	if method == "tabs.list" {
+		method = "tabs.listAll"
+	}
 
 	params, _ := req["params"].(map[string]interface{})
+	if params == nil {
+		params, _ = req["payload"].(map[string]interface{})
+	}
 	if params == nil {
 		params = make(map[string]interface{})
 	}

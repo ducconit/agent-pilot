@@ -3,13 +3,13 @@
  * Moved verbatim from bridge-client.js; behaviour must stay identical.
  */
 
-import { attachedTabs, agentControlledTabs, logDebug } from "../constants.js";
+import { attachedTabs, agentControlledTabs, NO_TARGET_TAB_ERROR, logDebug } from "../constants.js";
 import { handleJavaScriptDialog, getActiveDialog, attachDebugger } from "../cdp-manager.js";
 
 export const pageSessionHandlers = {
   "page.handleDialog": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.handleDialog", async () => {
       if (!attachedTabs.has(tabId)) {
         await attachDebugger(tabId, client.broadcastFn);
@@ -22,13 +22,13 @@ export const pageSessionHandlers = {
 
   "dialog.getActive": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     respond({ dialog: getActiveDialog(tabId) });
   },
 
   "page.setBusy": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     // session !== undefined switches to "agent session" semantics (persistent lock)
     if (params.session !== undefined) {
       const res = await client.setTabSession(tabId, params.session !== false, params.action || params.name || "");
@@ -41,7 +41,7 @@ export const pageSessionHandlers = {
 
   "session.start": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const sessionName = params.name || params.action || "Session đang hoạt động";
     const res = await client.setTabSession(tabId, true, sessionName);
     respond(res || { success: true, tabId, sessionActive: true, sessionName });
@@ -52,7 +52,7 @@ export const pageSessionHandlers = {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId, {
       allowFallback: params.closeTab === true ? (hasExplicitTab || !params.agentId) : true
     });
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const res = await client.setTabSession(tabId, false).catch((err) => {
       logDebug("session.end setTabSession error", err);
       return null;
@@ -84,7 +84,7 @@ export const pageSessionHandlers = {
 
   "session.status": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    if (!tabId) return respond(null, new Error("No target tab found"));
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const pingRes = await client.sendTabMessageWithRetry(tabId, { action: "ping" }).catch((err) => {
       logDebug("session.status ping error", err);
       return null;

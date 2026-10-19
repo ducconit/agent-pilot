@@ -13,6 +13,8 @@ export const activeTracingSessions = new Map(); // tabId -> { buffer: [], catego
 // Chrome Native Tab Group styling constants
 export const AGENT_GROUP_TITLE = "🤖 Agent Pilot";
 export const AGENT_GROUP_COLOR = "cyan";
+export const NO_TARGET_TAB_ERROR =
+  `No target tab found in the '${AGENT_GROUP_TITLE}' tab group. Personal/ungrouped browser tabs are isolated for security. Call browser_open_tab (or 'agent-pilot open <url>') to open a tab in the Agent Pilot group first, or move the target tab into the '${AGENT_GROUP_TITLE}' group.`;
 
 // Timeout & Capacity constants
 export const CDP_PROTOCOL_VERSION = "1.3";

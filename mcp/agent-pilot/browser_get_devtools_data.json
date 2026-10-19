@@ -1,13 +1,25 @@
 {
-  "description": "Retrieve real-time DevTools logs (Console, Network requests, Performance metrics).",
+  "description": "Retrieve real-time DevTools logs (Console, Network requests, Performance metrics). Supports errorsOnly and excludeStatic for compact debugging.",
   "inputSchema": {
     "properties": {
       "clear": {
         "description": "Clear buffer after reading",
         "type": "boolean"
       },
+      "errorsOnly": {
+        "description": "Only return console errors/assertions and failed/4xx/5xx network requests (default: false)",
+        "type": "boolean"
+      },
+      "excludeStatic": {
+        "description": "Exclude static assets (images, fonts, media, stylesheets) from network requests (default: false)",
+        "type": "boolean"
+      },
       "filterOrigin": {
         "description": "Filter out internal extension logs/warnings (chrome-extension://*). Default: true",
+        "type": "boolean"
+      },
+      "includeHeaders": {
+        "description": "Include full HTTP response headers on network requests (default: false to save tokens)",
         "type": "boolean"
       },
       "limit": {
@@ -32,8 +44,20 @@
         "description": "Clear buffer after reading",
         "type": "boolean"
       },
+      "errorsOnly": {
+        "description": "Only return console errors/assertions and failed/4xx/5xx network requests (default: false)",
+        "type": "boolean"
+      },
+      "excludeStatic": {
+        "description": "Exclude static assets (images, fonts, media, stylesheets) from network requests (default: false)",
+        "type": "boolean"
+      },
       "filterOrigin": {
         "description": "Filter out internal extension logs/warnings (chrome-extension://*). Default: true",
+        "type": "boolean"
+      },
+      "includeHeaders": {
+        "description": "Include full HTTP response headers on network requests (default: false to save tokens)",
         "type": "boolean"
       },
       "limit": {

@@ -245,8 +245,13 @@
       return { success: true, marker };
     },
     unmark_upload_target: (req) => {
-      const target = document.querySelector(`[data-agent-pilot-upload="${req.marker}"]`);
-      if (target) target.removeAttribute("data-agent-pilot-upload");
+      if (req.marker) {
+        const target = document.querySelector(`[data-agent-pilot-upload="${req.marker}"]`);
+        if (target) target.removeAttribute("data-agent-pilot-upload");
+      }
+      for (const tempInput of document.querySelectorAll('[data-ap-temp-upload-input="1"]')) {
+        tempInput.remove();
+      }
       return { success: true };
     },
     scroll_into_view: (req) => {

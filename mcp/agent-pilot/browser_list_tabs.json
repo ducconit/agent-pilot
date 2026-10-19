@@ -1,5 +1,5 @@
 {
-  "description": "List all open tabs across all browser windows.",
+  "description": "List open tabs managed by Agent Pilot (inside the '🤖 Agent Pilot' tab group). Personal user tabs outside this group are isolated to prevent focus theft — call browser_open_tab to open a new Agent Pilot tab if empty.",
   "inputSchema": {
     "properties": {},
     "type": "object"
