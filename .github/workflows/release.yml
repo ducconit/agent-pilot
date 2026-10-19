@@ -198,6 +198,7 @@ jobs:
           - **Bridge cục bộ an toàn**: chỉ lắng nghe `127.0.0.1:58765` (đổi bằng `AGENT_PILOT_PORT`).
           BODY_EOF
           sed -i "s/\$VERSION/$VERSION/g" dist/release_body.md
+          cat dist/bundles/checksums.txt >> dist/checksums.txt
 
       - name: Create GitHub Release & Upload Assets
         uses: softprops/action-gh-release@v2
@@ -207,7 +208,6 @@ jobs:
           files: |
             dist/bundles/agent-pilot-*.zip
             dist/agent-pilot-*.zip
-            dist/bundles/checksums.txt
             dist/checksums.txt
           body_path: dist/release_body.md
           generate_release_notes: true
