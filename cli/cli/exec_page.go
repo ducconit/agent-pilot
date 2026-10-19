@@ -16,7 +16,15 @@ import (
 	"github.com/ducconit/agent-pilot-extension/cli/config"
 )
 
-func ExecClick(selector string, x, y float64, via string, tabID interface{}) error {
+func mergeExtraParams(params map[string]interface{}, extra ...map[string]interface{}) {
+	for _, m := range extra {
+		for k, v := range m {
+			params[k] = v
+		}
+	}
+}
+
+func ExecClick(selector string, x, y float64, via string, tabID interface{}, extra ...map[string]interface{}) error {
 	params, err := BuildClickParams(selector, x, y, via)
 	if err != nil {
 		return err
@@ -24,6 +32,7 @@ func ExecClick(selector string, x, y float64, via string, tabID interface{}) err
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
+	mergeExtraParams(params, extra...)
 
 	res, err := bridge.DispatchCommand("page.click", params, config.DefaultBridgePort())
 	if err != nil {
@@ -33,7 +42,7 @@ func ExecClick(selector string, x, y float64, via string, tabID interface{}) err
 	return nil
 }
 
-func ExecType(selector, text string, clear, enter bool, tabID interface{}) error {
+func ExecType(selector, text string, clear, enter bool, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{
 		"selector":   selector,
 		"text":       text,
@@ -43,6 +52,7 @@ func ExecType(selector, text string, clear, enter bool, tabID interface{}) error
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
+	mergeExtraParams(params, extra...)
 
 	res, err := bridge.DispatchCommand("page.type", params, config.DefaultBridgePort())
 	if err != nil {
@@ -52,11 +62,30 @@ func ExecType(selector, text string, clear, enter bool, tabID interface{}) error
 	return nil
 }
 
-func ExecOpen(url string, active bool) error {
+func ExecScroll(deltaX, deltaY float64, tabID interface{}, extra ...map[string]interface{}) error {
+	params := map[string]interface{}{
+		"deltaX": deltaX,
+		"deltaY": deltaY,
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	mergeExtraParams(params, extra...)
+
+	res, err := bridge.DispatchCommand("page.scroll", params, config.DefaultBridgePort())
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✅ Scrolled (dx=%v, dy=%v): %v\n", deltaX, deltaY, res)
+	return nil
+}
+
+func ExecOpen(url string, active bool, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{
 		"url":    url,
 		"active": active,
 	}
+	mergeExtraParams(params, extra...)
 	res, err := bridge.DispatchCommand("tabs.create", params, config.DefaultBridgePort())
 	if err != nil {
 		return err
@@ -65,13 +94,14 @@ func ExecOpen(url string, active bool) error {
 	return nil
 }
 
-func ExecNavigate(url string, tabID interface{}) error {
+func ExecNavigate(url string, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{
 		"url": url,
 	}
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
+	mergeExtraParams(params, extra...)
 	res, err := bridge.DispatchCommand("tabs.update", params, config.DefaultBridgePort())
 	if err != nil {
 		return err
@@ -97,7 +127,7 @@ func ExecScreenshot(mode, selector, outputPath string, tabID interface{}) error 
 	return ExecScreenshotWithOptions(mode, selector, "", outputPath, tabID)
 }
 
-func ExecScreenshotWithOptions(mode, selector, clipStr, outputPath string, tabID interface{}) error {
+func ExecScreenshotWithOptions(mode, selector, clipStr, outputPath string, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{
 		"mode": mode,
 	}
@@ -138,6 +168,7 @@ func ExecScreenshotWithOptions(mode, selector, clipStr, outputPath string, tabID
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
+	mergeExtraParams(params, extra...)
 
 	res, err := bridge.DispatchCommand("page.screenshot", params, config.DefaultBridgePort())
 	if err != nil {
@@ -159,13 +190,14 @@ func ExecScreenshotWithOptions(mode, selector, clipStr, outputPath string, tabID
 	return nil
 }
 
-func ExecInspect(selector string, tabID interface{}) error {
+func ExecInspect(selector string, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{
 		"selector": selector,
 	}
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
+	mergeExtraParams(params, extra...)
 
 	res, err := bridge.DispatchCommand("page.getElement", params, config.DefaultBridgePort())
 	if err != nil {
@@ -271,13 +303,14 @@ func ExecSession(subcmd string, name string, tabID interface{}) error {
 	return nil
 }
 
-func ExecEvaluate(expression string, tabID interface{}) error {
+func ExecEvaluate(expression string, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{
 		"expression": expression,
 	}
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
+	mergeExtraParams(params, extra...)
 	res, err := bridge.DispatchCommand("page.evaluate", params, config.DefaultBridgePort())
 	if err != nil {
 		return err
@@ -309,7 +342,7 @@ func ExecEvaluate(expression string, tabID interface{}) error {
 	return nil
 }
 
-func ExecSnapshot(maxElements int, format string, tabID interface{}) error {
+func ExecSnapshot(maxElements int, format string, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{
 		"maxElements": maxElements,
 		"format":      format,
@@ -317,6 +350,7 @@ func ExecSnapshot(maxElements int, format string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
+	mergeExtraParams(params, extra...)
 	res, err := bridge.DispatchCommand("page.snapshot", params, config.DefaultBridgePort())
 	if err != nil {
 		return err
@@ -334,7 +368,7 @@ func ExecSnapshot(maxElements int, format string, tabID interface{}) error {
 	return nil
 }
 
-func ExecFillForm(fields []map[string]interface{}, submitSelector string, pressEnter bool, tabID interface{}) error {
+func ExecFillForm(fields []map[string]interface{}, submitSelector string, pressEnter bool, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{
 		"fields": fields,
 	}
@@ -347,6 +381,7 @@ func ExecFillForm(fields []map[string]interface{}, submitSelector string, pressE
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
+	mergeExtraParams(params, extra...)
 	res, err := bridge.DispatchCommand("page.fillForm", params, config.DefaultBridgePort())
 	if err != nil {
 		return err
@@ -360,13 +395,14 @@ func ExecFillForm(fields []map[string]interface{}, submitSelector string, pressE
 	return nil
 }
 
-func ExecHover(selector string, tabID interface{}) error {
+func ExecHover(selector string, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{
 		"selector": selector,
 	}
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
+	mergeExtraParams(params, extra...)
 	res, err := bridge.DispatchCommand("page.hover", params, config.DefaultBridgePort())
 	if err != nil {
 		return err
@@ -387,7 +423,7 @@ func ExecDrag(params map[string]interface{}, tabID interface{}) error {
 	return nil
 }
 
-func ExecPressKey(key, selector string, tabID interface{}) error {
+func ExecPressKey(key, selector string, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{
 		"key": key,
 	}
@@ -397,6 +433,7 @@ func ExecPressKey(key, selector string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
+	mergeExtraParams(params, extra...)
 	res, err := bridge.DispatchCommand("page.pressKey", params, config.DefaultBridgePort())
 	if err != nil {
 		return err
@@ -413,11 +450,18 @@ func ExecWaitFor(selector, text, state string, timeoutMs int, tabID interface{})
 	if text != "" {
 		params["text"] = text
 	}
-	if state != "" {
-		params["state"] = state
-	}
-	if timeoutMs > 0 {
-		params["timeoutMs"] = timeoutMs
+	if state == "sleep" && selector == "" && text == "" {
+		if timeoutMs > 0 {
+			params["waitMs"] = timeoutMs
+			params["timeoutMs"] = timeoutMs
+		}
+	} else {
+		if state != "" {
+			params["state"] = state
+		}
+		if timeoutMs > 0 {
+			params["timeoutMs"] = timeoutMs
+		}
 	}
 	if tabID != nil {
 		params["tabId"] = tabID
@@ -453,7 +497,7 @@ func validateUploadFilePath(p string) error {
 	return nil
 }
 
-func ExecUploadFile(selector string, files []string, tabID interface{}) error {
+func ExecUploadFile(selector string, files []string, tabID interface{}, extra ...map[string]interface{}) error {
 	for _, f := range files {
 		if err := validateUploadFilePath(f); err != nil {
 			return err
@@ -466,6 +510,7 @@ func ExecUploadFile(selector string, files []string, tabID interface{}) error {
 	if tabID != nil {
 		params["tabId"] = tabID
 	}
+	mergeExtraParams(params, extra...)
 	res, err := bridge.DispatchCommand("page.uploadFile", params, config.DefaultBridgePort())
 	if err != nil {
 		return err

@@ -20,18 +20,18 @@
       <span class="ap-hud-status" id="ap-hud-item-count">0 vị trí</span>
     </div>
     <div class="ap-hud-modes">
-      <button class="ap-hud-btn active" data-mode="element" title="Chọn phần tử DOM (E)">🎯 Phần tử</button>
-      <button class="ap-hud-btn" data-mode="region" title="Kéo chọn một vùng (R)">⬚ Vùng chọn</button>
-      <button class="ap-hud-btn" data-mode="screen" title="Chụp toàn màn hình hiển thị (S)">🖥️ Màn hình</button>
-      <button class="ap-hud-btn" data-mode="fullpage" title="Chụp toàn bộ trang web dài (P)">📄 Toàn trang</button>
+      <div role="button" tabindex="0" class="ap-hud-btn active" data-mode="element" title="Chọn phần tử DOM (E)">🎯 Phần tử</div>
+      <div role="button" tabindex="0" class="ap-hud-btn" data-mode="region" title="Kéo chọn một vùng (R)">⬚ Vùng chọn</div>
+      <div role="button" tabindex="0" class="ap-hud-btn" data-mode="screen" title="Chụp toàn màn hình hiển thị (S)">🖥️ Màn hình</div>
+      <div role="button" tabindex="0" class="ap-hud-btn" data-mode="fullpage" title="Chụp toàn bộ trang web dài (P)">📄 Toàn trang</div>
     </div>
     <div class="ap-hud-divider"></div>
     <div class="ap-hud-actions">
-      <button class="ap-hud-action-btn" id="ap-hud-btn-list" title="Xem danh sách các vị trí đã chọn">📋 Danh sách (<span id="ap-hud-list-count">0</span>)</button>
-      <button class="ap-hud-action-btn ap-btn-highlight" id="ap-hud-btn-copy" title="Copy toàn bộ chú thích dạng Markdown để gửi Agent (Kênh C)">📋 Copy Prompt</button>
-      <button class="ap-hud-action-btn ap-btn-save" id="ap-hud-btn-inbox" title="Lưu vào Inbox của Agent (Kênh B)">💾 Lưu Inbox</button>
-      <button class="ap-hud-action-btn ap-btn-send" id="ap-hud-btn-send" title="Gửi trực tiếp cho Agent qua cổng 58765 (Kênh A)">🚀 Gửi Agent</button>
-      <button class="ap-hud-close-btn" id="ap-hud-btn-close" title="Thoát chế độ chú thích UI">✕ Thoát</button>
+      <div role="button" tabindex="0" class="ap-hud-action-btn" id="ap-hud-btn-list" title="Xem danh sách các vị trí đã chọn">📋 Danh sách (<span id="ap-hud-list-count">0</span>)</div>
+      <div role="button" tabindex="0" class="ap-hud-action-btn ap-btn-highlight" id="ap-hud-btn-copy" title="Copy toàn bộ chú thích dạng Markdown để gửi Agent (Kênh C)">📋 Copy Prompt</div>
+      <div role="button" tabindex="0" class="ap-hud-action-btn ap-btn-save" id="ap-hud-btn-inbox" title="Lưu vào Inbox của Agent (Kênh B)">💾 Lưu Inbox</div>
+      <div role="button" tabindex="0" class="ap-hud-action-btn ap-btn-send" id="ap-hud-btn-send" title="Gửi trực tiếp cho Agent qua cổng 58765 (Kênh A)">🚀 Gửi Agent</div>
+      <div role="button" tabindex="0" class="ap-hud-close-btn" id="ap-hud-btn-close" title="Thoát chế độ chú thích UI">✕ Thoát</div>
     </div>
   `;
   document.documentElement.appendChild(hud);

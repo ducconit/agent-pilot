@@ -115,8 +115,8 @@
       badge.className = "ap-pinned-badge";
       badge.innerHTML = `
         <span class="ap-pinned-badge-num" title="Bấm để sửa ghi chú #${idx + 1}">#${idx + 1}</span>
-        <button class="ap-pinned-edit-btn" title="Sửa ghi chú #${idx + 1}">✏️</button>
-        <button class="ap-pinned-del-btn" title="Xóa vị trí #${idx + 1}">✕</button>
+        <span role="button" tabindex="0" class="ap-pinned-edit-btn" title="Sửa ghi chú #${idx + 1}">✏️</span>
+        <span role="button" tabindex="0" class="ap-pinned-del-btn" title="Xóa vị trí #${idx + 1}">✕</span>
         ${item.comment ? `<div class="ap-pinned-tooltip" title="Bấm để sửa"><strong>#${idx + 1}:</strong> ${escapeHtml(item.comment)}</div>` : ""}
       `;
 

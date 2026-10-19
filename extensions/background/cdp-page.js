@@ -96,7 +96,7 @@ export async function uploadFileInput(tabId, selector, filePaths) {
           const nested = root.querySelector('input[type=file]');
           if (nested) return nested;
         }
-        if (root.parentElement && root.parentElement.querySelector) {
+        if (root.parentElement && root.parentElement !== document.body && root.parentElement !== document.documentElement && root.parentElement.querySelector) {
           const sibling = root.parentElement.querySelector('input[type=file]');
           if (sibling) return sibling;
         }
@@ -189,6 +189,19 @@ export async function uploadFileInput(tabId, selector, filePaths) {
         nodeId: nodeResult.nodeId
       });
     }
+
+    // Dispatch input and change events on the file input so onchange handlers fire
+    await sendCdpCommand(tabId, "Runtime.callFunctionOn", {
+      objectId,
+      functionDeclaration: `function() {
+        try {
+          this.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+          this.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+        } catch (_) {}
+      }`
+    }).catch((dispatchErr) => {
+      console.debug("[AgentPilot] Dispatching change event on file input note:", dispatchErr);
+    });
 
     return {
       success: true,

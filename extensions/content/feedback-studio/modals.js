@@ -26,7 +26,7 @@
         <span class="ap-popover-icon">💬</span>
         <span class="ap-popover-title" id="ap-popover-title">Ghi chú sửa giao diện</span>
       </div>
-      <button class="ap-popover-close" id="ap-popover-btn-close" title="Đóng">✕</button>
+      <div role="button" tabindex="0" class="ap-popover-close" id="ap-popover-btn-close" title="Đóng">✕</div>
     </div>
     <div class="ap-popover-body">
       <div class="ap-popover-preview">
@@ -36,8 +36,8 @@
       <textarea id="ap-popover-input" class="ap-popover-textarea" placeholder="Nhập yêu cầu sửa giao diện (vd: đổi màu nút, thu nhỏ padding, sửa căn lề, thay đổi text...)" rows="3"></textarea>
     </div>
     <div class="ap-popover-footer">
-      <button class="ap-popover-btn ap-btn-cancel" id="ap-popover-btn-cancel">Hủy</button>
-      <button class="ap-popover-btn ap-btn-submit" id="ap-popover-btn-save">✓ Lưu Chú Thích</button>
+      <div role="button" tabindex="0" class="ap-popover-btn ap-btn-cancel" id="ap-popover-btn-cancel">Hủy</div>
+      <div role="button" tabindex="0" class="ap-popover-btn ap-btn-submit" id="ap-popover-btn-save">✓ Lưu Chú Thích</div>
     </div>
   `;
   document.documentElement.appendChild(commentPopover);
@@ -179,11 +179,11 @@
           <span class="ap-annotator-title" id="ap-annotator-title">Khoanh vùng & Ghi chú</span>
         </div>
         <div class="ap-annotator-tools">
-          <button class="ap-tool-btn active" id="ap-tool-pin" title="Ghim điểm đánh dấu">📍 Ghim điểm</button>
-          <button class="ap-tool-btn" id="ap-tool-box" title="Vẽ khung chữ nhật">⬜ Khung</button>
-          <button class="ap-tool-btn" id="ap-tool-clear" title="Xóa các dấu đã vẽ">🗑️ Xóa dấu</button>
+          <div role="button" tabindex="0" class="ap-tool-btn active" id="ap-tool-pin" title="Ghim điểm đánh dấu">📍 Ghim điểm</div>
+          <div role="button" tabindex="0" class="ap-tool-btn" id="ap-tool-box" title="Vẽ khung chữ nhật">⬜ Khung</div>
+          <div role="button" tabindex="0" class="ap-tool-btn" id="ap-tool-clear" title="Xóa các dấu đã vẽ">🗑️ Xóa dấu</div>
         </div>
-        <button class="ap-popover-close" id="ap-annotator-btn-close">✕</button>
+        <div role="button" tabindex="0" class="ap-popover-close" id="ap-annotator-btn-close">✕</div>
       </div>
       <div class="ap-annotator-body">
         <div class="ap-canvas-wrapper" id="ap-canvas-wrapper">
@@ -197,8 +197,8 @@
         </div>
       </div>
       <div class="ap-annotator-footer">
-        <button class="ap-popover-btn ap-btn-cancel" id="ap-annotator-btn-cancel">Hủy bỏ</button>
-        <button class="ap-popover-btn ap-btn-submit" id="ap-annotator-btn-save">✓ Lưu Chú Thích Này</button>
+        <div role="button" tabindex="0" class="ap-popover-btn ap-btn-cancel" id="ap-annotator-btn-cancel">Hủy bỏ</div>
+        <div role="button" tabindex="0" class="ap-popover-btn ap-btn-submit" id="ap-annotator-btn-save">✓ Lưu Chú Thích Này</div>
       </div>
     </div>
   `;
@@ -294,7 +294,7 @@
       <div class="ap-pin-row" data-idx="${idx}">
         <span class="ap-pin-num ${typeClass}" title="${isBox ? "Khung vùng" : "Điểm ghim"}">${icon} ${num}</span>
         <input type="text" class="ap-pin-input" data-idx="${idx}" placeholder="${placeholder}" value="${escapeHtml(ann.comment || "")}">
-        <button class="ap-pin-del" data-idx="${idx}" title="Xóa đánh dấu #${num}">🗑️</button>
+        <div role="button" tabindex="0" class="ap-pin-del" data-idx="${idx}" title="Xóa đánh dấu #${num}">🗑️</div>
       </div>
     `;
     }).join("");
@@ -382,16 +382,16 @@
           <span class="ap-list-icon">📋</span>
           <span class="ap-list-title">Danh sách vị trí cần sửa (<span id="ap-list-total-count">0</span>)</span>
         </div>
-        <button class="ap-popover-close" id="ap-list-btn-close">✕</button>
+        <div role="button" tabindex="0" class="ap-popover-close" id="ap-list-btn-close">✕</div>
       </div>
       <div class="ap-list-body" id="ap-list-items-container">
         <!-- Dynamic items rendered here -->
       </div>
       <div class="ap-list-footer">
-        <button class="ap-popover-btn ap-btn-danger" id="ap-list-btn-clear-all">🗑️ Xóa tất cả</button>
+        <div role="button" tabindex="0" class="ap-popover-btn ap-btn-danger" id="ap-list-btn-clear-all">🗑️ Xóa tất cả</div>
         <div style="display:flex;gap:8px;">
-          <button class="ap-popover-btn ap-btn-cancel" id="ap-list-btn-back">Đóng</button>
-          <button class="ap-popover-btn ap-btn-submit" id="ap-list-btn-copy-all">📋 Copy Prompt cho Agent</button>
+          <div role="button" tabindex="0" class="ap-popover-btn ap-btn-cancel" id="ap-list-btn-back">Đóng</div>
+          <div role="button" tabindex="0" class="ap-popover-btn ap-btn-submit" id="ap-list-btn-copy-all">📋 Copy Prompt cho Agent</div>
         </div>
       </div>
     </div>
@@ -438,8 +438,8 @@
               ${escapeHtml(item.title)}
             </span>
             <div class="ap-card-actions">
-              <button class="ap-card-action-btn btn-edit" data-id="${safeId}" title="Sửa ghi chú">✏️</button>
-              <button class="ap-card-action-btn btn-delete" data-id="${safeId}" title="Xóa mục này">🗑️</button>
+              <div role="button" tabindex="0" class="ap-card-action-btn btn-edit" data-id="${safeId}" title="Sửa ghi chú">✏️</div>
+              <div role="button" tabindex="0" class="ap-card-action-btn btn-delete" data-id="${safeId}" title="Xóa mục này">🗑️</div>
             </div>
           </div>
           ${item.component ? `
@@ -456,8 +456,8 @@
             <div class="ap-card-comment-edit hidden" id="comment-edit-${safeId}">
               <textarea class="ap-card-edit-textarea">${escapeHtml(item.comment || "")}</textarea>
               <div style="display:flex;gap:6px;margin-top:6px;">
-                <button class="ap-popover-btn ap-btn-submit btn-save-edit" data-id="${safeId}">Lưu</button>
-                <button class="ap-popover-btn ap-btn-cancel btn-cancel-edit" data-id="${safeId}">Hủy</button>
+                <div role="button" tabindex="0" class="ap-popover-btn ap-btn-submit btn-save-edit" data-id="${safeId}">Lưu</div>
+                <div role="button" tabindex="0" class="ap-popover-btn ap-btn-cancel btn-cancel-edit" data-id="${safeId}">Hủy</div>
               </div>
             </div>
           </div>

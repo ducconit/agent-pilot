@@ -522,35 +522,97 @@ if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.onUpdated) {
 }
 
 /**
+ * Create a tab via chrome.tabs.create, automatically falling back to
+ * chrome.windows.create when Chrome has no open browser window ("No current window").
+ */
+export function createTabWithWindowFallback(url, makeActive = false) {
+  return new Promise((resolve, reject) => {
+    const tryWindowCreate = (originalErr) => {
+      if (typeof chrome === "undefined" || !chrome.windows || typeof chrome.windows.create !== "function") {
+        reject(originalErr instanceof Error ? originalErr : new Error(originalErr?.message || String(originalErr)));
+        return;
+      }
+      chrome.windows.create({ url, focused: Boolean(makeActive) }, (win) => {
+        if (chrome.runtime?.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        const firstTab = win && Array.isArray(win.tabs) && win.tabs.length > 0 ? win.tabs[0] : null;
+        if (firstTab) {
+          resolve(firstTab);
+        } else {
+          reject(originalErr instanceof Error ? originalErr : new Error(originalErr?.message || "Failed to create tab in new window"));
+        }
+      });
+    };
+
+    chrome.tabs.create({ url, active: Boolean(makeActive) }, (tab) => {
+      if (chrome.runtime?.lastError) {
+        const msg = chrome.runtime.lastError.message || String(chrome.runtime.lastError);
+        if (/no current window|no last-focused window/i.test(msg)) {
+          tryWindowCreate(new Error(msg));
+          return;
+        }
+        reject(new Error(msg));
+        return;
+      }
+      resolve(tab);
+    });
+  });
+}
+
+/**
  * Wait until the given tab reports status === "complete" or timeout elapses.
  */
 export function waitForTabComplete(tabId, timeoutMs = DEFAULT_LOAD_TIMEOUT_MS) {
   return new Promise((resolve) => {
+    if (typeof chrome === "undefined" || !chrome.tabs?.onUpdated?.addListener) {
+      resolve();
+      return;
+    }
     let finished = false;
+    const isTabLoaded = (tab) => {
+      if (!tab) return false;
+      if (tab.status === undefined) return true;
+      if (tab.status !== "complete") return false;
+      if (tab.pendingUrl && (!tab.url || tab.url === "about:blank")) return false;
+      return true;
+    };
     const done = () => {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
-      if (chrome.tabs?.onUpdated) {
+      if (chrome.tabs?.onUpdated?.removeListener) {
         chrome.tabs.onUpdated.removeListener(onUpdated);
       }
       resolve();
     };
     const timer = setTimeout(done, timeoutMs);
-    const onUpdated = (tId, changeInfo) => {
+    const onUpdated = (tId, changeInfo, tab) => {
       if (tId === tabId && changeInfo.status === "complete") {
-        done();
-      }
-    };
-    if (chrome.tabs?.onUpdated) {
-      chrome.tabs.onUpdated.addListener(onUpdated);
-    }
-    if (chrome.tabs?.get) {
-      chrome.tabs.get(tabId, (tab) => {
-        if (!chrome.runtime.lastError && tab && tab.status === "complete") {
+        if (!tab || !tab.pendingUrl || (tab.url && tab.url !== "about:blank")) {
           done();
         }
-      });
+      }
+    };
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    if (chrome.tabs?.get) {
+      try {
+        const maybePromise = chrome.tabs.get(tabId, (tab) => {
+          if (!chrome.runtime?.lastError && isTabLoaded(tab)) {
+            done();
+          }
+        });
+        if (maybePromise && typeof maybePromise.then === "function") {
+          maybePromise.then((tab) => {
+            if (isTabLoaded(tab)) {
+              done();
+            }
+          }).catch(() => {});
+        }
+      } catch (_) {
+        done();
+      }
     } else {
       done();
     }

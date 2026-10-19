@@ -1,5 +1,5 @@
 {
-  "description": "Type text into an input or textarea with realistic human keystroke intervals.",
+  "description": "Type text into an input or textarea with realistic human keystroke intervals. Supports inline post-type waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
       "clear": {
@@ -14,6 +14,10 @@
         "description": "CSS selector of input (optional; defaults to focused active element or cursor position)",
         "type": "string"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after typing",
+        "type": "integer"
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
@@ -21,6 +25,18 @@
       "text": {
         "description": "Text to type",
         "type": "string"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after typing",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after typing",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after typing",
+        "type": "integer"
       }
     },
     "required": [
@@ -43,6 +59,10 @@
         "description": "CSS selector of input (optional; defaults to focused active element or cursor position)",
         "type": "string"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after typing",
+        "type": "integer"
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
@@ -50,6 +70,18 @@
       "text": {
         "description": "Text to type",
         "type": "string"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after typing",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after typing",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after typing",
+        "type": "integer"
       }
     },
     "required": [

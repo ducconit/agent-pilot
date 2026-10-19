@@ -523,5 +523,117 @@ record(
   `errConsole=${filteredDevtools.console.length}, errNet=${filteredDevtools.network.length}, headersStripped=${filteredDevtools.network[0]?.headers === undefined}, nonStaticCount=${nonStaticDevtools.network.length}`
 );
 
+// 15. runInlineWait & mergeWaitMeta support waitMs, sleepMs, waitForSelector, waitForText across handlers
+const { runInlineWait, mergeWaitMeta, pageInputHandlers } = await import("../extensions/background/agent-handlers/page-input.js");
+const inlineMessages = [];
+const mockInlineClient = {
+  getTargetTabId: async () => 501,
+  runWithTabLock: async (_tabId, _label, fn) => await fn(),
+  sendTabMessageWithRetry: async (_tabId, msg) => {
+    inlineMessages.push(msg);
+    if (msg.action === "wait_for") {
+      return { success: true, waitedMs: 12, state: msg.state || "visible" };
+    }
+    return { success: true, clicked: true };
+  }
+};
+const inlineMeta = await runInlineWait(mockInlineClient, 501, {
+  waitForSelector: ".loaded-panel",
+  waitMs: 15
+});
+const mergedClick = mergeWaitMeta({ success: true }, inlineMeta);
+
+// Also test page.evaluate with `script` alias + inline waitMs
+globalThis.chrome = {
+  runtime: { lastError: null },
+  scripting: {
+    executeScript: async ({ args: [expr] }) => [{ result: { ok: true, value: `eval:${expr}` } }]
+  }
+};
+const evalWithScriptAlias = await new Promise((resolve, reject) => {
+  pageInputHandlers["page.evaluate"](
+    mockInlineClient,
+    { script: "window.__squoosh", waitMs: 10 },
+    (res, err) => (err ? reject(err) : resolve(res))
+  );
+});
+record(
+  "15. runInlineWait + mergeWaitMeta & page.evaluate script alias",
+  inlineMessages.length === 1 &&
+    inlineMessages[0].action === "wait_for" &&
+    inlineMessages[0].selector === ".loaded-panel" &&
+    mergedClick.waitedMs >= 15 &&
+    mergedClick.waitForResult?.success === true &&
+    evalWithScriptAlias === "eval:window.__squoosh",
+  `waitForSelector=${inlineMessages[0]?.selector}, waitedMs=${mergedClick.waitedMs}, evalResult=${evalWithScriptAlias}`
+);
+
+// 16. createTabWithWindowFallback automatically falls back to chrome.windows.create when no browser window is open
+const { createTabWithWindowFallback } = await import("../extensions/background/tab-manager.js");
+let windowsCreateCalled = false;
+globalThis.chrome = {
+  runtime: { lastError: null },
+  tabs: {
+    create: (_opts, cb) => {
+      globalThis.chrome.runtime.lastError = { message: "No current window" };
+      cb(undefined);
+      globalThis.chrome.runtime.lastError = null;
+    }
+  },
+  windows: {
+    create: (opts, cb) => {
+      globalThis.chrome.runtime.lastError = null;
+      windowsCreateCalled = true;
+      cb({ id: 1, tabs: [{ id: 777, url: opts.url, active: Boolean(opts.focused), status: "complete" }] });
+    }
+  }
+};
+const fallbackTab = await createTabWithWindowFallback("https://squoosh.app", false);
+record(
+  "16. createTabWithWindowFallback recovers from 'No current window' via chrome.windows.create",
+  windowsCreateCalled === true && fallbackTab?.id === 777 && fallbackTab?.url === "https://squoosh.app",
+  `windowsCreateCalled=${windowsCreateCalled}, tabId=${fallbackTab?.id}`
+);
+
+// 17. cursor-wait.js supports pure sleep (waitMs) and condition-less document.readyState wait
+globalThis.window = globalThis.window || {};
+globalThis.document = {
+  readyState: "complete",
+  body: { innerText: "Hello Agent Pilot" },
+  querySelector: () => null
+};
+await import("../extensions/content/cursor-wait.js");
+const sleepWaitRes = await globalThis.window.__AP_INTERNAL__.cursorWait.waitFor({ waitMs: 20 });
+const readyStateWaitRes = await globalThis.window.__AP_INTERNAL__.cursorWait.waitFor({});
+record(
+  "17. cursor-wait.js supports pure sleep (waitMs) and condition-less readyState wait",
+  sleepWaitRes?.success === true &&
+    sleepWaitRes?.state === "slept" &&
+    sleepWaitRes?.waitedMs >= 15 &&
+    readyStateWaitRes?.success === true &&
+    readyStateWaitRes?.state === "ready" &&
+    readyStateWaitRes?.readyState === "complete",
+  `sleepState=${sleepWaitRes?.state} (${sleepWaitRes?.waitedMs}ms), readyState=${readyStateWaitRes?.state}`
+);
+
+// 18. Content scripts contain zero <button> elements so document.querySelectorAll('button') is never polluted
+import fs from "node:fs";
+import path from "node:path";
+const contentFiles = [
+  "extensions/content/dom-inspector.js",
+  "extensions/content/feedback-studio/hud-toolbar.js",
+  "extensions/content/feedback-studio/modals.js",
+  "extensions/content/feedback-studio/pinned-overlay.js"
+];
+const filesWithButtonTag = contentFiles.filter((rel) => {
+  const src = fs.readFileSync(path.resolve(rel), "utf8");
+  return /<button\b/i.test(src);
+});
+record(
+  "18. Content scripts use <div/span role='button'> with zero <button> tag pollution",
+  filesWithButtonTag.length === 0,
+  filesWithButtonTag.length === 0 ? "0 <button> tags in content scripts" : `found in: ${filesWithButtonTag.join(", ")}`
+);
+
 recorder.summarize();
 recorder.exitIfFailed();

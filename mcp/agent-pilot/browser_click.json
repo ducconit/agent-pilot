@@ -1,10 +1,14 @@
 {
-  "description": "Click with the virtual mouse (visual cursor). Accepts CSS selector or direct (x, y) coordinates. Tip: If a button/element cannot be found via selector (e.g. Canvas/Shadow DOM), take a screenshot -\u003e locate pixel coordinates -\u003e click with x, y and via:'cdp'.",
+  "description": "Click with the virtual mouse (visual cursor). Accepts CSS selector or direct (x, y) coordinates. Supports inline post-click waitMs/waitForSelector/waitForText. Tip: If a button/element cannot be found via selector (e.g. Canvas/Shadow DOM), take a screenshot -\u003e locate pixel coordinates -\u003e click with x, y and via:'cdp'.",
   "inputSchema": {
     "properties": {
       "selector": {
-        "description": "CSS selector to click",
+        "description": "CSS selector or @ref to click",
         "type": "string"
+      },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after clicking",
+        "type": "integer"
       },
       "tabId": {
         "description": "Target tab ID",
@@ -13,6 +17,18 @@
       "via": {
         "description": "Input backend: synthetic (default), cdp (trusted), auto (cdp with synthetic fallback)",
         "type": "string"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after clicking",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after clicking",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after clicking (saves a separate wait call)",
+        "type": "integer"
       },
       "x": {
         "description": "X coordinate in viewport pixels",
@@ -29,8 +45,12 @@
   "parameters": {
     "properties": {
       "selector": {
-        "description": "CSS selector to click",
+        "description": "CSS selector or @ref to click",
         "type": "string"
+      },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after clicking",
+        "type": "integer"
       },
       "tabId": {
         "description": "Target tab ID",
@@ -39,6 +59,18 @@
       "via": {
         "description": "Input backend: synthetic (default), cdp (trusted), auto (cdp with synthetic fallback)",
         "type": "string"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after clicking",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after clicking",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after clicking (saves a separate wait call)",
+        "type": "integer"
       },
       "x": {
         "description": "X coordinate in viewport pixels",

@@ -142,6 +142,15 @@ agent-pilot type "#search" "agent pilot automation" --clear --enter
 
 # Inspect DOM element details (rect, selector, XPath, text, computed CSS)
 agent-pilot inspect "#product-card"
+
+# Wait for an element selector or visible text
+agent-pilot wait "#dashboard-ready" --state visible --timeout 5000
+agent-pilot wait --text "Payment Successful" --timeout 5000
+
+# Pure sleep for a fixed duration (ms) or wait for document.readyState === "complete"
+agent-pilot wait 1500
+agent-pilot wait --ms 1500
+agent-pilot wait
 ```
 
 ### Trusted input via CDP (`--via cdp`) — cross-origin iframes, canvas & WebGL games

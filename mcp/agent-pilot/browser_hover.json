@@ -1,13 +1,29 @@
 {
-  "description": "Simulate human-like virtual mouse hover over an element (triggering mouseenter, mouseover, mousemove).",
+  "description": "Simulate human-like virtual mouse hover over an element (triggering mouseenter, mouseover, mousemove). Supports inline post-hover waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
       "selector": {
         "description": "CSS selector or @ref to hover over",
         "type": "string"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after hovering",
+        "type": "integer"
+      },
       "tabId": {
         "description": "Target tab ID",
+        "type": "integer"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after hovering",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after hovering",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after hovering",
         "type": "integer"
       }
     },
@@ -23,8 +39,24 @@
         "description": "CSS selector or @ref to hover over",
         "type": "string"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after hovering",
+        "type": "integer"
+      },
       "tabId": {
         "description": "Target tab ID",
+        "type": "integer"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after hovering",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after hovering",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after hovering",
         "type": "integer"
       }
     },

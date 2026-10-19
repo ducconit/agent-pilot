@@ -300,10 +300,22 @@ func TestParseWaitArgs(t *testing.T) {
 		t.Fatalf("case 6 failed: sel=%s, text=%s, timeout=%d, tab=%v, err=%v", sel, text, timeout, tab, err)
 	}
 
-	// 7. Empty args should return error
-	_, _, _, _, _, err = parseWaitArgs([]string{})
-	if err == nil {
-		t.Fatalf("expected error for empty args, got nil")
+	// 7. Empty args waits for document readyState with default timeout
+	sel, text, state, timeout, tab, err = parseWaitArgs([]string{})
+	if err != nil || sel != "" || text != "" || state != "visible" || timeout != 10000 || tab != nil {
+		t.Fatalf("case 7 (empty args readyState wait) failed: sel=%s, text=%s, state=%s, timeout=%d, err=%v", sel, text, state, timeout, err)
+	}
+
+	// 7b. Numeric positional argument triggers sleep mode
+	sel, text, state, timeout, tab, err = parseWaitArgs([]string{"1500", "--tab", "12"})
+	if err != nil || sel != "" || text != "" || state != "sleep" || timeout != 1500 || tab != 12 {
+		t.Fatalf("case 7b (numeric sleep) failed: sel=%s, text=%s, state=%s, timeout=%d, tab=%v, err=%v", sel, text, state, timeout, tab, err)
+	}
+
+	// 7c. Explicit --sleep / --ms flag triggers sleep mode
+	sel, text, state, timeout, tab, err = parseWaitArgs([]string{"--ms", "2500"})
+	if err != nil || sel != "" || text != "" || state != "sleep" || timeout != 2500 {
+		t.Fatalf("case 7c (--ms sleep) failed: state=%s, timeout=%d, err=%v", state, timeout, err)
 	}
 
 	// 8. Negative test: invalid timeout string
@@ -360,5 +372,45 @@ func TestExecScreenshotWithOptions_ClipValidation(t *testing.T) {
 	err = ExecScreenshotWithOptions("region", "", "10,20,0,40", "", nil)
 	if err == nil || !strings.Contains(err.Error(), "width and height must be > 0") {
 		t.Fatalf("expected dimensions > 0 error, got: %v", err)
+	}
+}
+
+func TestApplyInlineWaitAndNegativePositionalArgs(t *testing.T) {
+	// 1. Flags after positional arguments with inline wait
+	cmdArgs, err := parseCmdArgs(
+		[]string{"#search", "hello world", "--clear", "--enter", "--wait", "250ms", "--wait-for", ".results", "--wait-text", "Found", "--tab", "99"},
+		withInlineWaitFlags(
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
+			FlagDef{Name: "clear", IsBool: true},
+			FlagDef{Name: "enter", IsBool: true},
+		),
+	)
+	if err != nil {
+		t.Fatalf("unexpected parseCmdArgs error: %v", err)
+	}
+	if len(cmdArgs.Positional) != 2 || cmdArgs.Positional[0] != "#search" || cmdArgs.Positional[1] != "hello world" {
+		t.Fatalf("unexpected positional args: %v", cmdArgs.Positional)
+	}
+	if !cmdArgs.Bool("clear") || !cmdArgs.Bool("enter") {
+		t.Fatalf("expected clear=true and enter=true")
+	}
+	extra := map[string]interface{}{}
+	if err := cmdArgs.ApplyInlineWait(extra); err != nil {
+		t.Fatalf("unexpected ApplyInlineWait error: %v", err)
+	}
+	if extra["waitMs"] != 250 || extra["waitForSelector"] != ".results" || extra["waitForText"] != "Found" {
+		t.Fatalf("unexpected inline wait extra map: %v", extra)
+	}
+
+	// 2. Negative numeric positional argument (e.g. agent-pilot scroll -300 --tab 42)
+	scrollArgs, err := parseCmdArgs(
+		[]string{"-300", "--tab", "42"},
+		withInlineWaitFlags(FlagDef{Name: "tab", Aliases: []string{"t"}}),
+	)
+	if err != nil {
+		t.Fatalf("expected negative number to be accepted as positional arg, got err: %v", err)
+	}
+	if len(scrollArgs.Positional) != 1 || scrollArgs.Positional[0] != "-300" {
+		t.Fatalf("expected positional '-300', got: %v", scrollArgs.Positional)
 	}
 }

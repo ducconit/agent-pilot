@@ -11,7 +11,6 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -20,49 +19,72 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func registerInlineWaitPflags(cmd *cobra.Command) {
+	f := cmd.Flags()
+	f.Int("wait", 0, "Milliseconds to wait/sleep after action (alias: --sleep)")
+	f.Int("sleep", 0, "Milliseconds to sleep after action")
+	f.String("wait-for", "", "CSS selector or @ref to wait for after action")
+	f.String("wait-text", "", "Text to wait for on the page after action")
+}
+
 func newOpenCommand() *cobra.Command {
 	cmd := newLeafCommand("open", nil, func(args []string) error {
-		openFlags := flag.NewFlagSet("open", flag.ExitOnError)
-		active := openFlags.Bool("active", false, "Make tab active")
-		if err := openFlags.Parse(args); err != nil {
+		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "active", IsBool: true},
+		))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-		posArgs := openFlags.Args()
-		if len(posArgs) < 1 {
-			fmt.Println("Sử dụng: agent-pilot open <url> [--active]")
+		if len(cmdArgs.Positional) < 1 {
+			fmt.Println("Sử dụng: agent-pilot open <url> [--active] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
 			return errUsage
 		}
-		if err := ExecOpen(posArgs[0], *active); err != nil {
+		extra := map[string]interface{}{}
+		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecOpen(cmdArgs.Positional[0], cmdArgs.Bool("active"), extra); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
 		return nil
 	})
 	cmd.Flags().Bool("active", false, "Make tab active")
+	registerInlineWaitPflags(cmd)
 	return cmd
 }
 
 func newNavigateCommand() *cobra.Command {
 	cmd := newLeafCommand("navigate", nil, func(args []string) error {
-		navFlags := flag.NewFlagSet("navigate", flag.ExitOnError)
-		tabID := navFlags.Int("tab", 0, "Target tab ID")
-		if err := navFlags.Parse(args); err != nil {
+		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
+		))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-		posArgs := navFlags.Args()
-		if len(posArgs) < 1 {
-			fmt.Println("Sử dụng: agent-pilot navigate <url> [--tab <id>]")
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
+		if len(cmdArgs.Positional) < 1 {
+			fmt.Println("Sử dụng: agent-pilot navigate <url> [--tab <id>] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			return errUsage
 		}
-		if err := ExecNavigate(posArgs[0], t); err != nil {
+		extra := map[string]interface{}{}
+		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecNavigate(cmdArgs.Positional[0], tabID, extra); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
 		return nil
 	})
 	cmd.Flags().IntP("tab", "t", 0, "Target tab ID")
+	registerInlineWaitPflags(cmd)
 	return cmd
 }
 
@@ -99,12 +121,12 @@ func newCloseCommand() *cobra.Command {
 
 func newClickCommand() *cobra.Command {
 	cmd := newLeafCommand("click", nil, func(args []string) error {
-		cmdArgs, err := parseCmdArgs(args, []FlagDef{
-			{Name: "tab", Aliases: []string{"t"}},
-			{Name: "x"},
-			{Name: "y"},
-			{Name: "via"},
-		})
+		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
+			FlagDef{Name: "x"},
+			FlagDef{Name: "y"},
+			FlagDef{Name: "via"},
+		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -128,7 +150,12 @@ func newClickCommand() *cobra.Command {
 		if len(cmdArgs.Positional) > 0 {
 			selector = cmdArgs.Positional[0]
 		}
-		if err := ExecClick(selector, x, y, cmdArgs.String("via", "synthetic"), tabID); err != nil {
+		extra := map[string]interface{}{}
+		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecClick(selector, x, y, cmdArgs.String("via", "synthetic"), tabID, extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
@@ -139,29 +166,36 @@ func newClickCommand() *cobra.Command {
 	f.Float64("x", 0, "X coordinate (with --y)")
 	f.Float64("y", 0, "Y coordinate (with --x)")
 	f.String("via", "synthetic", "Input backend: synthetic|cdp|auto")
+	registerInlineWaitPflags(cmd)
 	return cmd
 }
 
 func newTypeCommand() *cobra.Command {
 	cmd := newLeafCommand("type", nil, func(args []string) error {
-		typeFlags := flag.NewFlagSet("type", flag.ExitOnError)
-		tabID := typeFlags.Int("tab", 0, "Target tab ID")
-		clear := typeFlags.Bool("clear", false, "Clear field before typing")
-		enter := typeFlags.Bool("enter", false, "Press enter after typing")
-		if err := typeFlags.Parse(args); err != nil {
+		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
+			FlagDef{Name: "clear", IsBool: true},
+			FlagDef{Name: "enter", IsBool: true},
+		))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-
-		posArgs := typeFlags.Args()
-		if len(posArgs) < 2 {
-			fmt.Println("Sử dụng: agent-pilot type <selector> <text> [--clear] [--enter] [--tab <id>]")
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
+		if len(cmdArgs.Positional) < 2 {
+			fmt.Println("Sử dụng: agent-pilot type <selector> <text> [--clear] [--enter] [--wait <ms>] [--tab <id>]")
+			return errUsage
 		}
-		if err := ExecType(posArgs[0], posArgs[1], *clear, *enter, t); err != nil {
+		extra := map[string]interface{}{}
+		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecType(cmdArgs.Positional[0], cmdArgs.Positional[1], cmdArgs.Bool("clear"), cmdArgs.Bool("enter"), tabID, extra); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
 		return nil
@@ -170,14 +204,104 @@ func newTypeCommand() *cobra.Command {
 	f.IntP("tab", "t", 0, "Target tab ID")
 	f.Bool("clear", false, "Clear field before typing")
 	f.Bool("enter", false, "Press enter after typing")
+	registerInlineWaitPflags(cmd)
+	return cmd
+}
+
+func newScrollCommand() *cobra.Command {
+	cmd := newLeafCommand("scroll", nil, func(args []string) error {
+		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
+			FlagDef{Name: "dx", Aliases: []string{"delta-x"}},
+			FlagDef{Name: "dy", Aliases: []string{"delta-y"}},
+		))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		dx, err := cmdArgs.Float("dx", 0)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		dy, err := cmdArgs.Float("dy", 500)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if len(cmdArgs.Positional) > 0 {
+			first := strings.ToLower(strings.TrimSpace(cmdArgs.Positional[0]))
+			switch first {
+			case "down":
+				if _, ok := cmdArgs.Flags["dy"]; !ok {
+					dy = 500
+				}
+			case "up":
+				if _, ok := cmdArgs.Flags["dy"]; !ok {
+					dy = -500
+				}
+			case "right":
+				if _, ok := cmdArgs.Flags["dx"]; !ok {
+					dx = 500
+				}
+				if _, ok := cmdArgs.Flags["dy"]; !ok {
+					dy = 0
+				}
+			case "left":
+				if _, ok := cmdArgs.Flags["dx"]; !ok {
+					dx = -500
+				}
+				if _, ok := cmdArgs.Flags["dy"]; !ok {
+					dy = 0
+				}
+			default:
+				if len(cmdArgs.Positional) >= 2 {
+					parsedX, errX := strconv.ParseFloat(cmdArgs.Positional[0], 64)
+					parsedY, errY := strconv.ParseFloat(cmdArgs.Positional[1], 64)
+					if errX != nil || errY != nil {
+						fmt.Fprintf(os.Stderr, "❌ Error: giá trị tọa độ scroll không hợp lệ\n")
+						return errUsage
+					}
+					dx, dy = parsedX, parsedY
+				} else {
+					parsedY, errY := strconv.ParseFloat(cmdArgs.Positional[0], 64)
+					if errY != nil {
+						fmt.Fprintf(os.Stderr, "❌ Error: giá trị scroll không hợp lệ: %s\n", cmdArgs.Positional[0])
+						return errUsage
+					}
+					dy = parsedY
+				}
+			}
+		}
+		extra := map[string]interface{}{}
+		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecScroll(dx, dy, tabID, extra); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		return nil
+	})
+	f := cmd.Flags()
+	f.IntP("tab", "t", 0, "Target tab ID")
+	f.Float64("dx", 0, "Horizontal scroll offset in pixels")
+	f.Float64("dy", 500, "Vertical scroll offset in pixels")
+	registerInlineWaitPflags(cmd)
 	return cmd
 }
 
 func newHoverCommand() *cobra.Command {
 	cmd := newLeafCommand("hover", nil, func(args []string) error {
-		cmdArgs, err := parseCmdArgs(args, []FlagDef{
-			{Name: "tab", Aliases: []string{"t"}},
-		})
+		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
+		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -188,31 +312,37 @@ func newHoverCommand() *cobra.Command {
 			return errUsage
 		}
 		if len(cmdArgs.Positional) < 1 {
-			fmt.Println("Sử dụng: agent-pilot hover <selector> [--tab <id>]")
+			fmt.Println("Sử dụng: agent-pilot hover <selector> [--wait <ms>] [--tab <id>]")
 			return errUsage
 		}
-		if err := ExecHover(cmdArgs.Positional[0], tabID); err != nil {
+		extra := map[string]interface{}{}
+		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecHover(cmdArgs.Positional[0], tabID, extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
 		return nil
 	})
 	cmd.Flags().IntP("tab", "t", 0, "Target tab ID")
+	registerInlineWaitPflags(cmd)
 	return cmd
 }
 
 func newDragCommand() *cobra.Command {
 	cmd := newLeafCommand("drag", nil, func(args []string) error {
-		cmdArgs, err := parseCmdArgs(args, []FlagDef{
-			{Name: "tab", Aliases: []string{"t"}},
-			{Name: "steps", Aliases: []string{"s"}},
-			{Name: "hold"},
-			{Name: "via"},
-			{Name: "from-x"},
-			{Name: "from-y"},
-			{Name: "to-x"},
-			{Name: "to-y"},
-		})
+		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
+			FlagDef{Name: "steps", Aliases: []string{"s"}},
+			FlagDef{Name: "hold"},
+			FlagDef{Name: "via"},
+			FlagDef{Name: "from-x"},
+			FlagDef{Name: "from-y"},
+			FlagDef{Name: "to-x"},
+			FlagDef{Name: "to-y"},
+		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -259,7 +389,11 @@ func newDragCommand() *cobra.Command {
 		params, err := BuildDragParams(fromSelector, toSelector, fromX, fromY, toX, toY, steps, hold, cmdArgs.String("via", "synthetic"))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			fmt.Println("Sử dụng: agent-pilot drag <fromSelector> <toSelector> | --from-x <x> --from-y <y> --to-x <x> --to-y <y> [--steps <n>] [--hold <ms>] [--via synthetic|cdp|auto] [--tab <id>]")
+			fmt.Println("Sử dụng: agent-pilot drag <fromSelector> <toSelector> | --from-x <x> --from-y <y> --to-x <x> --to-y <y> [--steps <n>] [--hold <ms>] [--via synthetic|cdp|auto] [--wait <ms>] [--tab <id>]")
+			return errUsage
+		}
+		if err := cmdArgs.ApplyInlineWait(params); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
 		if err := ExecDrag(params, tabID); err != nil {
@@ -277,15 +411,16 @@ func newDragCommand() *cobra.Command {
 	f.Float64("from-y", -1, "Start Y coordinate")
 	f.Float64("to-x", -1, "End X coordinate")
 	f.Float64("to-y", -1, "End Y coordinate")
+	registerInlineWaitPflags(cmd)
 	return cmd
 }
 
 func newKeyCommand() *cobra.Command {
 	cmd := newLeafCommand("key", []string{"press-key"}, func(args []string) error {
-		cmdArgs, err := parseCmdArgs(args, []FlagDef{
-			{Name: "selector", Aliases: []string{"sel", "s"}},
-			{Name: "tab", Aliases: []string{"t"}},
-		})
+		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "selector", Aliases: []string{"sel", "s"}},
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
+		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -297,10 +432,15 @@ func newKeyCommand() *cobra.Command {
 		}
 		selector := cmdArgs.String("selector", "")
 		if len(cmdArgs.Positional) < 1 {
-			fmt.Println("Sử dụng: agent-pilot key <keyName> [--selector <sel>] [--tab <id>]")
+			fmt.Println("Sử dụng: agent-pilot key <keyName> [--selector <sel>] [--wait <ms>] [--tab <id>]")
 			return errUsage
 		}
-		if err := ExecPressKey(cmdArgs.Positional[0], selector, tabID); err != nil {
+		extra := map[string]interface{}{}
+		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecPressKey(cmdArgs.Positional[0], selector, tabID, extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
@@ -310,15 +450,16 @@ func newKeyCommand() *cobra.Command {
 	f.StringP("selector", "s", "", "Target element selector")
 	f.String("sel", "", "Alias for --selector")
 	f.IntP("tab", "t", 0, "Target tab ID")
+	registerInlineWaitPflags(cmd)
 	return cmd
 }
 
 func newWaitCommand() *cobra.Command {
-	cmd := newLeafCommand("wait", []string{"wait-for"}, func(args []string) error {
+	cmd := newLeafCommand("wait", []string{"wait-for", "sleep"}, func(args []string) error {
 		sel, text, state, timeout, targetTab, err := parseWaitArgs(args)
 		if err != nil {
 			fmt.Printf("❌ %v\n", err)
-			fmt.Println("Sử dụng: agent-pilot wait <selector|text> [--text <text>] [--state <visible|attached|hidden>] [--timeout <ms>] [--tab <id>]")
+			fmt.Println("Sử dụng: agent-pilot wait [selector|text|ms] [--text <text>] [--state <visible|attached|hidden>] [--timeout <ms>] [--sleep <ms>] [--tab <id>]")
 			return errUsage
 		}
 		if err := ExecWaitFor(sel, text, state, timeout, targetTab); err != nil {
@@ -330,6 +471,8 @@ func newWaitCommand() *cobra.Command {
 	f := cmd.Flags()
 	f.IntP("tab", "t", 0, "Target tab ID")
 	f.Int("timeout", 0, "Timeout in milliseconds")
+	f.Int("sleep", 0, "Sleep duration in milliseconds (alias: --ms)")
+	f.Int("ms", 0, "Sleep duration in milliseconds")
 	f.String("state", "visible", "Wait state: visible|attached|hidden")
 	f.String("text", "", "Text to wait for")
 	f.StringP("selector", "s", "", "Element selector to wait for")
@@ -338,9 +481,9 @@ func newWaitCommand() *cobra.Command {
 
 func newUploadCommand() *cobra.Command {
 	cmd := newLeafCommand("upload", nil, func(args []string) error {
-		cmdArgs, err := parseCmdArgs(args, []FlagDef{
-			{Name: "tab", Aliases: []string{"t"}},
-		})
+		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
+		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -351,16 +494,22 @@ func newUploadCommand() *cobra.Command {
 			return errUsage
 		}
 		if len(cmdArgs.Positional) < 2 {
-			fmt.Println("Sử dụng: agent-pilot upload <selector> <file1> [file2...] [--tab <id>]")
+			fmt.Println("Sử dụng: agent-pilot upload <selector> <file1> [file2...] [--wait <ms>] [--tab <id>]")
 			return errUsage
 		}
-		if err := ExecUploadFile(cmdArgs.Positional[0], cmdArgs.Positional[1:], tabID); err != nil {
+		extra := map[string]interface{}{}
+		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecUploadFile(cmdArgs.Positional[0], cmdArgs.Positional[1:], tabID, extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
 		return nil
 	})
 	cmd.Flags().IntP("tab", "t", 0, "Target tab ID")
+	registerInlineWaitPflags(cmd)
 	return cmd
 }
 
@@ -424,29 +573,41 @@ func newEvaluateCommand() *cobra.Command {
 
 func newSnapshotCommand() *cobra.Command {
 	cmd := newLeafCommand("snapshot", nil, func(args []string) error {
-		var tabID int
-		var maxEl int = 80
-		var format string = "text"
-		snapFlags := flag.NewFlagSet("snapshot", flag.ExitOnError)
-		snapFlags.IntVar(&tabID, "tab", 0, "Target tab ID")
-		snapFlags.IntVar(&maxEl, "max", 80, "Max interactive elements to inspect")
-		snapFlags.StringVar(&format, "format", "text", "Output format: text or json")
-		if err := snapFlags.Parse(args); err != nil {
+		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
+			FlagDef{Name: "max"},
+			FlagDef{Name: "format"},
+		))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-		var t interface{}
-		if tabID > 0 {
-			t = tabID
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
 		}
-		if err := ExecSnapshot(maxEl, format, t); err != nil {
+		maxEl, err := cmdArgs.Int("max", 80)
+		if err != nil || maxEl <= 0 {
+			fmt.Fprintf(os.Stderr, "❌ Error: invalid --max value\n")
+			return errUsage
+		}
+		format := cmdArgs.String("format", "text")
+		extra := map[string]interface{}{}
+		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecSnapshot(maxEl, format, tabID, extra); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
 		return nil
 	})
 	f := cmd.Flags()
-	f.Int("tab", 0, "Target tab ID")
+	f.IntP("tab", "t", 0, "Target tab ID")
 	f.Int("max", 80, "Max interactive elements to inspect")
 	f.String("format", "text", "Output format: text or json")
+	registerInlineWaitPflags(cmd)
 	return cmd
 }
 
@@ -512,56 +673,80 @@ func newSessionCommand() *cobra.Command {
 
 func newScreenshotCommand() *cobra.Command {
 	cmd := newLeafCommand("screenshot", nil, func(args []string) error {
-		shotFlags := flag.NewFlagSet("screenshot", flag.ExitOnError)
-		tabID := shotFlags.Int("tab", 0, "Target tab ID")
-		mode := shotFlags.String("mode", "visible", "Capture mode: visible, region, element, full")
-		out := shotFlags.String("o", "", "Output PNG path")
-		selector := shotFlags.String("selector", "", "CSS selector or snapshot ref for element mode")
-		clip := shotFlags.String("clip", "", "Clip bounding box 'x,y,width,height' for region mode")
-		if err := shotFlags.Parse(args); err != nil {
+		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
+			FlagDef{Name: "mode"},
+			FlagDef{Name: "o", Aliases: []string{"output", "out", "path", "save-path"}},
+			FlagDef{Name: "selector", Aliases: []string{"sel", "s"}},
+			FlagDef{Name: "clip"},
+		))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
 		}
-		if err := ExecScreenshotWithOptions(*mode, *selector, *clip, *out, t); err != nil {
+		mode := cmdArgs.String("mode", "visible")
+		out := cmdArgs.String("o", "")
+		selector := cmdArgs.String("selector", "")
+		clip := cmdArgs.String("clip", "")
+		if out == "" && len(cmdArgs.Positional) > 0 {
+			out = cmdArgs.Positional[0]
+		}
+		extra := map[string]interface{}{}
+		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecScreenshotWithOptions(mode, selector, clip, out, tabID, extra); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
 		return nil
 	})
 	f := cmd.Flags()
-	f.Int("tab", 0, "Target tab ID")
+	f.IntP("tab", "t", 0, "Target tab ID")
 	f.String("mode", "visible", "Capture mode: visible, region, element, full")
-	f.String("o", "", "Output PNG path")
-	f.String("selector", "", "CSS selector or snapshot ref for element mode")
+	f.StringP("output", "o", "", "Output PNG path")
+	f.StringP("selector", "s", "", "CSS selector or snapshot ref for element mode")
 	f.String("clip", "", "Clip bounding box 'x,y,width,height' for region mode")
+	registerInlineWaitPflags(cmd)
 	return cmd
 }
 
 func newInspectCommand() *cobra.Command {
 	cmd := newLeafCommand("inspect", nil, func(args []string) error {
-		inspFlags := flag.NewFlagSet("inspect", flag.ExitOnError)
-		tabID := inspFlags.Int("tab", 0, "Target tab ID")
-		if err := inspFlags.Parse(args); err != nil {
+		cmdArgs, err := parseCmdArgs(args, []FlagDef{
+			{Name: "tab", Aliases: []string{"t"}},
+			{Name: "styles", Aliases: []string{"include-styles"}, IsBool: true},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-		posArgs := inspFlags.Args()
-		if len(posArgs) < 1 {
-			fmt.Println("Sử dụng: agent-pilot inspect <selector> [--tab <id>]")
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-		var t interface{}
-		if *tabID > 0 {
-			t = *tabID
+		if len(cmdArgs.Positional) < 1 {
+			fmt.Println("Sử dụng: agent-pilot inspect <selector> [--styles] [--tab <id>]")
+			return errUsage
 		}
-		if err := ExecInspect(posArgs[0], t); err != nil {
+		extra := map[string]interface{}{}
+		if cmdArgs.Bool("styles") {
+			extra["includeStyles"] = true
+		}
+		if err := ExecInspect(cmdArgs.Positional[0], tabID, extra); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
 		return nil
 	})
-	cmd.Flags().Int("tab", 0, "Target tab ID")
+	f := cmd.Flags()
+	f.IntP("tab", "t", 0, "Target tab ID")
+	f.Bool("styles", false, "Include computed CSS styles")
 	return cmd
 }
 

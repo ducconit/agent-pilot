@@ -1,5 +1,5 @@
 {
-  "description": "Dispatch keyboard key event or combination (Enter, Tab, Escape, Control+A, Control+Shift+R...) to active element or selector.",
+  "description": "Dispatch keyboard key event or combination (Enter, Tab, Escape, Control+A, Control+Shift+R...) to active element or selector. Supports inline post-key waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
       "key": {
@@ -10,8 +10,24 @@
         "description": "Optional target element selector or @ref",
         "type": "string"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after pressing key",
+        "type": "integer"
+      },
       "tabId": {
         "description": "Target tab ID",
+        "type": "integer"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after pressing key",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after pressing key",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after pressing key",
         "type": "integer"
       }
     },
@@ -31,8 +47,24 @@
         "description": "Optional target element selector or @ref",
         "type": "string"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after pressing key",
+        "type": "integer"
+      },
       "tabId": {
         "description": "Target tab ID",
+        "type": "integer"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after pressing key",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after pressing key",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after pressing key",
         "type": "integer"
       }
     },

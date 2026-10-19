@@ -423,6 +423,21 @@ func TestProcessScreenshotResult(t *testing.T) {
 		}
 	})
 
+	t.Run("SavePathAliasWritesFile", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		customPath := filepath.Join(tmpDir, "save_path_alias.png")
+
+		resText, isErr := processScreenshotResult(rawPayload, nil, map[string]interface{}{
+			"savePath": customPath,
+		})
+		if isErr {
+			t.Fatalf("unexpected error: %s", resText)
+		}
+		if _, err := os.Stat(customPath); os.IsNotExist(err) {
+			t.Errorf("expected file to be written to %s via savePath alias", customPath)
+		}
+	})
+
 	t.Run("BridgeErrorPropagated", func(t *testing.T) {
 		bridgeErr := fmt.Errorf("simulated bridge connection failure")
 		resText, isErr := processScreenshotResult(nil, bridgeErr, map[string]interface{}{})
@@ -430,6 +445,19 @@ func TestProcessScreenshotResult(t *testing.T) {
 			t.Errorf("expected bridge error propagation, got %v (isErr: %v)", resText, isErr)
 		}
 	})
+}
+
+func TestBrowserEvaluateValidation(t *testing.T) {
+	// Missing both expression and script returns error
+	resText, isErr := executeToolCall("browser_evaluate", map[string]interface{}{})
+	if !isErr || !strings.Contains(resText, "missing required parameter") {
+		t.Fatalf("expected missing expression/script error, got %q (isErr=%v)", resText, isErr)
+	}
+
+	// Schema validation passes with script alias
+	if err := validateToolArguments("browser_evaluate", map[string]interface{}{"script": "document.title"}); err != nil {
+		t.Fatalf("expected browser_evaluate with script alias to pass schema validation, got %v", err)
+	}
 }
 
 func TestBrowserScreenshotSchema(t *testing.T) {
@@ -449,7 +477,7 @@ func TestBrowserScreenshotSchema(t *testing.T) {
 		t.Fatalf("browser_screenshot schema has no properties map")
 	}
 
-	expectedProps := []string{"mode", "selector", "clip", "x", "y", "width", "height", "tabId", "path", "base64"}
+	expectedProps := []string{"mode", "selector", "clip", "x", "y", "width", "height", "tabId", "path", "savePath", "base64", "waitMs", "sleepMs", "waitForSelector", "waitForText"}
 	for _, prop := range expectedProps {
 		if _, exists := props[prop]; !exists {
 			t.Errorf("browser_screenshot schema missing expected property: %s", prop)

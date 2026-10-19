@@ -293,7 +293,8 @@ func parseCmdArgs(args []string, allowedFlags []FlagDef) (FlexibleCmdArgs, error
 			res.Positional = append(res.Positional, args[i+1:]...)
 			break
 		}
-		if strings.HasPrefix(arg, "-") {
+		isNegativeNumber := len(arg) > 1 && arg[0] == '-' && arg[1] >= '0' && arg[1] <= '9'
+		if strings.HasPrefix(arg, "-") && !isNegativeNumber {
 			if strings.Contains(arg, "=") {
 				parts := strings.SplitN(arg, "=", 2)
 				flagName := strings.TrimLeft(parts[0], "-")
@@ -323,6 +324,46 @@ func parseCmdArgs(args []string, allowedFlags []FlagDef) (FlexibleCmdArgs, error
 		}
 	}
 	return res, nil
+}
+
+// InlineWaitFlagDefs returns the shared flag definitions for inline wait options
+// (--wait/--sleep/--wait-ms/--sleep-ms, --wait-for/--wait-selector, --wait-text).
+func InlineWaitFlagDefs() []FlagDef {
+	return []FlagDef{
+		{Name: "wait", Aliases: []string{"sleep", "wait-ms", "sleep-ms"}},
+		{Name: "wait-for", Aliases: []string{"wait-selector"}},
+		{Name: "wait-text"},
+	}
+}
+
+// withInlineWaitFlags appends InlineWaitFlagDefs() to a slice of FlagDef.
+func withInlineWaitFlags(defs ...FlagDef) []FlagDef {
+	return append(defs, InlineWaitFlagDefs()...)
+}
+
+// ApplyInlineWait populates waitMs, waitForSelector, and waitForText on params
+// when any of the inline wait flags are present.
+func (a FlexibleCmdArgs) ApplyInlineWait(params map[string]interface{}) error {
+	if rawWait, ok := a.Flags["wait"]; ok && strings.TrimSpace(rawWait) != "" {
+		trimmed := strings.TrimSpace(rawWait)
+		if strings.HasSuffix(strings.ToLower(trimmed), "ms") {
+			trimmed = strings.TrimSpace(trimmed[:len(trimmed)-2])
+		}
+		ms, err := strconv.Atoi(trimmed)
+		if err != nil || ms < 0 {
+			return fmt.Errorf("giá trị wait/sleep không hợp lệ: %s", rawWait)
+		}
+		if ms > 0 {
+			params["waitMs"] = ms
+		}
+	}
+	if sel := strings.TrimSpace(a.String("wait-for", "")); sel != "" {
+		params["waitForSelector"] = sel
+	}
+	if txt := strings.TrimSpace(a.String("wait-text", "")); txt != "" {
+		params["waitForText"] = txt
+	}
+	return nil
 }
 
 func (a FlexibleCmdArgs) TabID() (interface{}, error) {
@@ -380,6 +421,7 @@ func parseWaitArgs(args []string) (string, string, string, int, interface{}, err
 	allowedFlags := []FlagDef{
 		{Name: "tab", Aliases: []string{"t"}},
 		{Name: "timeout"},
+		{Name: "sleep", Aliases: []string{"ms", "wait"}},
 		{Name: "state"},
 		{Name: "text"},
 		{Name: "selector", Aliases: []string{"sel", "s"}},
@@ -397,6 +439,11 @@ func parseWaitArgs(args []string) (string, string, string, int, interface{}, err
 		val := cmdArgs.Flags["timeout"]
 		return "", "", "", 0, nil, fmt.Errorf("giá trị timeout không hợp lệ: %s", val)
 	}
+	sleepMs, err := cmdArgs.Int("sleep", 0)
+	if err != nil || sleepMs < 0 {
+		val := cmdArgs.Flags["sleep"]
+		return "", "", "", 0, nil, fmt.Errorf("giá trị sleep/ms không hợp lệ: %s", val)
+	}
 	state := cmdArgs.String("state", "visible")
 	text := cmdArgs.String("text", "")
 	selector := cmdArgs.String("selector", "")
@@ -404,7 +451,14 @@ func parseWaitArgs(args []string) (string, string, string, int, interface{}, err
 	if len(cmdArgs.Positional) > 0 {
 		pos := cmdArgs.Positional[0]
 		if selector == "" && text == "" {
-			if strings.HasPrefix(pos, "@") || strings.HasPrefix(pos, "#") || strings.HasPrefix(pos, ".") || strings.HasPrefix(pos, "[") {
+			trimmed := strings.TrimSpace(pos)
+			lowerPos := strings.ToLower(trimmed)
+			if strings.HasSuffix(lowerPos, "ms") {
+				trimmed = strings.TrimSpace(trimmed[:len(trimmed)-2])
+			}
+			if ms, convErr := strconv.Atoi(trimmed); convErr == nil && ms > 0 {
+				sleepMs = ms
+			} else if strings.HasPrefix(pos, "@") || strings.HasPrefix(pos, "#") || strings.HasPrefix(pos, ".") || strings.HasPrefix(pos, "[") {
 				selector = pos
 			} else if strings.ContainsAny(pos, " \t\n\r") && !strings.ContainsAny(pos, ">+~:[") {
 				text = pos
@@ -418,8 +472,9 @@ func parseWaitArgs(args []string) (string, string, string, int, interface{}, err
 		}
 	}
 
-	if selector == "" && text == "" {
-		return "", "", "", 0, nil, fmt.Errorf("vui lòng cung cấp selector hoặc text cần chờ")
+	if selector == "" && text == "" && sleepMs > 0 {
+		state = "sleep"
+		timeout = sleepMs
 	}
 
 	return selector, text, state, timeout, tab, nil

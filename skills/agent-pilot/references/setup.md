@@ -29,43 +29,63 @@ ls ~/.agents/skills/agent-pilot/SKILL.md
 
 ---
 
-## 2. Chrome Extension Installation
+## 2. OS-Specific All-in-One Bundle Installation (Recommended)
 
-### Option A: From Release ZIP (Recommended)
-1. Download the latest `agent-pilot-vX.X.X-beta.zip` from [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases).
-2. Unzip the file to a permanent directory (e.g., `~/agent-pilot-extension` or `C:\Users\<user>\agent-pilot-extension`).
-3. Open Google Chrome, Brave, or Microsoft Edge and navigate to:
-   - Chrome / Brave: `chrome://extensions`
-   - Edge: `edge://extensions`
-4. Toggle **Developer mode** (top-right corner).
-5. Click **Load unpacked** (Tải tiện ích đã giải nén).
-6. Select the unzipped folder (the folder containing `manifest.json`).
-7. The Agent Pilot icon will appear in the extensions toolbar.
+Each release provides OS-specific bundles (`agent-pilot-v1.0.10-beta-linux-amd64.zip`, `agent-pilot-v1.0.10-beta-darwin-arm64.zip`, `agent-pilot-v1.0.10-beta-windows-amd64.zip`, plus `arm64`/`amd64` variants) containing:
+- `extensions/` — Chrome/Brave/Edge Manifest V3 unpacked extension
+- `agent-pilot` (`agent-pilot.exe` on Windows) — Pre-compiled standalone CLI & MCP server for that OS
+- `install.sh` / `install.ps1` — 1-step automated installer
+- `skills/agent-pilot/` — Embedded Agent Pilot skill bundle
+- `README.md` — OS-tailored setup & troubleshooting guide
 
-### Option B: Build & Pack from Source
+### Step 1: Run the 1-Step Installer (CLI + Background Service + Skill)
+- **Ubuntu / Linux**:
+  ```bash
+  unzip agent-pilot-v1.0.10-beta-linux-amd64.zip -d ~/agent-pilot
+  cd ~/agent-pilot/agent-pilot-v1.0.10-beta-linux-amd64 && ./install.sh
+  ```
+- **macOS (Apple Silicon / Intel)**:
+  ```bash
+  unzip agent-pilot-v1.0.10-beta-darwin-arm64.zip -d ~/agent-pilot
+  cd ~/agent-pilot/agent-pilot-v1.0.10-beta-darwin-arm64 && ./install.sh
+  ```
+- **Windows (PowerShell)**:
+  ```powershell
+  Expand-Archive .\agent-pilot-v1.0.10-beta-windows-amd64.zip -DestinationPath "$HOME\agent-pilot"
+  cd "$HOME\agent-pilot\agent-pilot-v1.0.10-beta-windows-amd64"
+  powershell -ExecutionPolicy Bypass -File .\install.ps1
+  ```
+
+### Step 2: Load the Chrome Extension
+1. Open Google Chrome, Brave, or Microsoft Edge and navigate to `chrome://extensions` (or `edge://extensions`).
+2. Toggle **Developer mode** (top-right corner).
+3. Click **Load unpacked** (Tải tiện ích đã giải nén).
+4. Select the `extensions/` folder inside your unzipped bundle.
+
+### Alternative: Build & Pack from Source
 ```bash
 git clone https://github.com/ducconit/agent-pilot-extension.git
 cd agent-pilot-extension
 npm install
-npm run pack
-# Output archive: dist/agent-pilot-vX.X.X-beta.zip
+npm run pack:bundle
+# Outputs OS-specific bundles + universal archive in dist/
 ```
 
 ---
 
 ## 3. Standalone Go CLI & Background Service Setup
 
-### Step 1: Install Binary
+### Step 1: Install Binary Manually (if not using the 1-step installer)
 Download the pre-compiled binary for your operating system from GitHub Releases or build from source:
 
 ```bash
 # Build from source (run from the repository root)
-go build -ldflags "-s -w -X github.com/ducconit/agent-pilot-extension/cli/version.Version=1.0.9-beta" -o cli/agent-pilot ./cli/cmd/agent-pilot
+npm run build:cli
 sudo cp cli/agent-pilot /usr/local/bin/   # or copy to ~/.local/bin/
 ```
 
 ### Step 2: Install Persistent Background Service
-Agent Pilot includes an OS-native service manager that requires **no root/administrator privileges**:
+Agent Pilot includes an OS-native service manager that requires **no root/administrator privileges** (it automatically copies the binary to a permanent per-OS location if invoked from a temporary folder):
 
 ```bash
 # Install and enable auto-start on boot
@@ -82,15 +102,15 @@ agent-pilot service uninstall
 ```
 
 #### OS Background Daemon Specifications:
-- **Linux**: Managed via `systemd --user` (`~/.config/systemd/user/agent-pilot.service`).
-- **macOS**: Managed via `launchd User Agent` (`~/Library/LaunchAgents/com.agentpilot.bridge.plist`).
-- **Windows**: Managed via `Task Scheduler` (`AgentPilotBridge` run at user logon).
+- **Linux**: Binary at `~/.local/bin/agent-pilot`, managed via `systemd --user` (`~/.config/systemd/user/agent-pilot.service`).
+- **macOS**: Binary at `~/.local/bin/agent-pilot`, managed via `launchd User Agent` (`~/Library/LaunchAgents/com.agentpilot.bridge.plist`).
+- **Windows**: Binary at `%LOCALAPPDATA%\AgentPilot\bin\agent-pilot.exe`, managed via `Task Scheduler` (`AgentPilotBridge` run at user logon).
 
 ---
 
 ## 4. MCP (Model Context Protocol) Client Setup
 
-To equip AI coding agents with the 16+ Agent Pilot browser tools over `stdio`, add the following snippet to your IDE's MCP configuration:
+To equip AI coding agents with the 36 Agent Pilot browser tools over `stdio`, add the following snippet to your IDE's MCP configuration:
 
 ### Google Antigravity / AGK
 Add to `~/.gemini/config/mcp_config.json`:
@@ -141,7 +161,7 @@ In Cursor Settings -> Features -> MCP Servers -> Add New MCP Server:
   Verify port 58765 is active:
   ```bash
   curl http://127.0.0.1:58765/health
-  # Expected: {"status":"ok","name":"Agent Pilot Go Bridge Server","port":58765,"extensionConnected":true,"clientCount":1,"version":"1.0.9-beta","clients":[{"instanceId":"<id>","browser":"Chromium","os":"linux","isActive":true,"connectedAt":1789295000000}]}
+  # Expected: {"status":"ok","name":"Agent Pilot Go Bridge Server","port":58765,"extensionConnected":true,"clientCount":1,"version":"1.0.10-beta","clients":[{"instanceId":"<id>","browser":"Chromium","os":"linux","isActive":true,"connectedAt":1789295000000}]}
   # NOTE: `clients` is an ARRAY of connected extension client objects (may be empty).
   ```
 

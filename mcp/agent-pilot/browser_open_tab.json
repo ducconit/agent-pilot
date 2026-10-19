@@ -1,14 +1,34 @@
 {
-  "description": "Open a new browser tab. Defaults to active: false to never interrupt user focus.",
+  "description": "Open a new browser tab (automatically creates a new browser window if none exists, and waits for page load completion by default). Defaults to active: false to never interrupt user focus.",
   "inputSchema": {
     "properties": {
       "active": {
         "description": "Make tab active (default: false)",
         "type": "boolean"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after opening tab",
+        "type": "integer"
+      },
       "url": {
         "description": "URL to load",
         "type": "string"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after opening tab",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after opening tab",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after opening tab (saves a separate wait call)",
+        "type": "integer"
+      },
+      "waitUntil": {
+        "description": "Wait for tab load completion before returning (default: true)",
+        "type": "boolean"
       }
     },
     "required": [
@@ -23,9 +43,29 @@
         "description": "Make tab active (default: false)",
         "type": "boolean"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after opening tab",
+        "type": "integer"
+      },
       "url": {
         "description": "URL to load",
         "type": "string"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after opening tab",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after opening tab",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after opening tab (saves a separate wait call)",
+        "type": "integer"
+      },
+      "waitUntil": {
+        "description": "Wait for tab load completion before returning (default: true)",
+        "type": "boolean"
       }
     },
     "required": [

@@ -92,6 +92,22 @@ if (fs.existsSync(binarySource)) {
       }
       console.log(`✓ Synchronized agent-pilot binary -> ${geminiBin}`);
     }
+
+    // Export & synchronize MCP tool schemas
+    const mcpTargets = [
+      path.join(ROOT_DIR, "mcp", "agent-pilot"),
+      path.join(agkDir, "mcp", "agent-pilot"),
+      path.join(homeDir, ".gemini", "antigravity", "mcp", "agent-pilot"),
+      path.join(homeDir, ".gemini", "antigravity", "mcp", "agk_agent-pilot"),
+    ];
+    for (const mcpDir of mcpTargets) {
+      if (mcpDir === path.join(ROOT_DIR, "mcp", "agent-pilot") || fs.existsSync(path.dirname(mcpDir))) {
+        try {
+          execSync(`"${binarySource}" export-mcp "${mcpDir}"`, { stdio: "ignore" });
+          console.log(`✓ Synchronized MCP schemas -> ${mcpDir}`);
+        } catch (_) {}
+      }
+    }
   } catch (err) {
     console.warn("⚠️ Note: Could not copy agent-pilot binary to AGK bin:", err.message);
   }

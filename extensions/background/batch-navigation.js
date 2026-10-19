@@ -17,6 +17,7 @@ import {
   getActiveTabId,
   getTargetTabId,
   assignTabToAgentGroup,
+  createTabWithWindowFallback,
   waitForTabComplete,
   navigateTabAndWait
 } from "./tab-manager.js";
@@ -45,12 +46,7 @@ async function openAction(ctx, act) {
   const makeActive = act.active === true;
   const activeTabBefore = !makeActive ? await getActiveTabId() : null;
 
-  const tab = await new Promise((resolve, reject) => {
-    chrome.tabs.create({ url, active: makeActive }, (t) => {
-      if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-      resolve(t);
-    });
-  });
+  const tab = await createTabWithWindowFallback(url, makeActive);
 
   ctx.currentTabId = tab.id;
   const agentId = act.agentId || ctx.params?.agentId || null;

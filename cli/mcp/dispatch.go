@@ -156,6 +156,14 @@ func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool)
 	port := config.DefaultBridgePort()
 
 	if bridgeMethod, ok := mcpToolBridgeMap[name]; ok {
+		if name == "browser_evaluate" {
+			expr, _ := args["expression"].(string)
+			script, _ := args["script"].(string)
+			code, _ := args["code"].(string)
+			if strings.TrimSpace(expr) == "" && strings.TrimSpace(script) == "" && strings.TrimSpace(code) == "" {
+				return `Error: missing required parameter "expression" or "script" for tool "browser_evaluate"`, true
+			}
+		}
 		res, err := bridge.DispatchCommand(bridgeMethod, args, port)
 		return formatToolResult(res, err)
 	}
@@ -322,6 +330,12 @@ func processScreenshotResult(res interface{}, err error, args map[string]interfa
 	}
 
 	pathParam, _ := args["path"].(string)
+	if pathParam == "" {
+		pathParam, _ = args["savePath"].(string)
+	}
+	if pathParam == "" {
+		pathParam, _ = args["outputPath"].(string)
+	}
 
 	// When base64 is requested and no file path is specified, return inline dataUrl without writing to disk
 	if includeBase64 && pathParam == "" {

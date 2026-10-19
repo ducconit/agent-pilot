@@ -159,4 +159,38 @@ func TestDeriveCommandTimeout(t *testing.T) {
 	if to != 27500 {
 		t.Errorf("expected 27500, got %d", to)
 	}
+
+	// 12. page.click with inline waitMs adds waitMs budget to base timeout
+	to = DeriveCommandTimeout("page.click", map[string]interface{}{"selector": "#btn", "waitMs": 8000}, 0)
+	if to != 23000 {
+		t.Errorf("expected 23000 (15000 + 8000), got %d", to)
+	}
+
+	// 13. page.click with waitForSelector + sleepMs adds condition timeout + sleepMs
+	to = DeriveCommandTimeout("page.click", map[string]interface{}{
+		"selector":        "#btn",
+		"waitForSelector": ".modal",
+		"sleepMs":         2000,
+	}, 0)
+	if to != 27000 {
+		t.Errorf("expected 27000 (15000 + 10000 + 2000), got %d", to)
+	}
+
+	// 14. tabs.create accounts for default navigation loadTimeout (30000) + buffer (5000)
+	to = DeriveCommandTimeout("tabs.create", map[string]interface{}{"url": "https://example.com"}, 0)
+	if to != 35000 {
+		t.Errorf("expected 35000 (30000 + 5000), got %d", to)
+	}
+
+	// 15. tabs.create with waitUntil=false stays at default command timeout
+	to = DeriveCommandTimeout("tabs.create", map[string]interface{}{"url": "https://example.com", "waitUntil": false}, 0)
+	if to != 15000 {
+		t.Errorf("expected 15000 when waitUntil=false, got %d", to)
+	}
+
+	// 16. page.waitFor with pure waitMs > default
+	to = DeriveCommandTimeout("page.waitFor", map[string]interface{}{"waitMs": 18000}, 0)
+	if to != 23000 {
+		t.Errorf("expected 23000 (18000 + 5000), got %d", to)
+	}
 }

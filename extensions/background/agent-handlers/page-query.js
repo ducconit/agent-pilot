@@ -4,6 +4,8 @@
  */
 
 import { LIMITS, NO_TARGET_TAB_ERROR } from "../constants.js";
+import { waitForTabComplete } from "../tab-manager.js";
+import { runInlineWait, mergeWaitMeta } from "./page-input.js";
 import {
   getFlowState,
   setFlowRecording,
@@ -33,13 +35,17 @@ export const pageQueryHandlers = {
   "page.snapshot": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
-    client.runWithTabLock(tabId, "page.snapshot", () =>
-      client.sendTabMessageWithRetry(tabId, {
+    client.runWithTabLock(tabId, "page.snapshot", async () => {
+      if (params.waitUntil !== false) {
+        await waitForTabComplete(tabId, 5000);
+      }
+      await runInlineWait(client, tabId, params);
+      return await client.sendTabMessageWithRetry(tabId, {
         action: "get_snapshot",
         maxElements: params.maxElements || LIMITS.SNAPSHOT_MAX_ELEMENTS_DEFAULT,
         format: params.format || "text"
-      })
-    )
+      });
+    })
       .then(res => respond(res?.result !== undefined ? res.result : (res || null)))
       .catch(err => respond(null, err));
   },
@@ -47,14 +53,16 @@ export const pageQueryHandlers = {
   "page.fillForm": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
-    client.runWithTabLock(tabId, "page.fillForm", () =>
-      client.sendTabMessageWithRetry(tabId, {
+    client.runWithTabLock(tabId, "page.fillForm", async () => {
+      const res = await client.sendTabMessageWithRetry(tabId, {
         action: "fill_form",
         fields: params.fields || [],
         submitSelector: params.submitSelector || null,
         pressEnter: Boolean(params.pressEnter)
-      })
-    )
+      });
+      const waitMeta = await runInlineWait(client, tabId, params);
+      return mergeWaitMeta(res || null, waitMeta);
+    })
       .then(res => respond(res || null))
       .catch(err => respond(null, err));
   },
@@ -72,9 +80,10 @@ export const pageQueryHandlers = {
   "page.screenshot": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
-    client.runWithTabLock(tabId, "page.screenshot", () =>
-      client.captureTabScreenshot(tabId, params)
-    )
+    client.runWithTabLock(tabId, "page.screenshot", async () => {
+      await runInlineWait(client, tabId, params);
+      return await client.captureTabScreenshot(tabId, params);
+    })
       .then(res => respond(res))
       .catch(err => respond(null, err));
   },

@@ -1,5 +1,5 @@
 {
-  "description": "Fill multiple form fields (inputs, selects, checkboxes, textareas) and optionally submit in a single tool call. Compatible with React Hook Form, Vue, and standard HTML5 forms.",
+  "description": "Fill multiple form fields (inputs, selects, checkboxes, textareas) and optionally submit in a single tool call. Compatible with React Hook Form, Vue, and standard HTML5 forms. Supports inline post-fill waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
       "fields": {
@@ -35,12 +35,28 @@
         "description": "Press enter on the last input after filling (default: false)",
         "type": "boolean"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after filling form",
+        "type": "integer"
+      },
       "submitSelector": {
         "description": "Optional selector or snapshot ref (e.g. '@4') of submit button to click after filling",
         "type": "string"
       },
       "tabId": {
         "description": "Target tab ID",
+        "type": "integer"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after filling form",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after filling form",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after filling form",
         "type": "integer"
       }
     },
@@ -85,12 +101,28 @@
         "description": "Press enter on the last input after filling (default: false)",
         "type": "boolean"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after filling form",
+        "type": "integer"
+      },
       "submitSelector": {
         "description": "Optional selector or snapshot ref (e.g. '@4') of submit button to click after filling",
         "type": "string"
       },
       "tabId": {
         "description": "Target tab ID",
+        "type": "integer"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after filling form",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after filling form",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after filling form",
         "type": "integer"
       }
     },

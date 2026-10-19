@@ -9,9 +9,13 @@ import {
   normalizeUrl,
   EXTENSION_VERSION,
   NO_TARGET_TAB_ERROR,
+  DEFAULT_LOAD_TIMEOUT_MS,
   logDebug
 } from "../constants.js";
 import { attachDebugger } from "../cdp-manager.js";
+import { createTabWithWindowFallback, waitForTabComplete } from "../tab-manager.js";
+import { getPositiveNumber } from "../batch-validation.js";
+import { runInlineWait, mergeWaitMeta } from "./page-input.js";
 
 export const tabsHandlers = {
   ping: async (_client, _params, respond) => {
@@ -83,31 +87,51 @@ export const tabsHandlers = {
     // Remember the previously active tab so a background-created tab never steals focus
     const activeTabBefore = !makeActive ? await client.getActiveTabId() : null;
 
-    chrome.tabs.create({ url, active: makeActive }, async (tab) => {
-      if (chrome.runtime.lastError) {
-        respond(null, chrome.runtime.lastError);
-      } else {
-        if (tab && tab.id) {
-          agentControlledTabs.add(tab.id);
-          if (typeof client.recordAgentTab === "function") {
-            client.recordAgentTab(tab.id, params.agentId, { isOwner: true });
-          } else {
-            client.lastAgentTabId = tab.id;
-          }
-          await client.assignTabToAgentGroup(tab).catch((err) => logDebug("assignTabToAgentGroup error", err));
+    let tab;
+    try {
+      tab = await createTabWithWindowFallback(url, makeActive);
+    } catch (err) {
+      return respond(null, err);
+    }
 
-          if (!makeActive && activeTabBefore && activeTabBefore !== tab.id) {
-            const currentActive = await client.getActiveTabId();
-            if (currentActive === tab.id) {
-              await chrome.tabs.update(activeTabBefore, { active: true }).catch((err) => logDebug("restore active tab error", err));
-            }
-          }
-
-          await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("attachDebugger error", err));
+    try {
+      let waitMeta = null;
+      if (tab && tab.id) {
+        agentControlledTabs.add(tab.id);
+        if (typeof client.recordAgentTab === "function") {
+          client.recordAgentTab(tab.id, params.agentId, { isOwner: true });
+        } else {
+          client.lastAgentTabId = tab.id;
         }
-        respond(tab);
+        await client.assignTabToAgentGroup(tab).catch((err) => logDebug("assignTabToAgentGroup error", err));
+
+        if (!makeActive && activeTabBefore && activeTabBefore !== tab.id) {
+          const currentActive = await client.getActiveTabId();
+          if (currentActive === tab.id) {
+            await chrome.tabs.update(activeTabBefore, { active: true }).catch((err) => logDebug("restore active tab error", err));
+          }
+        }
+
+        await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("attachDebugger error", err));
+
+        if (params.waitUntil !== false) {
+          const loadTimeout = getPositiveNumber(params.loadTimeout, params.timeoutMs, params.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
+          await waitForTabComplete(tab.id, loadTimeout);
+        }
+
+        waitMeta = await runInlineWait(client, tab.id, params);
+
+        if (typeof chrome.tabs?.get === "function") {
+          try {
+            const refreshed = await chrome.tabs.get(tab.id);
+            if (refreshed && refreshed.id) tab = refreshed;
+          } catch (_) {}
+        }
       }
-    });
+      respond(mergeWaitMeta(tab, waitMeta));
+    } catch (err) {
+      respond(null, err);
+    }
   },
 
   "tabs.update": async (client, params, respond) => {
@@ -122,21 +146,41 @@ export const tabsHandlers = {
     if (params.url) updateProps.url = normalizeUrl(params.url);
     if (params.active !== undefined) updateProps.active = Boolean(params.active);
 
-    chrome.tabs.update(tabId, updateProps, async (tab) => {
+    chrome.tabs.update(tabId, updateProps, async (updatedTab) => {
       if (chrome.runtime.lastError) {
         respond(null, chrome.runtime.lastError);
       } else {
-        if (tab && tab.id) {
-          agentControlledTabs.add(tab.id);
-          if (typeof client.recordAgentTab === "function") {
-            client.recordAgentTab(tab.id, params.agentId);
-          } else {
-            client.lastAgentTabId = tab.id;
+        try {
+          let tab = updatedTab;
+          let waitMeta = null;
+          if (tab && tab.id) {
+            agentControlledTabs.add(tab.id);
+            if (typeof client.recordAgentTab === "function") {
+              client.recordAgentTab(tab.id, params.agentId);
+            } else {
+              client.lastAgentTabId = tab.id;
+            }
+            await client.assignTabToAgentGroup(tab).catch((err) => logDebug("assignTabToAgentGroup error", err));
+            await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("attachDebugger error", err));
+
+            if (params.url && params.waitUntil !== false) {
+              const loadTimeout = getPositiveNumber(params.loadTimeout, params.timeoutMs, params.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
+              await waitForTabComplete(tab.id, loadTimeout);
+            }
+
+            waitMeta = await runInlineWait(client, tab.id, params);
+
+            if (typeof chrome.tabs?.get === "function") {
+              try {
+                const refreshed = await chrome.tabs.get(tab.id);
+                if (refreshed && refreshed.id) tab = refreshed;
+              } catch (_) {}
+            }
           }
-          await client.assignTabToAgentGroup(tab).catch((err) => logDebug("assignTabToAgentGroup error", err));
-          await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("attachDebugger error", err));
+          respond(mergeWaitMeta(tab, waitMeta));
+        } catch (err) {
+          respond(null, err);
         }
-        respond(tab);
       }
     });
   },

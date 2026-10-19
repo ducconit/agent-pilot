@@ -335,15 +335,7 @@
 
       // Filter out Agent Pilot's internal UI elements
       if ((el.id && el.id.startsWith("agent-pilot")) ||
-          el.closest("[id^='agent-pilot']") ||
-          el.closest(".agent-pilot-virtual-cursor") ||
-          el.closest("#agent-pilot-cursor-layer") ||
-          el.closest("#agent-pilot-inspector-box") ||
-          el.closest("#agent-pilot-inspector-tooltip") ||
-          el.closest("#agent-pilot-crop-overlay") ||
-          el.closest("#agent-pilot-toast-container") ||
-          el.closest("#agent-pilot-loupe") ||
-          el.closest("#agent-pilot-feedback-studio")) {
+          el.closest("[id^='agent-pilot'], .agent-pilot-virtual-cursor, .agent-pilot-toast")) {
         continue;
       }
 
@@ -729,8 +721,8 @@
     <div id="agent-pilot-crop-box">
       <div class="agent-pilot-crop-toolbar">
         <span class="agent-pilot-crop-dims" id="agent-pilot-crop-dims">0 × 0</span>
-        <button class="agent-pilot-crop-btn" id="agent-pilot-crop-confirm">✓ Chụp vùng này</button>
-        <button class="agent-pilot-crop-btn cancel" id="agent-pilot-crop-cancel">✕ Hủy</button>
+        <div role="button" tabindex="0" class="agent-pilot-crop-btn" id="agent-pilot-crop-confirm">✓ Chụp vùng này</div>
+        <div role="button" tabindex="0" class="agent-pilot-crop-btn cancel" id="agent-pilot-crop-cancel">✕ Hủy</div>
       </div>
     </div>
   `;

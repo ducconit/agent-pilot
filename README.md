@@ -178,7 +178,7 @@ flowchart LR
 ### 1. Cài Đặt Chrome Extension
 
 #### Cách A: Cài đặt từ Bản Phát Hành (Khuyên dùng)
-1. Tải **gói bundle** cho đúng nền tảng của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) — ví dụ `agent-pilot-v1.0.9-beta-linux-amd64.zip` (đã gồm sẵn extension + CLI + skills + README hướng dẫn), hoặc tệp chỉ-chứa-extension `agent-pilot-v1.0.9-beta.zip` nếu bạn chỉ cần phần Chrome.
+1. Tải **gói bundle** cho đúng nền tảng của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) — ví dụ `agent-pilot-v1.0.10-beta-linux-amd64.zip` (đã gồm sẵn extension + CLI + skills + README hướng dẫn), hoặc tệp chỉ-chứa-extension `agent-pilot-v1.0.10-beta.zip` nếu bạn chỉ cần phần Chrome.
 2. Giải nén tệp `.zip` ra một thư mục cố định.
 3. Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
 4. Gạt bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải.
@@ -211,9 +211,9 @@ Mỗi bundle chứa sẵn `extensions/` + binary đúng nền tảng + script c�
 
 | Bản Hệ Điều Hành | Kiến Trúc | Tên Tệp Tải Về | Cài Đặt 1 Lệnh & Tài Liệu Riêng |
 | :--- | :--- | :--- | :--- |
-| 🐧 **Ubuntu / Linux** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.9-beta-linux-amd64.zip`<br/>`agent-pilot-v1.0.9-beta-linux-arm64.zip` | `./install.sh` • [📄 Tài liệu Ubuntu](docs/bundles/README.ubuntu.md) |
-| 🍎 **macOS** | Apple Silicon (`arm64`) / Intel (`amd64`) | `agent-pilot-v1.0.9-beta-darwin-arm64.zip`<br/>`agent-pilot-v1.0.9-beta-darwin-amd64.zip` | `./install.sh` *(tự gỡ `xattr`)* • [📄 Tài liệu macOS](docs/bundles/README.macos.md) |
-| 🪟 **Windows** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.9-beta-windows-amd64.zip`<br/>`agent-pilot-v1.0.9-beta-windows-arm64.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` • [📄 Tài liệu Windows](docs/bundles/README.windows.md) |
+| 🐧 **Ubuntu / Linux** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.10-beta-linux-amd64.zip`<br/>`agent-pilot-v1.0.10-beta-linux-arm64.zip` | `./install.sh` • [📄 Tài liệu Ubuntu](docs/bundles/README.ubuntu.md) |
+| 🍎 **macOS** | Apple Silicon (`arm64`) / Intel (`amd64`) | `agent-pilot-v1.0.10-beta-darwin-arm64.zip`<br/>`agent-pilot-v1.0.10-beta-darwin-amd64.zip` | `./install.sh` *(tự gỡ `xattr`)* • [📄 Tài liệu macOS](docs/bundles/README.macos.md) |
+| 🪟 **Windows** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.10-beta-windows-amd64.zip`<br/>`agent-pilot-v1.0.10-beta-windows-arm64.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` • [📄 Tài liệu Windows](docs/bundles/README.windows.md) |
 
 Trong mỗi bundle, binary và script cài đặt nằm ngay cạnh thư mục `extensions/` — chạy script cài đặt xong và nạp extension theo mục 1 là sẵn sàng kết nối MCP.
 

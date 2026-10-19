@@ -1,5 +1,5 @@
 {
-  "description": "Upload local files into a file input element (\u003cinput type='file'\u003e) or an upload trigger button/menuitem using Chrome DevTools Protocol DOM.setFileInputFiles.",
+  "description": "Upload local files into a file input element (\u003cinput type='file'\u003e) or an upload trigger button/menuitem using Chrome DevTools Protocol DOM.setFileInputFiles. Supports inline post-upload waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
       "files": {
@@ -13,8 +13,24 @@
         "description": "CSS selector or @ref of the \u003cinput type='file'\u003e element or upload trigger button/menuitem",
         "type": "string"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after uploading",
+        "type": "integer"
+      },
       "tabId": {
         "description": "Target tab ID",
+        "type": "integer"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after uploading",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after uploading",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after uploading",
         "type": "integer"
       }
     },
@@ -38,8 +54,24 @@
         "description": "CSS selector or @ref of the \u003cinput type='file'\u003e element or upload trigger button/menuitem",
         "type": "string"
       },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep after uploading",
+        "type": "integer"
+      },
       "tabId": {
         "description": "Target tab ID",
+        "type": "integer"
+      },
+      "waitForSelector": {
+        "description": "Optional CSS selector or @ref to wait for after uploading",
+        "type": "string"
+      },
+      "waitForText": {
+        "description": "Optional text to wait for on the page after uploading",
+        "type": "string"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to wait/sleep after uploading",
         "type": "integer"
       }
     },

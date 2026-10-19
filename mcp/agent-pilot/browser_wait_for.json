@@ -1,10 +1,18 @@
 {
-  "description": "Smart wait until a selector or text appears, disappears, or meets state condition with timeout.",
+  "description": "Smart wait until a selector or text appears, disappears, or meets state condition with timeout — or sleep for a fixed duration (waitMs/sleepMs/ms), or wait for document.readyState === 'complete' when called with no arguments.",
   "inputSchema": {
     "properties": {
+      "ms": {
+        "description": "Alias for waitMs: milliseconds to sleep",
+        "type": "integer"
+      },
       "selector": {
         "description": "Optional CSS selector or @ref to wait for",
         "type": "string"
+      },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep",
+        "type": "integer"
       },
       "state": {
         "description": "Desired state (default: visible)",
@@ -25,6 +33,10 @@
       },
       "timeoutMs": {
         "description": "Timeout in milliseconds (default: 10000)",
+        "type": "integer"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to sleep (either pure sleep when no selector/text is given, or extra settle sleep after selector/text condition passes)",
         "type": "integer"
       }
     },
@@ -33,9 +45,17 @@
   "name": "browser_wait_for",
   "parameters": {
     "properties": {
+      "ms": {
+        "description": "Alias for waitMs: milliseconds to sleep",
+        "type": "integer"
+      },
       "selector": {
         "description": "Optional CSS selector or @ref to wait for",
         "type": "string"
+      },
+      "sleepMs": {
+        "description": "Alias for waitMs: milliseconds to sleep",
+        "type": "integer"
       },
       "state": {
         "description": "Desired state (default: visible)",
@@ -56,6 +76,10 @@
       },
       "timeoutMs": {
         "description": "Timeout in milliseconds (default: 10000)",
+        "type": "integer"
+      },
+      "waitMs": {
+        "description": "Optional milliseconds to sleep (either pure sleep when no selector/text is given, or extra settle sleep after selector/text condition passes)",
         "type": "integer"
       }
     },

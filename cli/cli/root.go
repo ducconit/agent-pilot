@@ -115,6 +115,7 @@ func newRootCommand() *cobra.Command {
 		newCloseCommand(),
 		newClickCommand(),
 		newTypeCommand(),
+		newScrollCommand(),
 		newHoverCommand(),
 		newDragCommand(),
 		newKeyCommand(),
@@ -154,7 +155,9 @@ func newRootCommand() *cobra.Command {
 var legacyLongFlags = []string{
 	"active", "tab", "x", "y", "via", "clear", "enter", "selector", "sel",
 	"steps", "hold", "from-x", "from-y", "to-x", "to-y", "prompt", "file",
-	"max", "format", "mode", "o", "text", "state", "timeout", "submit",
+	"max", "format", "mode", "o", "output", "clip", "text", "state", "timeout",
+	"wait", "sleep", "wait-ms", "sleep-ms", "wait-for", "wait-text", "ms",
+	"dx", "dy", "styles", "include-styles", "submit",
 	"action", "name", "network", "cpu", "theme", "filter", "method", "type",
 	"limit", "categories", "enabled", "path", "force", "agy", "antigravity",
 	"gc", "port",

@@ -104,10 +104,10 @@ func deriveBatchTimeout(params map[string]interface{}, defaultTimeoutMs int) int
 					} else if lt, ok := getIntOrFloat(act, "timeout"); ok && lt > 0 {
 						loadTo = lt
 					}
-					actsSum += loadTo
+					actsSum += loadTo + deriveInlineWaitBudgetMs(act)
 
 				default:
-					actsSum += config.BatchDefaultActionMs
+					actsSum += config.BatchDefaultActionMs + deriveInlineWaitBudgetMs(act)
 				}
 			}
 			if actsSum > estDuration {
@@ -122,6 +122,42 @@ func deriveBatchTimeout(params map[string]interface{}, defaultTimeoutMs int) int
 		return total
 	}
 	return minBatch
+}
+
+func deriveInlineSleepMs(params map[string]interface{}) int {
+	if params == nil {
+		return 0
+	}
+	for _, key := range []string{"waitMs", "sleepMs", "sleep", "wait", "ms", "duration"} {
+		if v, ok := getIntOrFloat(params, key); ok && v > 0 {
+			return v
+		}
+	}
+	return 0
+}
+
+func deriveInlineWaitBudgetMs(params map[string]interface{}) int {
+	if params == nil {
+		return 0
+	}
+	sleepMs := deriveInlineSleepMs(params)
+	hasCondition := false
+	if sel, ok := params["waitForSelector"].(string); ok && strings.TrimSpace(sel) != "" {
+		hasCondition = true
+	}
+	if txt, ok := params["waitForText"].(string); ok && strings.TrimSpace(txt) != "" {
+		hasCondition = true
+	}
+	if !hasCondition {
+		return sleepMs
+	}
+	condTimeout := config.BatchWaitForDefaultMs
+	if t, ok := getIntOrFloat(params, "timeoutMs"); ok && t > 0 {
+		condTimeout = t
+	} else if t, ok := getIntOrFloat(params, "timeout"); ok && t > 0 {
+		condTimeout = t
+	}
+	return condTimeout + sleepMs
 }
 
 // DeriveCommandTimeout derives the appropriate RPC/HTTP timeout in ms based on command type and params
@@ -144,11 +180,28 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 	}
 	if method == "page.waitFor" || method == "page.wait" {
 		waitMs := config.PageWaitDefaultMs
+		explicitTimeout := false
 		if params != nil {
 			if t, ok := getIntOrFloat(params, "timeoutMs"); ok && t > 0 {
 				waitMs = t
+				explicitTimeout = true
 			} else if t, ok := getIntOrFloat(params, "timeout"); ok && t > 0 {
 				waitMs = t
+				explicitTimeout = true
+			}
+		}
+		if sleepExtra := deriveInlineSleepMs(params); sleepExtra > 0 {
+			hasCondition := false
+			for _, key := range []string{"selector", "text", "waitForSelector", "waitForText"} {
+				if s, ok := params[key].(string); ok && strings.TrimSpace(s) != "" {
+					hasCondition = true
+					break
+				}
+			}
+			if hasCondition {
+				waitMs += sleepExtra
+			} else if !explicitTimeout || sleepExtra > waitMs {
+				waitMs = sleepExtra
 			}
 		}
 		effective := waitMs + config.PageWaitBufferMs
@@ -157,6 +210,43 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 		}
 		return effective
 	}
+
+	baseTimeout := defaultTimeoutMs
+	if baseTimeout <= 0 {
+		baseTimeout = config.DefaultCommandTimeoutMs
+	}
+
+	if method == "tabs.create" || method == "tabs.update" {
+		waitUntil := true
+		if params != nil {
+			if wu, ok := params["waitUntil"].(bool); ok {
+				waitUntil = wu
+			}
+		}
+		hasNav := method == "tabs.create"
+		if method == "tabs.update" && params != nil {
+			if u, ok := params["url"].(string); ok && strings.TrimSpace(u) != "" {
+				hasNav = true
+			}
+		}
+		if waitUntil && hasNav {
+			loadTo := config.BatchNavigateLoadDefaultMs
+			if params != nil {
+				if lt, ok := getIntOrFloat(params, "loadTimeout"); ok && lt > 0 {
+					loadTo = lt
+				} else if lt, ok := getIntOrFloat(params, "timeoutMs"); ok && lt > 0 {
+					loadTo = lt
+				} else if lt, ok := getIntOrFloat(params, "timeout"); ok && lt > 0 {
+					loadTo = lt
+				}
+			}
+			navEffective := loadTo + config.PageWaitBufferMs
+			if navEffective > baseTimeout {
+				baseTimeout = navEffective
+			}
+		}
+	}
+
 	if method == "page.type" || method == "page.typeText" {
 		if params != nil {
 			if textStr, ok := params["text"].(string); ok && len(textStr) > 0 {
@@ -167,14 +257,16 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 				// Estimate typing duration: length * delay + 2500ms mouse move / focus buffer
 				estimated := (len(textStr) * delayMs) + 2500
 				effective := estimated + config.PageWaitBufferMs
-				if effective > defaultTimeoutMs {
-					return effective
+				if effective > baseTimeout {
+					baseTimeout = effective
 				}
 			}
 		}
 	}
-	if defaultTimeoutMs <= 0 {
-		return config.DefaultCommandTimeoutMs
+
+	if inlineExtra := deriveInlineWaitBudgetMs(params); inlineExtra > 0 {
+		baseTimeout += inlineExtra
 	}
-	return defaultTimeoutMs
+
+	return baseTimeout
 }
