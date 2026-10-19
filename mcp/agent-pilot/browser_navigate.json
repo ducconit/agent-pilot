@@ -2,6 +2,10 @@
   "description": "Navigate the active or specified tab to a new URL (waits for page load completion by default).",
   "inputSchema": {
     "properties": {
+      "password": {
+        "description": "Optional HTTP Basic Auth password (automatically URL-encoded into the destination URL)",
+        "type": "string"
+      },
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep after navigation",
         "type": "integer"
@@ -12,6 +16,10 @@
       },
       "url": {
         "description": "Destination URL",
+        "type": "string"
+      },
+      "username": {
+        "description": "Optional HTTP Basic Auth username (automatically URL-encoded into the destination URL)",
         "type": "string"
       },
       "waitForSelector": {
@@ -39,6 +47,10 @@
   "name": "browser_navigate",
   "parameters": {
     "properties": {
+      "password": {
+        "description": "Optional HTTP Basic Auth password (automatically URL-encoded into the destination URL)",
+        "type": "string"
+      },
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep after navigation",
         "type": "integer"
@@ -49,6 +61,10 @@
       },
       "url": {
         "description": "Destination URL",
+        "type": "string"
+      },
+      "username": {
+        "description": "Optional HTTP Basic Auth username (automatically URL-encoded into the destination URL)",
         "type": "string"
       },
       "waitForSelector": {

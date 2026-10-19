@@ -1,10 +1,22 @@
 {
-  "description": "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs). Defaults to capturing the full visible screen viewport (mode: 'visible'). Supports pre-capture waitMs/waitForSelector/waitForText. Saves to local PNG file by default; set base64: true to return raw base64 dataUrl.",
+  "description": "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs). Defaults to capturing the full visible screen viewport (mode: 'visible'). Supports optional step/title/description banner annotation and element highlight box directly on the PNG without touching page DOM. Supports pre-capture waitMs/waitForSelector/waitForText. Saves to local PNG file by default; set base64: true to return raw base64 dataUrl.",
   "inputSchema": {
     "properties": {
       "base64": {
         "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)",
         "type": "boolean"
+      },
+      "caption": {
+        "description": "Optional banner title/caption drawn directly onto the screenshot PNG (alias for title)",
+        "type": "string"
+      },
+      "captionPosition": {
+        "description": "Position of the annotation banner: 'bottom' (default) or 'top'",
+        "enum": [
+          "bottom",
+          "top"
+        ],
+        "type": "string"
       },
       "clip": {
         "description": "Bounding box coordinates for region mode: { x, y, width, height }",
@@ -34,9 +46,17 @@
         ],
         "type": "object"
       },
+      "description": {
+        "description": "Optional multi-line subtitle/description drawn below the title on the screenshot annotation banner",
+        "type": "string"
+      },
       "height": {
         "description": "Height in pixels for region mode (alternative to clip object)",
         "type": "number"
+      },
+      "highlightSelector": {
+        "description": "Optional CSS selector or @ref to highlight with a glowing border on the screenshot",
+        "type": "string"
       },
       "mode": {
         "description": "Capture mode: 'visible' (default full screen viewport), 'full' (entire scrollable page), 'region', or 'element'",
@@ -58,9 +78,20 @@
         "description": "Alias for waitMs: milliseconds to sleep before capturing screenshot",
         "type": "integer"
       },
+      "step": {
+        "description": "Optional step number or label (e.g. 1 or '1/7') rendered as a badge in the screenshot banner",
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "title": {
+        "description": "Optional bold step title drawn on the screenshot annotation banner",
+        "type": "string"
       },
       "waitForSelector": {
         "description": "Optional CSS selector or @ref to wait for before capturing screenshot",
@@ -96,6 +127,18 @@
         "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)",
         "type": "boolean"
       },
+      "caption": {
+        "description": "Optional banner title/caption drawn directly onto the screenshot PNG (alias for title)",
+        "type": "string"
+      },
+      "captionPosition": {
+        "description": "Position of the annotation banner: 'bottom' (default) or 'top'",
+        "enum": [
+          "bottom",
+          "top"
+        ],
+        "type": "string"
+      },
       "clip": {
         "description": "Bounding box coordinates for region mode: { x, y, width, height }",
         "properties": {
@@ -124,9 +167,17 @@
         ],
         "type": "object"
       },
+      "description": {
+        "description": "Optional multi-line subtitle/description drawn below the title on the screenshot annotation banner",
+        "type": "string"
+      },
       "height": {
         "description": "Height in pixels for region mode (alternative to clip object)",
         "type": "number"
+      },
+      "highlightSelector": {
+        "description": "Optional CSS selector or @ref to highlight with a glowing border on the screenshot",
+        "type": "string"
       },
       "mode": {
         "description": "Capture mode: 'visible' (default full screen viewport), 'full' (entire scrollable page), 'region', or 'element'",
@@ -148,9 +199,20 @@
         "description": "Alias for waitMs: milliseconds to sleep before capturing screenshot",
         "type": "integer"
       },
+      "step": {
+        "description": "Optional step number or label (e.g. 1 or '1/7') rendered as a badge in the screenshot banner",
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "title": {
+        "description": "Optional bold step title drawn on the screenshot annotation banner",
+        "type": "string"
       },
       "waitForSelector": {
         "description": "Optional CSS selector or @ref to wait for before capturing screenshot",

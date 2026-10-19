@@ -136,17 +136,92 @@ export function cleanupTabResources(tabId) {
   tabLockStates.delete(tabId);
 }
 
+function safeEncodeAuthComponent(val) {
+  const str = String(val ?? "");
+  if (!str) return "";
+  try {
+    return encodeURIComponent(decodeURIComponent(str));
+  } catch (_) {
+    return encodeURIComponent(str);
+  }
+}
+
 /**
  * Cross-platform URL normalizer supporting Windows/Mac/Linux local file URLs
  * as well as edge://, chrome://, brave://, and standard web protocols.
+ * Also normalizes HTTP Basic Auth credentials passed via authOptions
+ * ({ username/user, password/pass }) or inline in https://user:pass@host URLs
+ * where passwords contain special characters like '@', '&', or '#'.
  */
-export function normalizeUrl(url) {
+export function normalizeUrl(url, authOptions = null) {
   if (!url) return "";
   const trimmed = String(url).trim();
-  if (/^(https?|file|chrome|edge|brave|about|data):/i.test(trimmed)) {
-    return trimmed;
+  const withScheme = /^(https?|file|chrome|edge|brave|about|data):/i.test(trimmed)
+    ? trimmed
+    : "https://" + trimmed;
+
+  const schemeMatch = withScheme.match(/^(https?:\/\/)(.*)$/i);
+  if (!schemeMatch) {
+    return withScheme;
   }
-  return "https://" + trimmed;
+
+  const schemePrefix = schemeMatch[1];
+  const remainder = schemeMatch[2];
+  const slashIdx = remainder.indexOf("/");
+  const beforeSlash = slashIdx !== -1 ? remainder.slice(0, slashIdx) : remainder;
+  const lastAtBeforeSlash = beforeSlash.lastIndexOf("@");
+  const searchStart = lastAtBeforeSlash !== -1 ? lastAtBeforeSlash + 1 : 0;
+
+  let authorityEnd = slashIdx !== -1 ? slashIdx : remainder.length;
+  for (const sep of ["?", "#"]) {
+    const idx = remainder.indexOf(sep, searchStart);
+    if (idx !== -1 && idx < authorityEnd) {
+      authorityEnd = idx;
+    }
+  }
+
+  const authority = remainder.slice(0, authorityEnd);
+  const pathAndMore = remainder.slice(authorityEnd);
+
+  const nestedAuth =
+    authOptions && typeof authOptions === "object" && authOptions.auth && typeof authOptions.auth === "object"
+      ? authOptions.auth
+      : null;
+  const optUser = authOptions && typeof authOptions === "object"
+    ? (authOptions.username ?? authOptions.user ?? nestedAuth?.username ?? nestedAuth?.user ?? "")
+    : "";
+  const optPass = authOptions && typeof authOptions === "object"
+    ? (authOptions.password ?? authOptions.pass ?? nestedAuth?.password ?? nestedAuth?.pass ?? "")
+    : "";
+
+  const atIdx = authority.lastIndexOf("@");
+  if (atIdx === -1 && !optUser && !optPass) {
+    return withScheme;
+  }
+
+  let hostPort = authority;
+  let rawUser = "";
+  let rawPass = "";
+  if (atIdx !== -1) {
+    const userInfo = authority.slice(0, atIdx);
+    hostPort = authority.slice(atIdx + 1);
+    const colonIdx = userInfo.indexOf(":");
+    if (colonIdx === -1) {
+      rawUser = userInfo;
+    } else {
+      rawUser = userInfo.slice(0, colonIdx);
+      rawPass = userInfo.slice(colonIdx + 1);
+    }
+  }
+
+  const finalUser = optUser ? encodeURIComponent(String(optUser)) : safeEncodeAuthComponent(rawUser);
+  const finalPass = optPass ? encodeURIComponent(String(optPass)) : safeEncodeAuthComponent(rawPass);
+
+  if (!finalUser && !finalPass) {
+    return `${schemePrefix}${hostPort}${pathAndMore}`;
+  }
+  const authPart = finalPass ? `${finalUser}:${finalPass}@` : `${finalUser}@`;
+  return `${schemePrefix}${authPart}${hostPort}${pathAndMore}`;
 }
 
 // Cached host platform: "win", "mac", "linux", "cros"

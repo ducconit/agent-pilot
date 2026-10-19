@@ -8,7 +8,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -480,29 +479,11 @@ func ExecWaitFor(selector, text, state string, timeoutMs int, tabID interface{})
 }
 
 func validateUploadFilePath(p string) error {
-	clean := filepath.ToSlash(filepath.Clean(p))
-	if abs, err := filepath.Abs(p); err == nil {
-		clean = filepath.ToSlash(abs)
-	}
-	lower := strings.ToLower(clean)
-	forbiddenSubstrings := []string{
-		"/.ssh/", "/.aws/", "/.gnupg/", "/.kube/", "/.config/gcloud/",
-		"/etc/shadow", "/etc/passwd", "/etc/gshadow", "/proc/", "/sys/",
-	}
-	for _, sub := range forbiddenSubstrings {
-		if strings.Contains(lower, sub) {
-			return fmt.Errorf("refusing to upload sensitive system/credential file: %s", p)
-		}
-	}
-	return nil
+	_, err := bridge.ValidateUploadFilePath(p)
+	return err
 }
 
 func ExecUploadFile(selector string, files []string, tabID interface{}, extra ...map[string]interface{}) error {
-	for _, f := range files {
-		if err := validateUploadFilePath(f); err != nil {
-			return err
-		}
-	}
 	params := map[string]interface{}{
 		"selector": selector,
 		"files":    files,
@@ -511,6 +492,9 @@ func ExecUploadFile(selector string, files []string, tabID interface{}, extra ..
 		params["tabId"] = tabID
 	}
 	mergeExtraParams(params, extra...)
+	if err := bridge.EnrichUploadArgs(params); err != nil {
+		return err
+	}
 	res, err := bridge.DispatchCommand("page.uploadFile", params, config.DefaultBridgePort())
 	if err != nil {
 		return err

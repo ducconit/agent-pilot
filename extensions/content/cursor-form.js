@@ -63,6 +63,7 @@
 
       const tag = el.tagName.toLowerCase();
       const type = (el.getAttribute("type") || "").toLowerCase();
+      const role = (el.getAttribute("role") || "").toLowerCase();
       const val = field.value !== undefined ? field.value : "";
 
       try {
@@ -79,6 +80,19 @@
             el.checked = shouldCheck;
             el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
             el.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+          filledCount++;
+        } else if (role === "checkbox" || role === "switch" || role === "radio") {
+          const shouldCheck = typeof val === "boolean" ? val : (val === "true" || val === "1" || val === "checked");
+          const ariaChecked = (el.getAttribute("aria-checked") || "").toLowerCase();
+          const dataState = (el.getAttribute("data-state") || "").toLowerCase();
+          const isCurrentlyChecked = ariaChecked === "true" || dataState === "checked" || Boolean(el.checked);
+          if (isCurrentlyChecked !== shouldCheck) {
+            if (typeof el.click === "function") {
+              el.click();
+            } else {
+              el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+            }
           }
           filledCount++;
         } else if (el.isContentEditable) {

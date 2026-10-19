@@ -7,6 +7,7 @@
  */
 
 import {
+  attachedTabs,
   normalizeUrl,
   DEFAULT_LOAD_TIMEOUT_MS,
   agentControlledTabs,
@@ -42,7 +43,7 @@ async function resolveBatchTargetTab(bridgeClient, requestedTabId, agentId, opti
  */
 async function openAction(ctx, act) {
   const { bridgeClient } = ctx;
-  const url = normalizeUrl(act.url || "https://google.com");
+  const url = normalizeUrl(act.url || "https://google.com", act);
   const makeActive = act.active === true;
   const activeTabBefore = !makeActive ? await getActiveTabId() : null;
 
@@ -73,6 +74,9 @@ async function openAction(ctx, act) {
   if (act.waitUntil !== false) {
     const loadTimeout = getPositiveNumber(act.loadTimeout, act.timeoutMs, act.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
     await waitForTabComplete(tab.id, loadTimeout);
+    if (!attachedTabs.has(tab.id)) {
+      await attachDebugger(tab.id).catch((err) => logDebug("batch post-load attachDebugger", err));
+    }
   }
 
   ctx.stepResult.success = true;
@@ -91,11 +95,14 @@ async function navigateAction(ctx, act) {
     ? await resolveBatchTargetTab(bridgeClient, act.tabId, agentId)
     : ctx.currentTabId;
   if (!targetTabId) throw new Error("No active tab for navigate");
-  const url = normalizeUrl(act.url);
+  const url = normalizeUrl(act.url, act);
 
   if (act.waitUntil !== false) {
     const loadTimeout = getPositiveNumber(act.loadTimeout, act.timeoutMs, act.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
     await navigateTabAndWait(targetTabId, url, loadTimeout);
+    if (!attachedTabs.has(targetTabId)) {
+      await attachDebugger(targetTabId).catch((err) => logDebug("batch navigate attachDebugger", err));
+    }
   } else {
     await new Promise((resolve, reject) => {
       chrome.tabs.update(targetTabId, { url }, (t) => {

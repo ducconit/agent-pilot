@@ -1,9 +1,9 @@
 {
-  "description": "Upload local files into a file input element (\u003cinput type='file'\u003e) or an upload trigger button/menuitem using Chrome DevTools Protocol DOM.setFileInputFiles. Supports inline post-upload waitMs/waitForSelector/waitForText.",
+  "description": "Upload local files into a file input element (\u003cinput type='file'\u003e) or an upload trigger button/menuitem using CDP DOM.setFileInputFiles with automatic MAIN-world DataTransfer synthetic fallback when CDP cannot attach. Supports inline post-upload waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
       "files": {
-        "description": "Array of absolute local file paths to upload",
+        "description": "Array of local file paths to upload",
         "items": {
           "type": "string"
         },
@@ -20,6 +20,15 @@
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "via": {
+        "description": "Upload backend: 'auto' (default, CDP with synthetic DataTransfer fallback), 'cdp' (strict CDP), or 'synthetic' (MAIN-world DataTransfer + File)",
+        "enum": [
+          "auto",
+          "cdp",
+          "synthetic"
+        ],
+        "type": "string"
       },
       "waitForSelector": {
         "description": "Optional CSS selector or @ref to wait for after uploading",
@@ -44,7 +53,7 @@
   "parameters": {
     "properties": {
       "files": {
-        "description": "Array of absolute local file paths to upload",
+        "description": "Array of local file paths to upload",
         "items": {
           "type": "string"
         },
@@ -61,6 +70,15 @@
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "via": {
+        "description": "Upload backend: 'auto' (default, CDP with synthetic DataTransfer fallback), 'cdp' (strict CDP), or 'synthetic' (MAIN-world DataTransfer + File)",
+        "enum": [
+          "auto",
+          "cdp",
+          "synthetic"
+        ],
+        "type": "string"
       },
       "waitForSelector": {
         "description": "Optional CSS selector or @ref to wait for after uploading",

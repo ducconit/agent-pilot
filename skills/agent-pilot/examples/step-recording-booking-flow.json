@@ -1,0 +1,83 @@
+{
+  "_comment": "End-to-End Automated Website Testing & Step Recording Batch Flow (HTTP Basic Auth, Multi-Step Form, File Upload with Synthetic Fallback, and Annotated Step Screenshots)",
+  "stopOnError": true,
+  "actions": [
+    {
+      "action": "open",
+      "url": "https://stg.example.com/booking",
+      "username": "stg_tester",
+      "password": "Test@2026&&",
+      "waitUntil": true,
+      "waitForSelector": "button[type='submit'], [data-testid='start-booking']"
+    },
+    {
+      "action": "screenshot",
+      "mode": "visible",
+      "path": "/tmp/booking_step_1_landing.png",
+      "step": "1/6",
+      "title": "Bước 1: Mở trang đặt dịch vụ (HTTP Basic Auth)",
+      "description": "Truy cập trang chủ đặt dịch vụ thành công và xác nhận nút bắt đầu hiển thị.",
+      "highlightSelector": "[data-testid='start-booking']"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid='start-booking']",
+      "waitForSelector": "input[name='fullName']"
+    },
+    {
+      "action": "fill_form",
+      "fields": [
+        { "selector": "input[name='fullName']", "value": "NGUYEN VAN A" },
+        { "selector": "input[name='passportNo']", "value": "C9876543" },
+        { "selector": "input[name='email']", "value": "nguyenvana@example.com" },
+        { "selector": "input[name='phone']", "value": "0901234567" },
+        { "selector": "[role='checkbox']", "value": true }
+      ]
+    },
+    {
+      "action": "screenshot",
+      "mode": "visible",
+      "path": "/tmp/booking_step_2_passenger_info.png",
+      "step": "2/6",
+      "title": "Bước 2: Điền thông tin hành khách",
+      "description": "Điền họ tên, số hộ chiếu, email, số điện thoại và tích chọn điều khoản (Radix UI checkbox)."
+    },
+    {
+      "action": "upload",
+      "selector": "#portrait-upload",
+      "files": ["/tmp/sample_portrait.jpg"],
+      "via": "auto"
+    },
+    {
+      "action": "upload",
+      "selector": "#passport-upload",
+      "files": ["/tmp/sample_passport.jpg"],
+      "via": "auto"
+    },
+    {
+      "action": "screenshot",
+      "mode": "visible",
+      "path": "/tmp/booking_step_3_uploads.png",
+      "step": "3/6",
+      "title": "Bước 3: Tải lên ảnh chân dung và ảnh hộ chiếu",
+      "description": "Xác nhận cả 2 khung preview ảnh chân dung và mặt hộ chiếu hiển thị đầy đủ."
+    },
+    {
+      "action": "click",
+      "selector": "button[type='submit']",
+      "waitForSelector": ".order-summary, [data-testid='payment-section']"
+    },
+    {
+      "action": "screenshot",
+      "mode": "visible",
+      "path": "/tmp/booking_step_4_checkout.png",
+      "step": "4/6",
+      "title": "Bước 4: Xác nhận đơn hàng & Thanh toán",
+      "description": "Kiểm tra thông tin tóm tắt đơn hàng và cổng thanh toán.",
+      "highlightSelector": ".order-summary"
+    },
+    {
+      "action": "close"
+    }
+  ]
+}

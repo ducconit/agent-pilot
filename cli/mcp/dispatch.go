@@ -170,9 +170,13 @@ func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool)
 
 	switch name {
 	case "browser_run_actions":
+		if err := bridge.EnrichBatchUploadArgs(args); err != nil {
+			return fmt.Sprintf("Error: %v", err), true
+		}
 		res, err := bridge.DispatchCommand("batch.run", args, port)
 		if err == nil {
 			recordSessionBatchOutcome(res)
+			res, err = bridge.ProcessBatchScreenshots(res)
 		}
 		return formatToolResult(res, err)
 
@@ -218,18 +222,8 @@ func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool)
 		return formatToolResult(res, err)
 
 	case "browser_upload_file":
-		if filesRaw, ok := args["files"].([]interface{}); ok {
-			for _, f := range filesRaw {
-				if fStr, ok := f.(string); ok {
-					if err := validateMCPUploadPath(fStr); err != nil {
-						return fmt.Sprintf("Error: %v", err), true
-					}
-				}
-			}
-		} else if fStr, ok := args["filePath"].(string); ok && fStr != "" {
-			if err := validateMCPUploadPath(fStr); err != nil {
-				return fmt.Sprintf("Error: %v", err), true
-			}
+		if err := bridge.EnrichUploadArgs(args); err != nil {
+			return fmt.Sprintf("Error: %v", err), true
 		}
 		res, err := bridge.DispatchCommand("page.uploadFile", args, port)
 		return formatToolResult(res, err)
@@ -291,20 +285,8 @@ func formatToolResult(res interface{}, err error) (string, bool) {
 }
 
 func validateMCPUploadPath(p string) error {
-	clean := filepath.ToSlash(filepath.Clean(p))
-	if abs, err := filepath.Abs(p); err == nil {
-		clean = filepath.ToSlash(abs)
-	}
-	lower := strings.ToLower(clean)
-	for _, sub := range []string{
-		"/.ssh/", "/.aws/", "/.gnupg/", "/.kube/", "/.config/gcloud/",
-		"/etc/shadow", "/etc/passwd", "/etc/gshadow", "/proc/", "/sys/",
-	} {
-		if strings.Contains(lower, sub) {
-			return fmt.Errorf("refusing to upload sensitive system/credential file %q", p)
-		}
-	}
-	return nil
+	_, err := bridge.ValidateUploadFilePath(p)
+	return err
 }
 
 func processScreenshotResult(res interface{}, err error, args map[string]interface{}) (string, bool) {

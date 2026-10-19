@@ -635,5 +635,224 @@ record(
   filesWithButtonTag.length === 0 ? "0 <button> tags in content scripts" : `found in: ${filesWithButtonTag.join(", ")}`
 );
 
+// 19. normalizeUrl encodes HTTP Basic Auth options (including nested auth) and inline credentials with special chars (@, &&, #)
+const { normalizeUrl: normUrl } = await import("../extensions/background/constants.js");
+const authFromOpts = normUrl("https://stg.example.com/booking?step=1", {
+  username: "tester",
+  password: "Pass@2026&&"
+});
+const authFromNestedObj = normUrl("lagom.sphoton.com", {
+  auth: { username: "lagom", password: "Lagom&&2026#test" }
+});
+const authFromInline = normUrl("https://lagom:Lagom&&2026#test@lagom.sphoton.com/booking");
+record(
+  "19. normalizeUrl encodes HTTP Basic Auth options and inline credentials with special characters",
+  authFromOpts === "https://tester:Pass%402026%26%26@stg.example.com/booking?step=1" &&
+    authFromNestedObj === "https://lagom:Lagom%26%262026%23test@lagom.sphoton.com" &&
+    authFromInline === "https://lagom:Lagom%26%262026%23test@lagom.sphoton.com/booking",
+  `opts=${authFromOpts}, nested=${authFromNestedObj}, inline=${authFromInline}`
+);
+
+// 20. uploadFileInput propagates real attachDebugger error with CDP_UNAVAILABLE: when via='cdp', rejects /etc/gshadow, and falls back to MAIN-world DataTransfer when via='auto'
+const { uploadFileInput } = await import("../extensions/background/cdp-page.js");
+let mainWorldSyntheticCalled = false;
+globalThis.chrome = {
+  runtime: { lastError: null },
+  tabs: {
+    sendMessage: (_tabId, msg, cb) => {
+      if (msg.action === "mark_upload_target") {
+        cb({ success: true, marker: "ap_m1" });
+      } else {
+        cb({ success: true });
+      }
+    }
+  },
+  debugger: {
+    getTargets: (cb) => cb([]),
+    attach: (_target, _ver, cb) => {
+      globalThis.chrome.runtime.lastError = {
+        message: "DevTools open"
+      };
+      cb();
+      globalThis.chrome.runtime.lastError = null;
+    }
+  },
+  scripting: {
+    executeScript: async ({ world, args }) => {
+      if (world === "MAIN" && Array.isArray(args[2]) && args[2].length === 1) {
+        mainWorldSyntheticCalled = true;
+        return [{ result: { __upload_ok: true, count: 1 } }];
+      }
+      return [{ result: { __upload_err: "unexpected args" } }];
+    }
+  }
+};
+let strictCdpErr = "";
+try {
+  await uploadFileInput(808, "#passport", ["/tmp/passport.jpg"], { via: "cdp" });
+} catch (err) {
+  strictCdpErr = err.message || String(err);
+}
+let gshadowErr = "";
+try {
+  await uploadFileInput(808, "#passport", ["/etc/gshadow"], { via: "auto" });
+} catch (err) {
+  gshadowErr = err.message || String(err);
+}
+const autoSyntheticRes = await uploadFileInput(808, "#passport", ["/tmp/passport.jpg"], {
+  via: "auto",
+  filePayloads: [
+    {
+      name: "passport.jpg",
+      path: "/tmp/passport.jpg",
+      mimeType: "image/jpeg",
+      base64: "ffd8ffe0",
+      size: 4
+    }
+  ]
+});
+record(
+  "20. uploadFileInput propagates CDP_UNAVAILABLE error on via='cdp', blocks /etc/gshadow, and falls back to MAIN-world DataTransfer on via='auto'",
+  strictCdpErr.startsWith("CDP_UNAVAILABLE:") &&
+    strictCdpErr.includes("DevTools open") &&
+    gshadowErr.includes("/etc/gshadow") &&
+    mainWorldSyntheticCalled === true &&
+    autoSyntheticRes?.success === true &&
+    autoSyntheticRes?.via === "synthetic" &&
+    autoSyntheticRes?.fallback === true,
+  `strictCdpErr="${strictCdpErr}", gshadowBlocked=${gshadowErr.includes("/etc/gshadow")}, fallbackVia=${autoSyntheticRes?.via}`
+);
+
+// 21. annotateDataUrlInWorker + batch screenshotAction render step/title/description & highlight box and forward requestedPath
+const { annotateDataUrlInWorker } = await import("../extensions/background/screenshot-service.js");
+const drawOps = [];
+const fillRectYs = [];
+const prevOffscreen = globalThis.OffscreenCanvas;
+const prevCreateBitmap = globalThis.createImageBitmap;
+const prevFetch = globalThis.fetch;
+globalThis.fetch = async () => ({
+  blob: async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" })
+});
+globalThis.createImageBitmap = async () => ({
+  width: 1280,
+  height: 720,
+  close: () => {}
+});
+globalThis.OffscreenCanvas = class MockOffscreenCanvas {
+  constructor(w, h) {
+    this.width = w;
+    this.height = h;
+  }
+  getContext() {
+    return {
+      drawImage: () => drawOps.push("drawImage"),
+      save: () => {},
+      restore: () => {},
+      fillRect: (_x, y) => {
+        drawOps.push("fillRect");
+        fillRectYs.push(y);
+      },
+      strokeRect: () => drawOps.push("strokeRect"),
+      fillText: (txt) => drawOps.push(`fillText:${txt}`),
+      measureText: (txt) => ({ width: String(txt).length * 8 })
+    };
+  }
+  async convertToBlob() {
+    return new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" });
+  }
+};
+const annOut = await annotateDataUrlInWorker("data:image/png;base64,iVBORw0KGgo=", {
+  step: "3/7",
+  title: "Tải lên ảnh chân dung & hộ chiếu",
+  description: "Kiểm tra preview ảnh sau khi upload",
+  captionPosition: "header",
+  highlightRect: { x: 100, y: 120, width: 300, height: 180, viewportWidth: 1280, viewportHeight: 720 }
+});
+globalThis.chrome = {
+  runtime: { lastError: null },
+  tabs: {
+    get: async (id) => ({ id, active: true, width: 1280, height: 720, windowId: 1 }),
+    captureVisibleTab: (_winId, _opts, cb) => cb("data:image/png;base64,iVBORw0KGgo=")
+  }
+};
+const batchShotOut = await executeBatchActions(
+  {
+    tabId: 901,
+    actions: [
+      {
+        action: "screenshot",
+        path: "/tmp/step_3.png",
+        step: "3/7",
+        title: "Upload",
+        description: "Preview"
+      }
+    ]
+  },
+  { getTargetTabId: async () => 901 }
+);
+globalThis.OffscreenCanvas = prevOffscreen;
+globalThis.createImageBitmap = prevCreateBitmap;
+globalThis.fetch = prevFetch;
+const batchStep0 = batchShotOut?.results?.[0] || {};
+record(
+  "21. annotateDataUrlInWorker & batch screenshotAction render step/title/description + highlight box and forward requestedPath",
+  annOut.annotated === true &&
+    fillRectYs.includes(0) &&
+    drawOps.includes("strokeRect") &&
+    drawOps.some((op) => op.includes("STEP 3/7")) &&
+    batchStep0.success === true &&
+    batchStep0.annotated === true &&
+    batchStep0.requestedPath === "/tmp/step_3.png",
+  `annotated=${annOut.annotated}, headerY0=${fillRectYs.includes(0)}, requestedPath=${batchStep0.requestedPath}, ops=${drawOps.length}`
+);
+
+// 22. cursor-form.js virtualFillForm toggles Radix UI / shadcn ARIA role='checkbox' controls
+let radixClicked = 0;
+let radixState = "false";
+const mockRadixCheckbox = {
+  tagName: "DIV",
+  getBoundingClientRect: () => ({ top: 10, left: 10, bottom: 30, right: 30 }),
+  focus: () => {},
+  getAttribute: (attr) => {
+    if (attr === "role") return "checkbox";
+    if (attr === "aria-checked") return radixState;
+    if (attr === "data-state") return radixState === "true" ? "checked" : "unchecked";
+    return "";
+  },
+  click: () => {
+    radixClicked++;
+    radixState = radixState === "true" ? "false" : "true";
+  }
+};
+globalThis.window = {
+  innerHeight: 800,
+  innerWidth: 1280,
+  __AP_CONFIG__: { timeouts: { fillFieldDelayMs: 1 } },
+  __AP_INTERNAL__: {
+    cursor: {
+      activateCursor: () => {},
+      resolveElement: (sel) => (sel === "@15" ? mockRadixCheckbox : null),
+      virtualClick: async () => ({ success: true }),
+      dispatchKey: () => {}
+    }
+  }
+};
+await import("../extensions/content/cursor-form.js");
+const fillRadixRes = await globalThis.window.__AP_INTERNAL__.cursorForm.virtualFillForm([
+  { selector: "@15", value: true }
+]);
+// Calling a second time with value: true when already checked should NOT click again
+await globalThis.window.__AP_INTERNAL__.cursorForm.virtualFillForm([
+  { selector: "@15", value: true }
+]);
+record(
+  "22. cursor-form.js virtualFillForm toggles ARIA role='checkbox' controls idempotently",
+  fillRadixRes?.success === true &&
+    fillRadixRes?.filledCount === 1 &&
+    radixState === "true" &&
+    radixClicked === 1,
+  `filledCount=${fillRadixRes?.filledCount}, radixState=${radixState}, radixClicked=${radixClicked}`
+);
+
 recorder.summarize();
 recorder.exitIfFailed();

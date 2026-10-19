@@ -100,6 +100,16 @@ async function screenshotAction(ctx, act) {
   if (!targetTabId) throw new Error("No active tab for screenshot");
   const shotRes = await captureTabScreenshot(targetTabId, act);
   ctx.stepResult.success = true;
+  if (shotRes.annotated) {
+    ctx.stepResult.annotated = true;
+  }
+  const requestedPath = act.path || act.savePath || act.outputPath || "";
+  if (requestedPath) {
+    ctx.stepResult.requestedPath = requestedPath;
+  }
+  if (act.base64 !== undefined) {
+    ctx.stepResult.includeBase64 = Boolean(act.base64);
+  }
   if (ctx.params.omitDataUrls || act.omitDataUrl) {
     ctx.stepResult.dataUrlOmitted = true;
     ctx.stepResult.byteLength = shotRes.dataUrl ? shotRes.dataUrl.length : 0;

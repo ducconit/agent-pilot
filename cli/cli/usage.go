@@ -60,7 +60,11 @@ TÙY CHỌN BỔ SUNG:
   --port <58765>                Cổng kết nối bridge server (Mặc định: 58765)
   --output, -o <file.png>       Đường dẫn lưu file ảnh screenshot
   --mode <visible|full|region>  Chế độ chụp màn hình
-  --via <synthetic|cdp|auto>    Backend input cho click/drag (mặc định: synthetic; cdp = trusted, dùng cho iframe/canvas)
+  --caption, --title <text>     Ghi chú tiêu đề trực tiếp lên ảnh screenshot
+  --description, --desc <text>  Mô tả chi tiết bước test hiển thị trên banner screenshot
+  --step <1|1/7>                Badge số thứ tự bước hiển thị trên banner screenshot
+  --highlight <selector>        Khoanh vùng nổi bật phần tử DOM trên ảnh screenshot
+  --via <synthetic|cdp|auto>    Backend cho click/drag/upload (upload mặc định: auto = CDP + synthetic fallback)
   --path <dir>                  Thư mục gốc cài skill (mặc định: ~/.agents/skills)
   --agy, --antigravity          Cài skill vào ~/.gemini/config/skills (Antigravity)
   --force, -f                   Ghi đè skill nếu đã tồn tại
@@ -79,7 +83,7 @@ VÍ DỤ NHANH:
   agent-pilot type "@2" "admin@example.com" --enter
   agent-pilot eval -f script.js --tab 1734672950
   cat script.js | agent-pilot eval --tab 1734672950
-  agent-pilot screenshot -o homepage.png --mode full
+  agent-pilot screenshot -o step_1.png --step "1/7" --title "Mở trang chủ" --desc "Kiểm tra giao diện ban đầu" --highlight "@1"
   agent-pilot click -x 733 -y 668 --via cdp --tab 1734672950
   agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --via cdp --tab 1734672950
   agent-pilot cdp status --tab 1734672950

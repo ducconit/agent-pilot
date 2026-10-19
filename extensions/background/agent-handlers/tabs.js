@@ -5,6 +5,7 @@
  */
 
 import {
+  attachedTabs,
   agentControlledTabs,
   normalizeUrl,
   EXTENSION_VERSION,
@@ -82,7 +83,7 @@ export const tabsHandlers = {
   },
 
   "tabs.create": async (client, params, respond) => {
-    const url = normalizeUrl(params.url || "https://google.com");
+    const url = normalizeUrl(params.url || "https://google.com", params);
     const makeActive = params.active === true;
     // Remember the previously active tab so a background-created tab never steals focus
     const activeTabBefore = !makeActive ? await client.getActiveTabId() : null;
@@ -117,6 +118,9 @@ export const tabsHandlers = {
         if (params.waitUntil !== false) {
           const loadTimeout = getPositiveNumber(params.loadTimeout, params.timeoutMs, params.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
           await waitForTabComplete(tab.id, loadTimeout);
+          if (!attachedTabs.has(tab.id)) {
+            await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("post-load attachDebugger error", err));
+          }
         }
 
         waitMeta = await runInlineWait(client, tab.id, params);
@@ -143,7 +147,7 @@ export const tabsHandlers = {
     }
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const updateProps = {};
-    if (params.url) updateProps.url = normalizeUrl(params.url);
+    if (params.url) updateProps.url = normalizeUrl(params.url, params);
     if (params.active !== undefined) updateProps.active = Boolean(params.active);
 
     chrome.tabs.update(tabId, updateProps, async (updatedTab) => {
@@ -166,6 +170,9 @@ export const tabsHandlers = {
             if (params.url && params.waitUntil !== false) {
               const loadTimeout = getPositiveNumber(params.loadTimeout, params.timeoutMs, params.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
               await waitForTabComplete(tab.id, loadTimeout);
+              if (!attachedTabs.has(tab.id)) {
+                await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("post-load attachDebugger error", err));
+              }
             }
 
             waitMeta = await runInlineWait(client, tab.id, params);

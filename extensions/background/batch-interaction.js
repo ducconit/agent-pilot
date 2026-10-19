@@ -202,15 +202,16 @@ async function dragAction(ctx, act) {
   ctx.stepResult.drag = res;
 }
 
-/** upload / upload_file — set files on a file input via CDP. */
+/** upload / upload_file — set files on a file input via CDP or synthetic DataTransfer fallback. */
 async function uploadAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for upload");
-  if (!attachedTabs.has(targetTabId)) {
-    await attachDebugger(targetTabId);
-  }
   const files = Array.isArray(act.files) ? act.files : (act.filePath ? [act.filePath] : (act.file ? [act.file] : []));
-  const res = await uploadFileInput(targetTabId, act.selector, files);
+  const res = await uploadFileInput(targetTabId, act.selector, files, {
+    via: act.via,
+    filePayloads: act.filePayloads,
+    broadcastFn: ctx.bridgeClient?.broadcastFn
+  });
   ctx.stepResult.success = true;
   ctx.stepResult.upload = res;
 }

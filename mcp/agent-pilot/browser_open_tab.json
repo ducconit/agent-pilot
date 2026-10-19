@@ -6,12 +6,20 @@
         "description": "Make tab active (default: false)",
         "type": "boolean"
       },
+      "password": {
+        "description": "Optional HTTP Basic Auth password (automatically URL-encoded into the target URL, safe for special characters like \u0026\u0026 or #)",
+        "type": "string"
+      },
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep after opening tab",
         "type": "integer"
       },
       "url": {
         "description": "URL to load",
+        "type": "string"
+      },
+      "username": {
+        "description": "Optional HTTP Basic Auth username (automatically URL-encoded into the target URL)",
         "type": "string"
       },
       "waitForSelector": {
@@ -43,12 +51,20 @@
         "description": "Make tab active (default: false)",
         "type": "boolean"
       },
+      "password": {
+        "description": "Optional HTTP Basic Auth password (automatically URL-encoded into the target URL, safe for special characters like \u0026\u0026 or #)",
+        "type": "string"
+      },
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep after opening tab",
         "type": "integer"
       },
       "url": {
         "description": "URL to load",
+        "type": "string"
+      },
+      "username": {
+        "description": "Optional HTTP Basic Auth username (automatically URL-encoded into the target URL)",
         "type": "string"
       },
       "waitForSelector": {

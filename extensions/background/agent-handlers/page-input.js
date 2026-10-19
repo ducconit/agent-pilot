@@ -436,10 +436,11 @@ export const pageInputHandlers = {
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const files = Array.isArray(params.files) ? params.files : (params.filePath ? [params.filePath] : (params.file ? [params.file] : []));
     client.runWithTabLock(tabId, "page.uploadFile", async () => {
-      if (!attachedTabs.has(tabId)) {
-        await attachDebugger(tabId, client.broadcastFn);
-      }
-      const res = await uploadFileInput(tabId, params.selector, files);
+      const res = await uploadFileInput(tabId, params.selector, files, {
+        via: params.via,
+        filePayloads: params.filePayloads,
+        broadcastFn: client.broadcastFn
+      });
       const waitMeta = await runInlineWait(client, tabId, params);
       return mergeWaitMeta(res, waitMeta);
     })

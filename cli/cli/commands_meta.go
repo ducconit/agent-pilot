@@ -87,9 +87,18 @@ func newBatchCommand() *cobra.Command {
 			}
 		}
 
+		if err := bridge.EnrichBatchUploadArgs(payload); err != nil {
+			return fmt.Errorf("❌ Lỗi tham số upload trong batch: %v", err)
+		}
+
 		res, err := bridge.DispatchCommand("batch.run", payload, config.DefaultBridgePort())
 		if err != nil {
 			return fmt.Errorf("❌ Thực thi batch thất bại: %v", err)
+		}
+		if processed, pErr := bridge.ProcessBatchScreenshots(res); pErr == nil {
+			res = processed
+		} else {
+			return fmt.Errorf("❌ Lỗi lưu ảnh screenshot trong batch: %v", pErr)
 		}
 		resJSON, mErr := json.MarshalIndent(res, "", "  ")
 		if mErr != nil {

@@ -477,7 +477,12 @@ func TestBrowserScreenshotSchema(t *testing.T) {
 		t.Fatalf("browser_screenshot schema has no properties map")
 	}
 
-	expectedProps := []string{"mode", "selector", "clip", "x", "y", "width", "height", "tabId", "path", "savePath", "base64", "waitMs", "sleepMs", "waitForSelector", "waitForText"}
+	expectedProps := []string{
+		"mode", "selector", "clip", "x", "y", "width", "height", "tabId",
+		"path", "savePath", "base64", "caption", "title", "description",
+		"step", "captionPosition", "highlightSelector",
+		"waitMs", "sleepMs", "waitForSelector", "waitForText",
+	}
 	for _, prop := range expectedProps {
 		if _, exists := props[prop]; !exists {
 			t.Errorf("browser_screenshot schema missing expected property: %s", prop)
@@ -495,6 +500,33 @@ func TestBrowserScreenshotSchema(t *testing.T) {
 	for _, coord := range []string{"x", "y", "width", "height"} {
 		if _, exists := clipProps[coord]; !exists {
 			t.Errorf("clip schema missing expected coordinate property: %s", coord)
+		}
+	}
+}
+
+func TestBrowserUploadAndAuthSchemas(t *testing.T) {
+	toolMap := make(map[string]ToolInfo, len(mcpTools))
+	for _, tool := range mcpTools {
+		toolMap[tool.Name] = tool
+	}
+
+	uploadProps, ok := toolMap["browser_upload_file"].InputSchema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("browser_upload_file missing properties")
+	}
+	if _, hasVia := uploadProps["via"]; !hasVia {
+		t.Errorf("browser_upload_file schema missing 'via' property")
+	}
+
+	for _, toolName := range []string{"browser_open_tab", "browser_navigate"} {
+		props, ok := toolMap[toolName].InputSchema["properties"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("%s missing properties", toolName)
+		}
+		for _, authKey := range []string{"username", "password"} {
+			if _, exists := props[authKey]; !exists {
+				t.Errorf("%s schema missing %q property", toolName, authKey)
+			}
 		}
 	}
 }

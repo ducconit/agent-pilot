@@ -14,7 +14,7 @@ type ToolInfo struct {
 var mcpTools = []ToolInfo{
 	{
 		Name:        "browser_run_actions",
-		Description: "Execute an ordered sequence of browser actions in a single tool call (open, wait, click, type, screenshot, devtools, close).",
+		Description: "Execute an ordered sequence of browser actions in a single tool call (open, navigate, wait, click, type, fill_form, upload, screenshot with step/title/description/highlightSelector & disk path, evaluate, devtools, close).",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -45,6 +45,8 @@ var mcpTools = []ToolInfo{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"url":             map[string]interface{}{"type": "string", "description": "URL to load"},
+				"username":        map[string]interface{}{"type": "string", "description": "Optional HTTP Basic Auth username (automatically URL-encoded into the target URL)"},
+				"password":        map[string]interface{}{"type": "string", "description": "Optional HTTP Basic Auth password (automatically URL-encoded into the target URL, safe for special characters like && or #)"},
 				"active":          map[string]interface{}{"type": "boolean", "description": "Make tab active (default: false)"},
 				"waitUntil":       map[string]interface{}{"type": "boolean", "description": "Wait for tab load completion before returning (default: true)"},
 				"waitMs":          map[string]interface{}{"type": "integer", "description": "Optional milliseconds to wait/sleep after opening tab (saves a separate wait call)"},
@@ -80,6 +82,8 @@ var mcpTools = []ToolInfo{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"url":             map[string]interface{}{"type": "string", "description": "Destination URL"},
+				"username":        map[string]interface{}{"type": "string", "description": "Optional HTTP Basic Auth username (automatically URL-encoded into the destination URL)"},
+				"password":        map[string]interface{}{"type": "string", "description": "Optional HTTP Basic Auth password (automatically URL-encoded into the destination URL)"},
 				"tabId":           map[string]interface{}{"type": "integer", "description": "Tab ID to navigate"},
 				"waitUntil":       map[string]interface{}{"type": "boolean", "description": "Wait for tab load completion before returning (default: true)"},
 				"waitMs":          map[string]interface{}{"type": "integer", "description": "Optional milliseconds to wait/sleep after navigation"},
@@ -205,7 +209,7 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_screenshot",
-		Description: "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs). Defaults to capturing the full visible screen viewport (mode: 'visible'). Supports pre-capture waitMs/waitForSelector/waitForText. Saves to local PNG file by default; set base64: true to return raw base64 dataUrl.",
+		Description: "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs). Defaults to capturing the full visible screen viewport (mode: 'visible'). Supports optional step/title/description banner annotation and element highlight box directly on the PNG without touching page DOM. Supports pre-capture waitMs/waitForSelector/waitForText. Saves to local PNG file by default; set base64: true to return raw base64 dataUrl.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -222,18 +226,24 @@ var mcpTools = []ToolInfo{
 					},
 					"required": []string{"x", "y", "width", "height"},
 				},
-				"x":               map[string]interface{}{"type": "number", "description": "X coordinate in pixels for region mode (alternative to clip object)"},
-				"y":               map[string]interface{}{"type": "number", "description": "Y coordinate in pixels for region mode (alternative to clip object)"},
-				"width":           map[string]interface{}{"type": "number", "description": "Width in pixels for region mode (alternative to clip object)"},
-				"height":          map[string]interface{}{"type": "number", "description": "Height in pixels for region mode (alternative to clip object)"},
-				"tabId":           map[string]interface{}{"type": "integer", "description": "Target tab ID"},
-				"path":            map[string]interface{}{"type": "string", "description": "Output file path to save PNG image (default: OS temp directory screenshot_<ts>.png)"},
-				"savePath":        map[string]interface{}{"type": "string", "description": "Alias for path: output file path to save PNG image"},
-				"base64":          map[string]interface{}{"type": "boolean", "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)"},
-				"waitMs":          map[string]interface{}{"type": "integer", "description": "Optional milliseconds to wait/sleep before capturing screenshot"},
-				"sleepMs":         map[string]interface{}{"type": "integer", "description": "Alias for waitMs: milliseconds to sleep before capturing screenshot"},
-				"waitForSelector": map[string]interface{}{"type": "string", "description": "Optional CSS selector or @ref to wait for before capturing screenshot"},
-				"waitForText":     map[string]interface{}{"type": "string", "description": "Optional text to wait for on the page before capturing screenshot"},
+				"x":                 map[string]interface{}{"type": "number", "description": "X coordinate in pixels for region mode (alternative to clip object)"},
+				"y":                 map[string]interface{}{"type": "number", "description": "Y coordinate in pixels for region mode (alternative to clip object)"},
+				"width":             map[string]interface{}{"type": "number", "description": "Width in pixels for region mode (alternative to clip object)"},
+				"height":            map[string]interface{}{"type": "number", "description": "Height in pixels for region mode (alternative to clip object)"},
+				"tabId":             map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"path":              map[string]interface{}{"type": "string", "description": "Output file path to save PNG image (default: OS temp directory screenshot_<ts>.png)"},
+				"savePath":          map[string]interface{}{"type": "string", "description": "Alias for path: output file path to save PNG image"},
+				"base64":            map[string]interface{}{"type": "boolean", "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)"},
+				"caption":           map[string]interface{}{"type": "string", "description": "Optional banner title/caption drawn directly onto the screenshot PNG (alias for title)"},
+				"title":             map[string]interface{}{"type": "string", "description": "Optional bold step title drawn on the screenshot annotation banner"},
+				"description":       map[string]interface{}{"type": "string", "description": "Optional multi-line subtitle/description drawn below the title on the screenshot annotation banner"},
+				"step":              map[string]interface{}{"type": []string{"integer", "string"}, "description": "Optional step number or label (e.g. 1 or '1/7') rendered as a badge in the screenshot banner"},
+				"captionPosition":   map[string]interface{}{"type": "string", "enum": []string{"bottom", "top"}, "description": "Position of the annotation banner: 'bottom' (default) or 'top'"},
+				"highlightSelector": map[string]interface{}{"type": "string", "description": "Optional CSS selector or @ref to highlight with a glowing border on the screenshot"},
+				"waitMs":            map[string]interface{}{"type": "integer", "description": "Optional milliseconds to wait/sleep before capturing screenshot"},
+				"sleepMs":           map[string]interface{}{"type": "integer", "description": "Alias for waitMs: milliseconds to sleep before capturing screenshot"},
+				"waitForSelector":   map[string]interface{}{"type": "string", "description": "Optional CSS selector or @ref to wait for before capturing screenshot"},
+				"waitForText":       map[string]interface{}{"type": "string", "description": "Optional text to wait for on the page before capturing screenshot"},
 			},
 		},
 	},
@@ -361,7 +371,7 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_upload_file",
-		Description: "Upload local files into a file input element (<input type='file'>) or an upload trigger button/menuitem using Chrome DevTools Protocol DOM.setFileInputFiles. Supports inline post-upload waitMs/waitForSelector/waitForText.",
+		Description: "Upload local files into a file input element (<input type='file'>) or an upload trigger button/menuitem using CDP DOM.setFileInputFiles with automatic MAIN-world DataTransfer synthetic fallback when CDP cannot attach. Supports inline post-upload waitMs/waitForSelector/waitForText.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -369,8 +379,9 @@ var mcpTools = []ToolInfo{
 				"files": map[string]interface{}{
 					"type":        "array",
 					"items":       map[string]interface{}{"type": "string"},
-					"description": "Array of absolute local file paths to upload",
+					"description": "Array of local file paths to upload",
 				},
+				"via":             map[string]interface{}{"type": "string", "enum": []string{"auto", "cdp", "synthetic"}, "description": "Upload backend: 'auto' (default, CDP with synthetic DataTransfer fallback), 'cdp' (strict CDP), or 'synthetic' (MAIN-world DataTransfer + File)"},
 				"tabId":           map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 				"waitMs":          map[string]interface{}{"type": "integer", "description": "Optional milliseconds to wait/sleep after uploading"},
 				"sleepMs":         map[string]interface{}{"type": "integer", "description": "Alias for waitMs: milliseconds to sleep after uploading"},

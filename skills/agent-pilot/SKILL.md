@@ -102,9 +102,9 @@ When the `agent-pilot` MCP server or skill is active, agents have direct access 
 | Tool Name | Key Parameters | Description |
 | :--- | :--- | :--- |
 | `browser_snapshot` | `{ maxElements?: number, format?: "text" \| "json", waitUntil?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Token-Efficient Interactive Map**: Captures an accessibility tree of interactive elements with numbered refs (`@1`, `@2`, etc.) in ~300 tokens. Supports pre-snapshot `waitMs`/`waitForSelector`/`waitForText` to wait for SPA rendering and snapshot in 1 call. |
-| `browser_fill_form` | `{ fields: Array<{ selector: string, value: any, clear?: boolean }>, submitSelector?: string, pressEnter?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Fast Batch Form Filler**: Fills multiple form inputs, selects, and checkboxes and optionally clicks submit (plus optional inline post-fill wait) in a single tool call. |
-| `browser_run_actions` | `{ actions: Action[], tabId?: number, stopOnError?: boolean }` | **Batch Execution Engine**: Executes an ordered sequence of actions (`open`, `navigate`, `wait_for_selector`, `scroll_into_view`, `click`, `type`, `fill_form`, `snapshot`, `hover`, `drag`, `upload`, `dialog`, `press_key`, `scroll`, `sleep`, `screenshot`, `get_element`, `evaluate`, `cdp`, `close`) in a single round-trip, saving ~80% context tokens and eliminating network latency. |
-| `browser_upload_file` | `{ selector: string, files: string[], waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Local File Uploader**: Uploads local files to `<input type="file">` or an upload trigger button/menuitem via CDP `DOM.setFileInputFiles`. Supports `@ref`, CSS selector, and inline post-upload wait. |
+| `browser_fill_form` | `{ fields: Array<{ selector: string, value: any, clear?: boolean }>, submitSelector?: string, pressEnter?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Fast Batch Form Filler**: Fills multiple form inputs, selects, native checkboxes/radios, and ARIA controls (`role="checkbox"`, `role="switch"`, `role="radio"`) and optionally clicks submit (plus optional inline post-fill wait) in a single tool call. |
+| `browser_run_actions` | `{ actions: Action[], tabId?: number, stopOnError?: boolean }` | **Batch Execution Engine**: Executes an ordered sequence of actions (`open`, `navigate`, `wait_for_selector`, `scroll_into_view`, `click`, `type`, `fill_form`, `snapshot`, `hover`, `drag`, `upload`, `dialog`, `press_key`, `scroll`, `sleep`, `screenshot`, `get_element`, `evaluate`, `cdp`, `close`) in a single round-trip, saving ~80% context tokens, decoding batch screenshots to disk, and stripping base64 bloat by default. |
+| `browser_upload_file` | `{ selector: string, files: string[], via?: "auto" \| "cdp" \| "synthetic", waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Resilient Local File Uploader**: Uploads local files to `<input type="file">` (including hidden inputs and React/Dropzone inputs) via CDP `DOM.setFileInputFiles` with automatic `MAIN`-world `DataTransfer` fallback (`via: "auto"`). Supports `@ref`, CSS selector, and inline post-upload wait. |
 | `browser_handle_dialog` | `{ accept?: boolean, promptText?: string, tabId?: number }` | **JavaScript Dialog Handler**: Automatically accepts or dismisses `alert`, `confirm`, or `prompt` browser dialogs with optional text. |
 | `browser_hover` | `{ selector: string, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Virtual Mouse Hover**: Simulates hovering over an element (triggering `mouseenter`, `mouseover`, `mousemove`) with optional inline post-hover wait. |
 | `browser_drag` | `{ from?: string, to?: string, fromX?: number, fromY?: number, toX?: number, toY?: number, steps?: number, holdMs?: number, via?: "synthetic"\|"cdp"\|"auto", waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Virtual Drag & Drop**: Drags an element or between coordinates with optional inline post-drag wait. `via:"cdp"` uses trusted CDP input; `holdMs` holds before release. |
@@ -121,15 +121,15 @@ When the `agent-pilot` MCP server or skill is active, agents have direct access 
 | `browser_start_session` | `{ name?: string, tabId?: number }` | **Continuous Session Start**: Initiates an active AI Agent session. Keeps the virtual cursor and glowing neon lock shield continuously visible on the tab until ended. |
 | `browser_end_session` | `{ tabId?: number, closeTab?: boolean }` | **Continuous Session End**: Concludes the active AI Agent session. Set `closeTab: true` to automatically close the agent tab and free RAM when the test finishes. |
 | `browser_evaluate` | `{ expression?: string, script?: string, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Page Evaluator**: Evaluates a JavaScript expression or script in the context of the page (accepts either `expression` or `script`, plus optional post-eval wait) and returns the serialized result. |
-| `browser_open_tab` | `{ url: string, active?: boolean, waitUntil?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string }` | Opens a new browser tab inside the `🤖 Agent Pilot` tab group (auto-creates a window if none exists, and waits for page load completion by default). Supports inline `waitMs`/`waitForSelector`/`waitForText`. |
+| `browser_open_tab` | `{ url: string, username?: string, password?: string, active?: boolean, waitUntil?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string }` | Opens a new browser tab inside the `🤖 Agent Pilot` tab group (auto-creates a window if none exists, and waits for page load completion by default). Supports HTTP Basic Auth (`username`/`password`) and inline `waitMs`/`waitForSelector`/`waitForText`. |
 | `browser_close_tab` | `{ tabId?: number }` | Closes an Agent-controlled tab inside the `🤖 Agent Pilot` tab group to free browser RAM after testing is complete. |
 | `browser_list_tabs` | `{}` | Lists all open tabs with IDs, titles, URLs, active state, and agent ownership indicators. |
-| `browser_navigate` | `{ url: string, waitUntil?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | Navigates an Agent-controlled tab in the `🤖 Agent Pilot` group to a URL (waits for load completion by default, plus optional inline `waitMs`/`waitForSelector`/`waitForText`). |
+| `browser_navigate` | `{ url: string, username?: string, password?: string, waitUntil?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | Navigates an Agent-controlled tab in the `🤖 Agent Pilot` group to a URL (waits for load completion by default, plus optional `username`/`password` Basic Auth and inline `waitMs`/`waitForSelector`/`waitForText`). |
 | `browser_click` | `{ x?: number, y?: number, selector?: string, via?: "synthetic"\|"cdp"\|"auto", waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | Moves virtual mouse cursor and clicks, with optional inline post-click `waitMs`/`sleepMs`/`waitForSelector`/`waitForText` to avoid a separate wait tool call. |
 | `browser_type` | `{ text: string, selector?: string, clear?: boolean, pressEnter?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | Simulates human typing into inputs with realistic keystroke delays and optional inline post-type `waitMs`/`waitForSelector`/`waitForText`. |
 | `browser_scroll` | `{ deltaX?: number, deltaY?: number, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | Smoothly scrolls the page viewport by relative pixel offsets with optional inline post-scroll wait. |
 | `browser_get_element` | `{ selector: string, includeStyles?: boolean, tabId?: number }` | Inspects DOM elements, returning tag name, coordinates, bounding box dimensions, text, and value. Pass `includeStyles: true` only when styling details are needed (omitted by default to save tokens). |
-| `browser_screenshot` | `{ mode?: "visible" \| "region" \| "element" \| "full", selector?: string, path?: string, savePath?: string, base64?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | Captures high-resolution PNG screenshot via CDP even on background tabs. Supports pre-capture `waitMs`/`waitForSelector`/`waitForText`, and saves to `path` (or `savePath` alias, default OS temp dir). |
+| `browser_screenshot` | `{ mode?: "visible" \| "region" \| "element" \| "full", selector?: string, path?: string, savePath?: string, step?: number \| string, title?: string, caption?: string, description?: string, highlightSelector?: string, highlightBox?: { x, y, width, height }, base64?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | Captures high-resolution PNG screenshot via CDP even on background tabs. Supports built-in visual annotations (`step`, `title`, `description`, `highlightSelector`) rendered directly onto the PNG, pre-capture `waitMs`/`waitForSelector`/`waitForText`, and saves to `path` (or `savePath` alias, default OS temp dir). |
 | `browser_get_devtools_data` | `{ tabId?: number, type?: "all" \| "console" \| "network" \| "performance", filterOrigin?: boolean, limit?: number, clear?: boolean }` | Intercepts real-time CDP Console logs, Network requests, and Performance metrics. Extension noise (`chrome-extension://*`) is filtered by default (`filterOrigin: true`). |
 | `browser_pick_color` | `{ tabId?: number, x?: number, y?: number }` | Samples any on-screen pixel color. Returns all 5 modern color formats (`hex`, `rgb`, `rgba`, `hsl`, `oklch`). |
 | `browser_list_instances` | `{}` | Lists all connected browser instances (Chrome, Brave, Edge, profiles/windows). |
@@ -164,7 +164,7 @@ Agent Pilot has two automation engines:
 | `browser_hover` / `hover` | CDP first, synthetic fallback | ⚙️ Optional (automatic, no flag) |
 | `browser_press_key` / `key` | CDP first, synthetic fallback | ⚙️ Optional (automatic, no flag) |
 | `browser_screenshot` / `screenshot` | CDP `Page.captureScreenshot` | ✅ Yes for background tabs (active tab falls back to `captureVisibleTab`) |
-| `browser_upload_file` / `upload` | CDP `DOM.setFileInputFiles` | ✅ Yes |
+| `browser_upload_file` / `upload` | CDP `DOM.setFileInputFiles` + `MAIN`-world `DataTransfer` fallback (`via: "auto"`) | ⚙️ Optional — tries CDP first, falls back to synthetic `DataTransfer` + `File` (`via: "cdp"` requires CDP) |
 | `browser_handle_dialog` / `dialog` | CDP dialog handling | ✅ Yes |
 | `browser_emulate` / `emulate` | CDP `Emulation.set*` | ✅ Yes |
 | `browser_resize_page` / `resize` | CDP `Emulation.setDeviceMetricsOverride` | ✅ Yes |
@@ -417,6 +417,37 @@ curl -s -X POST http://127.0.0.1:58765/api \
 
 ---
 
+## 📸 Multi-Step Recording, Annotated Screenshots, Resilient Upload & Basic Auth
+
+When recording multi-step QA test guides, user manuals, or end-to-end flows with visual evidence, use built-in Agent Pilot features instead of writing external Python/PIL scripts or manual `browser_evaluate` workarounds:
+
+1. **Built-in Annotated Screenshots (`step`, `title`, `description`, `highlightSelector`)**:
+   - Both `browser_screenshot` and `{ "action": "screenshot" }` inside `browser_run_actions` can render a dark translucent header banner (with step badge, title, and word-wrapped description) and a red highlight box around any target element directly inside the Extension Worker (`OffscreenCanvas`) before saving the PNG to disk:
+   ```json
+   {
+     "action": "screenshot",
+     "path": "/tmp/step-01-packages.png",
+     "step": 1,
+     "title": "Chọn gói chụp và thêm vào giỏ",
+     "description": "Khách hàng chọn gói chụp và bấm Thêm vào giỏ hàng",
+     "highlightSelector": "[data-testid='package-card']"
+   }
+   ```
+   - In `browser_run_actions` (`agent-pilot batch`), each screenshot action with `path` (or `savePath`) is automatically decoded and written to disk by the Go bridge, and raw `dataUrl` is stripped from the JSON response (unless `base64: true`) so a 10-step recording consumes ~300 tokens instead of ~500,000 tokens.
+
+2. **Resilient File Upload (`browser_upload_file` / `upload` action)**:
+   - Supports `via: "auto"` (default), `"cdp"`, or `"synthetic"`.
+   - When `via: "auto"`, Agent Pilot first attempts CDP `DOM.setFileInputFiles` (supporting `input[type="file"]` inside hidden wrappers or adjacent to trigger buttons). If CDP cannot attach (e.g., DevTools is open or policy blocks debugger), it automatically falls back to `MAIN`-world synthetic `DataTransfer` + `File` construction using pre-loaded file payloads from the Go bridge, resets React's `_valueTracker`, dispatches `input` + `change`, and waits `80ms` for async `FileReader.onload` previews.
+   - Never write manual `atob(...)` + `DataTransfer` scripts in `browser_evaluate` to upload files—just call `browser_upload_file` or `{ "action": "upload", "selector": "input[type=file]", "files": ["/path/to/file.png"] }`.
+
+3. **Radix UI / shadcn Form Controls in `browser_fill_form`**:
+   - `browser_fill_form` natively toggles ARIA checkboxes (`role="checkbox"`), switches (`role="switch"`), and radios (`role="radio"`) by checking `aria-checked` / `data-state="checked"` against the boolean `value` and dispatching a trusted synthetic click only when a state transition is needed.
+
+4. **HTTP Basic Auth with Special Characters (`username` / `password`)**:
+   - Pass `username` and `password` directly to `browser_open_tab`, `browser_navigate`, or batch `open`/`navigate` actions (or `--user` / `--password` in CLI). Credentials containing `@`, `:`, `&`, or `#` are safely URL-encoded via `encodeURIComponent` and CDP debugger attachment automatically retries after auth challenge navigation completes.
+
+---
+
 ## 📚 References & Resources
 
 Detailed guides, troubleshooting instructions, and reference specifications are available in the skill directory:
@@ -425,3 +456,4 @@ Detailed guides, troubleshooting instructions, and reference specifications are 
 - [CLI Command & Automation Reference](references/cli-usage.md): Syntax, arguments, and copy-paste examples for all `agent-pilot` CLI commands.
 - [Architecture, Server & Concurrency Reference](references/architecture-and-server.md): Deep dive into Master Bridge Dual Mode, HTTP REST endpoints, WebSocket protocol, and the 12-rule Secret Redaction Layer.
 - [Batch Automation Example](examples/batch-flow-example.json): Ready-to-use JSON batch flow for automated web testing and regression suites.
+- [Step Recording & Booking Flow Example](examples/step-recording-booking-flow.json): Single-call multi-step recording workflow with Basic Auth, Radix/shadcn `fill_form`, resilient `upload`, and annotated screenshots saved directly to disk.

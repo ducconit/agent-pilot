@@ -31,16 +31,24 @@ func newOpenCommand() *cobra.Command {
 	cmd := newLeafCommand("open", nil, func(args []string) error {
 		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
 			FlagDef{Name: "active", IsBool: true},
+			FlagDef{Name: "username", Aliases: []string{"user", "u"}},
+			FlagDef{Name: "password", Aliases: []string{"pass"}},
 		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
 		if len(cmdArgs.Positional) < 1 {
-			fmt.Println("Sử dụng: agent-pilot open <url> [--active] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			fmt.Println("Sử dụng: agent-pilot open <url> [--active] [--user <username>] [--password <password>] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
 			return errUsage
 		}
 		extra := map[string]interface{}{}
+		if u := cmdArgs.String("username", ""); u != "" {
+			extra["username"] = u
+		}
+		if p := cmdArgs.String("password", ""); p != "" {
+			extra["password"] = p
+		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -50,7 +58,10 @@ func newOpenCommand() *cobra.Command {
 		}
 		return nil
 	})
-	cmd.Flags().Bool("active", false, "Make tab active")
+	f := cmd.Flags()
+	f.Bool("active", false, "Make tab active")
+	f.StringP("user", "u", "", "Optional HTTP Basic Auth username")
+	f.String("password", "", "Optional HTTP Basic Auth password")
 	registerInlineWaitPflags(cmd)
 	return cmd
 }
@@ -59,6 +70,8 @@ func newNavigateCommand() *cobra.Command {
 	cmd := newLeafCommand("navigate", nil, func(args []string) error {
 		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
 			FlagDef{Name: "tab", Aliases: []string{"t"}},
+			FlagDef{Name: "username", Aliases: []string{"user", "u"}},
+			FlagDef{Name: "password", Aliases: []string{"pass"}},
 		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -70,10 +83,16 @@ func newNavigateCommand() *cobra.Command {
 			return errUsage
 		}
 		if len(cmdArgs.Positional) < 1 {
-			fmt.Println("Sử dụng: agent-pilot navigate <url> [--tab <id>] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			fmt.Println("Sử dụng: agent-pilot navigate <url> [--tab <id>] [--user <username>] [--password <password>] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
 			return errUsage
 		}
 		extra := map[string]interface{}{}
+		if u := cmdArgs.String("username", ""); u != "" {
+			extra["username"] = u
+		}
+		if p := cmdArgs.String("password", ""); p != "" {
+			extra["password"] = p
+		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -83,7 +102,10 @@ func newNavigateCommand() *cobra.Command {
 		}
 		return nil
 	})
-	cmd.Flags().IntP("tab", "t", 0, "Target tab ID")
+	f := cmd.Flags()
+	f.IntP("tab", "t", 0, "Target tab ID")
+	f.StringP("user", "u", "", "Optional HTTP Basic Auth username")
+	f.String("password", "", "Optional HTTP Basic Auth password")
 	registerInlineWaitPflags(cmd)
 	return cmd
 }
@@ -483,6 +505,7 @@ func newUploadCommand() *cobra.Command {
 	cmd := newLeafCommand("upload", nil, func(args []string) error {
 		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
 			FlagDef{Name: "tab", Aliases: []string{"t"}},
+			FlagDef{Name: "via"},
 		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -494,10 +517,13 @@ func newUploadCommand() *cobra.Command {
 			return errUsage
 		}
 		if len(cmdArgs.Positional) < 2 {
-			fmt.Println("Sử dụng: agent-pilot upload <selector> <file1> [file2...] [--wait <ms>] [--tab <id>]")
+			fmt.Println("Sử dụng: agent-pilot upload <selector> <file1> [file2...] [--via auto|cdp|synthetic] [--wait <ms>] [--tab <id>]")
 			return errUsage
 		}
 		extra := map[string]interface{}{}
+		if via := cmdArgs.String("via", ""); via != "" {
+			extra["via"] = via
+		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -508,7 +534,9 @@ func newUploadCommand() *cobra.Command {
 		}
 		return nil
 	})
-	cmd.Flags().IntP("tab", "t", 0, "Target tab ID")
+	f := cmd.Flags()
+	f.IntP("tab", "t", 0, "Target tab ID")
+	f.String("via", "auto", "Upload backend: auto|cdp|synthetic")
 	registerInlineWaitPflags(cmd)
 	return cmd
 }
@@ -679,6 +707,12 @@ func newScreenshotCommand() *cobra.Command {
 			FlagDef{Name: "o", Aliases: []string{"output", "out", "path", "save-path"}},
 			FlagDef{Name: "selector", Aliases: []string{"sel", "s"}},
 			FlagDef{Name: "clip"},
+			FlagDef{Name: "caption", Aliases: []string{"c"}},
+			FlagDef{Name: "title"},
+			FlagDef{Name: "description", Aliases: []string{"desc"}},
+			FlagDef{Name: "step"},
+			FlagDef{Name: "caption-pos", Aliases: []string{"caption-position"}},
+			FlagDef{Name: "highlight", Aliases: []string{"highlight-selector"}},
 		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -697,6 +731,24 @@ func newScreenshotCommand() *cobra.Command {
 			out = cmdArgs.Positional[0]
 		}
 		extra := map[string]interface{}{}
+		if v := cmdArgs.String("caption", ""); v != "" {
+			extra["caption"] = v
+		}
+		if v := cmdArgs.String("title", ""); v != "" {
+			extra["title"] = v
+		}
+		if v := cmdArgs.String("description", ""); v != "" {
+			extra["description"] = v
+		}
+		if v := cmdArgs.String("step", ""); v != "" {
+			extra["step"] = v
+		}
+		if v := cmdArgs.String("caption-pos", ""); v != "" {
+			extra["captionPosition"] = v
+		}
+		if v := cmdArgs.String("highlight", ""); v != "" {
+			extra["highlightSelector"] = v
+		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -712,6 +764,12 @@ func newScreenshotCommand() *cobra.Command {
 	f.StringP("output", "o", "", "Output PNG path")
 	f.StringP("selector", "s", "", "CSS selector or snapshot ref for element mode")
 	f.String("clip", "", "Clip bounding box 'x,y,width,height' for region mode")
+	f.StringP("caption", "c", "", "Annotation banner caption/title")
+	f.String("title", "", "Annotation banner title")
+	f.String("description", "", "Annotation banner subtitle/description")
+	f.String("step", "", "Annotation banner step badge (e.g. 1 or 1/7)")
+	f.String("caption-pos", "bottom", "Annotation banner position: bottom|top")
+	f.String("highlight", "", "CSS selector or @ref to highlight on screenshot")
 	registerInlineWaitPflags(cmd)
 	return cmd
 }

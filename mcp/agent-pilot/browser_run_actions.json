@@ -1,5 +1,5 @@
 {
-  "description": "Execute an ordered sequence of browser actions in a single tool call (open, wait, click, type, screenshot, devtools, close).",
+  "description": "Execute an ordered sequence of browser actions in a single tool call (open, navigate, wait, click, type, fill_form, upload, screenshot with step/title/description/highlightSelector \u0026 disk path, evaluate, devtools, close).",
   "inputSchema": {
     "properties": {
       "actions": {

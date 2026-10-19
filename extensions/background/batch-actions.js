@@ -34,6 +34,8 @@ export const BATCH_ACTION_HANDLERS = {
   "page.hover": interactionHandlers.hover,
   "page.drag": interactionHandlers.drag,
   upload_file: interactionHandlers.upload,
+  uploadfile: interactionHandlers.upload,
+  "page.uploadfile": interactionHandlers.upload,
   handle_dialog: interactionHandlers.dialog,
   fill: interactionHandlers.fill_form,
   "page.fillform": interactionHandlers.fill_form,

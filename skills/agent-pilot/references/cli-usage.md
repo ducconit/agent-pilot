@@ -20,8 +20,9 @@ Commands use either the **synthetic DOM engine** (no debugger needed) or the **C
 | `click`, `drag` | ⚙️ Optional — default synthetic; add `--via cdp` for cross-origin iframes / canvas / WebGL |
 | `click --via auto`, `drag --via auto` | ⚙️ Optional — tries CDP, falls back to synthetic |
 | `hover`, `key` | ⚙️ Optional — CDP-first with automatic synthetic fallback |
+| `upload` | ⚙️ Optional — default `--via auto` tries CDP `DOM.setFileInputFiles`, falls back to `MAIN`-world `DataTransfer` + `File` (`--via cdp` requires CDP) |
 | `screenshot` | ✅ Yes for background tabs (active tab has a `captureVisibleTab` fallback) |
-| `upload`, `dialog`, `emulate`, `resize`, `network`, `trace`, `metrics`, `heap` | ✅ Yes |
+| `dialog`, `emulate`, `resize`, `network`, `trace`, `metrics`, `heap` | ✅ Yes |
 | `cdp status` | ✅ Yes (by definition; reports attach status) |
 | `--via cdp` failure mode | Returns `CDP_UNAVAILABLE: <reason>` — no silent fallback |
 
@@ -102,7 +103,7 @@ agent-pilot busy off
 
 ---
 
-## 4. Browser Navigation & Tabs (`open`, `close`, `tabs`)
+## 4. Browser Navigation & Tabs (`open`, `navigate`, `close`, `tabs`)
 
 ```bash
 # Open a new URL in background inside the 🤖 Agent Pilot tab group (active=false by default)
@@ -110,6 +111,10 @@ agent-pilot open https://example.com
 
 # Open URL and make it the active tab
 agent-pilot open https://example.com --active
+
+# Open or navigate to a Basic Auth protected staging URL (safely encodes @, &, :, # in credentials)
+agent-pilot open https://staging.example.com --user admin --password "p@ss&&word!"
+agent-pilot navigate https://staging.example.com/checkout --user admin --password "p@ss&&word!" --tab 12345
 
 # Close the current or specified Agent tab when testing is done to free RAM
 agent-pilot close [--tab <id>]
@@ -120,9 +125,9 @@ agent-pilot tabs
 
 ---
 
-## 5. Web Interactions (`click`, `type`, `inspect`)
+## 5. Web Interactions (`click`, `type`, `fill`, `upload`, `inspect`)
 
-> Engine: synthetic DOM by default (no CDP). `click`/`drag` support opt-in trusted CDP input via `--via cdp` (see §1.1 matrix).
+> Engine: synthetic DOM by default (no CDP). `click`/`drag` support opt-in trusted CDP input via `--via cdp`, and `upload` uses `--via auto` (CDP with automatic `MAIN`-world `DataTransfer` fallback).
 
 ```bash
 # Click an element by CSS selector (auto-calculates center & plays neon ripple)
@@ -139,6 +144,10 @@ agent-pilot type "#email" "user@example.com"
 
 # Clear field before typing and press Enter afterwards
 agent-pilot type "#search" "agent pilot automation" --clear --enter
+
+# Upload local file(s) to <input type="file"> (CDP first + automatic MAIN-world DataTransfer fallback)
+agent-pilot upload "input[type=file]" ./receipt.png
+agent-pilot upload "#avatar-upload" ./photo1.png ./photo2.jpg --via auto --tab 12345
 
 # Inspect DOM element details (rect, selector, XPath, text, computed CSS)
 agent-pilot inspect "#product-card"
@@ -200,11 +209,11 @@ agent-pilot evaluate "document.querySelector('h1').innerText" --tab 12345
 
 ---
 
-## 7. Screenshots (`screenshot`)
+## 7. Screenshots & Step Annotations (`screenshot`)
 
 > Engine: CDP `Page.captureScreenshot`. CDP is **required for background tabs**; the active tab can fall back to `chrome.tabs.captureVisibleTab`.
 
-Capture high-resolution PNG screenshots via Chrome DevTools Protocol. When `-o` is omitted, screenshots are saved by default into the OS temporary directory (`os.TempDir()`, e.g., `/tmp/screenshot_<timestamp>.png`) so home and project directories stay clean:
+Capture high-resolution PNG screenshots via Chrome DevTools Protocol. Supports built-in visual annotations (`--step`, `--title`, `--description`, `--highlight`) rendered directly onto the PNG via `OffscreenCanvas` before saving. When `-o` is omitted, screenshots are saved by default into the OS temporary directory (`os.TempDir()`, e.g., `/tmp/screenshot_<timestamp>.png`) so home and project directories stay clean:
 
 ```bash
 # Capture visible viewport (saved to OS temp directory by default)
@@ -212,6 +221,13 @@ agent-pilot screenshot
 
 # Capture visible viewport to a specific file path
 agent-pilot screenshot -o ./viewport.png
+
+# Capture annotated step screenshot with banner and highlighted element
+agent-pilot screenshot -o /tmp/step-01.png \
+  --step 1 \
+  --title "Chọn gói dịch vụ" \
+  --description "Khách hàng chọn gói chụp và bấm Thêm vào giỏ hàng" \
+  --highlight "[data-testid='package-card']"
 
 # Capture specific element
 agent-pilot screenshot --mode element --selector ".hero-banner" -o ./banner.png
@@ -224,23 +240,28 @@ agent-pilot screenshot --mode region -o ./region.png
 
 ## 8. Batch Automation (`batch`)
 
-Execute an ordered sequence of browser actions in a single atomic network round-trip, saving ~80% context tokens and eliminating network round-trips:
+Execute an ordered sequence of browser actions in a single atomic network round-trip, saving ~80% context tokens and eliminating network round-trips. Any `screenshot` step in the batch with `path` (or `savePath`) is automatically saved to disk and its raw `dataUrl` is stripped from the JSON response (unless `base64: true`):
 
 ```bash
 agent-pilot batch ./workflows/login-flow.json
+agent-pilot batch ./skills/agent-pilot/examples/step-recording-booking-flow.json
 ```
 
 ### Batch Script Format (`flow.json`):
 ```json
 {
   "actions": [
-    { "type": "open", "url": "https://example.com/login" },
+    { "type": "open", "url": "https://example.com/login", "username": "staging", "password": "secret" },
     { "type": "wait_for_selector", "selector": "#username", "timeout": 5000 },
-    { "type": "type", "selector": "#username", "text": "tester@example.com" },
-    { "type": "type", "selector": "#password", "text": "Secret123!" },
+    { "type": "fill_form", "fields": [
+      { "selector": "#username", "value": "tester@example.com" },
+      { "selector": "#password", "value": "Secret123!" },
+      { "selector": "[role='checkbox']", "value": true }
+    ]},
+    { "type": "upload", "selector": "input[type='file']", "files": ["/tmp/sample.png"], "via": "auto" },
     { "type": "click", "selector": "#btn-submit" },
     { "type": "sleep", "ms": 1000 },
-    { "type": "screenshot", "mode": "visible" },
+    { "type": "screenshot", "mode": "visible", "path": "/tmp/step-login.png", "step": 1, "title": "Login Completed", "highlightSelector": "#dashboard" },
     { "type": "close" }
   ]
 }
