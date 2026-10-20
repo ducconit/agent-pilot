@@ -39,9 +39,9 @@ THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT / A
   emulate [tùy chọn]            Giả lập mạng (slow-3g, offline), CPU throttling, theme (dark/light)
   resize <width> <height>       Thay đổi kích thước khung nhìn viewport
   network [list|get <id>]       Xem danh sách request HTTP hoặc lấy response body
-  trace <start|stop>            Ghi và xuất trace phân tích DevTools Performance
-  metrics                       Lấy các thông số hiệu năng runtime thời gian thực (DOM, Heap...)
-  heap                          Chụp Memory Heap Snapshot qua CDP
+  trace <start|stop>            Ghi & phân tích Performance Trace (Long Tasks, Forced Reflows, Hot Scripts)
+  metrics                       Lấy chỉ số chuyên sâu (Core Web Vitals: LCP/CLS/FCP/TTFB/TBT, DOM Health, Heap)
+  heap [baseline|diff|snapshot] Chụp V8 Heap Snapshot, phân tích Detached DOM & phát hiện Memory Leak
   extensions [list|toggle]      Quản lý, xem danh sách và bật/tắt các Extension đã cài đặt
   open <url>                    Mở tab mới với URL chỉ định
   navigate <url>                Điều hướng tab hiện tại đến URL

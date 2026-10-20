@@ -12,7 +12,14 @@ import {
   LIMITS,
   DEFAULTS
 } from "./constants.js";
-import { attachDebugger, sendCdpCommand } from "./cdp-manager.js";
+import {
+  attachDebugger,
+  sendCdpCommand,
+  getPerformanceMetrics,
+  startPerformanceTrace,
+  stopPerformanceTrace,
+  takeHeapSnapshot
+} from "./cdp-manager.js";
 import {
   getTargetTabId,
   sendTabMessageWithRetry
@@ -31,7 +38,10 @@ export const observationHandlers = {
   get_element: getElementAction,
   evaluate: evaluateAction,
   cdp: cdpAction,
-  devtools: devtoolsAction
+  devtools: devtoolsAction,
+  performance_metrics: performanceMetricsAction,
+  performance_trace: performanceTraceAction,
+  heap_snapshot: heapSnapshotAction
 };
 
 async function resolveStepTabId(ctx, act) {
@@ -182,9 +192,46 @@ async function devtoolsAction(ctx, act) {
       type: devType,
       limit: act.limit,
       clear: act.clear,
-      filterOrigin: act.filterOrigin
+      filterOrigin: act.filterOrigin,
+      errorsOnly: act.errorsOnly,
+      excludeStatic: act.excludeStatic
     },
     ctx.bridgeClient?.broadcastFn
   );
+  Object.assign(ctx.stepResult, payload, { success: true });
+}
+
+/** performance_metrics / metrics — collect runtime CDP counters, Core Web Vitals, DOM health & diagnostics. */
+async function performanceMetricsAction(ctx, act) {
+  const targetTabId = await resolveStepTabId(ctx, act);
+  if (!targetTabId) throw new Error("No active tab for performance_metrics");
+  await attachDebugger(targetTabId, ctx.bridgeClient?.broadcastFn).catch(() => {});
+  const payload = await getPerformanceMetrics(targetTabId, act);
+  Object.assign(ctx.stepResult, payload, { success: true });
+}
+
+/** performance_trace / trace — start or stop a timeline trace and compute bottleneck insights. */
+async function performanceTraceAction(ctx, act) {
+  const targetTabId = await resolveStepTabId(ctx, act);
+  if (!targetTabId) throw new Error("No active tab for performance_trace");
+  await attachDebugger(targetTabId, ctx.bridgeClient?.broadcastFn);
+  const traceAct = String(act.traceAction || act.subAction || act.mode || "start").toLowerCase().trim();
+  const payload =
+    traceAct === "stop" || traceAct === "end"
+      ? await stopPerformanceTrace(targetTabId)
+      : await startPerformanceTrace(targetTabId, act.categories);
+  Object.assign(ctx.stepResult, payload, { success: true });
+}
+
+/** heap_snapshot / heap / memory — take a V8 heap snapshot, record a baseline, or run a memory leak diff. */
+async function heapSnapshotAction(ctx, act) {
+  const targetTabId = await resolveStepTabId(ctx, act);
+  if (!targetTabId) throw new Error("No active tab for heap_snapshot");
+  await attachDebugger(targetTabId, ctx.bridgeClient?.broadcastFn);
+  const heapAct = act.heapAction || act.subAction || act.mode || (act.recordBaseline ? "baseline" : act.compareWithBaseline ? "diff" : "snapshot");
+  const payload = await takeHeapSnapshot(targetTabId, {
+    ...act,
+    action: heapAct
+  });
   Object.assign(ctx.stepResult, payload, { success: true });
 }

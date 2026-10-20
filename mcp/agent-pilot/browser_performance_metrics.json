@@ -1,7 +1,19 @@
 {
-  "description": "Retrieve live runtime performance metrics from Chrome DevTools Protocol (JSHeapUsedSize, JSHeapTotalSize, LayoutCount, Nodes...).",
+  "description": "Retrieve comprehensive runtime \u0026 debugging metrics: CDP counters (JSHeapUsedMB, Nodes, JSEventListeners, LayoutCount, ScriptDuration), Core Web Vitals (TTFB, FCP, LCP + target element, CLS + shifting elements, TBT + long tasks), Resource bottlenecks (slowest \u0026 render-blocking URLs), DOM/A11y health (max depth, duplicate IDs, missing alt/labels), and automated diagnostic warnings.",
   "inputSchema": {
     "properties": {
+      "includeDomHealth": {
+        "description": "Collect DOM depth, duplicate IDs, and accessibility health metrics (default: true)",
+        "type": "boolean"
+      },
+      "includeResources": {
+        "description": "Collect resource bottleneck metrics (slowest \u0026 render-blocking URLs) (default: true)",
+        "type": "boolean"
+      },
+      "includeWebVitals": {
+        "description": "Collect Core Web Vitals (TTFB, FCP, LCP, CLS, TBT) (default: true)",
+        "type": "boolean"
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
@@ -12,6 +24,18 @@
   "name": "browser_performance_metrics",
   "parameters": {
     "properties": {
+      "includeDomHealth": {
+        "description": "Collect DOM depth, duplicate IDs, and accessibility health metrics (default: true)",
+        "type": "boolean"
+      },
+      "includeResources": {
+        "description": "Collect resource bottleneck metrics (slowest \u0026 render-blocking URLs) (default: true)",
+        "type": "boolean"
+      },
+      "includeWebVitals": {
+        "description": "Collect Core Web Vitals (TTFB, FCP, LCP, CLS, TBT) (default: true)",
+        "type": "boolean"
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"

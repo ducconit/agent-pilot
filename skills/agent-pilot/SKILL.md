@@ -103,7 +103,7 @@ When the `agent-pilot` MCP server or skill is active, agents have direct access 
 | :--- | :--- | :--- |
 | `browser_snapshot` | `{ maxElements?: number, format?: "text" \| "json", waitUntil?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Token-Efficient Interactive Map**: Captures an accessibility tree of interactive elements with numbered refs (`@1`, `@2`, etc.) in ~300 tokens. Supports pre-snapshot `waitMs`/`waitForSelector`/`waitForText` to wait for SPA rendering and snapshot in 1 call. |
 | `browser_fill_form` | `{ fields: Array<{ selector: string, value: any, clear?: boolean }>, submitSelector?: string, pressEnter?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Fast Batch Form Filler**: Fills multiple form inputs, selects, native checkboxes/radios, and ARIA controls (`role="checkbox"`, `role="switch"`, `role="radio"`) and optionally clicks submit (plus optional inline post-fill wait) in a single tool call. |
-| `browser_run_actions` | `{ actions: Action[], tabId?: number, stopOnError?: boolean }` | **Batch Execution Engine**: Executes an ordered sequence of actions (`open`, `navigate`, `wait_for_selector`, `scroll_into_view`, `click`, `type`, `fill_form`, `snapshot`, `hover`, `drag`, `upload`, `dialog`, `press_key`, `scroll`, `sleep`, `screenshot`, `get_element`, `evaluate`, `cdp`, `close`) in a single round-trip, saving ~80% context tokens, decoding batch screenshots to disk, and stripping base64 bloat by default. |
+| `browser_run_actions` | `{ actions: Action[], tabId?: number, stopOnError?: boolean }` | **Batch Execution Engine**: Executes an ordered sequence of actions (`open`, `navigate`, `wait_for_selector`, `scroll_into_view`, `click`, `type`, `fill_form`, `snapshot`, `hover`, `drag`, `upload`, `dialog`, `press_key`, `scroll`, `sleep`, `screenshot`, `get_element`, `evaluate`, `cdp`, `performance_metrics`, `performance_trace`, `heap_snapshot`, `close`) in a single round-trip, saving ~80% context tokens, decoding batch screenshots to disk, and stripping base64 bloat by default. |
 | `browser_upload_file` | `{ selector: string, files: string[], via?: "auto" \| "cdp" \| "synthetic", waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Resilient Local File Uploader**: Uploads local files to `<input type="file">` (including hidden inputs and React/Dropzone inputs) via CDP `DOM.setFileInputFiles` with automatic `MAIN`-world `DataTransfer` fallback (`via: "auto"`). Supports `@ref`, CSS selector, and inline post-upload wait. |
 | `browser_handle_dialog` | `{ accept?: boolean, promptText?: string, tabId?: number }` | **JavaScript Dialog Handler**: Automatically accepts or dismisses `alert`, `confirm`, or `prompt` browser dialogs with optional text. |
 | `browser_hover` | `{ selector: string, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | **Virtual Mouse Hover**: Simulates hovering over an element (triggering `mouseenter`, `mouseover`, `mousemove`) with optional inline post-hover wait. |
@@ -114,9 +114,9 @@ When the `agent-pilot` MCP server or skill is active, agents have direct access 
 | `browser_resize_page` | `{ width: number, height: number, deviceScaleFactor?: number, mobile?: boolean, tabId?: number }` | **Viewport Resizer**: Overrides device metrics and screen resolution for responsive UI testing. |
 | `browser_list_network_requests` | `{ filterUrl?: string, method?: string, resourceType?: string, limit?: number, tabId?: number }` | **Network Inspector**: Lists recent HTTP requests captured on the tab with filtering by URL, method, or resource type. |
 | `browser_get_network_request` | `{ requestId: string, tabId?: number }` | **Response Body Inspector**: Retrieves the full response body (JSON/text) and headers for a specific network request via CDP `Network.getResponseBody`. |
-| `browser_performance_trace` | `{ action?: "start" \| "stop", categories?: string, tabId?: number }` | **Performance Tracer**: Records DevTools timeline trace (`Tracing.start/end`) to detect rendering bottlenecks and long tasks. |
-| `browser_performance_metrics` | `{ tabId?: number }` | **Runtime Metrics**: Queries live CDP performance metrics (JSHeapUsedSize, JSHeapTotalSize, LayoutCount, Nodes...). |
-| `browser_take_heapsnapshot` | `{ collectGarbage?: boolean, tabId?: number }` | **Memory Heap Profiler**: Captures memory heap snapshot or triggers V8 Garbage Collection to detect memory leaks. |
+| `browser_performance_trace` | `{ action?: "start" \| "stop", categories?: string, tabId?: number }` | **Timeline Bottleneck Analyzer**: Records DevTools timeline trace (`Tracing.start/end`) and automatically parses trace events into CPU breakdown (`scriptingMs`, `renderingMs`, `paintingMs`), Long Tasks ($\ge 50\text{ms}$), synchronous Forced Reflows / Layout Thrashing with stack trace URLs, Hot Scripts, and actionable `diagnostics`. |
+| `browser_performance_metrics` | `{ includeWebVitals?: boolean, includeResources?: boolean, includeDomHealth?: boolean, tabId?: number }` | **Deep Performance & Core Web Vitals**: Queries live CDP metrics (`JSHeapUsedSize`, `Nodes`, `JSEventListeners`), Core Web Vitals (`TTFB`, `FCP`, `LCP` + element selector, `CLS` + shifting elements, `TBT` + long tasks), slowest & render-blocking resources, DOM/A11y health (`maxDepth`, `duplicateIds`, missing alt/labels), and automated `diagnostics`. |
+| `browser_take_heapsnapshot` | `{ action?: "snapshot" \| "baseline" \| "diff" \| "check_leak" \| "gc", collectGarbage?: boolean, forceGC?: boolean, recordBaseline?: boolean, compareWithBaseline?: boolean, maxConstructors?: number, tabId?: number }` | **V8 Heap Profiler & Memory Leak Detector**: Triggers V8 GC, parses V8 `.heapsnapshot` nodes/strings into `topConstructors` and `detachedDomNodes` (`Detached HTML*` / `detachedness=2`), and supports `baseline` $\rightarrow$ `diff` comparison to detect memory leaks (`leakSuspected`, `severity`, `growingConstructors`, DOM/listener deltas). |
 | `browser_manage_extensions` | `{ action?: "list" \| "setEnabled", extensionId?: string, enabled?: boolean }` | **Extension Manager**: Lists installed browser extensions or toggles them on/off via `chrome.management`. |
 | `browser_start_session` | `{ name?: string, tabId?: number }` | **Continuous Session Start**: Initiates an active AI Agent session. Keeps the virtual cursor and glowing neon lock shield continuously visible on the tab until ended. |
 | `browser_end_session` | `{ tabId?: number, closeTab?: boolean }` | **Continuous Session End**: Concludes the active AI Agent session. Set `closeTab: true` to automatically close the agent tab and free RAM when the test finishes. |
@@ -130,7 +130,7 @@ When the `agent-pilot` MCP server or skill is active, agents have direct access 
 | `browser_scroll` | `{ deltaX?: number, deltaY?: number, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | Smoothly scrolls the page viewport by relative pixel offsets with optional inline post-scroll wait. |
 | `browser_get_element` | `{ selector: string, includeStyles?: boolean, tabId?: number }` | Inspects DOM elements, returning tag name, coordinates, bounding box dimensions, text, and value. Pass `includeStyles: true` only when styling details are needed (omitted by default to save tokens). |
 | `browser_screenshot` | `{ mode?: "visible" \| "region" \| "element" \| "full", selector?: string, path?: string, savePath?: string, step?: number \| string, title?: string, caption?: string, description?: string, highlightSelector?: string, highlightBox?: { x, y, width, height }, base64?: boolean, waitMs?: number, waitForSelector?: string, waitForText?: string, tabId?: number }` | Captures high-resolution PNG screenshot via CDP even on background tabs. Supports built-in visual annotations (`step`, `title`, `description`, `highlightSelector`) rendered directly onto the PNG, pre-capture `waitMs`/`waitForSelector`/`waitForText`, and saves to `path` (or `savePath` alias, default OS temp dir). |
-| `browser_get_devtools_data` | `{ tabId?: number, type?: "all" \| "console" \| "network" \| "performance", filterOrigin?: boolean, limit?: number, clear?: boolean }` | Intercepts real-time CDP Console logs, Network requests, and Performance metrics. Extension noise (`chrome-extension://*`) is filtered by default (`filterOrigin: true`). |
+| `browser_get_devtools_data` | `{ tabId?: number, type?: "all" \| "console" \| "network" \| "performance", filterOrigin?: boolean, limit?: number, clear?: boolean }` | **All-in-One DevTools Diagnostic**: Intercepts real-time CDP Console logs, uncaught JS exceptions, Network requests (with failed status/MIME), runtime CDP metrics, Core Web Vitals (`webVitals`), DOM/A11y health (`domHealth`), and actionable `diagnostics`. Extension noise (`chrome-extension://*`) is filtered by default (`filterOrigin: true`). |
 | `browser_pick_color` | `{ tabId?: number, x?: number, y?: number }` | Samples any on-screen pixel color. Returns all 5 modern color formats (`hex`, `rgb`, `rgba`, `hsl`, `oklch`). |
 | `browser_list_instances` | `{}` | Lists all connected browser instances (Chrome, Brave, Edge, profiles/windows). |
 | `browser_select_instance` | `{ instanceId: string }` | Switches active target browser instance in multi-browser setups. |
@@ -445,6 +445,56 @@ When recording multi-step QA test guides, user manuals, or end-to-end flows with
 
 4. **HTTP Basic Auth with Special Characters (`username` / `password`)**:
    - Pass `username` and `password` directly to `browser_open_tab`, `browser_navigate`, or batch `open`/`navigate` actions (or `--user` / `--password` in CLI). Credentials containing `@`, `:`, `&`, or `#` are safely URL-encoded via `encodeURIComponent` and CDP debugger attachment automatically retries after auth challenge navigation completes.
+
+---
+
+## 🔬 Deep Website Diagnostics, Core Web Vitals, Trace Insights & Memory Leak Detection
+
+Agent Pilot provides built-in deep performance diagnostics and V8 memory leak detection so AI agents never need to parse multi-megabyte raw CDP JSON files manually:
+
+### 1. Core Web Vitals, Resource Bottlenecks & DOM/A11y Health (`browser_performance_metrics` & `browser_get_devtools_data`)
+Call `browser_performance_metrics({ tabId })` (or `browser_get_devtools_data({ type: "all", tabId })`) to receive a compact, structured diagnostic report:
+- **`webVitals`**:
+  - `ttfbMs`, `fcpMs`, `lcpMs` + `lcpElement` (exact CSS selector of the Largest Contentful Paint element), `cls` + `clsCulprits` (selectors causing layout shifts), `totalBlockingTimeMs` (Total Blocking Time $\sum(\text{dur} - 50\text{ms})$) + `longTasksCount`, `maxLongTaskMs`, `topLongTasks`, and `ratings` (`"good"`, `"needs-improvement"`, `"poor"`).
+- **`resources`**:
+  - `totalCount`, `totalTransferKB`, `renderBlockingCount`, `renderBlockingUrls`, and `slowestResources` (top 5 slowest network resources with `url`, `initiatorType`, `durationMs`, `transferKB`).
+- **`domHealth`**:
+  - `totalElements`, `maxDepth`, `maxChildrenCount` + `maxChildrenSelector`, `iframeCount`, `duplicateIds` (`[{ id, count }]`), `imagesMissingAlt`, and `unlabelledInputs`.
+- **`diagnostics`**:
+  - Automated root-cause warnings/critical alerts with `severity` (`"warning"` | `"critical"`), `category`, `metric` (`LCP`, `CLS`, `TBT`, `DOMNodes`, `JSHeapUsedMB`, `DuplicateIDs`, `DOMDepth`, `RenderBlockingResources`), and `message`.
+
+### 2. Timeline Trace Bottleneck Analyzer (`browser_performance_trace`)
+To diagnose slow interactions, jank, or main-thread freezes:
+1. Start tracing: `browser_performance_trace({ action: "start", tabId })`
+2. Trigger the slow UI action (`browser_click`, `browser_scroll`, etc.)
+3. Stop & analyze: `browser_performance_trace({ action: "stop", tabId })`
+- **Returned `insights` & `eventsSummary`**:
+  - `insights.breakdownMs`: Main-thread CPU time split into `scriptingMs`, `renderingMs` (Layout / Recalculate Style), `paintingMs` (Paint / Composite), and `otherMs`.
+  - `insights.longTasks`: `count`, `totalBlockingTimeMs`, `maxDurationMs`, and `topTasks` (main-thread tasks $\ge 50\text{ms}$ with source script `url`/`functionName`/`lineNumber`).
+  - `insights.forcedReflows`: Synchronous Forced Layout / Recalculate Style events triggered inside JavaScript execution (Layout Thrashing), including `type`, `durationMs`, `functionName`, `url`, and `lineNumber`.
+  - `insights.hotScripts`: Top scripts ranked by main-thread CPU execution time (`url`, `totalMs`, `callCount`).
+  - `insights.bottlenecks`: Actionable summary strings of detected main-thread bottlenecks.
+
+### 3. Memory Leak Detection & V8 Heap Snapshot Diffing (`browser_take_heapsnapshot`)
+To verify whether an SPA interaction (e.g., opening and closing a modal, switching routes, or polling data) leaks memory:
+1. **Record Baseline (triggers V8 GC automatically first)**:
+   ```json
+   { "action": "baseline", "tabId": 123 }
+   ```
+2. **Perform the suspect UI cycle** (e.g. open modal $\rightarrow$ close modal, or navigate to detail $\rightarrow$ back).
+3. **Compare against Baseline (`diff` / `check_leak`)**:
+   ```json
+   { "action": "diff", "tabId": 123 }
+   ```
+- **Returned Memory & Leak Analysis**:
+  - `heapSummary.topConstructors`: Top V8 object constructors ranked by retained `selfSizeBytes` (`selfSizeKB`) and instance `count`.
+  - `heapSummary.detachedDomNodes`: `{ totalCount, totalBytes, totalKB, items }` for Detached DOM trees (`Detached HTMLDivElement`, `Detached HTMLLIElement`, or V8 `detachedness === 2`) still retained in JS memory after removal from the document.
+  - `leakAnalysis`:
+    - `leakSuspected` (`boolean`) and `severity` (`"none"` | `"low"` | `"medium"` | `"high"`).
+    - `deltas`: Exact growth in `jsHeapUsedBytes`, `jsHeapUsedMB`, `domNodes`, `jsEventListeners`, `documents`, and `detachedDomCount`.
+    - `growingConstructors`: Constructors with the largest positive instance and byte deltas (`deltaCount`, `deltaBytes`, `deltaKB`, `baselineCount`, `currentCount`) between baseline and post-interaction snapshot.
+    - `suspectedCauses`: Human- and agent-readable diagnosis of detached DOM retention, unremoved `addEventListener` handlers, or growing JS caches/closures.
+- Can also be run in a single `browser_run_actions` batch using `{ "action": "heap_snapshot", "mode": "baseline" }` $\rightarrow$ UI steps $\rightarrow$ `{ "action": "heap_snapshot", "mode": "diff" }`.
 
 ---
 

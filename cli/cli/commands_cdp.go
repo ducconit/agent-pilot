@@ -169,6 +169,9 @@ func newTraceCommand() *cobra.Command {
 func newMetricsCommand() *cobra.Command {
 	cmd := newLeafCommand("metrics", nil, func(args []string) error {
 		cmdArgs, err := parseCmdArgs(args, []FlagDef{
+			{Name: "no-vitals", IsBool: true},
+			{Name: "no-resources", IsBool: true},
+			{Name: "no-dom-health", IsBool: true},
 			{Name: "tab", Aliases: []string{"t"}},
 		})
 		if err != nil {
@@ -180,40 +183,77 @@ func newMetricsCommand() *cobra.Command {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-		if err := ExecPerformanceMetrics(tabID); err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			return errUsage
-		}
-		return nil
-	})
-	cmd.Flags().IntP("tab", "t", 0, "Target tab ID")
-	return cmd
-}
-
-func newHeapCommand() *cobra.Command {
-	cmd := newLeafCommand("heap", []string{"heapsnapshot"}, func(args []string) error {
-		cmdArgs, err := parseCmdArgs(args, []FlagDef{
-			{Name: "gc", IsBool: true},
-			{Name: "tab", Aliases: []string{"t"}},
-		})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			return errUsage
-		}
-		tabID, err := cmdArgs.TabID()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			return errUsage
-		}
-		gc := cmdArgs.Bool("gc")
-		if err := ExecTakeHeapSnapshot(gc, tabID); err != nil {
+		includeVitals := !cmdArgs.Bool("no-vitals")
+		includeResources := !cmdArgs.Bool("no-resources")
+		includeDomHealth := !cmdArgs.Bool("no-dom-health")
+		if err := ExecPerformanceMetricsWithOptions(includeVitals, includeResources, includeDomHealth, tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
 		return nil
 	})
 	f := cmd.Flags()
-	f.Bool("gc", false, "Force garbage collection before snapshot")
+	f.Bool("no-vitals", false, "Skip Core Web Vitals probe")
+	f.Bool("no-resources", false, "Skip resource bottleneck probe")
+	f.Bool("no-dom-health", false, "Skip DOM and accessibility health scan")
+	f.IntP("tab", "t", 0, "Target tab ID")
+	return cmd
+}
+
+func newHeapCommand() *cobra.Command {
+	cmd := newLeafCommand("heap", []string{"heapsnapshot"}, func(args []string) error {
+		cmdArgs, err := parseCmdArgs(args, []FlagDef{
+			{Name: "action", Aliases: []string{"a"}},
+			{Name: "baseline", IsBool: true},
+			{Name: "diff", Aliases: []string{"leak", "check-leak"}, IsBool: true},
+			{Name: "gc", IsBool: true},
+			{Name: "no-gc", IsBool: true},
+			{Name: "max-constructors"},
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		maxConstructors, err := cmdArgs.Int("max-constructors", 0)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		action := strings.ToLower(strings.TrimSpace(cmdArgs.String("action", "")))
+		if action == "" && len(cmdArgs.Positional) > 0 {
+			action = strings.ToLower(strings.TrimSpace(cmdArgs.Positional[0]))
+		}
+		if action == "" {
+			if cmdArgs.Bool("baseline") {
+				action = "baseline"
+			} else if cmdArgs.Bool("diff") {
+				action = "diff"
+			} else if cmdArgs.Bool("gc") {
+				action = "gc"
+			} else {
+				action = "snapshot"
+			}
+		}
+		collectGarbage := !cmdArgs.Bool("no-gc")
+		if err := ExecTakeHeapSnapshotWithOptions(action, collectGarbage, maxConstructors, tabID); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		return nil
+	})
+	f := cmd.Flags()
+	f.StringP("action", "a", "snapshot", "Action: snapshot|baseline|diff|check_leak|gc")
+	f.Bool("baseline", false, "Record GC'd memory baseline for this tab")
+	f.Bool("diff", false, "Compare current GC'd heap against tab baseline for memory leaks")
+	f.Bool("gc", false, "Trigger V8 garbage collection only")
+	f.Bool("no-gc", false, "Skip automatic V8 garbage collection before snapshot")
+	f.Int("max-constructors", 15, "Maximum number of top object constructors to return")
 	f.IntP("tab", "t", 0, "Target tab ID")
 	return cmd
 }

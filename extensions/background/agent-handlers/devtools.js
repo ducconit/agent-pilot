@@ -5,9 +5,8 @@
  */
 
 import { attachedTabs, getBuffer, LIMITS, NO_TARGET_TAB_ERROR } from "../constants.js";
-import { attachDebugger, sendCdpCommand } from "../cdp-manager.js";
+import { attachDebugger, getPerformanceMetrics } from "../cdp-manager.js";
 
-const BYTES_PER_MB = 1024 * 1024;
 const STATIC_RESOURCE_TYPES = new Set(["image", "media", "font", "stylesheet", "manifest"]);
 const STATIC_URL_RE = /\.(?:png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf|eot|css|mp4|webm|mp3|wav)(?:[?#]|$)/i;
 
@@ -96,31 +95,36 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
   }
 
   if (requestedType === "all" || requestedType === "performance") {
-    if (attachedTabs.has(tabId)) {
-      try {
-        const perfRes = await sendCdpCommand(tabId, "Performance.getMetrics");
-        const metricsMap = {};
-        (perfRes.metrics || []).forEach((m) => {
-          metricsMap[m.name] = m.value;
-        });
-        performanceData = {
-          metrics: metricsMap,
-          jsHeapUsedMB: metricsMap.JSHeapUsedSize ? +(metricsMap.JSHeapUsedSize / BYTES_PER_MB).toFixed(2) : undefined,
-          jsHeapTotalMB: metricsMap.JSHeapTotalSize ? +(metricsMap.JSHeapTotalSize / BYTES_PER_MB).toFixed(2) : undefined,
-          domNodes: metricsMap.Nodes,
-          documents: metricsMap.Documents,
-          frames: metricsMap.Frames,
-          layoutCount: metricsMap.LayoutCount,
-          recalcStyleCount: metricsMap.RecalcStyleCount,
-          timestamp: Date.now()
-        };
-      } catch (perfErr) {
-        performanceData = { error: perfErr.message };
-      }
-    } else {
-      performanceData = { error: "Debugger not attached to tab" };
+    try {
+      const perfDetails = await getPerformanceMetrics(tabId, params);
+      const metricsMap = perfDetails.metrics || {};
+      performanceData = {
+        metrics: metricsMap,
+        jsHeapUsedMB: perfDetails.memory?.jsHeapUsedMB,
+        jsHeapTotalMB: perfDetails.memory?.jsHeapTotalMB,
+        domNodes: perfDetails.memory?.domNodes,
+        jsEventListeners: perfDetails.memory?.jsEventListeners,
+        documents: perfDetails.memory?.documents,
+        frames: perfDetails.memory?.frames,
+        layoutCount: perfDetails.memory?.layoutCount,
+        recalcStyleCount: perfDetails.memory?.recalcStyleCount,
+        webVitals: perfDetails.webVitals,
+        resources: perfDetails.resources,
+        domHealth: perfDetails.domHealth,
+        diagnostics: perfDetails.diagnostics,
+        timestamp: perfDetails.timestamp || Date.now()
+      };
+    } catch (perfErr) {
+      performanceData = { error: perfErr.message };
     }
   }
+
+  const consoleErrorCount = consoleData
+    ? consoleData.filter((c) => c.type === "error" || c.type === "assert").length
+    : undefined;
+  const failedNetworkRequests = networkData
+    ? networkData.filter((r) => r.status === "failed" || Boolean(r.errorText) || (typeof r.status === "number" && r.status >= 400)).length
+    : undefined;
 
   const responsePayload = {
     tabId,
@@ -128,9 +132,15 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
     timestamp: Date.now(),
     summary: {
       consoleEntries: consoleData ? consoleData.length : 0,
+      consoleErrors: consoleErrorCount,
       networkRequests: networkData ? networkData.length : 0,
+      failedNetworkRequests,
       jsHeapUsedMB: performanceData?.jsHeapUsedMB,
-      domNodes: performanceData?.domNodes
+      domNodes: performanceData?.domNodes,
+      jsEventListeners: performanceData?.jsEventListeners,
+      lcpMs: performanceData?.webVitals?.lcpMs,
+      cls: performanceData?.webVitals?.cls,
+      diagnosticsCount: Array.isArray(performanceData?.diagnostics) ? performanceData.diagnostics.length : undefined
     }
   };
 

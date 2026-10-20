@@ -1,9 +1,9 @@
 {
-  "description": "Start or stop DevTools Performance tracing session (Tracing.start/end) to analyze browser timeline and runtime performance.",
+  "description": "Start or stop DevTools Performance tracing session (Tracing.start/end). When stopped, returns structured bottleneck insights (CPU scripting/rendering/painting breakdown, Long Tasks \u003e=50ms, synchronous Forced Reflows / layout thrashing, and Hot Scripts).",
   "inputSchema": {
     "properties": {
       "action": {
-        "description": "Action: 'start' to begin recording, 'stop' to end and retrieve metrics",
+        "description": "Action: 'start' to begin recording, 'stop' to end and retrieve bottleneck insights",
         "enum": [
           "start",
           "stop"
@@ -25,7 +25,7 @@
   "parameters": {
     "properties": {
       "action": {
-        "description": "Action: 'start' to begin recording, 'stop' to end and retrieve metrics",
+        "description": "Action: 'start' to begin recording, 'stop' to end and retrieve bottleneck insights",
         "enum": [
           "start",
           "stop"

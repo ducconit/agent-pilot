@@ -23,6 +23,7 @@ import {
   activeDialogs,
   agentControlledTabs,
   tabLockStates,
+  memoryBaselines,
   cleanupTabResources
 } from "../extensions/background/constants.js";
 import { transportMethods } from "../extensions/background/bridge-transport.js";
@@ -61,7 +62,9 @@ const EXPECTED_CDP_EXPORTS = [
   "stopPerformanceTrace",
   "getPerformanceMetrics",
   "collectGarbage",
-  "takeHeapSnapshot"
+  "takeHeapSnapshot",
+  "analyzeTraceEvents",
+  "parseV8HeapSnapshot"
 ];
 const missingCdp = EXPECTED_CDP_EXPORTS.filter((name) => typeof cdpManager[name] === "undefined");
 record(
@@ -77,6 +80,7 @@ const EXPECTED_BATCH_ACTIONS = [
   "click", "page.click", "type", "page.type", "press_key", "key",
   "scroll", "page.scroll", "hover", "page.hover", "drag", "page.drag",
   "evaluate", "eval", "cdp", "devtools", "get_devtools_data",
+  "performance_metrics", "metrics", "performance_trace", "trace", "heap_snapshot", "heap", "memory",
   "screenshot", "page.screenshot", "snapshot", "page.snapshot",
   "fill_form", "fill", "page.fillform", "get_element", "upload", "upload_file",
   "dialog", "handle_dialog", "scroll_into_view"
@@ -187,6 +191,7 @@ devtoolsBuffers.set(testTabId, { console: [], network: new Map() });
 activeTracingSessions.set(testTabId, { buffer: [] });
 activeDialogs.set(testTabId, { type: "alert" });
 agentControlledTabs.add(testTabId);
+memoryBaselines.set(testTabId, { timestamp: Date.now() });
 const dummyTimer = setTimeout(() => {}, 60000);
 tabLockStates.set(testTabId, { manualLock: true, autoCount: 1, unlockTimer: dummyTimer });
 cleanupTabResources(testTabId);
@@ -196,11 +201,12 @@ const tabCleaned =
   !activeTracingSessions.has(testTabId) &&
   !activeDialogs.has(testTabId) &&
   !agentControlledTabs.has(testTabId) &&
+  !memoryBaselines.has(testTabId) &&
   !tabLockStates.has(testTabId);
 record(
   "7. cleanupTabResources clears all per-tab Maps/Sets and timers",
   tabCleaned,
-  `all 6 state stores cleared=${tabCleaned}`
+  `all 7 state stores cleared=${tabCleaned}`
 );
 
 // 8. reconcileDebuggerState resets its in-flight promise after completion
@@ -852,6 +858,260 @@ record(
     radixState === "true" &&
     radixClicked === 1,
   `filledCount=${fillRadixRes?.filledCount}, radixState=${radixState}, radixClicked=${radixClicked}`
+);
+
+// 23. takeHeapSnapshot parses V8 heap snapshot chunks, records baseline, and detects Detached DOM + listener + constructor memory leaks on diff
+const buildMockV8HeapSnapshot = ({ cachedItemCount, detachedDivCount }) => {
+  const strings = ["", "Object", "CachedModalState", "Detached HTMLDivElement", "HTMLButtonElement"];
+  const nodes = [];
+  // [type, name, id, self_size, edge_count, trace_node_id, detachedness]
+  // Base Object node (type=3 "object", name=1 "Object", self_size=1024, detachedness=0)
+  nodes.push(3, 1, 1, 1024, 0, 0, 0);
+  // CachedModalState nodes (type=3 "object", name=2 "CachedModalState", self_size=65536 each)
+  for (let i = 0; i < cachedItemCount; i++) {
+    nodes.push(3, 2, 100 + i, 65536, 0, 0, 0);
+  }
+  // Detached HTMLDivElement nodes (type=8 "native", name=3 "Detached HTMLDivElement", self_size=2048, detachedness=2)
+  for (let i = 0; i < detachedDivCount; i++) {
+    nodes.push(8, 3, 500 + i, 2048, 0, 0, 2);
+  }
+  // Attached HTMLButtonElement with detachedness=2 (also detached via detachedness flag)
+  if (detachedDivCount > 0) {
+    nodes.push(8, 4, 900, 1024, 0, 0, 2);
+  }
+  return JSON.stringify({
+    snapshot: {
+      meta: {
+        node_fields: ["type", "name", "id", "self_size", "edge_count", "trace_node_id", "detachedness"],
+        node_types: [
+          ["hidden", "array", "string", "object", "code", "closure", "regexp", "number", "native", "synthetic"]
+        ]
+      }
+    },
+    nodes,
+    strings
+  });
+};
+
+let heapPhase = "baseline";
+let gcCollectCalls = 0;
+let heapChunkListener = null;
+attachedTabs.add(923);
+globalThis.chrome = {
+  runtime: { lastError: null },
+  debugger: {
+    onEvent: {
+      addListener: (fn) => {
+        heapChunkListener = fn;
+      },
+      removeListener: () => {
+        heapChunkListener = null;
+      }
+    },
+    sendCommand: (_target, method, _params, cb) => {
+      if (method === "HeapProfiler.collectGarbage") {
+        gcCollectCalls++;
+        cb({});
+        return;
+      }
+      if (method === "Performance.enable") {
+        cb({});
+        return;
+      }
+      if (method === "Performance.getMetrics") {
+        const isDiff = heapPhase === "diff";
+        cb({
+          metrics: [
+            { name: "JSHeapUsedSize", value: isDiff ? 28 * 1024 * 1024 : 10 * 1024 * 1024 },
+            { name: "JSHeapTotalSize", value: 40 * 1024 * 1024 },
+            { name: "Nodes", value: isDiff ? 1850 : 1200 },
+            { name: "JSEventListeners", value: isDiff ? 410 : 120 },
+            { name: "Documents", value: isDiff ? 4 : 1 }
+          ]
+        });
+        return;
+      }
+      if (method === "HeapProfiler.takeHeapSnapshot") {
+        const rawJson =
+          heapPhase === "baseline"
+            ? buildMockV8HeapSnapshot({ cachedItemCount: 2, detachedDivCount: 0 })
+            : buildMockV8HeapSnapshot({ cachedItemCount: 80, detachedDivCount: 6 });
+        if (heapChunkListener) {
+          const mid = Math.floor(rawJson.length / 2);
+          heapChunkListener({ tabId: 923 }, "HeapProfiler.addHeapSnapshotChunk", { chunk: rawJson.slice(0, mid) });
+          heapChunkListener({ tabId: 923 }, "HeapProfiler.addHeapSnapshotChunk", { chunk: rawJson.slice(mid) });
+        }
+        cb({});
+        return;
+      }
+      cb({});
+    }
+  }
+};
+
+const malformedOk =
+  cdpManager.parseV8HeapSnapshot([]) === null &&
+  cdpManager.parseV8HeapSnapshot(["{malformed"]) === null;
+const baselineHeapRes = await cdpManager.takeHeapSnapshot(923, { action: "baseline" });
+heapPhase = "diff";
+const diffHeapRes = await cdpManager.takeHeapSnapshot(923, { action: "diff" });
+const reBaselineRes = await cdpManager.takeHeapSnapshot(923, { action: "baseline" });
+record(
+  "23. takeHeapSnapshot parses V8 heap nodes/strings, stores baseline, and detects Detached DOM + listener + constructor leaks on diff",
+  malformedOk &&
+    baselineHeapRes.success === true &&
+    baselineHeapRes.baselineRecorded === true &&
+    !baselineHeapRes.leakAnalysis &&
+    reBaselineRes.baselineRecorded === true &&
+    !reBaselineRes.leakAnalysis &&
+    diffHeapRes.success === true &&
+    gcCollectCalls >= 3 &&
+    diffHeapRes.heapSummary?.detachedDomNodes?.totalCount === 7 &&
+    diffHeapRes.heapSummary?.detachedDomNodes?.items?.some((d) => d.name === "Detached HTMLDivElement" && d.count === 6) &&
+    diffHeapRes.leakAnalysis?.leakSuspected === true &&
+    diffHeapRes.leakAnalysis?.severity === "high" &&
+    diffHeapRes.leakAnalysis?.deltas?.domNodes === 650 &&
+    diffHeapRes.leakAnalysis?.deltas?.jsEventListeners === 290 &&
+    diffHeapRes.leakAnalysis?.growingConstructors?.some((c) => c.name === "CachedModalState" && c.deltaCount === 78),
+  `malformedOk=${malformedOk}, leakSuspected=${diffHeapRes.leakAnalysis?.leakSuspected}, severity=${diffHeapRes.leakAnalysis?.severity}, detachedCount=${diffHeapRes.heapSummary?.detachedDomNodes?.totalCount}, growing=${diffHeapRes.leakAnalysis?.growingConstructors?.[0]?.name}`
+);
+
+// 24. stopPerformanceTrace & analyzeTraceEvents ignore ph='M' metadata events and extract CPU breakdown, Long Tasks, Forced Reflows, and Hot Scripts
+activeTracingSessions.set(924, {
+  completed: true,
+  startTime: Date.now() - 1500,
+  buffer: [
+    // Metadata event with ph='M' (must be excluded from eventsSummary!)
+    { name: "process_name", cat: "__metadata", ph: "M", ts: 0, dur: 0 },
+    // Long task (120ms = 120,000us)
+    { name: "RunTask", cat: "disabled-by-default-devtools.timeline", ph: "X", ts: 1000000, dur: 120000 },
+    // Scripting FunctionCall (90ms) attributed to app.bundle.js
+    {
+      name: "FunctionCall",
+      cat: "devtools.timeline",
+      ph: "X",
+      ts: 1010000,
+      dur: 90000,
+      args: { data: { url: "https://example.test/app.bundle.js", functionName: "renderHeavyTable", lineNumber: 42 } }
+    },
+    // Synchronous Forced Layout (25ms) with stackTrace inside JS
+    {
+      name: "Layout",
+      cat: "devtools.timeline",
+      ph: "X",
+      ts: 1050000,
+      dur: 25000,
+      args: {
+        beginData: {
+          dirtyObjects: 15,
+          stackTrace: [{ url: "https://example.test/app.bundle.js", functionName: "measureRowHeight", lineNumber: 88 }]
+        }
+      }
+    },
+    // Paint event (12ms)
+    { name: "Paint", cat: "devtools.timeline", ph: "X", ts: 1130000, dur: 12000 }
+  ]
+});
+const traceStopRes = await cdpManager.stopPerformanceTrace(924);
+record(
+  "24. stopPerformanceTrace filters metadata events and reports CPU breakdown, Long Tasks, Forced Reflows, and Hot Scripts",
+  traceStopRes.success === true &&
+    traceStopRes.eventsSummary.every((e) => e.ph !== "M") &&
+    traceStopRes.insights.breakdownMs.scriptingMs === 90 &&
+    traceStopRes.insights.breakdownMs.renderingMs === 25 &&
+    traceStopRes.insights.breakdownMs.paintingMs === 12 &&
+    traceStopRes.insights.longTasks.count === 2 &&
+    traceStopRes.insights.longTasks.maxDurationMs === 120 &&
+    traceStopRes.insights.forcedReflows.length === 1 &&
+    traceStopRes.insights.forcedReflows[0]?.functionName === "measureRowHeight" &&
+    traceStopRes.insights.hotScripts[0]?.url === "https://example.test/app.bundle.js" &&
+    Array.isArray(traceStopRes.insights.bottlenecks) &&
+    traceStopRes.insights.bottlenecks.length >= 2,
+  `scriptingMs=${traceStopRes.insights?.breakdownMs?.scriptingMs}, longTasks=${traceStopRes.insights?.longTasks?.count}, forcedReflows=${traceStopRes.insights?.forcedReflows?.length}`
+);
+
+// 25. getPerformanceMetrics & collectDevtoolsData combine CDP metrics with Core Web Vitals, DOM/A11y health, and actionable diagnostics
+attachedTabs.add(925);
+devtoolsBuffers.set(925, {
+  console: [{ type: "error", text: "Uncaught TypeError: Cannot read properties of null", timestamp: Date.now() }],
+  errors: [{ text: "Uncaught TypeError: Cannot read properties of null", timestamp: Date.now() }],
+  issues: [],
+  network: new Map([
+    [
+      "req-1",
+      {
+        requestId: "req-1",
+        url: "https://example.test/api/orders",
+        method: "GET",
+        status: 500,
+        failed: true,
+        errorText: "HTTP 500",
+        timestamp: Date.now()
+      }
+    ]
+  ])
+});
+globalThis.chrome.scripting = {
+  executeScript: async () => [
+    {
+      result: {
+        webVitals: {
+          ttfbMs: 950,
+          fcpMs: 2100,
+          lcpMs: 4600,
+          lcpElement: "img.hero-banner",
+          cls: 0.32,
+          clsCulprits: ["div.promo-banner"],
+          totalBlockingTimeMs: 680,
+          longTasksCount: 5,
+          domContentLoadedMs: 2200,
+          loadEventMs: 4900
+        },
+        resources: {
+          totalCount: 42,
+          totalTransferKB: 3500,
+          renderBlockingCount: 4,
+          renderBlockingUrls: ["https://example.test/blocking.css"],
+          slowestResources: [{ url: "https://example.test/vendor.js", initiatorType: "script", durationMs: 1850, transferKB: 1200 }]
+        },
+        domHealth: {
+          totalElements: 2100,
+          maxDepth: 36,
+          maxChildrenCount: 120,
+          maxChildrenSelector: "div#feed",
+          iframeCount: 1,
+          duplicateIds: [{ id: "submit-btn", count: 2 }],
+          imagesMissingAlt: 3,
+          unlabelledInputs: 2
+        }
+      }
+    }
+  ]
+};
+const devtoolsFull = await collectDevtoolsData(925, {});
+const metricsNoRes = await cdpManager.getPerformanceMetrics(925, { includeResources: false });
+const diagMetrics = (devtoolsFull.performance?.diagnostics || []).map((d) => d.metric);
+record(
+  "25. getPerformanceMetrics & collectDevtoolsData return Core Web Vitals, DOM/A11y health, and automated diagnostics",
+  devtoolsFull.performance?.webVitals?.lcpMs === 4600 &&
+    devtoolsFull.performance?.webVitals?.lcpElement === "img.hero-banner" &&
+    devtoolsFull.performance?.webVitals?.cls === 0.32 &&
+    devtoolsFull.performance?.webVitals?.ratings?.lcp === "poor" &&
+    devtoolsFull.performance?.domHealth?.totalElements === 2100 &&
+    devtoolsFull.performance?.domHealth?.duplicateIds?.[0]?.id === "submit-btn" &&
+    devtoolsFull.summary?.consoleErrors === 1 &&
+    devtoolsFull.summary?.failedNetworkRequests === 1 &&
+    devtoolsFull.summary?.lcpMs === 4600 &&
+    metricsNoRes.resources === undefined &&
+    metricsNoRes.webVitals?.lcpMs === 4600 &&
+    diagMetrics.includes("LCP") &&
+    diagMetrics.includes("CLS") &&
+    diagMetrics.includes("TBT") &&
+    diagMetrics.includes("DOMNodes") &&
+    diagMetrics.includes("DuplicateIDs") &&
+    diagMetrics.includes("DOMDepth") &&
+    diagMetrics.includes("RenderBlockingResources"),
+  `lcpMs=${devtoolsFull.performance?.webVitals?.lcpMs}, cls=${devtoolsFull.performance?.webVitals?.cls}, diagnostics=${diagMetrics.join(",")}`
 );
 
 recorder.summarize();

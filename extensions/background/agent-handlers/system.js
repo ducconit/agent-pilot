@@ -123,9 +123,9 @@ export const systemHandlers = {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     if (!attachedTabs.has(tabId)) {
-      await attachDebugger(tabId, client.broadcastFn);
+      await attachDebugger(tabId, client.broadcastFn).catch(() => {});
     }
-    getPerformanceMetrics(tabId)
+    getPerformanceMetrics(tabId, params)
       .then(res => respond(res))
       .catch(err => respond(null, err));
   },
@@ -136,7 +136,7 @@ export const systemHandlers = {
     if (!attachedTabs.has(tabId)) {
       await attachDebugger(tabId, client.broadcastFn);
     }
-    takeHeapSnapshot(tabId)
+    takeHeapSnapshot(tabId, params)
       .then(res => respond(res))
       .catch(err => respond(null, err));
   },

@@ -238,6 +238,36 @@ agent-pilot screenshot --mode region -o ./region.png
 
 ---
 
+## 7b. Deep Performance Metrics, Timeline Trace & Memory Leak Detection (`metrics`, `trace`, `heap`, `devtools`)
+
+> Engine: CDP `Performance`, `Tracing`, and `HeapProfiler` domains + `MAIN`-world Web Vitals & DOM/A11y probe.
+
+```bash
+# Query CDP runtime metrics + Core Web Vitals (LCP, CLS, TBT, FCP, TTFB) + DOM/A11y health + diagnostics
+agent-pilot metrics [--tab 12345]
+agent-pilot metrics --no-vitals --no-dom-health --tab 12345
+
+# Start & stop DevTools timeline trace (returns CPU breakdown, Long Tasks >=50ms, Forced Reflows, Hot Scripts)
+agent-pilot trace start [--tab 12345]
+agent-pilot click "#heavy-filter-btn" --tab 12345
+agent-pilot trace stop [--tab 12345]
+
+# Memory Leak Detection workflow: record baseline -> interact -> diff against baseline
+agent-pilot heap baseline --tab 12345
+agent-pilot click "#open-modal" --tab 12345
+agent-pilot click "#close-modal" --tab 12345
+agent-pilot heap diff --tab 12345
+
+# One-shot V8 heap snapshot (top constructors + Detached DOM nodes) or forced Garbage Collection
+agent-pilot heap snapshot [--max-constructors 25] [--tab 12345]
+agent-pilot heap gc [--tab 12345]
+
+# All-in-one DevTools snapshot (Console errors, failed Network requests, Web Vitals, DOM health, diagnostics)
+agent-pilot devtools [--tab 12345]
+```
+
+---
+
 ## 8. Batch Automation (`batch`)
 
 Execute an ordered sequence of browser actions in a single atomic network round-trip, saving ~80% context tokens and eliminating network round-trips. Any `screenshot` step in the batch with `path` (or `savePath`) is automatically saved to disk and its raw `dataUrl` is stripped from the JSON response (unless `base64: true`):

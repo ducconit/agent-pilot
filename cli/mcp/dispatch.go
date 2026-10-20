@@ -262,7 +262,9 @@ func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool)
 
 	case "browser_take_heapsnapshot":
 		method := "memory.heapSnapshot"
-		if cg, ok := args["collectGarbage"].(bool); ok && cg {
+		action, _ := args["action"].(string)
+		action = strings.ToLower(strings.TrimSpace(action))
+		if action == "gc" {
 			method = "memory.collectGarbage"
 		}
 		res, err := bridge.DispatchCommand(method, args, port)

@@ -14,7 +14,7 @@ type ToolInfo struct {
 var mcpTools = []ToolInfo{
 	{
 		Name:        "browser_run_actions",
-		Description: "Execute an ordered sequence of browser actions in a single tool call (open, navigate, wait, click, type, fill_form, upload, screenshot with step/title/description/highlightSelector & disk path, evaluate, devtools, close).",
+		Description: "Execute an ordered sequence of browser actions in a single tool call (open, navigate, wait, click, type, fill_form, upload, screenshot with step/title/description/highlightSelector & disk path, evaluate, devtools, metrics/performance_metrics, trace/performance_trace, heap/heap_snapshot, close).",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -532,11 +532,11 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_performance_trace",
-		Description: "Start or stop DevTools Performance tracing session (Tracing.start/end) to analyze browser timeline and runtime performance.",
+		Description: "Start or stop DevTools Performance tracing session (Tracing.start/end). When stopped, returns structured bottleneck insights (CPU scripting/rendering/painting breakdown, Long Tasks >=50ms, synchronous Forced Reflows / layout thrashing, and Hot Scripts).",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"action":     map[string]interface{}{"type": "string", "enum": []string{"start", "stop"}, "description": "Action: 'start' to begin recording, 'stop' to end and retrieve metrics"},
+				"action":     map[string]interface{}{"type": "string", "enum": []string{"start", "stop"}, "description": "Action: 'start' to begin recording, 'stop' to end and retrieve bottleneck insights"},
 				"categories": map[string]interface{}{"type": "string", "description": "Optional trace categories string"},
 				"tabId":      map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
@@ -544,22 +544,30 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_performance_metrics",
-		Description: "Retrieve live runtime performance metrics from Chrome DevTools Protocol (JSHeapUsedSize, JSHeapTotalSize, LayoutCount, Nodes...).",
+		Description: "Retrieve comprehensive runtime & debugging metrics: CDP counters (JSHeapUsedMB, Nodes, JSEventListeners, LayoutCount, ScriptDuration), Core Web Vitals (TTFB, FCP, LCP + target element, CLS + shifting elements, TBT + long tasks), Resource bottlenecks (slowest & render-blocking URLs), DOM/A11y health (max depth, duplicate IDs, missing alt/labels), and automated diagnostic warnings.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"tabId": map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"includeWebVitals": map[string]interface{}{"type": "boolean", "description": "Collect Core Web Vitals (TTFB, FCP, LCP, CLS, TBT) (default: true)"},
+				"includeResources": map[string]interface{}{"type": "boolean", "description": "Collect resource bottleneck metrics (slowest & render-blocking URLs) (default: true)"},
+				"includeDomHealth": map[string]interface{}{"type": "boolean", "description": "Collect DOM depth, duplicate IDs, and accessibility health metrics (default: true)"},
+				"tabId":            map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
 		},
 	},
 	{
 		Name:        "browser_take_heapsnapshot",
-		Description: "Capture a heap memory snapshot or trigger garbage collection via CDP HeapProfiler.",
+		Description: "Capture a V8 heap memory snapshot, parse top object constructors & Detached DOM nodes, and detect memory leaks via baseline/diff comparison. Automatically triggers V8 Garbage Collection before snapshot unless collectGarbage: false.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"collectGarbage": map[string]interface{}{"type": "boolean", "description": "Set to true to trigger V8 Garbage Collection before or instead of snapshot"},
-				"tabId":          map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"action":              map[string]interface{}{"type": "string", "enum": []string{"snapshot", "baseline", "diff", "check_leak", "gc"}, "description": "Memory action: 'baseline' (record GC'd baseline for tab), 'diff' / 'check_leak' (compare current GC'd heap against tab baseline to pinpoint growing constructors, detached DOM nodes, and listener leaks), 'snapshot' (default, parse heap & compare if baseline exists), or 'gc' (trigger V8 GC only)"},
+				"collectGarbage":      map[string]interface{}{"type": "boolean", "description": "Trigger V8 Garbage Collection before capturing snapshot (default: true)"},
+				"forceGC":             map[string]interface{}{"type": "boolean", "description": "Alias for collectGarbage: trigger V8 Garbage Collection before snapshot (default: true)"},
+				"recordBaseline":      map[string]interface{}{"type": "boolean", "description": "Explicitly save this snapshot as the new per-tab memory baseline"},
+				"compareWithBaseline": map[string]interface{}{"type": "boolean", "description": "Compare this snapshot against the stored per-tab baseline to detect memory leaks"},
+				"maxConstructors":     map[string]interface{}{"type": "integer", "description": "Maximum number of top object constructors to return (default: 20)"},
+				"tabId":               map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
 		},
 	},

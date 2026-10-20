@@ -9,6 +9,7 @@ export const agentControlledTabs = new Set(); // Track tabs opened or controlled
 export const tabLockStates = new Map(); // tabId -> { manualLock: boolean, autoCount: number, unlockTimer: any, currentAction: string, sessionActive: boolean, sessionName: string }
 export const activeDialogs = new Map(); // tabId -> { type, message, defaultPrompt, url, timestamp }
 export const activeTracingSessions = new Map(); // tabId -> { buffer: [], categories: string, startTime: number }
+export const memoryBaselines = new Map(); // tabId -> { timestamp, metrics, heapSummary, domSummary }
 
 // Chrome Native Tab Group styling constants
 export const AGENT_GROUP_TITLE = "🤖 Agent Pilot";
@@ -114,13 +115,14 @@ export function getTabLockState(tabId) {
 }
 
 /**
- * Drop per-tab CDP session state (attached flag, devtools buffer, active trace, active dialog).
+ * Drop per-tab CDP session state (attached flag, devtools buffer, active trace, active dialog, memory baseline).
  */
 export function cleanupDebuggerState(tabId) {
   attachedTabs.delete(tabId);
   devtoolsBuffers.delete(tabId);
   activeTracingSessions.delete(tabId);
   activeDialogs.delete(tabId);
+  memoryBaselines.delete(tabId);
 }
 
 /**

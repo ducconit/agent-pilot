@@ -41,7 +41,9 @@ export { uploadFileInput, handleJavaScriptDialog, getActiveDialog } from "./cdp-
 export {
   startPerformanceTrace,
   stopPerformanceTrace,
+  analyzeTraceEvents,
   getPerformanceMetrics,
   collectGarbage,
+  parseV8HeapSnapshot,
   takeHeapSnapshot
 } from "./cdp-performance.js";

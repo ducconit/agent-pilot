@@ -8,6 +8,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/ducconit/agent-pilot-extension/cli/bridge"
 	"github.com/ducconit/agent-pilot-extension/cli/config"
@@ -143,15 +144,42 @@ func ExecPerformanceTrace(action, categories string, tabID interface{}) error {
 }
 
 func ExecPerformanceMetrics(tabID interface{}) error {
-	return dispatchAndPrintJSON("performance.metrics", nil, tabID)
+	return ExecPerformanceMetricsWithOptions(true, true, true, tabID)
+}
+
+func ExecPerformanceMetricsWithOptions(includeWebVitals, includeResources, includeDomHealth bool, tabID interface{}) error {
+	params := map[string]interface{}{
+		"includeWebVitals": includeWebVitals,
+		"includeResources": includeResources,
+		"includeDomHealth": includeDomHealth,
+	}
+	return dispatchAndPrintJSON("performance.metrics", params, tabID)
 }
 
 func ExecTakeHeapSnapshot(gc bool, tabID interface{}) error {
-	method := "memory.heapSnapshot"
+	action := "snapshot"
 	if gc {
-		method = "memory.collectGarbage"
+		action = "gc"
 	}
-	return dispatchAndPrintJSON(method, nil, tabID)
+	return ExecTakeHeapSnapshotWithOptions(action, true, 0, tabID)
+}
+
+func ExecTakeHeapSnapshotWithOptions(action string, collectGarbage bool, maxConstructors int, tabID interface{}) error {
+	normalized := strings.ToLower(strings.TrimSpace(action))
+	if normalized == "gc" {
+		return dispatchAndPrintJSON("memory.collectGarbage", nil, tabID)
+	}
+	if normalized == "" {
+		normalized = "snapshot"
+	}
+	params := map[string]interface{}{
+		"action":         normalized,
+		"collectGarbage": collectGarbage,
+	}
+	if maxConstructors > 0 {
+		params["maxConstructors"] = maxConstructors
+	}
+	return dispatchAndPrintJSON("memory.heapSnapshot", params, tabID)
 }
 
 func ExecManageExtensions(action, extensionID string, enabled *bool) error {

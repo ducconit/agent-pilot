@@ -1,9 +1,36 @@
 {
-  "description": "Capture a heap memory snapshot or trigger garbage collection via CDP HeapProfiler.",
+  "description": "Capture a V8 heap memory snapshot, parse top object constructors \u0026 Detached DOM nodes, and detect memory leaks via baseline/diff comparison. Automatically triggers V8 Garbage Collection before snapshot unless collectGarbage: false.",
   "inputSchema": {
     "properties": {
+      "action": {
+        "description": "Memory action: 'baseline' (record GC'd baseline for tab), 'diff' / 'check_leak' (compare current GC'd heap against tab baseline to pinpoint growing constructors, detached DOM nodes, and listener leaks), 'snapshot' (default, parse heap \u0026 compare if baseline exists), or 'gc' (trigger V8 GC only)",
+        "enum": [
+          "snapshot",
+          "baseline",
+          "diff",
+          "check_leak",
+          "gc"
+        ],
+        "type": "string"
+      },
       "collectGarbage": {
-        "description": "Set to true to trigger V8 Garbage Collection before or instead of snapshot",
+        "description": "Trigger V8 Garbage Collection before capturing snapshot (default: true)",
+        "type": "boolean"
+      },
+      "compareWithBaseline": {
+        "description": "Compare this snapshot against the stored per-tab baseline to detect memory leaks",
+        "type": "boolean"
+      },
+      "forceGC": {
+        "description": "Alias for collectGarbage: trigger V8 Garbage Collection before snapshot (default: true)",
+        "type": "boolean"
+      },
+      "maxConstructors": {
+        "description": "Maximum number of top object constructors to return (default: 20)",
+        "type": "integer"
+      },
+      "recordBaseline": {
+        "description": "Explicitly save this snapshot as the new per-tab memory baseline",
         "type": "boolean"
       },
       "tabId": {
@@ -16,8 +43,35 @@
   "name": "browser_take_heapsnapshot",
   "parameters": {
     "properties": {
+      "action": {
+        "description": "Memory action: 'baseline' (record GC'd baseline for tab), 'diff' / 'check_leak' (compare current GC'd heap against tab baseline to pinpoint growing constructors, detached DOM nodes, and listener leaks), 'snapshot' (default, parse heap \u0026 compare if baseline exists), or 'gc' (trigger V8 GC only)",
+        "enum": [
+          "snapshot",
+          "baseline",
+          "diff",
+          "check_leak",
+          "gc"
+        ],
+        "type": "string"
+      },
       "collectGarbage": {
-        "description": "Set to true to trigger V8 Garbage Collection before or instead of snapshot",
+        "description": "Trigger V8 Garbage Collection before capturing snapshot (default: true)",
+        "type": "boolean"
+      },
+      "compareWithBaseline": {
+        "description": "Compare this snapshot against the stored per-tab baseline to detect memory leaks",
+        "type": "boolean"
+      },
+      "forceGC": {
+        "description": "Alias for collectGarbage: trigger V8 Garbage Collection before snapshot (default: true)",
+        "type": "boolean"
+      },
+      "maxConstructors": {
+        "description": "Maximum number of top object constructors to return (default: 20)",
+        "type": "integer"
+      },
+      "recordBaseline": {
+        "description": "Explicitly save this snapshot as the new per-tab memory baseline",
         "type": "boolean"
       },
       "tabId": {

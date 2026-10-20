@@ -45,5 +45,13 @@ export const BATCH_ACTION_HANDLERS = {
   "page.snapshot": observationHandlers.snapshot,
   "page.getelement": observationHandlers.get_element,
   eval: observationHandlers.evaluate,
-  get_devtools_data: observationHandlers.devtools
+  get_devtools_data: observationHandlers.devtools,
+  metrics: observationHandlers.performance_metrics,
+  "performance.metrics": observationHandlers.performance_metrics,
+  trace: observationHandlers.performance_trace,
+  "performance.trace": observationHandlers.performance_trace,
+  heap: observationHandlers.heap_snapshot,
+  heapsnapshot: observationHandlers.heap_snapshot,
+  memory: observationHandlers.heap_snapshot,
+  "memory.heapsnapshot": observationHandlers.heap_snapshot
 };

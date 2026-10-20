@@ -531,6 +531,33 @@ func TestBrowserUploadAndAuthSchemas(t *testing.T) {
 	}
 }
 
+func TestPerformanceAndHeapSnapshotSchemas(t *testing.T) {
+	toolMap := make(map[string]ToolInfo, len(mcpTools))
+	for _, tool := range mcpTools {
+		toolMap[tool.Name] = tool
+	}
+
+	metricsProps, ok := toolMap["browser_performance_metrics"].InputSchema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("browser_performance_metrics missing properties")
+	}
+	for _, key := range []string{"includeWebVitals", "includeResources", "includeDomHealth", "tabId"} {
+		if _, exists := metricsProps[key]; !exists {
+			t.Errorf("browser_performance_metrics schema missing %q property", key)
+		}
+	}
+
+	heapProps, ok := toolMap["browser_take_heapsnapshot"].InputSchema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("browser_take_heapsnapshot missing properties")
+	}
+	for _, key := range []string{"action", "forceGC", "recordBaseline", "compareWithBaseline", "maxConstructors", "tabId"} {
+		if _, exists := heapProps[key]; !exists {
+			t.Errorf("browser_take_heapsnapshot schema missing %q property", key)
+		}
+	}
+}
+
 func TestMCPSessionStateTracking(t *testing.T) {
 	mcpSessionMu.Lock()
 	origTab := mcpSessionLastTabID
