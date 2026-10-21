@@ -38,7 +38,7 @@
 | **Trích xuất Mã màu** | 🎨 | Kính lúp pixel nhặt màu chính xác 5 định dạng (HEX, RGB, RGBA, HSL, OKLCH), 1-click copy từng định dạng và lưu khay lịch sử màu sắc. |
 | **Bộ Chụp Màn Hình** | 📸 | Hỗ trợ 4 chế độ (`visible`, `region`, `element`, `full`): Chụp toàn khung nhìn, Kéo chọn vùng cắt tùy ý (Crop), Chụp riêng phần tử DOM đã khóa, và Chụp toàn trang cuộn (Full Page). |
 | **Chú Thích & Chỉ Điểm UI** | ✏️ | Khoanh vùng, chỉ điểm phần tử/component nguồn (React/Vue/Astro:line), ghim ghi chú lỗi để giao việc cho AI Agent sửa code (hỗ trợ 3 kênh Live Push, Persistent Inbox, Clipboard Prompt). |
-| **Tương thích Antigravity** | 🤖 | Tích hợp sẵn bộ chạy kịch bản **JSON Action**, cầu nối `window.__AGENT_PILOT__` và 48 công cụ MCP Tools. |
+| **Tương thích Antigravity** | 🤖 | Tích hợp sẵn bộ chạy kịch bản **JSON Action**, cầu nối `window.__AGENT_PILOT__` và 51 công cụ MCP Tools. |
 | **DevTools nâng cao** | 🔬 | CSS cascade, Lighthouse và audit drill-down, raw trace + DevTools insights, MP4, phiên đăng nhập độc lập, service worker và AX tree. Runtime nhúng sẵn; máy sử dụng không cần cài Node/npm/FFmpeg. [Hướng dẫn](docs/DEVTOOLS.md). |
 
 ---
@@ -74,7 +74,7 @@ agent-pilot-extension/
 │   ├── config/                         # Hằng số cấu hình dùng chung & DefaultBridgePort()
 │   ├── bridge/                         # WebSocket Server 58765, HTTP REST API, timeout derivation, sanitizer
 │   ├── feedback/                       # Feedback Inbox, Waiter & long-poll (Channel A/B)
-│   ├── mcp/                            # MCP stdio server & registry 48 công cụ
+│   ├── mcp/                            # MCP stdio server & registry 51 công cụ
 │   ├── service/                        # Quản lý service chạy ngầm (systemd / launchd / Task Scheduler)
 │   ├── skill/                          # Cài Agent Skill từ //go:embed (một nguồn: skills/ ở gốc repo)
 │   ├── version/                        # Version/Commit/Date — inject lúc build bằng -ldflags -X
@@ -130,7 +130,7 @@ agent-pilot-extension/
 │   ├── popup.js                        # Xử lý sự kiện popup
 │   ├── popup.css
 │   └── icons/                          # Bộ icon nhận diện chuẩn các kích thước
-├── mcp/agent-pilot/                    # 48 tệp lược đồ chuẩn Single Source of Truth (SSOT)
+├── mcp/agent-pilot/                    # 51 tệp lược đồ chuẩn Single Source of Truth (SSOT)
 ├── scripts/                            # Bộ công cụ build, test, pack & sync cross-platform
 │   ├── browser_resolver.mjs            # Tự động tìm kiếm Chrome/Chromium/Edge/Brave đa nền tảng
 │   ├── build_cli.mjs                   # Build CLI tĩnh cross-platform (thay cho env-var prefix POSIX)
@@ -332,7 +332,7 @@ agent-pilot server
 ```
 Khi chạy đa tác vụ hoặc nhiều cửa sổ IDE, Agent Pilot tự động chuyển sang chế độ **Forwarder**, chuyển tiếp lệnh qua HTTP REST API `http://127.0.0.1:58765/api` mà không bao giờ gặp lỗi xung đột cổng `EADDRINUSE`.
 
-#### Bộ Công Cụ MCP Điều Khiển Trình Duyệt (48 Tools):
+#### Bộ Công Cụ MCP Điều Khiển Trình Duyệt (51 Tools):
 - `browser_run_actions`: Động cơ thực thi chuỗi kịch bản hàng loạt (Batch Engine), tiết kiệm >80% token.
 - `browser_open_tab`, `browser_list_tabs`, `browser_navigate`: Quản lý và điều hướng các tab trình duyệt (mặc định mở ngầm không cướp focus).
 - `browser_click`, `browser_drag`, `browser_type`, `browser_scroll`: Mô phỏng chuột ảo neon với sóng click ripple. `browser_click`/`browser_drag` hỗ trợ `via: "cdp"` (trusted input cho cross-origin iframe/canvas/WebGL) và drag theo tọa độ `fromX/fromY/toX/toY` + `holdMs` cho game.

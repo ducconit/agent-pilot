@@ -178,6 +178,8 @@ func TestMCPToolDispatchTargetsExist(t *testing.T) {
 		"devtools.runtime": true, "accessibility.snapshot": true, "screencast.record": true,
 		"contexts.create": true, "contexts.list": true, "contexts.close": true,
 		"lighthouse.audit": true, "lighthouse.analyze": true, "performance.analyzeInsight": true,
+		"memory.analyzeSnapshot": true,
+		"developerTools.list":    true, "developerTools.execute": true,
 		"instances.list":   true,
 		"instances.select": true,
 	}

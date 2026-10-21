@@ -50,7 +50,7 @@ Các method nhận input có hỗ trợ chọn engine (`via`) và toạ độ ch
 
 > Các method **bắt buộc CDP**: `page.screenshot` (tab ngầm), `page.uploadFile`, `page.handleDialog`, `emulation.*`, `network.*`, `performance.*`, `memory.*`, `devtools.getData`.
 > Synthetic event **không vượt được cross-origin iframe** và không điều khiển được canvas/WebGL.
-> Lưu ý: `memory.heapSnapshot` hiện chỉ trả về **kích thước snapshot (byte)** để kiểm tra nhanh mức tiêu thụ RAM, không trả nội dung snapshot đầy đủ.
+> `memory.heapSnapshot` lưu snapshot V8 ra file `.heapsnapshot`; dùng MCP `browser_analyze_heapsnapshot` để query, xem retainers/retaining paths hoặc compare hai snapshot.
 
 ---
 

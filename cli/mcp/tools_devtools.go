@@ -43,6 +43,36 @@ func init() {
 			"tabId": field("integer", "Target tab ID"), "verbose": field("boolean", "Include ignored AX nodes"), "maxElements": field("integer", "Maximum nodes, default 1000, maximum 10000"),
 		}),
 		devtoolsTool("browser_devtools_status", "Report the versions of the runtime embedded in the MCP binary. Works without a system Node or FFmpeg installation.", map[string]interface{}{}),
+		devtoolsTool("browser_analyze_heapsnapshot", "Analyze a saved V8 heap snapshot: summary, object queries, outgoing edges, retainers, retaining paths, duplicate strings, native contexts, and constructor diffs. The snapshot is read by the embedded runtime and never sent to a remote service.", map[string]interface{}{
+			"filePath":        field("string", "Path to a .heapsnapshot JSON file"),
+			"action":          choices("Analysis operation", "summary", "query", "details", "edges", "retainers", "retaining_paths", "dominators", "duplicate_strings", "contexts", "compare"),
+			"baseFilePath":    field("string", "Earlier snapshot path for compare"),
+			"currentFilePath": field("string", "Later snapshot path for compare"),
+			"nodeId":          field("integer", "Heap node index or V8 node id for details/edges/retainers/paths"),
+			"className":       field("string", "Name substring or /regex/ filter"),
+			"name":            field("string", "Node name substring or /regex/ filter"),
+			"nodeType":        field("string", "V8 node type filter"),
+			"propertyName":    field("string", "Outgoing property name filter"),
+			"isDetached":      field("boolean", "Filter detached DOM nodes"),
+			"selfSize":        field("string", "Minimum self size, e.g. 1MB"),
+			"maxSelfSize":     field("string", "Maximum self size, e.g. 10MB"),
+			"sortBy":          choices("Query sort field", "selfSize", "name", "edgeCount"),
+			"pageIdx":         field("integer", "Zero-based result page"),
+			"pageSize":        field("integer", "Result page size"),
+			"maxItems":        field("integer", "Maximum summary/detail rows"),
+			"maxDepth":        field("integer", "Maximum retaining-path depth"),
+			"maxNodes":        field("integer", "Maximum retaining paths"),
+			"maxSiblings":     field("integer", "Maximum incoming edges explored per node"),
+		}),
+		devtoolsTool("browser_list_3p_developer_tools", "Discover developer tools exposed by the current page through the devtoolstooldiscovery event. Returns page-defined names, descriptions and input schemas without executing them.", map[string]interface{}{
+			"tabId": field("integer", "Target tab ID"),
+		}),
+		devtoolsTool("browser_execute_3p_developer_tool", "Execute one developer tool exposed by the current page through devtoolstooldiscovery. The tool runs in the page context and grants no privileges beyond page JavaScript.", map[string]interface{}{
+			"tabId":    field("integer", "Target tab ID"),
+			"toolName": field("string", "Page-defined developer tool name"),
+			"input":    map[string]interface{}{"type": "object", "description": "JSON input passed to the page tool"},
+			"params":   field("string", "JSON-stringified input alias"),
+		}, "toolName"),
 	)
 	for i := range mcpTools {
 		tool := &mcpTools[i]

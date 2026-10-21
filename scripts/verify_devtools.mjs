@@ -19,13 +19,30 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "application/javascript" });
     res.end("self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.testValue=42;"); return;
   }
-  if (req.url === "/echo") { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ custom: req.headers["x-ap-test"], cookie: req.headers.cookie })); return; }
+  if (req.url === "/echo") { let body = ""; req.on("data", chunk => { body += chunk; }); req.on("end", () => { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ custom: req.headers["x-ap-test"], cookie: req.headers.cookie, body })); }); return; }
   res.setHeader("Content-Type", "text/html");
   res.end(`<!doctype html><html lang="en"><head><title>DevTools fixture</title><meta name="viewport" content="width=device-width"><style>
     @layer base, theme; @layer base { #target { color: red; margin: 4px } } @layer theme { #target { color: blue } }
     body { font-family: sans-serif; background: white; color: #444 } #target { color: green !important } .unused { color: purple }
     </style></head><body><main><h1>DevTools fixture</h1><p id="target">Inspectable content</p><label for="name">Name</label><input id="name"><button id="go" onclick="document.querySelector('#target').textContent='Clicked'">Go</button><img src="/missing.png"></main>
-    <script>navigator.serviceWorker.register('/worker.js');</script></body></html>`);
+    <script>
+      window.addEventListener('devtoolstooldiscovery', event => event.respondWith({
+        name: 'Fixture developer tools',
+        description: 'Tools exposed only by this test page',
+        tools: [{
+          name: 'count_buttons',
+          description: 'Count buttons in the fixture',
+          inputSchema: { type: 'object' },
+          execute: () => document.querySelectorAll('button').length
+        }, {
+          name: 'echo_input',
+          description: 'Return the supplied input',
+          inputSchema: { type: 'object' },
+          execute: input => ({ input })
+        }]
+      }));
+      navigator.serviceWorker.register('/worker.js');
+    </script></body></html>`);
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const url = `http://127.0.0.1:${server.address().port}/`;
@@ -119,6 +136,29 @@ try {
     const button = tree.nodes.find(n => n.role === "button");
     const styles = await extension("css.getStyles", { tabId, backendNodeId: button.backendNodeId });
     assert(styles.computed.display);
+  });
+  await test("page developer tools are discoverable and executable", async () => {
+    const discovered = await host("developerTools.list", { tabId });
+    const tools = discovered.tools.flatMap(group => group.tools || []);
+    assert(tools.some(tool => tool.name === "count_buttons"));
+    const executed = await host("developerTools.execute", { tabId, toolName: "echo_input", input: { value: "ok" } });
+    assert.deepEqual(executed.result, { input: { value: "ok" } });
+  });
+  await test("network detail returns request and response bodies and writes artifacts", async () => {
+    await extension("page.evaluate", { tabId, expression: "fetch('/echo',{method:'POST',headers:{'Content-Type':'text/plain'},body:'hello'}).then(r=>r.text())" });
+    const captured = await extension("network.listRequests", { tabId, method: "POST", resourceType: "Fetch", limit: 20 });
+    const request = captured.requests.find(item => item.url.endsWith("/echo"));
+    assert(request, JSON.stringify(captured));
+    const detail = await host("network.getResponseBody", {
+      tabId,
+      requestId: request.id,
+      requestFilePath: path.join(temporary, "request.network-request"),
+      responseFilePath: path.join(temporary, "response.network-response")
+    });
+    assert.equal(detail.postData, "hello");
+    assert.equal(JSON.parse(detail.responseBody).body, "hello");
+    assert.equal(await fs.readFile(detail.requestFilePath, "utf8"), "hello");
+    assert.equal(JSON.parse(await fs.readFile(detail.responseFilePath, "utf8")).body, "hello");
   });
   let audit;
   await test("Lighthouse audits the existing tab and saves real HTML/JSON reports", async () => {

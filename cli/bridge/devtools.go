@@ -27,7 +27,22 @@ func useDevtoolsHost(method string, params map[string]interface{}) bool {
 	if method == "extensions.manage" {
 		return false
 	}
-	if strings.HasPrefix(method, "lighthouse.") || strings.HasPrefix(method, "contexts.") || strings.HasPrefix(method, "screencast.") || method == "performance.trace" || method == "performance.analyzeInsight" || method == "accessibility.snapshot" || method == "devtools.runtime" {
+	if method == "memory.analyzeSnapshot" {
+		return true
+	}
+	if method == "memory.heapSnapshot" {
+		if filePath, _ := params["filePath"].(string); filePath != "" {
+			return true
+		}
+	}
+	if method == "network.getResponseBody" {
+		_, requestFile := params["requestFilePath"].(string)
+		_, responseFile := params["responseFilePath"].(string)
+		if requestFile || responseFile {
+			return true
+		}
+	}
+	if strings.HasPrefix(method, "lighthouse.") || strings.HasPrefix(method, "contexts.") || strings.HasPrefix(method, "screencast.") || strings.HasPrefix(method, "developerTools.") || method == "performance.trace" || method == "performance.analyzeInsight" || method == "accessibility.snapshot" || method == "devtools.runtime" {
 		return true
 	}
 	if context, _ := params["isolatedContext"].(string); context != "" {

@@ -1,0 +1,26 @@
+{
+  "description": "Execute a developer tool exposed by the current page through devtoolstooldiscovery.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["toolName"],
+    "properties": {
+      "tabId": { "type": "integer", "description": "Target tab ID" },
+      "contextId": { "type": "string", "description": "Optional isolated context" },
+      "toolName": { "type": "string", "description": "Page-defined developer tool name" },
+      "input": { "type": "object", "description": "JSON input passed to the page tool" },
+      "params": { "type": "string", "description": "JSON-stringified input alias" }
+    }
+  },
+  "name": "browser_execute_3p_developer_tool",
+  "parameters": {
+    "type": "object",
+    "required": ["toolName"],
+    "properties": {
+      "tabId": { "type": "integer" },
+      "contextId": { "type": "string" },
+      "toolName": { "type": "string" },
+      "input": { "type": "object" },
+      "params": { "type": "string" }
+    }
+  }
+}

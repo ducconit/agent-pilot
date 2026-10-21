@@ -114,7 +114,8 @@ AGENT_PILOT_PORT=58765 agent-pilot server
 ```
 
 ### 3.2. Cấu hình Antigravity MCP Server:
-Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/config/mcp_config.json` hoặc cấu hình MCP dự án) để AI Agent tự động sở hữu toàn bộ 48 công cụ điều khiển trình duyệt. Binary phát hành nhúng sẵn runtime DevTools; máy sử dụng không cần cài Node/npm/FFmpeg hoặc dependency:
+MCP hiện cung cấp 51 tool; các tool DevTools mở rộng được mô tả trong [DevTools nâng cao](DEVTOOLS.md).
+Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/config/mcp_config.json` hoặc cấu hình MCP dự án) để AI Agent tự động sở hữu toàn bộ 51 công cụ điều khiển trình duyệt. Binary phát hành nhúng sẵn runtime DevTools; máy sử dụng không cần cài Node/npm/FFmpeg hoặc dependency:
 ```json
 {
   "mcpServers": {
@@ -127,7 +128,7 @@ Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/c
 ```
 *(Nếu cài đặt binary ở đường dẫn riêng, thay `"agent-pilot"` bằng đường dẫn tuyệt đối như `"/home/ubuntu/.agk/bin/agent-pilot"` hoặc `"/usr/local/bin/agent-pilot"`)*.
 
-### 3.3. Bộ Công Cụ MCP Cung Cấp Cho AI Agent (48 Tools — trích lược):
+### 3.3. Bộ Công Cụ MCP Cung Cấp Cho AI Agent (51 Tools — trích lược):
 1. `browser_open_tab(url, active)`: Mở tab trình duyệt mới (mặc định mở nền không cướp focus của người dùng, tự động phân nhóm Chrome Tab Group).
 2. `browser_list_tabs()`: Liệt kê toàn bộ các tab trình duyệt kèm trạng thái tab do Agent quản lý.
 3. `browser_navigate(url, tabId)`: Điều hướng tab đang hoạt động hoặc tab chỉ định.
@@ -147,7 +148,7 @@ Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/c
 15. `browser_get_pending_feedback(limit, sessionId, clear)`: Truy vấn danh sách phiên phản hồi UI do người dùng tạo từ Feedback Studio lưu trong hộp thư máy chủ cục bộ.
 16. `browser_wait_for_feedback(timeout, tabId)`: Chế độ chờ phản hồi trực tiếp (Channel A Reactive Long-Polling), phản hồi ngay khi người dùng nhấn 'Gửi Agent'.
 
-> 📝 *Danh sách trên là trích lược — xem `mcp/agent-pilot/` để có đủ 48 tool và [DevTools nâng cao](DEVTOOLS.md) cho CSS, Lighthouse, trace insights, MP4, context riêng và service worker.*
+> 📝 *Danh sách trên là trích lược — xem `mcp/agent-pilot/` để có đủ 51 tool và [DevTools nâng cao](DEVTOOLS.md) cho CSS, Lighthouse, trace insights, MP4, context riêng, service worker, heap analysis và page-defined developer tools.*
 
 ---
 

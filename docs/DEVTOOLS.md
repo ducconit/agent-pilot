@@ -17,6 +17,11 @@ Runtime và các thư viện đã khóa phiên bản được nhúng trong binar
 | `browser_service_workers` | Liệt kê worker đang chạy, evaluate async, đọc console/error, gửi lệnh CDP Debugger và detach. |
 | `browser_accessibility_snapshot` | Accessibility tree thật của Chrome, vai trò/tên/trạng thái và backend DOM IDs. |
 | `browser_devtools_status` | Kiểm tra phiên bản runtime nhúng; không cần Node trên PATH. |
+| `browser_analyze_heapsnapshot` | Phân tích file V8 `.heapsnapshot`: constructor summary, query object, edges/retainers/retaining paths, duplicate strings, contexts và diff giữa hai snapshot. `action: compare` dùng `baseFilePath` + `currentFilePath`; các action khác dùng `filePath`. |
+| `browser_list_3p_developer_tools`, `browser_execute_3p_developer_tool` | Discover và gọi developer tools mà trang tự expose qua event `devtoolstooldiscovery`, không cấp thêm quyền ngoài JavaScript của trang. |
+| `browser_get_network_request` | Ngoài metadata và response body, có thể lấy request POST body, tắt từng body, và lưu request/response ra file `.network-request`/`.network-response`. |
+
+Các thao tác quản lý extension qua `browser_manage_extensions` hỗ trợ `list`, `setEnabled`, `toggle` và `uninstall`. `uninstall` dùng cơ chế xác nhận của Chrome và chỉ nên gọi khi agent có chủ đích rõ ràng.
 
 `browser_performance_trace` giờ lưu đầy đủ raw trace `.json`/`.json.gz`, không bị cắt ở 2.000 events. Dừng trace trả `traceId`, file và insight sets. File có thể mở lại trong Chrome DevTools.
 
@@ -31,6 +36,9 @@ Runtime và các thư viện đã khóa phiên bản được nhúng trong binar
 {"tool":"browser_performance_analyze_insight","arguments":{"traceId":"<traceId>","insightSetId":"<id from trace>","insightName":"LCPBreakdown"}}
 {"tool":"browser_screencast_start","arguments":{"tabId":123,"filePath":"/absolute/path/demo.mp4"}}
 {"tool":"browser_screencast_stop","arguments":{"tabId":123}}
+{"tool":"browser_analyze_heapsnapshot","arguments":{"action":"compare","baseFilePath":"/tmp/before.heapsnapshot","currentFilePath":"/tmp/after.heapsnapshot"}}
+{"tool":"browser_list_3p_developer_tools","arguments":{"tabId":123}}
+{"tool":"browser_execute_3p_developer_tool","arguments":{"tabId":123,"toolName":"component_state","input":{"id":"checkout"}}}
 ```
 
 Audit `navigation` tải lại trang; `snapshot` kiểm tra trạng thái hiện tại. Mặc định chạy accessibility, best practices và SEO; thêm `performance` vào `categories` nếu muốn. `device` chọn giả định đánh giá của Lighthouse; viewport và user agent hiện tại được giữ để audit đúng trạng thái đã cấu hình qua `browser_emulate`. Báo cáo lưu tại `~/.agent-pilot/artifacts/` trừ khi chỉ định đường dẫn. File đã tồn tại không bị ghi đè.

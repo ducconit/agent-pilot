@@ -14,7 +14,7 @@ import {
 import {
   attachDebugger,
   setEmulation,
-  getNetworkResponseBody,
+  getNetworkRequestDetail,
   startPerformanceTrace,
   stopPerformanceTrace,
   getPerformanceMetrics,
@@ -101,7 +101,8 @@ export const systemHandlers = {
     if (!attachedTabs.has(tabId)) {
       await attachDebugger(tabId, client.broadcastFn);
     }
-    getNetworkResponseBody(tabId, params.requestId)
+    const request = getBuffer(tabId).network.get(params.requestId) || {};
+    getNetworkRequestDetail(tabId, params.requestId, params, request)
       .then(res => respond(res))
       .catch(err => respond(null, err));
   },

@@ -16,6 +16,7 @@
     "test:color-utils": "node scripts/verify_color_utils.mjs",
     "test:background-api": "node scripts/verify_background_api.mjs",
     "test:devtools": "node scripts/run_test.mjs scripts/verify_devtools.mjs",
+    "test:heap-analysis": "node scripts/verify_heap_analysis.mjs",
     "test:isolation": "node scripts/verify_tab_group_isolation.mjs",
     "test:cli": "go test -race -v ./...",
     "test:all": "npm run test:cli && npm run test:secret && npm run test:item-schema && npm run test:color-utils && npm run test:background-api && npm run test:isolation && npm run test && npm run test:session && npm run test:agent && npm run test:feedback && npm run test:pinned && npm run test:annotator && npm run test:edit-delete",

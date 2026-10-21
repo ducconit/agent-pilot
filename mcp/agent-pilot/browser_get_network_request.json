@@ -1,13 +1,29 @@
 {
-  "description": "Get the full response body (JSON/Text) and details for a specific captured network request ID via CDP Network.getResponseBody.",
+  "description": "Get request metadata plus request/response bodies for a captured network request, optionally saving bodies to artifact files.",
   "inputSchema": {
     "properties": {
       "contextId": {
         "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
       },
+      "includeRequestBody": {
+        "description": "Include the request POST body when available (default: true)",
+        "type": "boolean"
+      },
+      "includeResponseBody": {
+        "description": "Include the response body (default: true)",
+        "type": "boolean"
+      },
       "requestId": {
         "description": "The unique request ID obtained from browser_list_network_requests or devtools data",
+        "type": "string"
+      },
+      "requestFilePath": {
+        "description": "Save the request body to a .network-request file",
+        "type": "string"
+      },
+      "responseFilePath": {
+        "description": "Save the response body to a .network-response file",
         "type": "string"
       },
       "tabId": {
@@ -27,8 +43,24 @@
         "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
       },
+      "includeRequestBody": {
+        "description": "Include the request POST body when available (default: true)",
+        "type": "boolean"
+      },
+      "includeResponseBody": {
+        "description": "Include the response body (default: true)",
+        "type": "boolean"
+      },
       "requestId": {
         "description": "The unique request ID obtained from browser_list_network_requests or devtools data",
+        "type": "string"
+      },
+      "requestFilePath": {
+        "description": "Save the request body to a .network-request file",
+        "type": "string"
+      },
+      "responseFilePath": {
+        "description": "Save the response body to a .network-response file",
         "type": "string"
       },
       "tabId": {

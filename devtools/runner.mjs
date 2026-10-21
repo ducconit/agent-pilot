@@ -6,6 +6,7 @@ import { pageCommand, accessibilitySnapshot, inlineWait } from "./pages.mjs";
 import { runAudit, analyzeAudit } from "./audits.mjs";
 import { performanceTrace, analyzeInsight } from "./traces.mjs";
 import { screencast, stopAllRecordings } from "./video.mjs";
+import { analyzeHeapSnapshot } from "./heap-analysis.mjs";
 
 const require = createRequire(import.meta.url);
 const extensionPending = new Map();
@@ -50,6 +51,7 @@ async function workers(params) {
 
 async function dispatch(method, params) {
   if (method === "devtools.runtime") return { embedded: true, nodeVersion: process.version, lighthouseVersion: require("lighthouse/package.json").version, puppeteerVersion: require("puppeteer-core/package.json").version, systemNodeRequired: false, ffmpegRequired: false };
+  if (method === "memory.analyzeSnapshot") return analyzeHeapSnapshot(params);
   if (method.startsWith("contexts.")) return browsers.context(method.slice(9), params);
   if (method === "lighthouse.analyze") return analyzeAudit(params);
   if (method === "performance.analyzeInsight") return analyzeInsight(params);

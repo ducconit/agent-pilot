@@ -33,10 +33,63 @@ export async function inlineWait(tab, params) {
   if (ms > 0) await new Promise(resolve => setTimeout(resolve, Math.min(ms, 120000)));
 }
 
+async function evaluateInTab(tab, expression) {
+  if (!tab.transport) return tab.page.evaluate(expression);
+  const result = await tab.client.send("Runtime.evaluate", {
+    expression: String(expression),
+    awaitPromise: true,
+    returnByValue: true,
+    userGesture: true
+  });
+  if (result.exceptionDetails) {
+    throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text || "Page evaluation failed");
+  }
+  return result.result?.value;
+}
+
+async function discoverPageDeveloperTools(tab) {
+  return evaluateInTab(tab, `(() => {
+    const groups = [];
+    const event = new Event("devtoolstooldiscovery");
+    Object.defineProperty(event, "respondWith", { value: group => groups.push(group) });
+    window.dispatchEvent(event);
+    return groups.map(group => ({
+      name: group?.name,
+      description: group?.description,
+      tools: (group?.tools || []).map(tool => ({
+        name: tool?.name,
+        description: tool?.description,
+        inputSchema: tool?.inputSchema
+      }))
+    }));
+  })()`);
+}
+
+async function executePageDeveloperTool(tab, params) {
+  if (!params.toolName) throw new Error("toolName is required");
+  let input = params.input ?? params.params ?? {};
+  if (typeof input === "string") {
+    try { input = JSON.parse(input || "{}"); }
+    catch (error) { throw new Error(`input must be valid JSON: ${error.message}`); }
+  }
+  const payload = JSON.stringify({ toolName: params.toolName, input });
+  return evaluateInTab(tab, `(async ({ toolName, input }) => {
+    const groups = [];
+    const event = new Event("devtoolstooldiscovery");
+    Object.defineProperty(event, "respondWith", { value: group => groups.push(group) });
+    window.dispatchEvent(event);
+    const tool = groups.flatMap(group => group?.tools || []).find(candidate => candidate?.name === toolName);
+    if (!tool || typeof tool.execute !== "function") throw new Error('Page developer tool not found: ' + toolName);
+    return await tool.execute(input);
+  })(${payload})`);
+}
+
 export async function pageCommand(tab, method, p) {
   const { page, client } = tab;
   switch (method) {
-    case "page.evaluate": return page.evaluate(p.expression || p.script || p.code);
+    case "page.evaluate": return evaluateInTab(tab, p.expression || p.script || p.code);
+    case "developerTools.list": return { tools: await discoverPageDeveloperTools(tab) };
+    case "developerTools.execute": return { toolName: p.toolName, result: await executePageDeveloperTool(tab, p) };
     case "tabs.update":
       tab.refs.clear();
       if (p.username !== undefined) await page.authenticate({ username: String(p.username), password: String(p.password || "") });
@@ -143,7 +196,31 @@ export async function pageCommand(tab, method, p) {
       const requests = [...tab.requests.values()].filter(r => (!p.filterUrl || r.url.includes(p.filterUrl)) && (!p.method || r.method.toLowerCase() === p.method.toLowerCase()) && (!p.resourceType || r.type?.toLowerCase() === p.resourceType.toLowerCase()));
       return { requests: requests.slice(-Math.min(1000, p.limit || 100)), totalCaptured: tab.requests.size, matchingCount: requests.length };
     }
-    case "network.getResponseBody": return { ...tab.requests.get(p.requestId), ...await client.send("Network.getResponseBody", { requestId: p.requestId }) };
+    case "network.getResponseBody": {
+      let request = tab.requests?.get(p.requestId);
+      if (!request && tab.transport?.request) {
+        const captured = await tab.transport.request("network.listRequests", { tabId: tab.tabId, limit: 1000 }).catch(() => null);
+        request = captured?.requests?.find(item => item.id === p.requestId);
+      }
+      request ||= { id: p.requestId };
+      const detail = { ...request };
+      if (p.includeRequestBody !== false && !detail.postData) {
+        detail.postData = (await client.send("Network.getRequestPostData", { requestId: p.requestId }).catch(() => ({}))).postData;
+      }
+      if (p.includeResponseBody !== false) {
+        const response = await client.send("Network.getResponseBody", { requestId: p.requestId });
+        detail.responseBody = response.body;
+        detail.base64Encoded = Boolean(response.base64Encoded);
+      }
+      if (p.requestFilePath && detail.postData !== undefined) {
+        detail.requestFilePath = (await writeArtifact(await outputPath(p.requestFilePath, ".network-request", "network-request"), Buffer.from(String(detail.postData)))).path;
+      }
+      if (p.responseFilePath && detail.responseBody !== undefined) {
+        const responseText = detail.base64Encoded ? Buffer.from(detail.responseBody, "base64") : Buffer.from(String(detail.responseBody));
+        detail.responseFilePath = (await writeArtifact(await outputPath(p.responseFilePath, ".network-response", "network-response"), responseText)).path;
+      }
+      return detail;
+    }
     case "devtools.getData": return { tabId: tab.tabId, console: tab.console.slice(-(p.limit || 100)), network: [...tab.requests.values()].slice(-(p.limit || 100)) };
     case "performance.metrics": await client.send("Performance.enable"); return { metrics: Object.fromEntries((await client.send("Performance.getMetrics")).metrics.map(m => [m.name, m.value])) };
     case "memory.collectGarbage": await client.send("HeapProfiler.collectGarbage"); break;

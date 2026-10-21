@@ -524,8 +524,12 @@ var mcpTools = []ToolInfo{
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"requestId": map[string]interface{}{"type": "string", "description": "The unique request ID obtained from browser_list_network_requests or devtools data"},
-				"tabId":     map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"requestId":           map[string]interface{}{"type": "string", "description": "The unique request ID obtained from browser_list_network_requests or devtools data"},
+				"includeRequestBody":  map[string]interface{}{"type": "boolean", "description": "Include the request POST body when available (default: true)"},
+				"includeResponseBody": map[string]interface{}{"type": "boolean", "description": "Include the response body (default: true)"},
+				"requestFilePath":     map[string]interface{}{"type": "string", "description": "Save the request body to a .network-request file; supported by the embedded runtime"},
+				"responseFilePath":    map[string]interface{}{"type": "string", "description": "Save the response body to a .network-response file; supported by the embedded runtime"},
+				"tabId":               map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
 			"required": []string{"requestId"},
 		},
@@ -573,11 +577,11 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_manage_extensions",
-		Description: "List installed browser extensions or enable/disable specific extensions via chrome.management.",
+		Description: "List, enable/disable, toggle, or uninstall browser extensions via chrome.management.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"action":      map[string]interface{}{"type": "string", "enum": []string{"list", "setEnabled"}, "description": "Action: 'list' all extensions or 'setEnabled' to toggle"},
+				"action":      map[string]interface{}{"type": "string", "enum": []string{"list", "setEnabled", "toggle", "uninstall"}, "description": "Action: list, setEnabled, toggle, or uninstall"},
 				"extensionId": map[string]interface{}{"type": "string", "description": "Extension ID to enable or disable"},
 				"enabled":     map[string]interface{}{"type": "boolean", "description": "Target enabled state for setEnabled action"},
 			},

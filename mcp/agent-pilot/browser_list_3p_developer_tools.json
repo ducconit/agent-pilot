@@ -1,0 +1,18 @@
+{
+  "description": "Discover developer tools exposed by the current page through the devtoolstooldiscovery event.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "tabId": { "type": "integer", "description": "Target tab ID" },
+      "contextId": { "type": "string", "description": "Optional isolated context" }
+    }
+  },
+  "name": "browser_list_3p_developer_tools",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "tabId": { "type": "integer" },
+      "contextId": { "type": "string" }
+    }
+  }
+}

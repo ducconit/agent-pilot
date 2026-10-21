@@ -1,0 +1,52 @@
+{
+  "description": "Analyze a saved V8 heap snapshot: summary, object queries, edges, retainers, retaining paths, duplicate strings, contexts, and constructor diffs.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "filePath": { "type": "string", "description": "Path to a .heapsnapshot JSON file; omit for compare" },
+      "action": { "type": "string", "enum": ["summary", "query", "details", "edges", "retainers", "retaining_paths", "dominators", "duplicate_strings", "contexts", "compare"] },
+      "baseFilePath": { "type": "string", "description": "Earlier snapshot path for compare" },
+      "currentFilePath": { "type": "string", "description": "Later snapshot path for compare" },
+      "nodeId": { "type": "integer", "description": "Heap node index or V8 node id" },
+      "className": { "type": "string" },
+      "name": { "type": "string" },
+      "nodeType": { "type": "string" },
+      "propertyName": { "type": "string" },
+      "isDetached": { "type": "boolean" },
+      "selfSize": { "type": "string" },
+      "maxSelfSize": { "type": "string" },
+      "sortBy": { "type": "string", "enum": ["selfSize", "name", "edgeCount"] },
+      "pageIdx": { "type": "integer" },
+      "pageSize": { "type": "integer" },
+      "maxItems": { "type": "integer" },
+      "maxDepth": { "type": "integer" },
+      "maxNodes": { "type": "integer" },
+      "maxSiblings": { "type": "integer" }
+    }
+  },
+  "name": "browser_analyze_heapsnapshot",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "filePath": { "type": "string" },
+      "action": { "type": "string", "enum": ["summary", "query", "details", "edges", "retainers", "retaining_paths", "dominators", "duplicate_strings", "contexts", "compare"] },
+      "baseFilePath": { "type": "string" },
+      "currentFilePath": { "type": "string" },
+      "nodeId": { "type": "integer" },
+      "className": { "type": "string" },
+      "name": { "type": "string" },
+      "nodeType": { "type": "string" },
+      "propertyName": { "type": "string" },
+      "isDetached": { "type": "boolean" },
+      "selfSize": { "type": "string" },
+      "maxSelfSize": { "type": "string" },
+      "sortBy": { "type": "string", "enum": ["selfSize", "name", "edgeCount"] },
+      "pageIdx": { "type": "integer" },
+      "pageSize": { "type": "integer" },
+      "maxItems": { "type": "integer" },
+      "maxDepth": { "type": "integer" },
+      "maxNodes": { "type": "integer" },
+      "maxSiblings": { "type": "integer" }
+    }
+  }
+}

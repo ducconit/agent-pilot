@@ -1,12 +1,14 @@
 {
-  "description": "List installed browser extensions or enable/disable specific extensions via chrome.management.",
+  "description": "List, enable/disable, toggle, or uninstall browser extensions via chrome.management.",
   "inputSchema": {
     "properties": {
       "action": {
-        "description": "Action: 'list' all extensions or 'setEnabled' to toggle",
+        "description": "Action: list, setEnabled, toggle, or uninstall",
         "enum": [
           "list",
-          "setEnabled"
+          "setEnabled",
+          "toggle",
+          "uninstall"
         ],
         "type": "string"
       },
@@ -25,10 +27,12 @@
   "parameters": {
     "properties": {
       "action": {
-        "description": "Action: 'list' all extensions or 'setEnabled' to toggle",
+        "description": "Action: list, setEnabled, toggle, or uninstall",
         "enum": [
           "list",
-          "setEnabled"
+          "setEnabled",
+          "toggle",
+          "uninstall"
         ],
         "type": "string"
       },
