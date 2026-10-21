@@ -1,0 +1,70 @@
+{
+  "description": "Drill into a saved Lighthouse report: list failures by category or inspect an audit's explanation, recommendations, DOM nodes, opportunity savings and paginated detail rows. Use reportId from browser_lighthouse_audit or the saved JSON filePath.",
+  "inputSchema": {
+    "properties": {
+      "auditId": {
+        "description": "Specific failing audit ID, e.g. color-contrast",
+        "type": "string"
+      },
+      "category": {
+        "description": "Optional category filter",
+        "type": "string"
+      },
+      "failuresOnly": {
+        "description": "Only failing audits, default true",
+        "type": "boolean"
+      },
+      "filePath": {
+        "description": "Saved Lighthouse JSON report; works after server restart",
+        "type": "string"
+      },
+      "pageIdx": {
+        "description": "Zero-based page",
+        "type": "integer"
+      },
+      "pageSize": {
+        "description": "Rows per page, maximum 100",
+        "type": "integer"
+      },
+      "reportId": {
+        "description": "Report identifier",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_lighthouse_analyze_audit",
+  "parameters": {
+    "properties": {
+      "auditId": {
+        "description": "Specific failing audit ID, e.g. color-contrast",
+        "type": "string"
+      },
+      "category": {
+        "description": "Optional category filter",
+        "type": "string"
+      },
+      "failuresOnly": {
+        "description": "Only failing audits, default true",
+        "type": "boolean"
+      },
+      "filePath": {
+        "description": "Saved Lighthouse JSON report; works after server restart",
+        "type": "string"
+      },
+      "pageIdx": {
+        "description": "Zero-based page",
+        "type": "integer"
+      },
+      "pageSize": {
+        "description": "Rows per page, maximum 100",
+        "type": "integer"
+      },
+      "reportId": {
+        "description": "Report identifier",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}

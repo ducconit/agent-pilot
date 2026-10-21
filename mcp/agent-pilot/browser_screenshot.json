@@ -46,6 +46,10 @@
         ],
         "type": "object"
       },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "description": {
         "description": "Optional multi-line subtitle/description drawn below the title on the screenshot annotation banner",
         "type": "string"
@@ -166,6 +170,10 @@
           "height"
         ],
         "type": "object"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
       },
       "description": {
         "description": "Optional multi-line subtitle/description drawn below the title on the screenshot annotation banner",

@@ -175,6 +175,9 @@ func TestToolsListDoesNotDispatch(t *testing.T) {
 func TestMCPToolDispatchTargetsExist(t *testing.T) {
 	// Methods served by the Go bridge itself instead of the extension
 	bridgeLocal := map[string]bool{
+		"devtools.runtime": true, "accessibility.snapshot": true, "screencast.record": true,
+		"contexts.create": true, "contexts.list": true, "contexts.close": true,
+		"lighthouse.audit": true, "lighthouse.analyze": true, "performance.analyzeInsight": true,
 		"instances.list":   true,
 		"instances.select": true,
 	}

@@ -162,6 +162,16 @@ func deriveInlineWaitBudgetMs(params map[string]interface{}) int {
 
 // DeriveCommandTimeout derives the appropriate RPC/HTTP timeout in ms based on command type and params
 func DeriveCommandTimeout(method string, params map[string]interface{}, defaultTimeoutMs int) int {
+	if strings.HasPrefix(method, "lighthouse.") || strings.HasPrefix(method, "contexts.") || strings.HasPrefix(method, "screencast.") || method == "performance.trace" || method == "performance.analyzeInsight" || method == "accessibility.snapshot" || method == "devtools.runtime" {
+		budget := 180000
+		if requested, ok := getIntOrFloat(params, "timeoutMs"); ok && requested > budget {
+			budget = requested
+		}
+		if defaultTimeoutMs > budget {
+			budget = defaultTimeoutMs
+		}
+		return budget
+	}
 	if method == "batch.run" {
 		return deriveBatchTimeout(params, defaultTimeoutMs)
 	}

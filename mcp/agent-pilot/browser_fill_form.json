@@ -2,6 +2,10 @@
   "description": "Fill multiple form fields (inputs, selects, checkboxes, textareas) and optionally submit in a single tool call. Compatible with React Hook Form, Vue, and standard HTML5 forms. Supports inline post-fill waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "fields": {
         "description": "List of fields to fill: [{selector: '@1' or '#id', value: 'my text', clear: true}]",
         "items": {
@@ -68,6 +72,10 @@
   "name": "browser_fill_form",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "fields": {
         "description": "List of fields to fill: [{selector: '@1' or '#id', value: 'my text', clear: true}]",
         "items": {

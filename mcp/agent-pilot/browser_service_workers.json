@@ -1,0 +1,92 @@
+{
+  "description": "Discover and debug active service-worker targets. Evaluate async JavaScript, read console/errors, or send CDP Debugger commands (enable, breakpoints, resume). Context workers require contextId; ordinary Chrome workers use the extension. Workers must be running to attach.",
+  "inputSchema": {
+    "properties": {
+      "action": {
+        "description": "Operation; default list",
+        "enum": [
+          "list",
+          "evaluate",
+          "console",
+          "send",
+          "detach"
+        ],
+        "type": "string"
+      },
+      "cdpMethod": {
+        "description": "CDP Debugger/Runtime method for send",
+        "type": "string"
+      },
+      "cdpParams": {
+        "description": "CDP command parameters",
+        "type": "object"
+      },
+      "clear": {
+        "description": "Clear captured events after reading",
+        "type": "boolean"
+      },
+      "contextId": {
+        "description": "Optional isolated context",
+        "type": "string"
+      },
+      "expression": {
+        "description": "JavaScript to evaluate in the worker",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum captured events, default 100",
+        "type": "integer"
+      },
+      "serviceWorkerId": {
+        "description": "ID from the worker list",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_service_workers",
+  "parameters": {
+    "properties": {
+      "action": {
+        "description": "Operation; default list",
+        "enum": [
+          "list",
+          "evaluate",
+          "console",
+          "send",
+          "detach"
+        ],
+        "type": "string"
+      },
+      "cdpMethod": {
+        "description": "CDP Debugger/Runtime method for send",
+        "type": "string"
+      },
+      "cdpParams": {
+        "description": "CDP command parameters",
+        "type": "object"
+      },
+      "clear": {
+        "description": "Clear captured events after reading",
+        "type": "boolean"
+      },
+      "contextId": {
+        "description": "Optional isolated context",
+        "type": "string"
+      },
+      "expression": {
+        "description": "JavaScript to evaluate in the worker",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum captured events, default 100",
+        "type": "integer"
+      },
+      "serviceWorkerId": {
+        "description": "ID from the worker list",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}

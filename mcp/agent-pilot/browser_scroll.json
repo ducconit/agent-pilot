@@ -2,6 +2,10 @@
   "description": "Scroll viewport or active element smoothly by deltaX and deltaY pixels. Supports inline post-scroll waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "deltaX": {
         "description": "Horizontal scroll offset",
         "type": "number"
@@ -36,6 +40,10 @@
   "name": "browser_scroll",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "deltaX": {
         "description": "Horizontal scroll offset",
         "type": "number"

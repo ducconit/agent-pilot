@@ -7,7 +7,7 @@ Phiên bản dòng lệnh độc lập (**Single Executable Binary**) viết b�
 ## 🌟 Đặc Điểm Nổi Bật
 
 - **Độc lập hoàn toàn (Zero Runtime Dependencies)**: Không cần cài đặt Node.js hay `npm`, không cần `node_modules`.
-- **Khởi động siêu tốc**: Thời gian khởi động `<5ms`, chiếm chỉ khoảng `10MB - 15MB RAM`.
+- **Runtime nhúng**: CSS, Lighthouse, trace insights, MP4 và context riêng được đóng gói sẵn; server tự khởi chạy khi cần. [Hướng dẫn DevTools](../docs/DEVTOOLS.md).
 - **Đa năng (Hybrid All-in-One)**:
   - **Dành cho AI Agent**: Chạy làm máy chủ MCP Server qua `stdio` (Antigravity, Claude Code, Cursor).
   - **Dành cho Tester / QC**: Chạy lệnh trực tiếp từ terminal (`agent-pilot click`, `agent-pilot type`, `agent-pilot screenshot`, `agent-pilot batch`).
@@ -30,18 +30,11 @@ Tải tệp binary tương ứng với hệ điều hành và CPU của bạn t�
 | **Windows** | x86_64 (amd64) | `agent-pilot-windows-amd64.exe` | Đổi tên thành `agent-pilot.exe` và đưa vào thư mục PATH |
 | **Windows** | ARM64 | `agent-pilot-windows-arm64.exe` | Đổi tên thành `agent-pilot.exe` và đưa vào thư mục PATH |
 
-### 2. Tự Biên Dịch Từ Mã Nguồn (Yêu cầu Go >= 1.21)
+### 2. Tự Biên Dịch Từ Mã Nguồn (chỉ trên máy build)
 
 ```bash
-# Từ GỐC repo (module Go nằm ở gốc, package cli/ nằm trong đó)
-go mod tidy
-
-# Biên dịch pure static binary, inject version từ package.json
-CGO_ENABLED=0 go build \
-  -ldflags "-s -w -X github.com/ducconit/agent-pilot-extension/cli/version.Version=$(node -p "require('./package.json').version")" \
-  -o cli/agent-pilot ./cli/cmd/agent-pilot
-
-# Hoặc dùng script tiện dụng (tự thêm cả Commit/Date):
+# Go theo go.mod, Node >=22.19; máy dùng binary không cần cài chúng
+npm ci
 npm run build:cli
 ```
 
@@ -51,8 +44,8 @@ npm run build:cli
 # Trên Linux / macOS:
 sudo mv agent-pilot /usr/local/bin/
 
-# Hoặc cài đặt qua go install:
-go install github.com/ducconit/agent-pilot-extension/cli/cmd/agent-pilot@latest
+# Có thể trỏ cấu hình MCP vào binary ngay trong thư mục vừa giải nén;
+# việc đưa vào PATH hoặc cài service là tùy chọn.
 ```
 
 ---

@@ -111,7 +111,7 @@ export function createZip(sourceDir, outputZip, options = {}) {
 
   // Linux & macOS: prefer the `zip` utility (with exclusions applied).
   if (commandExists("zip")) {
-    const args = ["-r", "-9", outputZip, "."];
+    const args = [...(options.quiet ? ["-q"] : []), "-r", "-9", outputZip, "."];
     if (excludes.length > 0) {
       args.push("-x", ...excludes);
     }

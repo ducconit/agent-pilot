@@ -1,5 +1,5 @@
 {
-  "description": "Start or stop DevTools Performance tracing session (Tracing.start/end). When stopped, returns structured bottleneck insights (CPU scripting/rendering/painting breakdown, Long Tasks \u003e=50ms, synchronous Forced Reflows / layout thrashing, and Hot Scripts).",
+  "description": "Record a complete Chrome trace without the old 2,000-event cap, save .json/.json.gz, and return bottleneck summaries plus DevTools insight sets. Start, interact with the page, then stop; or use reload and autoStop. Drill down with browser_performance_analyze_insight.",
   "inputSchema": {
     "properties": {
       "action": {
@@ -10,9 +10,33 @@
         ],
         "type": "string"
       },
+      "autoStop": {
+        "description": "Automatically stop and analyze",
+        "type": "boolean"
+      },
       "categories": {
         "description": "Optional trace categories string",
         "type": "string"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "durationMs": {
+        "description": "Auto-stop recording window, default 5000, max 30000",
+        "type": "integer"
+      },
+      "filePath": {
+        "description": "Raw trace output path (.json or .json.gz); default local artifacts directory",
+        "type": "string"
+      },
+      "ignoreCache": {
+        "description": "Bypass cache during reload",
+        "type": "boolean"
+      },
+      "reload": {
+        "description": "Reload after starting trace",
+        "type": "boolean"
       },
       "tabId": {
         "description": "Target tab ID",
@@ -32,9 +56,33 @@
         ],
         "type": "string"
       },
+      "autoStop": {
+        "description": "Automatically stop and analyze",
+        "type": "boolean"
+      },
       "categories": {
         "description": "Optional trace categories string",
         "type": "string"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "durationMs": {
+        "description": "Auto-stop recording window, default 5000, max 30000",
+        "type": "integer"
+      },
+      "filePath": {
+        "description": "Raw trace output path (.json or .json.gz); default local artifacts directory",
+        "type": "string"
+      },
+      "ignoreCache": {
+        "description": "Bypass cache during reload",
+        "type": "boolean"
+      },
+      "reload": {
+        "description": "Reload after starting trace",
+        "type": "boolean"
       },
       "tabId": {
         "description": "Target tab ID",

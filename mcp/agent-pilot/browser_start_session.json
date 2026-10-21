@@ -2,6 +2,10 @@
   "description": "Start an active AI Agent session. Keeps the virtual cursor and glowing neon lock shield continuously visible on the tab until ended.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "name": {
         "description": "Session name or task description shown in the action pill",
         "type": "string"
@@ -16,6 +20,10 @@
   "name": "browser_start_session",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "name": {
         "description": "Session name or task description shown in the action pill",
         "type": "string"

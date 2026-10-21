@@ -21,6 +21,14 @@
         "description": "Compare this snapshot against the stored per-tab baseline to detect memory leaks",
         "type": "boolean"
       },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "filePath": {
+        "description": "Raw .heapsnapshot output for isolated context tabs; required there. Native tabs keep their constructor/baseline summaries.",
+        "type": "string"
+      },
       "forceGC": {
         "description": "Alias for collectGarbage: trigger V8 Garbage Collection before snapshot (default: true)",
         "type": "boolean"
@@ -61,6 +69,14 @@
       "compareWithBaseline": {
         "description": "Compare this snapshot against the stored per-tab baseline to detect memory leaks",
         "type": "boolean"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "filePath": {
+        "description": "Raw .heapsnapshot output for isolated context tabs; required there. Native tabs keep their constructor/baseline summaries.",
+        "type": "string"
       },
       "forceGC": {
         "description": "Alias for collectGarbage: trigger V8 Garbage Collection before snapshot (default: true)",

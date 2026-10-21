@@ -1,0 +1,28 @@
+{
+  "description": "Close all tabs in this agent's isolated context and discard its cookies and storage.",
+  "inputSchema": {
+    "properties": {
+      "contextId": {
+        "description": "Context to close",
+        "type": "string"
+      }
+    },
+    "required": [
+      "contextId"
+    ],
+    "type": "object"
+  },
+  "name": "browser_close_context",
+  "parameters": {
+    "properties": {
+      "contextId": {
+        "description": "Context to close",
+        "type": "string"
+      }
+    },
+    "required": [
+      "contextId"
+    ],
+    "type": "object"
+  }
+}

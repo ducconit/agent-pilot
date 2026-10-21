@@ -67,6 +67,14 @@ jobs:
       - name: Run Go Unit Tests (Race Detector)
         run: npm run test:cli
 
+      - name: Verify Self-Contained MCP Binary (No System Node or FFmpeg)
+        run: |
+          npm run build:cli
+          node scripts/verify_packaged_devtools.mjs
+
+      - name: Verify DevTools Through the Extension
+        run: npm run test:devtools
+
       # Block the release when the tag, package.json and manifest.json disagree.
       - name: Validate Version Alignment
         env:
@@ -187,7 +195,7 @@ jobs:
           ---
 
           ### ✨ Tính Năng Nổi Bật
-          - **36 công cụ MCP chuẩn hóa**: quản lý tab, click chuột ảo neon, gõ phím human-like, soi DOM,
+          - **48 công cụ MCP chuẩn hóa**: quản lý tab, click chuột ảo neon, gõ phím human-like, soi DOM,
             chụp ảnh màn hình, batch actions, đọc DevTools (Console/Network/Performance) qua CDP, tích hợp sẵn Inline Wait (`waitMs`/`waitForSelector`/`waitForText`) ngay trong lệnh.
           - **Động cơ Batch Engine (`browser_run_actions`)**: gom chuỗi kịch bản đa bước trong 1 tool call,
             tiết kiệm >80% token.

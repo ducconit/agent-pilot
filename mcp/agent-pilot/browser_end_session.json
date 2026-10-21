@@ -6,6 +6,10 @@
         "description": "Close the Agent tab after ending the session to free RAM (default: false)",
         "type": "boolean"
       },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
@@ -19,6 +23,10 @@
       "closeTab": {
         "description": "Close the Agent tab after ending the session to free RAM (default: false)",
         "type": "boolean"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
       },
       "tabId": {
         "description": "Target tab ID",

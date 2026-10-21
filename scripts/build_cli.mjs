@@ -16,6 +16,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { prepareDevtoolsRuntime } from "./build_devtools_runtime.mjs";
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUTPUT_NAME = process.platform === "win32" ? "agent-pilot.exe" : "agent-pilot";
@@ -43,6 +44,7 @@ const ldflags = [
   `-X github.com/ducconit/agent-pilot-extension/cli/version.Date=${date}`
 ].join(" ");
 
+await prepareDevtoolsRuntime();
 const result = spawnSync("go", ["build", "-ldflags", ldflags, "-o", OUTPUT_PATH, "./cli/cmd/agent-pilot"], {
   cwd: ROOT_DIR,
   stdio: "inherit",

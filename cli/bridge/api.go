@@ -236,7 +236,7 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Dispatch to extension
-	res, err := SendCommandToExtension(method, params, 0)
+	res, err := dispatchLocalCommand(method, params)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 		return

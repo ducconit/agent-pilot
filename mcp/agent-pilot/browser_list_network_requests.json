@@ -2,6 +2,10 @@
   "description": "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "filterUrl": {
         "description": "Filter requests matching URL substring",
         "type": "string"
@@ -28,6 +32,10 @@
   "name": "browser_list_network_requests",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "filterUrl": {
         "description": "Filter requests matching URL substring",
         "type": "string"

@@ -1,0 +1,62 @@
+{
+  "description": "Inspect matched CSS rules, inline/inherited styles, specificity, important declarations, cascade layers, source locations and final computed styles. Paginated; accepts a CSS selector, snapshot @ref or backendNodeId.",
+  "inputSchema": {
+    "properties": {
+      "backendNodeId": {
+        "description": "Backend DOM node ID from an accessibility snapshot",
+        "type": "integer"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "pageIdx": {
+        "description": "Zero-based rule page",
+        "type": "integer"
+      },
+      "pageSize": {
+        "description": "Rules per page, default 10, maximum 100",
+        "type": "integer"
+      },
+      "selector": {
+        "description": "CSS selector or snapshot @ref",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_get_css_styles",
+  "parameters": {
+    "properties": {
+      "backendNodeId": {
+        "description": "Backend DOM node ID from an accessibility snapshot",
+        "type": "integer"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "pageIdx": {
+        "description": "Zero-based rule page",
+        "type": "integer"
+      },
+      "pageSize": {
+        "description": "Rules per page, default 10, maximum 100",
+        "type": "integer"
+      },
+      "selector": {
+        "description": "CSS selector or snapshot @ref",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

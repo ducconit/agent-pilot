@@ -2,6 +2,10 @@
   "description": "Smart wait until a selector or text appears, disappears, or meets state condition with timeout — or sleep for a fixed duration (waitMs/sleepMs/ms), or wait for document.readyState === 'complete' when called with no arguments.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "ms": {
         "description": "Alias for waitMs: milliseconds to sleep",
         "type": "integer"
@@ -45,6 +49,10 @@
   "name": "browser_wait_for",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "ms": {
         "description": "Alias for waitMs: milliseconds to sleep",
         "type": "integer"

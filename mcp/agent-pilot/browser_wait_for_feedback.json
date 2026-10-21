@@ -2,6 +2,10 @@
   "description": "Channel A: Reactively pause agent execution until human user submits visual UI feedback.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "tabId": {
         "description": "Optional tab ID filter",
         "type": "integer"
@@ -16,6 +20,10 @@
   "name": "browser_wait_for_feedback",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "tabId": {
         "description": "Optional tab ID filter",
         "type": "integer"

@@ -2,6 +2,10 @@
   "description": "Click with the virtual mouse (visual cursor). Accepts CSS selector or direct (x, y) coordinates. Supports inline post-click waitMs/waitForSelector/waitForText. Tip: If a button/element cannot be found via selector (e.g. Canvas/Shadow DOM), take a screenshot -\u003e locate pixel coordinates -\u003e click with x, y and via:'cdp'.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "selector": {
         "description": "CSS selector or @ref to click",
         "type": "string"
@@ -44,6 +48,10 @@
   "name": "browser_click",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "selector": {
         "description": "CSS selector or @ref to click",
         "type": "string"

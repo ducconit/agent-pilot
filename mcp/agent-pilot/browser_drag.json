@@ -2,6 +2,10 @@
   "description": "Drag from a source to a target element, or between coordinates (fromX/fromY/toX/toY) for canvas/game aiming. Set via:'cdp' for trusted CDP input; via:'auto' falls back to synthetic. Supports inline post-drag waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "from": {
         "description": "Source element selector or @ref",
         "type": "string"
@@ -64,6 +68,10 @@
   "name": "browser_drag",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "from": {
         "description": "Source element selector or @ref",
         "type": "string"

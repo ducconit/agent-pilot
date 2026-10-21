@@ -6,6 +6,10 @@
         "description": "List of actions to execute sequentially",
         "type": "array"
       },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "omitDataUrls": {
         "description": "Omit raw Base64 data from screenshot steps to prevent memory bloat",
         "type": "boolean"
@@ -30,6 +34,10 @@
       "actions": {
         "description": "List of actions to execute sequentially",
         "type": "array"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
       },
       "omitDataUrls": {
         "description": "Omit raw Base64 data from screenshot steps to prevent memory bloat",

@@ -38,7 +38,8 @@
 | **Trích xuất Mã màu** | 🎨 | Kính lúp pixel nhặt màu chính xác 5 định dạng (HEX, RGB, RGBA, HSL, OKLCH), 1-click copy từng định dạng và lưu khay lịch sử màu sắc. |
 | **Bộ Chụp Màn Hình** | 📸 | Hỗ trợ 4 chế độ (`visible`, `region`, `element`, `full`): Chụp toàn khung nhìn, Kéo chọn vùng cắt tùy ý (Crop), Chụp riêng phần tử DOM đã khóa, và Chụp toàn trang cuộn (Full Page). |
 | **Chú Thích & Chỉ Điểm UI** | ✏️ | Khoanh vùng, chỉ điểm phần tử/component nguồn (React/Vue/Astro:line), ghim ghi chú lỗi để giao việc cho AI Agent sửa code (hỗ trợ 3 kênh Live Push, Persistent Inbox, Clipboard Prompt). |
-| **Tương thích Antigravity** | 🤖 | Tích hợp sẵn bộ chạy kịch bản **JSON Action**, cầu nối `window.__AGENT_PILOT__` và 35 công cụ MCP Tools. |
+| **Tương thích Antigravity** | 🤖 | Tích hợp sẵn bộ chạy kịch bản **JSON Action**, cầu nối `window.__AGENT_PILOT__` và 48 công cụ MCP Tools. |
+| **DevTools nâng cao** | 🔬 | CSS cascade, Lighthouse và audit drill-down, raw trace + DevTools insights, MP4, phiên đăng nhập độc lập, service worker và AX tree. Runtime nhúng sẵn; máy sử dụng không cần cài Node/npm/FFmpeg. [Hướng dẫn](docs/DEVTOOLS.md). |
 
 ---
 
@@ -73,7 +74,7 @@ agent-pilot-extension/
 │   ├── config/                         # Hằng số cấu hình dùng chung & DefaultBridgePort()
 │   ├── bridge/                         # WebSocket Server 58765, HTTP REST API, timeout derivation, sanitizer
 │   ├── feedback/                       # Feedback Inbox, Waiter & long-poll (Channel A/B)
-│   ├── mcp/                            # MCP stdio server & registry 35 công cụ
+│   ├── mcp/                            # MCP stdio server & registry 48 công cụ
 │   ├── service/                        # Quản lý service chạy ngầm (systemd / launchd / Task Scheduler)
 │   ├── skill/                          # Cài Agent Skill từ //go:embed (một nguồn: skills/ ở gốc repo)
 │   ├── version/                        # Version/Commit/Date — inject lúc build bằng -ldflags -X
@@ -129,7 +130,7 @@ agent-pilot-extension/
 │   ├── popup.js                        # Xử lý sự kiện popup
 │   ├── popup.css
 │   └── icons/                          # Bộ icon nhận diện chuẩn các kích thước
-├── mcp/agent-pilot/                    # 35 tệp lược đồ chuẩn Single Source of Truth (SSOT)
+├── mcp/agent-pilot/                    # 48 tệp lược đồ chuẩn Single Source of Truth (SSOT)
 ├── scripts/                            # Bộ công cụ build, test, pack & sync cross-platform
 │   ├── browser_resolver.mjs            # Tự động tìm kiếm Chrome/Chromium/Edge/Brave đa nền tảng
 │   ├── build_cli.mjs                   # Build CLI tĩnh cross-platform (thay cho env-var prefix POSIX)
@@ -204,7 +205,7 @@ Sau đó nạp thư mục `extensions/` trực tiếp vào `chrome://extensions`
 
 ### 2. Cài Đặt Standalone Go CLI & MCP Server (`agent-pilot`)
 
-Bản binary độc lập viết bằng **Golang** tích hợp sẵn máy chủ **WebSocket/REST Bridge Server (cổng 58765)**, **MCP Server (stdio)** và **bộ lệnh CLI** điều khiển trình duyệt trực tiếp (khởi động `<5ms`, RAM `~12MB` — số liệu tham khảo, có thể thay đổi theo nền tảng, đóng gói tĩnh pure static `CGO_ENABLED=0`, không phụ thuộc Node.js hay thư viện hệ thống).
+Bản binary độc lập tích hợp **WebSocket/REST Bridge Server (cổng 58765)**, **MCP Server (stdio)**, **CLI** và runtime DevTools nhúng. Máy sử dụng không phải cài Node.js/npm/FFmpeg hoặc chạy cài dependency. Nhóm DevTools nâng cao tự khởi chạy runtime khi cần và dùng RAM theo tác vụ audit/trace. [Chi tiết](docs/DEVTOOLS.md).
 
 #### Cách A: Tải Bundle Biên Dịch Sẵn Theo 3 Hệ Điều Hành (GitHub Releases)
 Mỗi bundle chứa sẵn `extensions/` + binary đúng nền tảng + script cài đặt 1 lệnh (`install.sh` / `install.ps1`) + `skills/` + `README.md` chuyên biệt cho hệ điều hành đó:
@@ -215,21 +216,16 @@ Mỗi bundle chứa sẵn `extensions/` + binary đúng nền tảng + script c�
 | 🍎 **macOS** | Apple Silicon (`arm64`) / Intel (`amd64`) | `agent-pilot-v1.0.10-beta-darwin-arm64.zip`<br/>`agent-pilot-v1.0.10-beta-darwin-amd64.zip` | `./install.sh` *(tự gỡ `xattr`)* • [📄 Tài liệu macOS](docs/bundles/README.macos.md) |
 | 🪟 **Windows** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.10-beta-windows-amd64.zip`<br/>`agent-pilot-v1.0.10-beta-windows-arm64.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` • [📄 Tài liệu Windows](docs/bundles/README.windows.md) |
 
-Trong mỗi bundle, binary và script cài đặt nằm ngay cạnh thư mục `extensions/` — chạy script cài đặt xong và nạp extension theo mục 1 là sẵn sàng kết nối MCP.
+Trong mỗi bundle, binary nằm ngay cạnh `extensions/`. Nạp extension rồi trỏ cấu hình MCP vào binary là dùng được, không cần chạy script cài đặt. Script chỉ hỗ trợ đưa binary vào PATH và cài service nếu muốn.
 
-#### Cách B: Tự Biên Dịch Từ Nguồn (Yêu cầu Go 1.21+)
+#### Cách B: Tự Biên Dịch Từ Nguồn (chỉ dành cho máy build)
 ```bash
-# Cách 1: Sử dụng npm script (tự inject version từ package.json)
+# Go theo go.mod và Node >=22.19 chỉ cần trên máy build
+npm ci
 npm run build:cli
-
-# Cách 2: Tự biên dịch trực tiếp qua go build (từ gốc repo)
-go build -ldflags "-s -w -X github.com/ducconit/agent-pilot-extension/cli/version.Version=$(node -p "require('./package.json').version")" -o cli/agent-pilot ./cli/cmd/agent-pilot
-
-# Hoặc cài đặt trực tiếp qua Go toolchain (skills vẫn được nhúng sẵn)
-go install github.com/ducconit/agent-pilot-extension/cli/cmd/agent-pilot@latest
 ```
 
-> Lưu ý: `go build` không kèm `-X` sẽ báo version là `dev`; mọi script build của repo đều tự inject version từ `package.json`.
+Script build nhúng runtime và các dependency vào binary. Không dùng `go build`/`go install` trực tiếp để phát hành khi chưa chuẩn bị payload DevTools. Máy nhận binary không cần Node hoặc npm. [Quy trình đóng gói](docs/DEVTOOLS.md).
 
 #### Cách Kích Hoạt Service Chạy Ngầm (Khuyên dùng cho trải nghiệm tốt nhất)
 Thay vì phải tự chạy server thủ công, bạn chỉ cần gõ 1 lệnh để hệ thống tự động đăng ký service chạy ngầm (Linux `systemd --user`, macOS `launchd`, Windows `Task Scheduler`):
@@ -336,7 +332,7 @@ agent-pilot server
 ```
 Khi chạy đa tác vụ hoặc nhiều cửa sổ IDE, Agent Pilot tự động chuyển sang chế độ **Forwarder**, chuyển tiếp lệnh qua HTTP REST API `http://127.0.0.1:58765/api` mà không bao giờ gặp lỗi xung đột cổng `EADDRINUSE`.
 
-#### Bộ Công Cụ MCP Điều Khiển Trình Duyệt (35 Tools):
+#### Bộ Công Cụ MCP Điều Khiển Trình Duyệt (48 Tools):
 - `browser_run_actions`: Động cơ thực thi chuỗi kịch bản hàng loạt (Batch Engine), tiết kiệm >80% token.
 - `browser_open_tab`, `browser_list_tabs`, `browser_navigate`: Quản lý và điều hướng các tab trình duyệt (mặc định mở ngầm không cướp focus).
 - `browser_click`, `browser_drag`, `browser_type`, `browser_scroll`: Mô phỏng chuột ảo neon với sóng click ripple. `browser_click`/`browser_drag` hỗ trợ `via: "cdp"` (trusted input cho cross-origin iframe/canvas/WebGL) và drag theo tọa độ `fromX/fromY/toX/toY` + `holdMs` cho game.

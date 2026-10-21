@@ -44,5 +44,11 @@ jobs:
           npm run build:cli
           ./cli/agent-pilot --help
 
+      - name: Test Advanced DevTools in Chrome
+        run: npm run test:devtools
+
+      - name: Verify Embedded Runtime Without System Node
+        run: node scripts/verify_packaged_devtools.mjs
+
       - name: Test Extension Packaging
         run: npm run pack

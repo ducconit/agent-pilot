@@ -95,9 +95,17 @@ Agent Pilot provides an all-in-one compiled Go binary (`cli/agent-pilot`) for ul
 ---
 
 
-## 🛠️ Available MCP Tools (36 Tools)
+## 🛠️ Available MCP Tools (48 Tools)
 
-When the `agent-pilot` MCP server or skill is active, agents have direct access to the following 36 tools:
+When the `agent-pilot` MCP server or skill is active, agents have direct access to 48 tools. Release binaries embed the private DevTools runtime: users never need to install Node, npm, FFmpeg or dependencies, or open a remote-debugging port.
+
+Advanced tools: `browser_get_css_styles`, `browser_lighthouse_audit`, `browser_lighthouse_analyze_audit`, `browser_performance_analyze_insight`, `browser_screencast_start`, `browser_screencast_stop`, `browser_create_context`, `browser_list_contexts`, `browser_close_context`, `browser_service_workers`, `browser_accessibility_snapshot`, and `browser_devtools_status`.
+
+For independent login sessions, create a context and pass its `contextId` to `browser_open_tab`, or pass `isolatedContext` with a name. Context tab IDs are negative and work with regular page tools. Do not confuse tab groups with cookie/storage isolation. Contexts belong to the creating agent and are discarded on close/server shutdown. Context tabs have no extension HUD. Use a fresh snapshot after navigation.
+
+Performance tracing saves complete `.json`/`.json.gz` traces and returns `traceId` plus insight sets. Use `browser_performance_analyze_insight` to drill into a named insight. Lighthouse returns `reportId`, `jsonPath` and `htmlPath`; use `browser_lighthouse_analyze_audit` with `auditId` for details. Saved file paths work after server restarts. `navigation` audits reload the page; `snapshot` audits its current state. MP4 recording uses Chrome's built-in encoder and requires a current Chrome with `Page.startScreenRecording` support.
+
+`browser_emulate` also accepts 4G/custom networks, geolocation, user agent/client hints, extra HTTP headers, locale/timezone, reduced motion/contrast/forced colors and viewport/mobile/touch/landscape. Calls preserve previous emulation settings; explicitly reset overrides after testing. Worker debugging lists active workers, evaluates async JS, captures console/errors, and supports CDP Debugger commands; pass `contextId` for context workers.
 
 | Tool Name | Key Parameters | Description |
 | :--- | :--- | :--- |

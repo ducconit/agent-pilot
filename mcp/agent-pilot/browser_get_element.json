@@ -2,6 +2,10 @@
   "description": "Inspect a DOM element, retrieving bounding box, coordinates, XPath, selector, text content, and optionally computed CSS.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "includeStyles": {
         "description": "Include computed CSS styles. Omitted by default to minimize token usage.",
         "type": "boolean"
@@ -23,6 +27,10 @@
   "name": "browser_get_element",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "includeStyles": {
         "description": "Include computed CSS styles. Omitted by default to minimize token usage.",
         "type": "boolean"

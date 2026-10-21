@@ -13,6 +13,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"github.com/ducconit/agent-pilot-extension/cli/bridge"
 	"os"
 	"strings"
 
@@ -32,6 +33,7 @@ var cobraDefaultHelp = (&cobra.Command{}).HelpFunc()
 
 // Run executes the CLI with the given arguments (os.Args[1:]).
 func Run(args []string) {
+	defer bridge.CloseDevtoolsHost()
 	root := newRootCommand()
 	root.SetArgs(normalizeLegacyFlags(args))
 	if err := root.Execute(); err != nil {
@@ -110,6 +112,7 @@ func newRootCommand() *cobra.Command {
 	})
 
 	root.AddCommand(
+		newDevtoolsCommand(),
 		newOpenCommand(),
 		newNavigateCommand(),
 		newCloseCommand(),

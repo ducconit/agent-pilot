@@ -150,8 +150,11 @@ export async function launchExtensionBrowser({ headless = false, extensionsDir =
   const browser = await puppeteer.launch({
     executablePath,
     headless,
-    args: getChromiumLaunchArgs(extensionsDir)
+    pipe: true,
+    enableExtensions: true,
+    args: [...getChromiumLaunchArgs(extensionsDir).filter(arg => !arg.startsWith("--load-extension") && !arg.startsWith("--disable-extensions-except")), "--enable-unsafe-extension-debugging"]
   });
+  await browser.installExtension(extensionsDir);
   launchedBrowsers.add(browser);
   installExitHook();
 

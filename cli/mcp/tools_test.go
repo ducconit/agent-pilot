@@ -7,12 +7,16 @@ import (
 )
 
 func TestMCPToolsRegistry(t *testing.T) {
-	expectedCount := 36
+	expectedCount := 48
 	if len(mcpTools) != expectedCount {
 		t.Fatalf("expected %d tools, got %d", expectedCount, len(mcpTools))
 	}
 
 	requiredTools := []string{
+		"browser_get_css_styles", "browser_lighthouse_audit", "browser_lighthouse_analyze_audit",
+		"browser_performance_analyze_insight", "browser_screencast_start", "browser_screencast_stop",
+		"browser_create_context", "browser_list_contexts", "browser_close_context",
+		"browser_service_workers", "browser_accessibility_snapshot", "browser_devtools_status",
 		"browser_run_actions", "browser_open_tab", "browser_close_tab", "browser_list_tabs", "browser_navigate",
 		"browser_click", "browser_type", "browser_scroll", "browser_snapshot", "browser_fill_form",
 		"browser_get_element", "browser_screenshot", "browser_get_devtools_data", "browser_pick_color",

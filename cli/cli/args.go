@@ -372,7 +372,7 @@ func (a FlexibleCmdArgs) TabID() (interface{}, error) {
 		return nil, nil
 	}
 	id, err := strconv.Atoi(val)
-	if err != nil || id <= 0 {
+	if err != nil || id == 0 {
 		return nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", val)
 	}
 	return id, nil

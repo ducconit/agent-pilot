@@ -1,0 +1,46 @@
+{
+  "description": "Read Chrome's actual accessibility tree, including semantic roles, names, states, parent/child relationships and backend DOM IDs. Use backendNodeId with CSS inspection. Existing browser_snapshot keeps its compact interactive format.",
+  "inputSchema": {
+    "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "maxElements": {
+        "description": "Maximum nodes, default 1000, maximum 10000",
+        "type": "integer"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "verbose": {
+        "description": "Include ignored AX nodes",
+        "type": "boolean"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_accessibility_snapshot",
+  "parameters": {
+    "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "maxElements": {
+        "description": "Maximum nodes, default 1000, maximum 10000",
+        "type": "integer"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "verbose": {
+        "description": "Include ignored AX nodes",
+        "type": "boolean"
+      }
+    },
+    "type": "object"
+  }
+}

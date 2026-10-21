@@ -2,6 +2,10 @@
   "description": "Simulate human-like virtual mouse hover over an element (triggering mouseenter, mouseover, mousemove). Supports inline post-hover waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "selector": {
         "description": "CSS selector or @ref to hover over",
         "type": "string"
@@ -35,6 +39,10 @@
   "name": "browser_hover",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "selector": {
         "description": "CSS selector or @ref to hover over",
         "type": "string"

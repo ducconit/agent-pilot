@@ -2,6 +2,10 @@
   "description": "Evaluate a JavaScript expression or script in the context of the page (MAIN world first, with CDP Runtime.evaluate fallback) and return the serialized result. Accepts either 'expression' or 'script', plus optional post-eval waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "expression": {
         "description": "JavaScript expression or script to evaluate",
         "type": "string"
@@ -36,6 +40,10 @@
   "name": "browser_evaluate",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "expression": {
         "description": "JavaScript expression or script to evaluate",
         "type": "string"

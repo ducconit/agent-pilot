@@ -34,7 +34,8 @@ export {
   dispatchCdpMouseDrag
 } from "./cdp-input.js";
 
-export { setEmulation, getNetworkResponseBody } from "./cdp-network.js";
+export { getNetworkResponseBody } from "./cdp-network.js";
+export { setEmulation } from "./cdp-emulation.js";
 
 export { uploadFileInput, handleJavaScriptDialog, getActiveDialog } from "./cdp-page.js";
 

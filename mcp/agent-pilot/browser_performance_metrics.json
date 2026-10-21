@@ -2,6 +2,10 @@
   "description": "Retrieve comprehensive runtime \u0026 debugging metrics: CDP counters (JSHeapUsedMB, Nodes, JSEventListeners, LayoutCount, ScriptDuration), Core Web Vitals (TTFB, FCP, LCP + target element, CLS + shifting elements, TBT + long tasks), Resource bottlenecks (slowest \u0026 render-blocking URLs), DOM/A11y health (max depth, duplicate IDs, missing alt/labels), and automated diagnostic warnings.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "includeDomHealth": {
         "description": "Collect DOM depth, duplicate IDs, and accessibility health metrics (default: true)",
         "type": "boolean"
@@ -24,6 +28,10 @@
   "name": "browser_performance_metrics",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "includeDomHealth": {
         "description": "Collect DOM depth, duplicate IDs, and accessibility health metrics (default: true)",
         "type": "boolean"

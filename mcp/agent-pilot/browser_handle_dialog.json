@@ -6,6 +6,10 @@
         "description": "Whether to accept (true) or dismiss/cancel (false) the dialog (default: true)",
         "type": "boolean"
       },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "promptText": {
         "description": "Optional text to enter into a prompt() dialog",
         "type": "string"
@@ -23,6 +27,10 @@
       "accept": {
         "description": "Whether to accept (true) or dismiss/cancel (false) the dialog (default: true)",
         "type": "boolean"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
       },
       "promptText": {
         "description": "Optional text to enter into a prompt() dialog",

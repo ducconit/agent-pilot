@@ -1,0 +1,106 @@
+{
+  "description": "Run real Lighthouse on the current authenticated tab without opening a debugging port. Returns category scores, failing audits, flagged DOM nodes, and HTML/JSON reports. Navigation reloads the tab; snapshot audits its current state. Built-in runtime; no Node installation required.",
+  "inputSchema": {
+    "properties": {
+      "categories": {
+        "description": "Default accessibility, best-practices, seo; performance is optional",
+        "items": {
+          "description": "Category",
+          "enum": [
+            "performance",
+            "accessibility",
+            "best-practices",
+            "seo"
+          ],
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "device": {
+        "description": "Scoring form factor; current viewport is preserved",
+        "enum": [
+          "desktop",
+          "mobile"
+        ],
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum failing audits inline; full report always saved",
+        "type": "integer"
+      },
+      "mode": {
+        "description": "Audit mode; default navigation",
+        "enum": [
+          "navigation",
+          "snapshot"
+        ],
+        "type": "string"
+      },
+      "outputDirPath": {
+        "description": "Directory for HTML and JSON reports",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_lighthouse_audit",
+  "parameters": {
+    "properties": {
+      "categories": {
+        "description": "Default accessibility, best-practices, seo; performance is optional",
+        "items": {
+          "description": "Category",
+          "enum": [
+            "performance",
+            "accessibility",
+            "best-practices",
+            "seo"
+          ],
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "device": {
+        "description": "Scoring form factor; current viewport is preserved",
+        "enum": [
+          "desktop",
+          "mobile"
+        ],
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum failing audits inline; full report always saved",
+        "type": "integer"
+      },
+      "mode": {
+        "description": "Audit mode; default navigation",
+        "enum": [
+          "navigation",
+          "snapshot"
+        ],
+        "type": "string"
+      },
+      "outputDirPath": {
+        "description": "Directory for HTML and JSON reports",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

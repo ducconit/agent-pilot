@@ -1,0 +1,12 @@
+{
+  "description": "Report the versions of the runtime embedded in the MCP binary. Works without a system Node or FFmpeg installation.",
+  "inputSchema": {
+    "properties": {},
+    "type": "object"
+  },
+  "name": "browser_devtools_status",
+  "parameters": {
+    "properties": {},
+    "type": "object"
+  }
+}

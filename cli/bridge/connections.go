@@ -157,6 +157,9 @@ func SendCommandToExtension(method string, params map[string]interface{}, timeou
 			return nil, fmt.Errorf("%s", errMsg)
 		}
 		resultData := res["result"]
+		if strings.HasPrefix(method, "devtools.protocol.") {
+			return resultData, nil
+		}
 		sanitized := SanitizeData(resultData, filterEnabled)
 		return sanitized, nil
 
@@ -350,6 +353,9 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		// Handle extension events and feedback messages
 		if t, ok := msg["type"].(string); ok {
 			switch t {
+			case "DEVTOOLS_PROTOCOL_EVENT", "DEVTOOLS_PROTOCOL_CLOSED":
+				msg["instanceId"] = clientID
+				devtoolsHost.Event(msg)
 			case "HANDSHAKE":
 				if details, ok := msg["details"].(map[string]interface{}); ok {
 					clientsLock.Lock()

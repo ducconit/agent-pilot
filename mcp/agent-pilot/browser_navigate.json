@@ -2,6 +2,10 @@
   "description": "Navigate the active or specified tab to a new URL (waits for page load completion by default).",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "password": {
         "description": "Optional HTTP Basic Auth password (automatically URL-encoded into the destination URL)",
         "type": "string"
@@ -47,6 +51,10 @@
   "name": "browser_navigate",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "password": {
         "description": "Optional HTTP Basic Auth password (automatically URL-encoded into the destination URL)",
         "type": "string"

@@ -3,25 +3,100 @@
   "inputSchema": {
     "properties": {
       "colorScheme": {
-        "description": "Color scheme preference",
+        "description": "Color scheme preference; auto/default reset",
         "enum": [
           "dark",
           "light",
+          "auto",
           "default"
         ],
+        "type": "string"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
       },
       "cpuThrottlingRate": {
         "description": "CPU throttling rate (1 = normal, 4 = 4x slowdown, 6 = 6x slowdown)",
         "type": "number"
       },
+      "extraHttpHeaders": {
+        "description": "Extra HTTP headers; empty object clears them",
+        "type": [
+          "object",
+          "string"
+        ]
+      },
+      "forcedColors": {
+        "description": "Forced colors",
+        "enum": [
+          "active",
+          "none",
+          "auto"
+        ],
+        "type": "string"
+      },
+      "geolocation": {
+        "description": "latitude,longitude or {latitude,longitude,accuracy}; null clears the override; site permission still applies",
+        "type": [
+          "string",
+          "object",
+          "null"
+        ]
+      },
+      "locale": {
+        "description": "Locale, e.g. vi-VN; empty clears",
+        "type": "string"
+      },
       "networkConditions": {
-        "description": "Network preset: 'offline', 'slow-3g', 'fast-3g', 'none'",
+        "description": "offline, slow-3g, fast-3g, slow-4g, fast-4g, none, or custom offline/latency/downloadThroughput/uploadThroughput (bytes/sec)",
+        "type": [
+          "string",
+          "object"
+        ]
+      },
+      "prefersContrast": {
+        "description": "Contrast preference",
+        "enum": [
+          "more",
+          "less",
+          "custom",
+          "no-preference",
+          "auto"
+        ],
+        "type": "string"
+      },
+      "prefersReducedMotion": {
+        "description": "Reduced motion",
+        "enum": [
+          "reduce",
+          "no-preference",
+          "auto"
+        ],
         "type": "string"
       },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "timezoneId": {
+        "description": "IANA timezone, e.g. Asia/Bangkok; empty clears",
+        "type": "string"
+      },
+      "userAgent": {
+        "description": "Override user agent; empty string clears it",
+        "type": "string"
+      },
+      "userAgentMetadata": {
+        "description": "Optional CDP client hints metadata",
+        "type": "object"
+      },
+      "viewport": {
+        "description": "{width,height,deviceScaleFactor,mobile,touch,landscape}; null resets",
+        "type": [
+          "object",
+          "null"
+        ]
       }
     },
     "type": "object"
@@ -30,25 +105,100 @@
   "parameters": {
     "properties": {
       "colorScheme": {
-        "description": "Color scheme preference",
+        "description": "Color scheme preference; auto/default reset",
         "enum": [
           "dark",
           "light",
+          "auto",
           "default"
         ],
+        "type": "string"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
       },
       "cpuThrottlingRate": {
         "description": "CPU throttling rate (1 = normal, 4 = 4x slowdown, 6 = 6x slowdown)",
         "type": "number"
       },
+      "extraHttpHeaders": {
+        "description": "Extra HTTP headers; empty object clears them",
+        "type": [
+          "object",
+          "string"
+        ]
+      },
+      "forcedColors": {
+        "description": "Forced colors",
+        "enum": [
+          "active",
+          "none",
+          "auto"
+        ],
+        "type": "string"
+      },
+      "geolocation": {
+        "description": "latitude,longitude or {latitude,longitude,accuracy}; null clears the override; site permission still applies",
+        "type": [
+          "string",
+          "object",
+          "null"
+        ]
+      },
+      "locale": {
+        "description": "Locale, e.g. vi-VN; empty clears",
+        "type": "string"
+      },
       "networkConditions": {
-        "description": "Network preset: 'offline', 'slow-3g', 'fast-3g', 'none'",
+        "description": "offline, slow-3g, fast-3g, slow-4g, fast-4g, none, or custom offline/latency/downloadThroughput/uploadThroughput (bytes/sec)",
+        "type": [
+          "string",
+          "object"
+        ]
+      },
+      "prefersContrast": {
+        "description": "Contrast preference",
+        "enum": [
+          "more",
+          "less",
+          "custom",
+          "no-preference",
+          "auto"
+        ],
+        "type": "string"
+      },
+      "prefersReducedMotion": {
+        "description": "Reduced motion",
+        "enum": [
+          "reduce",
+          "no-preference",
+          "auto"
+        ],
         "type": "string"
       },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "timezoneId": {
+        "description": "IANA timezone, e.g. Asia/Bangkok; empty clears",
+        "type": "string"
+      },
+      "userAgent": {
+        "description": "Override user agent; empty string clears it",
+        "type": "string"
+      },
+      "userAgentMetadata": {
+        "description": "Optional CDP client hints metadata",
+        "type": "object"
+      },
+      "viewport": {
+        "description": "{width,height,deviceScaleFactor,mobile,touch,landscape}; null resets",
+        "type": [
+          "object",
+          "null"
+        ]
       }
     },
     "type": "object"

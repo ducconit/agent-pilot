@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const TARGET_DIRS = ["extensions", "scripts"];
+const TARGET_DIRS = ["extensions", "scripts", "devtools"];
 
 const files = [];
 function walk(dir) {

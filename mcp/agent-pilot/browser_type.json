@@ -6,6 +6,10 @@
         "description": "Clear field first",
         "type": "boolean"
       },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "pressEnter": {
         "description": "Press Enter after typing",
         "type": "boolean"
@@ -50,6 +54,10 @@
       "clear": {
         "description": "Clear field first",
         "type": "boolean"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
       },
       "pressEnter": {
         "description": "Press Enter after typing",

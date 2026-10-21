@@ -18,6 +18,7 @@ import {
   getBuffer,
   cleanupDebuggerState
 } from "./constants.js";
+import { clearEmulationState } from "./cdp-emulation.js";
 
 /**
  * Initialize CDP event listeners for DevTools Console, Network, and Runtime events
@@ -27,6 +28,7 @@ export function initCdpEventListeners(broadcastFn) {
   chrome.debugger.onDetach.addListener((source, reason) => {
     if (source && source.tabId) {
       cleanupDebuggerState(source.tabId);
+      clearEmulationState(source.tabId);
       if (typeof broadcastFn === "function") {
         broadcastFn({
           type: "DEBUGGER_STATUS_CHANGED",

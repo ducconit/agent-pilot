@@ -1,0 +1,52 @@
+{
+  "description": "Create a genuinely isolated login session: independent cookies, localStorage, IndexedDB and service workers. Uses installed Chrome and the embedded runtime automatically. Open tabs with the returned contextId; negative tab IDs identify context tabs.",
+  "inputSchema": {
+    "properties": {
+      "headless": {
+        "description": "Launch the managed browser headlessly; default false; applies to the first context",
+        "type": "boolean"
+      },
+      "name": {
+        "description": "Optional session name",
+        "type": "string"
+      },
+      "origin": {
+        "description": "Origin to grant optional permissions",
+        "type": "string"
+      },
+      "permissions": {
+        "items": {
+          "description": "Chrome permission, e.g. geolocation",
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_create_context",
+  "parameters": {
+    "properties": {
+      "headless": {
+        "description": "Launch the managed browser headlessly; default false; applies to the first context",
+        "type": "boolean"
+      },
+      "name": {
+        "description": "Optional session name",
+        "type": "string"
+      },
+      "origin": {
+        "description": "Origin to grant optional permissions",
+        "type": "string"
+      },
+      "permissions": {
+        "items": {
+          "description": "Chrome permission, e.g. geolocation",
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "type": "object"
+  }
+}

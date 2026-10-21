@@ -60,7 +60,8 @@ export const systemHandlers = {
           width: Math.floor(width),
           height: Math.floor(height),
           deviceScaleFactor: !isNaN(scale) && scale > 0 ? scale : 1,
-          mobile: !!params.mobile
+          mobile: !!params.mobile,
+          touch: !!params.touch
         }
       });
     })

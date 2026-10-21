@@ -1,0 +1,54 @@
+{
+  "description": "Analyze a recorded trace using the Chrome DevTools trace engine. List insight sets, then inspect a named insight such as LCPBreakdown, DocumentLatency, RenderBlocking or CLSCulprits. Accepts traceId or saved .json/.json.gz filePath.",
+  "inputSchema": {
+    "properties": {
+      "filePath": {
+        "description": "Saved raw trace; works after server restart",
+        "type": "string"
+      },
+      "insightName": {
+        "description": "Omit to list available insights",
+        "type": "string"
+      },
+      "insightSetId": {
+        "description": "ID from the trace's available insight sets",
+        "type": "string"
+      },
+      "maxItems": {
+        "description": "Maximum items in nested insight collections",
+        "type": "integer"
+      },
+      "traceId": {
+        "description": "ID returned when stopping a trace",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_performance_analyze_insight",
+  "parameters": {
+    "properties": {
+      "filePath": {
+        "description": "Saved raw trace; works after server restart",
+        "type": "string"
+      },
+      "insightName": {
+        "description": "Omit to list available insights",
+        "type": "string"
+      },
+      "insightSetId": {
+        "description": "ID from the trace's available insight sets",
+        "type": "string"
+      },
+      "maxItems": {
+        "description": "Maximum items in nested insight collections",
+        "type": "integer"
+      },
+      "traceId": {
+        "description": "ID returned when stopping a trace",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}

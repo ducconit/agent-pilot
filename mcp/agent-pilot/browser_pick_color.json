@@ -2,6 +2,10 @@
   "description": "Sample the pixel color at coordinates (X, Y) or activate the interactive eyedropper loupe.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
@@ -20,6 +24,10 @@
   "name": "browser_pick_color",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"

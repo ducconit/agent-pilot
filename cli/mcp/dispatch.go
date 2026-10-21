@@ -40,7 +40,7 @@ func prepareSessionArgs(raw map[string]interface{}) map[string]interface{} {
 	if _, hasAgent := cloned["agentId"]; !hasAgent && agentID != "" {
 		cloned["agentId"] = agentID
 	}
-	if _, hasHint := cloned["agentLastTabId"]; !hasHint && lastTabID > 0 {
+	if _, hasHint := cloned["agentLastTabId"]; !hasHint && lastTabID != 0 {
 		cloned["agentLastTabId"] = lastTabID
 	}
 	if _, hasInst := cloned["instanceId"]; !hasInst && instanceID != "" {
@@ -71,10 +71,10 @@ func recordSessionOpenedTab(res interface{}) {
 		return
 	}
 	tabID := extractPositiveInt(resMap["id"])
-	if tabID <= 0 {
+	if tabID == 0 {
 		tabID = extractPositiveInt(resMap["tabId"])
 	}
-	if tabID > 0 {
+	if tabID != 0 {
 		mcpSessionMu.Lock()
 		mcpSessionLastTabID = tabID
 		mcpSessionMu.Unlock()
@@ -84,9 +84,9 @@ func recordSessionOpenedTab(res interface{}) {
 func recordSessionClosedTab(res interface{}, requestedTab interface{}) {
 	closedID := extractPositiveInt(requestedTab)
 	if resMap, ok := res.(map[string]interface{}); ok {
-		if cid := extractPositiveInt(resMap["closedTabId"]); cid > 0 {
+		if cid := extractPositiveInt(resMap["closedTabId"]); cid != 0 {
 			closedID = cid
-		} else if tid := extractPositiveInt(resMap["tabId"]); tid > 0 {
+		} else if tid := extractPositiveInt(resMap["tabId"]); tid != 0 {
 			closedID = tid
 		}
 	}
@@ -113,10 +113,10 @@ func recordSessionBatchOutcome(res interface{}) {
 		if !ok {
 			continue
 		}
-		if tid := extractPositiveInt(stepMap["tabId"]); tid > 0 {
+		if tid := extractPositiveInt(stepMap["tabId"]); tid != 0 {
 			mcpSessionLastTabID = tid
 		}
-		if closedID := extractPositiveInt(stepMap["closedTabId"]); closedID > 0 && mcpSessionLastTabID == closedID {
+		if closedID := extractPositiveInt(stepMap["closedTabId"]); closedID != 0 && mcpSessionLastTabID == closedID {
 			mcpSessionLastTabID = 0
 		}
 	}
@@ -125,35 +125,53 @@ func recordSessionBatchOutcome(res interface{}) {
 // mcpToolBridgeMap maps 1-to-1 pass-through MCP tool names onto their
 // corresponding bridge command names (Table-Driven Command Registry).
 var mcpToolBridgeMap = map[string]string{
-	"browser_list_tabs":             "tabs.listAll",
-	"browser_click":                 "page.click",
-	"browser_type":                  "page.type",
-	"browser_scroll":                "page.scroll",
-	"browser_fill_form":             "page.fillForm",
-	"browser_get_element":           "page.getElement",
-	"browser_get_devtools_data":     "devtools.getData",
-	"browser_pick_color":            "page.pickColor",
-	"browser_list_instances":        "instances.list",
-	"browser_set_busy":              "page.setBusy",
-	"browser_start_session":         "session.start",
-	"browser_evaluate":              "page.evaluate",
-	"browser_handle_dialog":         "page.handleDialog",
-	"browser_hover":                 "page.hover",
-	"browser_drag":                  "page.drag",
-	"browser_press_key":             "page.pressKey",
-	"browser_wait_for":              "page.waitFor",
-	"browser_emulate":               "emulation.set",
-	"browser_resize_page":           "emulation.resize",
-	"browser_list_network_requests": "network.listRequests",
-	"browser_get_network_request":   "network.getResponseBody",
-	"browser_performance_trace":     "performance.trace",
-	"browser_performance_metrics":   "performance.metrics",
-	"browser_manage_extensions":     "extensions.manage",
+	"browser_get_css_styles":              "css.getStyles",
+	"browser_lighthouse_audit":            "lighthouse.audit",
+	"browser_lighthouse_analyze_audit":    "lighthouse.analyze",
+	"browser_performance_analyze_insight": "performance.analyzeInsight",
+	"browser_screencast_start":            "screencast.record",
+	"browser_screencast_stop":             "screencast.record",
+	"browser_create_context":              "contexts.create",
+	"browser_list_contexts":               "contexts.list",
+	"browser_close_context":               "contexts.close",
+	"browser_service_workers":             "workers.debug",
+	"browser_accessibility_snapshot":      "accessibility.snapshot",
+	"browser_devtools_status":             "devtools.runtime",
+	"browser_list_tabs":                   "tabs.listAll",
+	"browser_click":                       "page.click",
+	"browser_type":                        "page.type",
+	"browser_scroll":                      "page.scroll",
+	"browser_fill_form":                   "page.fillForm",
+	"browser_get_element":                 "page.getElement",
+	"browser_get_devtools_data":           "devtools.getData",
+	"browser_pick_color":                  "page.pickColor",
+	"browser_list_instances":              "instances.list",
+	"browser_set_busy":                    "page.setBusy",
+	"browser_start_session":               "session.start",
+	"browser_evaluate":                    "page.evaluate",
+	"browser_handle_dialog":               "page.handleDialog",
+	"browser_hover":                       "page.hover",
+	"browser_drag":                        "page.drag",
+	"browser_press_key":                   "page.pressKey",
+	"browser_wait_for":                    "page.waitFor",
+	"browser_emulate":                     "emulation.set",
+	"browser_resize_page":                 "emulation.resize",
+	"browser_list_network_requests":       "network.listRequests",
+	"browser_get_network_request":         "network.getResponseBody",
+	"browser_performance_trace":           "performance.trace",
+	"browser_performance_metrics":         "performance.metrics",
+	"browser_manage_extensions":           "extensions.manage",
 }
 
 func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool) {
 	args := prepareSessionArgs(rawArgs)
 	port := config.DefaultBridgePort()
+	if name == "browser_screencast_start" {
+		args["action"] = "start"
+	}
+	if name == "browser_screencast_stop" {
+		args["action"] = "stop"
+	}
 
 	if bridgeMethod, ok := mcpToolBridgeMap[name]; ok {
 		if name == "browser_evaluate" {

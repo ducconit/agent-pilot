@@ -1,0 +1,12 @@
+{
+  "description": "List this agent's isolated login contexts and their tab IDs.",
+  "inputSchema": {
+    "properties": {},
+    "type": "object"
+  },
+  "name": "browser_list_contexts",
+  "parameters": {
+    "properties": {},
+    "type": "object"
+  }
+}

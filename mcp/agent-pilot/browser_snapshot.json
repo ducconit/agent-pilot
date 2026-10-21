@@ -2,6 +2,10 @@
   "description": "Capture a token-efficient interactive accessibility snapshot of the page with numbered element references (@1, @2, etc.). Supports pre-snapshot waitMs/waitForSelector/waitForText so you can wait for SPA rendering and snapshot in a single call.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "format": {
         "description": "Output format: 'text' (default, compact tree) or 'json'",
         "type": "string"
@@ -40,6 +44,10 @@
   "name": "browser_snapshot",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "format": {
         "description": "Output format: 'text' (default, compact tree) or 'json'",
         "type": "string"

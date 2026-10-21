@@ -10,6 +10,10 @@
         "description": "Enable or disable lock shield",
         "type": "boolean"
       },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "session": {
         "description": "Keep cursor and lock shield continuously visible throughout the agent session",
         "type": "boolean"
@@ -31,6 +35,10 @@
       "busy": {
         "description": "Enable or disable lock shield",
         "type": "boolean"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
       },
       "session": {
         "description": "Keep cursor and lock shield continuously visible throughout the agent session",

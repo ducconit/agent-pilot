@@ -21,8 +21,11 @@ import {
   detachDebugger,
   sendCdpCommand,
   dispatchCdpMouseClick,
-  initCdpEventListeners
+  initCdpEventListeners,
+  getPerformanceMetrics
 } from "./background/cdp-manager.js";
+
+import { collectDevtoolsData } from "./background/agent-handlers/devtools.js";
 
 import {
   getActiveTabId,
@@ -85,6 +88,12 @@ export function broadcastToMonitors(message) {
 
 // Broadcast helper for extension views and agent bridge
 export function broadcastToExtension(message) {
+  // Protocol frames are private transport, not UI telemetry. Their values must
+  // remain byte-for-byte usable by Puppeteer and Lighthouse.
+  if (message.type === "DEVTOOLS_PROTOCOL_EVENT" || message.type === "DEVTOOLS_PROTOCOL_CLOSED") {
+    if (agentBridge?.connected) agentBridge.send(message);
+    return;
+  }
   broadcastToMonitors(message);
   if (typeof agentBridge !== "undefined" && agentBridge && agentBridge.connected) {
     agentBridge.send(sanitizeData(message, getSecretFilterEnabled()));
@@ -331,12 +340,21 @@ const BACKGROUND_ACTION_HANDLERS = {
 
   get_debugger_status: (request) => ({ attached: attachedTabs.has(request.tabId) }),
 
-  get_devtools_data: (request) => {
-    const buffer = getBuffer(request.tabId);
+  get_devtools_data: async (request) => {
+    // Keep the legacy Side Panel response shape, but source it from the same
+    // collector as the MCP/agent API. This keeps old UI callers compatible
+    // with the newer auto-attach, filtering, and buffer lifecycle behaviour.
+    const payload = await collectDevtoolsData(request.tabId, {
+      type: "all",
+      limit: 100,
+      filterOrigin: false,
+      includeHeaders: true
+    }, broadcastToExtension);
     return {
-      console: buffer.console,
-      network: Array.from(buffer.network.values()).slice(-100),
-      attached: attachedTabs.has(request.tabId)
+      ...payload,
+      console: payload.console || [],
+      network: payload.network || [],
+      attached: payload.attached === true
     };
   },
 
@@ -353,16 +371,17 @@ const BACKGROUND_ACTION_HANDLERS = {
   },
 
   get_performance_metrics: async (request) => {
-    const tabId = request.tabId;
-    if (!attachedTabs.has(tabId)) {
-      return { success: false, error: "Debugger not attached" };
-    }
-    const res = await sendCdpCommand(tabId, "Performance.getMetrics");
-    const metricsMap = {};
-    (res.metrics || []).forEach((m) => {
-      metricsMap[m.name] = m.value;
-    });
-    return { success: true, metrics: metricsMap };
+    // Preserve the historical { success, metrics } contract while using the
+    // resilient metrics collector, which adds page fallbacks and DOM health.
+    const res = await getPerformanceMetrics(request.tabId);
+    return {
+      success: res.success !== false,
+      metrics: res.metrics || {},
+      memory: res.memory,
+      webVitals: res.webVitals,
+      domHealth: res.domHealth,
+      diagnostics: res.diagnostics
+    };
   },
 
   // 3. Screenshot Capture Operations (Human UI: Sidepanel, Popup, Content Script)
@@ -506,7 +525,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   const { action, type } = request || {};
 
-  if (sender.tab && action && PRIVILEGED_EXTENSION_ONLY_ACTIONS.has(action)) {
+  // Extension views such as Side Panel can also carry `sender.tab`. Only
+  // reject privileged actions when the message originated from a web page
+  // content script; otherwise the Side Panel cannot attach or detach CDP.
+  const senderUrl = typeof sender.url === "string" ? sender.url : "";
+  const isExtensionView = senderUrl.startsWith(`chrome-extension://${chrome.runtime.id}/`);
+  if (sender.tab && !isExtensionView && action && PRIVILEGED_EXTENSION_ONLY_ACTIONS.has(action)) {
     sendResponse({ success: false, error: `Rejected: privileged action '${action}' is not allowed from content scripts` });
     return false;
   }

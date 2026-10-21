@@ -336,10 +336,10 @@ func TestParseWaitArgs(t *testing.T) {
 		t.Fatalf("expected error for invalid tab string, got nil")
 	}
 
-	// 11. Negative test: non-positive tab ID
-	_, _, _, _, _, err = parseWaitArgs([]string{"#btn", "--tab", "-5"})
-	if err == nil {
-		t.Fatalf("expected error for negative tab ID, got nil")
+	// Negative tab IDs identify tabs in isolated browser contexts.
+	_, _, _, _, tab, err = parseWaitArgs([]string{"#btn", "--tab", "-5"})
+	if err != nil || tab != -5 {
+		t.Fatalf("expected isolated tab -5, got %v, error %v", tab, err)
 	}
 
 	// 13. Dash-leading text value (e.g. -Loading)

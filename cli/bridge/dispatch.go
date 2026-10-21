@@ -52,6 +52,9 @@ func DispatchCommand(method string, params map[string]interface{}, port int) (in
 
 	// Master bridge is NOT running -> start embedded bridge in background
 	ensureEmbeddedBridgeRunning(port, addr)
+	if useDevtoolsHost(method, params) {
+		return dispatchLocalCommand(method, params)
+	}
 
 	// Give the Chrome Extension a brief window to connect to the newly started
 	// embedded server before failing with "no Chrome Extension connected".
@@ -65,7 +68,7 @@ func DispatchCommand(method string, params map[string]interface{}, port int) (in
 	}
 
 	// Now try dispatching
-	return SendCommandToExtension(method, params, DeriveCommandTimeout(method, params, config.DefaultCommandTimeoutMs))
+	return dispatchLocalCommand(method, params)
 }
 
 // DispatchFeedbackWait routes a feedback long-poll either to an external master

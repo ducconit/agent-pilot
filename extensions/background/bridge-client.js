@@ -62,7 +62,7 @@ export class AgentBridgeClient {
       let maskedCount = 0;
       let maskedTypes = [];
 
-      if (result !== undefined && result !== null) {
+      if (result !== undefined && result !== null && !method.startsWith("devtools.protocol.")) {
         const sanitized = sanitizeDataWithMeta(result, isFilterActive);
         sanitizedResult = sanitized.data;
         maskedCount = sanitized.maskedCount;
@@ -88,6 +88,8 @@ export class AgentBridgeClient {
           maskedTypes
         } : {})
       });
+
+      if (method.startsWith("devtools.protocol.")) return;
 
       if (typeof this.broadcastFn === "function") {
         this.broadcastFn({

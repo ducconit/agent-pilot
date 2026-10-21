@@ -30,6 +30,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createZip, copyFiltered, DEFAULT_EXCLUDES } from "./lib/zip.mjs";
 import { validateManifestReferences, readExtensionManifest } from "./lib/manifest.mjs";
+import { prepareDevtoolsRuntime } from "./build_devtools_runtime.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
@@ -182,7 +183,8 @@ function copyOSInstaller(platform, bundleRoot) {
   }
 }
 
-function buildBinary(platform, outputPath) {
+async function buildBinary(platform, outputPath) {
+  await prepareDevtoolsRuntime({ ...platform, release: true });
   // -X flags inject the build metadata; package.json stays the version source
   const ldflags = [
     "-s",
@@ -259,7 +261,7 @@ for (const platform of platforms) {
   copyFiltered(EXT_DIR, path.join(bundleRoot, "extensions"), DEFAULT_EXCLUDES);
 
   // 2. Platform binary
-  buildBinary(platform, path.join(bundleRoot, binaryName(platform)));
+  await buildBinary(platform, path.join(bundleRoot, binaryName(platform)));
 
   // 3. OS-specific 1-step installer script (install.sh or install.ps1)
   copyOSInstaller(platform, bundleRoot);

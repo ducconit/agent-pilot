@@ -1,0 +1,46 @@
+{
+  "description": "Record the target tab to MP4 using Chrome's built-in encoder, without FFmpeg. Requires Chrome with Page.startScreenRecording support. The recording continues until browser_screencast_stop.",
+  "inputSchema": {
+    "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "filePath": {
+        "description": "MP4 path; defaults to the local artifacts directory; existing files are never replaced",
+        "type": "string"
+      },
+      "fps": {
+        "description": "Frame rate 1..60, default 20",
+        "type": "number"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_screencast_start",
+  "parameters": {
+    "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "filePath": {
+        "description": "MP4 path; defaults to the local artifacts directory; existing files are never replaced",
+        "type": "string"
+      },
+      "fps": {
+        "description": "Frame rate 1..60, default 20",
+        "type": "number"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

@@ -1,12 +1,22 @@
 {
   "description": "List open tabs managed by Agent Pilot (inside the '🤖 Agent Pilot' tab group). Personal user tabs outside this group are isolated to prevent focus theft — call browser_open_tab to open a new Agent Pilot tab if empty.",
   "inputSchema": {
-    "properties": {},
+    "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      }
+    },
     "type": "object"
   },
   "name": "browser_list_tabs",
   "parameters": {
-    "properties": {},
+    "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      }
+    },
     "type": "object"
   }
 }

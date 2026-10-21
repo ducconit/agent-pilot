@@ -2,6 +2,10 @@
   "description": "Upload local files into a file input element (\u003cinput type='file'\u003e) or an upload trigger button/menuitem using CDP DOM.setFileInputFiles with automatic MAIN-world DataTransfer synthetic fallback when CDP cannot attach. Supports inline post-upload waitMs/waitForSelector/waitForText.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "files": {
         "description": "Array of local file paths to upload",
         "items": {
@@ -52,6 +56,10 @@
   "name": "browser_upload_file",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "files": {
         "description": "Array of local file paths to upload",
         "items": {

@@ -2,6 +2,10 @@
   "description": "Close a tab belonging to the Agent Pilot tab group to free RAM after testing is complete.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "tabId": {
         "description": "Target tab ID in the Agent Pilot group (defaults to last agent-controlled tab)",
         "type": "integer"
@@ -12,6 +16,10 @@
   "name": "browser_close_tab",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "tabId": {
         "description": "Target tab ID in the Agent Pilot group (defaults to last agent-controlled tab)",
         "type": "integer"

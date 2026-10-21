@@ -2,6 +2,10 @@
   "description": "Resize browser page viewport metrics (width, height, deviceScaleFactor, mobile) for responsive testing.",
   "inputSchema": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "deviceScaleFactor": {
         "description": "Device pixel ratio (default: 1)",
         "type": "number"
@@ -17,6 +21,10 @@
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "touch": {
+        "description": "Enable touch emulation",
+        "type": "boolean"
       },
       "width": {
         "description": "Viewport width in pixels",
@@ -32,6 +40,10 @@
   "name": "browser_resize_page",
   "parameters": {
     "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
       "deviceScaleFactor": {
         "description": "Device pixel ratio (default: 1)",
         "type": "number"
@@ -47,6 +59,10 @@
       "tabId": {
         "description": "Target tab ID",
         "type": "integer"
+      },
+      "touch": {
+        "description": "Enable touch emulation",
+        "type": "boolean"
       },
       "width": {
         "description": "Viewport width in pixels",
