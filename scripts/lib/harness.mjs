@@ -152,7 +152,7 @@ export async function launchExtensionBrowser({ headless = false, extensionsDir =
     headless,
     pipe: true,
     enableExtensions: true,
-    args: [...getChromiumLaunchArgs(extensionsDir).filter(arg => !arg.startsWith("--load-extension") && !arg.startsWith("--disable-extensions-except")), "--enable-unsafe-extension-debugging"]
+    args: getChromiumLaunchArgs(extensionsDir).filter(arg => !arg.startsWith("--load-extension") && !arg.startsWith("--disable-extensions-except"))
   });
   await browser.installExtension(extensionsDir);
   launchedBrowsers.add(browser);

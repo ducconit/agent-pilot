@@ -10,6 +10,7 @@ import path from "node:path";
 import os from "node:os";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import puppeteer from "puppeteer-core";
 import { resolveChromiumBin, getChromiumLaunchArgs } from "./browser_resolver.mjs";
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -184,11 +185,14 @@ const readyTimeoutMs = parsePositiveInteger(
 let tempRoot = null;
 let bridge = null;
 let chrome = null;
+let chromeBrowser = null;
 let ready = false;
 let shuttingDown = false;
 let shutdownPromise = null;
 
 async function cleanup() {
+  await chromeBrowser?.close().catch(() => {});
+  chromeBrowser = null;
   await terminateChild(chrome, "Chrome");
   await terminateChild(bridge, "Bridge");
   if (tempRoot) await fs.rm(tempRoot, { recursive: true, force: true });
@@ -234,15 +238,6 @@ async function main() {
 
     const buildInfo = await fs.readFile(path.join(extensionDir, "background", "build-info.js"), "utf8");
     const expectedBuildId = readBuildId(buildInfo);
-    const chromeArgs = [
-      ...getChromiumLaunchArgs(extensionDir),
-      `--user-data-dir=${profile}`,
-      "--no-first-run",
-      "--no-default-browser-check",
-      "--new-window",
-      url
-    ];
-
     bridge = spawn(BRIDGE_BINARY, ["server"], {
       cwd: ROOT_DIR,
       env: { ...process.env, AGENT_PILOT_PORT: String(port) },
@@ -260,7 +255,28 @@ async function main() {
       }
     });
 
-    chrome = spawn(chromeBinary, chromeArgs, { stdio: "inherit" });
+    // Google Chrome 153+ rejects --load-extension and --disable-extensions-except
+    // on the command line. Puppeteer's installExtension uses Chrome's supported
+    // extension installation path and works for both Chrome and Chromium.
+    chromeBrowser = await puppeteer.launch({
+      executablePath: chromeBinary,
+      headless: false,
+      pipe: true,
+      enableExtensions: true,
+      userDataDir: profile,
+      defaultViewport: null,
+      args: getChromiumLaunchArgs(extensionDir).filter((argument) => (
+        !argument.startsWith("--load-extension") &&
+        !argument.startsWith("--disable-extensions-except")
+      ))
+    });
+    await chromeBrowser.installExtension(extensionDir);
+    const pages = await chromeBrowser.pages();
+    const page = pages[0] || await chromeBrowser.newPage();
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 }).catch((error) => {
+      console.warn(`[Agent Pilot] Initial URL did not finish loading: ${error.message}`);
+    });
+    chrome = chromeBrowser.process();
     chrome.on("error", (error) => {
       console.error(`[Agent Pilot] Chrome failed: ${error.message}`);
       if (!shuttingDown) requestShutdown(1);

@@ -120,6 +120,8 @@ export function getChromiumLaunchArgs(extDir) {
     "--no-sandbox",
     "--disable-setuid-sandbox",
     "--disable-gpu",
+    // Puppeteer uses this opt-in when installing unpacked MV3 extensions.
+    "--enable-unsafe-extension-debugging",
     `--disable-extensions-except=${extDir}`,
     `--load-extension=${extDir}`
   ];
