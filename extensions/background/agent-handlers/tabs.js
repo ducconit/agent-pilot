@@ -115,9 +115,11 @@ export const tabsHandlers = {
 
         await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("attachDebugger error", err));
 
+        let loadWaitResult = null;
+        let loadTimeout = DEFAULT_LOAD_TIMEOUT_MS;
         if (params.waitUntil !== false) {
-          const loadTimeout = getPositiveNumber(params.loadTimeout, params.timeoutMs, params.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
-          await waitForTabComplete(tab.id, loadTimeout);
+          loadTimeout = getPositiveNumber(params.loadTimeout, params.timeoutMs, params.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
+          loadWaitResult = await waitForTabComplete(tab.id, loadTimeout);
           if (!attachedTabs.has(tab.id)) {
             await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("post-load attachDebugger error", err));
           }
@@ -130,6 +132,9 @@ export const tabsHandlers = {
             const refreshed = await chrome.tabs.get(tab.id);
             if (refreshed && refreshed.id) tab = refreshed;
           } catch (_) {}
+        }
+        if (loadWaitResult?.timedOut && tab && typeof tab === "object" && tab.status !== "complete") {
+          tab = { ...tab, loadTimedOut: true, loadTimeoutMs: loadTimeout };
         }
       }
       respond(mergeWaitMeta(tab, waitMeta));
@@ -167,9 +172,11 @@ export const tabsHandlers = {
             await client.assignTabToAgentGroup(tab).catch((err) => logDebug("assignTabToAgentGroup error", err));
             await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("attachDebugger error", err));
 
+            let loadWaitResult = null;
+            let loadTimeout = DEFAULT_LOAD_TIMEOUT_MS;
             if (params.url && params.waitUntil !== false) {
-              const loadTimeout = getPositiveNumber(params.loadTimeout, params.timeoutMs, params.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
-              await waitForTabComplete(tab.id, loadTimeout);
+              loadTimeout = getPositiveNumber(params.loadTimeout, params.timeoutMs, params.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
+              loadWaitResult = await waitForTabComplete(tab.id, loadTimeout);
               if (!attachedTabs.has(tab.id)) {
                 await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("post-load attachDebugger error", err));
               }
@@ -182,6 +189,9 @@ export const tabsHandlers = {
                 const refreshed = await chrome.tabs.get(tab.id);
                 if (refreshed && refreshed.id) tab = refreshed;
               } catch (_) {}
+            }
+            if (loadWaitResult?.timedOut && tab && typeof tab === "object" && tab.status !== "complete") {
+              tab = { ...tab, loadTimedOut: true, loadTimeoutMs: loadTimeout };
             }
           }
           respond(mergeWaitMeta(tab, waitMeta));

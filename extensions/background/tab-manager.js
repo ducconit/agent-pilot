@@ -566,11 +566,12 @@ export function createTabWithWindowFallback(url, makeActive = false) {
 
 /**
  * Wait until the given tab reports status === "complete" or timeout elapses.
+ * Resolves with { completed: boolean, timedOut: boolean }.
  */
 export function waitForTabComplete(tabId, timeoutMs = DEFAULT_LOAD_TIMEOUT_MS) {
   return new Promise((resolve) => {
     if (typeof chrome === "undefined" || !chrome.tabs?.onUpdated?.addListener) {
-      resolve();
+      resolve({ completed: true, timedOut: false });
       return;
     }
     let finished = false;
@@ -581,20 +582,20 @@ export function waitForTabComplete(tabId, timeoutMs = DEFAULT_LOAD_TIMEOUT_MS) {
       if (tab.pendingUrl && (!tab.url || tab.url === "about:blank")) return false;
       return true;
     };
-    const done = () => {
+    const done = (timedOut = false) => {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
       if (chrome.tabs?.onUpdated?.removeListener) {
         chrome.tabs.onUpdated.removeListener(onUpdated);
       }
-      resolve();
+      resolve({ completed: !timedOut, timedOut: Boolean(timedOut) });
     };
-    const timer = setTimeout(done, timeoutMs);
+    const timer = setTimeout(() => done(true), timeoutMs);
     const onUpdated = (tId, changeInfo, tab) => {
       if (tId === tabId && changeInfo.status === "complete") {
         if (!tab || !tab.pendingUrl || (tab.url && tab.url !== "about:blank")) {
-          done();
+          done(false);
         }
       }
     };
@@ -603,21 +604,21 @@ export function waitForTabComplete(tabId, timeoutMs = DEFAULT_LOAD_TIMEOUT_MS) {
       try {
         const maybePromise = chrome.tabs.get(tabId, (tab) => {
           if (!chrome.runtime?.lastError && isTabLoaded(tab)) {
-            done();
+            done(false);
           }
         });
         if (maybePromise && typeof maybePromise.then === "function") {
           maybePromise.then((tab) => {
             if (isTabLoaded(tab)) {
-              done();
+              done(false);
             }
           }).catch(() => {});
         }
       } catch (_) {
-        done();
+        done(false);
       }
     } else {
-      done();
+      done(false);
     }
   });
 }

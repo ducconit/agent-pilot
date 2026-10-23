@@ -108,7 +108,7 @@ func dispatchAndPrintJSON(method string, params map[string]interface{}, tabID in
 	return nil
 }
 
-func ExecListNetworkRequests(filterUrl, method, resType string, limit int, tabID interface{}) error {
+func ExecListNetworkRequests(filterUrl, method, resType string, limit int, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{}
 	if filterUrl != "" {
 		params["filterUrl"] = filterUrl
@@ -122,6 +122,7 @@ func ExecListNetworkRequests(filterUrl, method, resType string, limit int, tabID
 	if limit > 0 {
 		params["limit"] = limit
 	}
+	mergeExtraParams(params, extra...)
 	return dispatchAndPrintJSON("network.listRequests", params, tabID)
 }
 
@@ -133,10 +134,18 @@ func ExecGetNetworkResponseBody(requestId string, tabID interface{}) error {
 }
 
 func ExecListConsoleLogs(level string, limit int, clearLogs bool, tabID interface{}) error {
+	normalizedLevel := strings.ToLower(strings.TrimSpace(level))
 	params := map[string]interface{}{
+		"type":    "console",
 		"console": true,
 		"network": false,
 		"clear":   clearLogs,
+	}
+	if normalizedLevel == "error" || normalizedLevel == "errors" || normalizedLevel == "err" {
+		normalizedLevel = "error"
+		params["errorsOnly"] = true
+	} else if normalizedLevel == "warn" || normalizedLevel == "warning" || normalizedLevel == "warnings" {
+		normalizedLevel = "warning"
 	}
 	if limit > 0 {
 		params["limit"] = limit
@@ -148,7 +157,6 @@ func ExecListConsoleLogs(level string, limit int, clearLogs bool, tabID interfac
 	if err != nil {
 		return err
 	}
-	normalizedLevel := strings.ToLower(strings.TrimSpace(level))
 	if normalizedLevel != "" {
 		if resMap, ok := res.(map[string]interface{}); ok {
 			if rawLogs, ok := resMap["console"].([]interface{}); ok {
@@ -158,8 +166,15 @@ func ExecListConsoleLogs(level string, limit int, clearLogs bool, tabID interfac
 					if !ok {
 						continue
 					}
-					entryLevel := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", entry["level"])))
-					if entryLevel == normalizedLevel || (normalizedLevel == "error" && entryLevel == "exception") || (normalizedLevel == "warn" && entryLevel == "warning") {
+					rawEntryLevel := entry["level"]
+					if rawEntryLevel == nil || rawEntryLevel == "" {
+						rawEntryLevel = entry["type"]
+					}
+					entryLevel := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", rawEntryLevel)))
+					if entryLevel == normalizedLevel ||
+						(normalizedLevel == "error" && (entryLevel == "exception" || entryLevel == "assert")) ||
+						(normalizedLevel == "warning" && entryLevel == "warn") ||
+						(normalizedLevel == "warn" && entryLevel == "warning") {
 						filtered = append(filtered, item)
 					}
 				}

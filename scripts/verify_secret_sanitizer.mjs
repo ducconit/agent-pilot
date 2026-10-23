@@ -411,6 +411,25 @@ try {
     "Injected [MASKED_SECRET marker cannot bypass redaction; numeric PIN/OTP values are masked"
   );
 
+  // 29. URL Basic Auth Credentials Masking (https://user:password@host) & Idempotency
+  const basicAuthUrl = "https://lagom:Lagom%26%262026@lagom.sphoton.com/vi?step=1";
+  const maskedBasicAuth = maskString(basicAuthUrl);
+  const remaskedBasicAuth = maskString(maskedBasicAuth.text);
+  const normalPortUrl = maskString("https://example.com:8443/profile/user@domain.com");
+  const queryPortUrl = maskString("https://example.com:8443?user=alice@domain.com");
+  const jsonOriginPlusEmail = maskString('{"origin":"http://localhost:3000","email":"alice@domain.com"}');
+  record(
+    "29. URL Basic Auth Credentials Redaction (https://user:password@host)",
+    maskedBasicAuth.masked &&
+    maskedBasicAuth.text === "https://lagom:******************** [MASKED_SECRET: URL Basic Auth]@lagom.sphoton.com/vi?step=1" &&
+    !maskedBasicAuth.text.includes("Lagom%26%262026") &&
+    remaskedBasicAuth.text === maskedBasicAuth.text &&
+    !normalPortUrl.masked &&
+    !queryPortUrl.masked &&
+    !jsonOriginPlusEmail.masked,
+    "Masked URL Basic Auth password while preserving username/host/port, query emails, and JSON fields"
+  );
+
   recorder.summarize();
   recorder.exitIfFailed();
 

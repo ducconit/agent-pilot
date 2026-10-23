@@ -58,6 +58,11 @@ func TestMaskStringSecrets(t *testing.T) {
 			expected: "Bearer secr******************** [MASKED_SECRET: Bearer Token]",
 		},
 		{
+			name:     "URL Basic Auth with encoded special characters",
+			input:    "https://lagom:Lagom%26%262026@lagom.sphoton.com/vi",
+			expected: "https://lagom:******************** [MASKED_SECRET: URL Basic Auth]@lagom.sphoton.com/vi",
+		},
+		{
 			name:     "URL Param",
 			input:    "https://example.com/api?api_key=my_secret_key_123456&user=alice",
 			expected: "https://example.com/api?api_key=******************** [MASKED_SECRET: URL Parameter]&user=alice",
@@ -79,6 +84,17 @@ func TestMaskStringSecrets(t *testing.T) {
 				t.Fatalf("expected:\n%s\ngot:\n%s", tt.expected, res)
 			}
 		})
+	}
+
+	nonSecretURLs := []string{
+		"https://example.com:8443/profile/user@domain.com",
+		"https://example.com:8443?user=alice@domain.com",
+		`{"origin":"http://localhost:3000","email":"alice@domain.com"}`,
+	}
+	for _, raw := range nonSecretURLs {
+		if res, masked, _ := MaskString(raw); masked || res != raw {
+			t.Fatalf("expected non-secret URL/JSON %q to remain untouched, got %q (masked=%v)", raw, res, masked)
+		}
 	}
 }
 

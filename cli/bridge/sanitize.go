@@ -20,6 +20,7 @@ type secretPattern struct {
 
 var sensitivePropRegex = regexp.MustCompile(`(?i)^(?:password|passwd|passcode|pin|otp|secret|api_?key|x-api-key|access_?token|auth_?token|private_?key|client_?secret|authorization|proxy-authorization|cookie|set-cookie|credentials|token)$`)
 var sensitiveKvRegex = regexp.MustCompile(`(?i)(["']?(?:password|passwd|secret|client_?secret|access_?token|auth_?token|api_?key|authorization|proxy-authorization|cookie|set-cookie|x-api-key|credentials|token)["']?\s*[:=]\s*["'])([^"'\\,]{4,}?)(["'])`)
+var urlBasicAuthRegex = regexp.MustCompile(`(?i)(https?://[^/\s:@?#"',;<>]+:)([^@\s/?#"',;<>]+)(@)`)
 
 var secretPatterns = []secretPattern{
 
@@ -149,7 +150,22 @@ var secretPatterns = []secretPattern{
 			return fmt.Sprintf("Bearer %s******************** [MASKED_SECRET: Bearer Token]", prefix)
 		},
 	},
-	// 11. URL Query Parameters
+	// 11. URL Basic Auth Credentials (https://user:password@host)
+	{
+		name:  "URL Basic Auth",
+		regex: urlBasicAuthRegex,
+		replacer: func(match string) string {
+			sub := urlBasicAuthRegex.FindStringSubmatch(match)
+			if len(sub) == 4 {
+				if isAlreadyMaskedValue(sub[2]) {
+					return match
+				}
+				return sub[1] + "******************** [MASKED_SECRET: URL Basic Auth]" + sub[3]
+			}
+			return match
+		},
+	},
+	// 12. URL Query Parameters
 	{
 		name:  "URL Secret Parameter",
 		regex: regexp.MustCompile(`(?i)([?&](?:api_key|apikey|access_token|auth_token|token|password|passwd|secret)=)([^&\s]{6,})`),
@@ -161,7 +177,7 @@ var secretPatterns = []secretPattern{
 			return match
 		},
 	},
-	// 12. Sensitive Key-Value ("password": "...")
+	// 13. Sensitive Key-Value ("password": "...")
 	{
 		name:  "Sensitive Key-Value",
 		regex: sensitiveKvRegex,

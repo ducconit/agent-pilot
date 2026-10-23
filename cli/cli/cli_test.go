@@ -66,7 +66,7 @@ func TestConsoleAndMetricsCommandsDispatchExpectedPayloads(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		method, _ := req["method"].(string)
 		if method == "devtools.getData" {
-			_, _ = w.Write([]byte(`{"success":true,"result":{"console":[{"level":"info","text":"hello"},{"level":"error","text":"boom"}],"errors":[{"text":"uncaught boom"}]}}`))
+			_, _ = w.Write([]byte(`{"success":true,"result":{"console":[{"type":"info","text":"hello"},{"type":"error","text":"boom"}]}}`))
 			return
 		}
 		_, _ = w.Write([]byte(`{"success":true,"result":{"success":true,"tabId":1103687522,"garbageCollected":true}}`))
@@ -102,6 +102,10 @@ func TestConsoleAndMetricsCommandsDispatchExpectedPayloads(t *testing.T) {
 	root3.SetArgs([]string{"navigate", "http://localhost:5173/products", "--tab", "1103687583", "--port", strconv.Itoa(port)})
 	err3 := root3.Execute()
 
+	root4 := newRootCommand()
+	root4.SetArgs([]string{"network", "--headers", "--limit", "15", "--tab", "1103687583", "--port", strconv.Itoa(port)})
+	err4 := root4.Execute()
+
 	_ = wPipe.Close()
 	os.Stdout = oldStdout
 	var outBuf bytes.Buffer
@@ -116,12 +120,19 @@ func TestConsoleAndMetricsCommandsDispatchExpectedPayloads(t *testing.T) {
 	if err3 != nil {
 		t.Fatalf("navigate <url> --tab command failed: %v", err3)
 	}
-	if len(received) != 3 {
-		t.Fatalf("expected 3 bridge requests, got %d", len(received))
+	if err4 != nil {
+		t.Fatalf("network --headers command failed: %v", err4)
+	}
+	if len(received) != 4 {
+		t.Fatalf("expected 4 bridge requests, got %d", len(received))
 	}
 
 	req1Params, _ := received[0]["params"].(map[string]interface{})
-	if received[0]["method"] != "devtools.getData" || req1Params["clear"] != true || req1Params["limit"] != float64(25) {
+	if received[0]["method"] != "devtools.getData" ||
+		req1Params["type"] != "console" ||
+		req1Params["errorsOnly"] != true ||
+		req1Params["clear"] != true ||
+		req1Params["limit"] != float64(25) {
 		t.Fatalf("unexpected console request: %#v", received[0])
 	}
 	if !strings.Contains(outBuf.String(), `"boom"`) || strings.Contains(outBuf.String(), `"hello"`) {
@@ -142,5 +153,13 @@ func TestConsoleAndMetricsCommandsDispatchExpectedPayloads(t *testing.T) {
 		req3Params["url"] != "http://localhost:5173/products" ||
 		req3Params["tabId"] != float64(1103687583) {
 		t.Fatalf("unexpected navigate request (expected tabId=1103687583 after positional URL): %#v", received[2])
+	}
+
+	req4Params, _ := received[3]["params"].(map[string]interface{})
+	if received[3]["method"] != "network.listRequests" ||
+		req4Params["includeHeaders"] != true ||
+		req4Params["limit"] != float64(15) ||
+		req4Params["tabId"] != float64(1103687583) {
+		t.Fatalf("unexpected network --headers request: %#v", received[3])
 	}
 }

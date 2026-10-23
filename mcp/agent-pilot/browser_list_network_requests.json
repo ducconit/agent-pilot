@@ -1,5 +1,5 @@
 {
-  "description": "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType.",
+  "description": "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType, and compact summary statistics.",
   "inputSchema": {
     "properties": {
       "contextId": {
@@ -9,6 +9,10 @@
       "filterUrl": {
         "description": "Filter requests matching URL substring",
         "type": "string"
+      },
+      "includeHeaders": {
+        "description": "Include full HTTP request and response headers (default: false to save tokens)",
+        "type": "boolean"
       },
       "limit": {
         "description": "Max requests to return (default: 100)",
@@ -39,6 +43,10 @@
       "filterUrl": {
         "description": "Filter requests matching URL substring",
         "type": "string"
+      },
+      "includeHeaders": {
+        "description": "Include full HTTP request and response headers (default: false to save tokens)",
+        "type": "boolean"
       },
       "limit": {
         "description": "Max requests to return (default: 100)",

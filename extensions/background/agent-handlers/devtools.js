@@ -51,7 +51,18 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
   }
 
   const buffer = getBuffer(tabId);
-  const requestedType = params.type || "all";
+  let requestedType = params.type;
+  if (!requestedType) {
+    if (params.console === true && params.network === false && !params.performance) {
+      requestedType = "console";
+    } else if (params.network === true && params.console === false && !params.performance) {
+      requestedType = "network";
+    } else if (params.performance === true && params.console === false && params.network === false) {
+      requestedType = "performance";
+    } else {
+      requestedType = "all";
+    }
+  }
   const limit = Math.min(Math.max(Number(params.limit) || LIMITS.DEVTOOLS_FETCH_DEFAULT, 1), LIMITS.DEVTOOLS_FETCH_MAX);
   const filterOrigin = params.filterOrigin !== false;
   const errorsOnly = Boolean(params.errorsOnly);
@@ -120,7 +131,7 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
     }
     reqs = reqs.slice(-limit);
     if (!includeHeaders) {
-      reqs = reqs.map(({ headers: _headers, ...rest }) => rest);
+      reqs = reqs.map(({ headers: _headers, requestHeaders: _requestHeaders, startTimeMs: _startTimeMs, ...rest }) => rest);
     }
     networkData = reqs;
     if (detail === "summary") {
@@ -171,22 +182,29 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
     ? networkData.filter((r) => r.status === "failed" || Boolean(r.errorText) || (typeof r.status === "number" && r.status >= 400)).length
     : undefined;
 
+  const summary = {};
+  if (consoleData !== undefined) {
+    summary.consoleEntries = consoleData.length;
+    summary.consoleErrors = consoleErrorCount;
+  }
+  if (networkData !== undefined) {
+    summary.networkRequests = networkData.length;
+    summary.failedNetworkRequests = failedNetworkRequests;
+  }
+  if (performanceData !== undefined) {
+    summary.jsHeapUsedMB = performanceData?.jsHeapUsedMB;
+    summary.domNodes = performanceData?.domNodes;
+    summary.jsEventListeners = performanceData?.jsEventListeners;
+    summary.lcpMs = performanceData?.webVitals?.lcpMs;
+    summary.cls = performanceData?.webVitals?.cls;
+    summary.diagnosticsCount = Array.isArray(performanceData?.diagnostics) ? performanceData.diagnostics.length : undefined;
+  }
+
   const responsePayload = {
     tabId,
     attached: attachedTabs.has(tabId),
     timestamp: Date.now(),
-    summary: {
-      consoleEntries: consoleData ? consoleData.length : 0,
-      consoleErrors: consoleErrorCount,
-      networkRequests: networkData ? networkData.length : 0,
-      failedNetworkRequests,
-      jsHeapUsedMB: performanceData?.jsHeapUsedMB,
-      domNodes: performanceData?.domNodes,
-      jsEventListeners: performanceData?.jsEventListeners,
-      lcpMs: performanceData?.webVitals?.lcpMs,
-      cls: performanceData?.webVitals?.cls,
-      diagnosticsCount: Array.isArray(performanceData?.diagnostics) ? performanceData.diagnostics.length : undefined
-    }
+    summary
   };
 
   if (consoleData !== undefined) responsePayload.console = consoleData;

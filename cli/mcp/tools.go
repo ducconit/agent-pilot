@@ -516,15 +516,16 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_list_network_requests",
-		Description: "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType.",
+		Description: "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType, and compact summary statistics.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"filterUrl":    map[string]interface{}{"type": "string", "description": "Filter requests matching URL substring"},
-				"method":       map[string]interface{}{"type": "string", "description": "Filter by HTTP method (GET, POST, PUT, DELETE...)"},
-				"resourceType": map[string]interface{}{"type": "string", "description": "Filter by resource type (Fetch, XHR, Document, Script...)"},
-				"limit":        map[string]interface{}{"type": "integer", "description": "Max requests to return (default: 100)"},
-				"tabId":        map[string]interface{}{"type": "integer", "description": "Target tab ID"},
+				"filterUrl":      map[string]interface{}{"type": "string", "description": "Filter requests matching URL substring"},
+				"method":         map[string]interface{}{"type": "string", "description": "Filter by HTTP method (GET, POST, PUT, DELETE...)"},
+				"resourceType":   map[string]interface{}{"type": "string", "description": "Filter by resource type (Fetch, XHR, Document, Script...)"},
+				"includeHeaders": map[string]interface{}{"type": "boolean", "description": "Include full HTTP request and response headers (default: false to save tokens)"},
+				"limit":          map[string]interface{}{"type": "integer", "description": "Max requests to return (default: 100)"},
+				"tabId":          map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
 		},
 	},

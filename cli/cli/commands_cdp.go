@@ -96,6 +96,7 @@ func newNetworkCommand() *cobra.Command {
 			{Name: "method"},
 			{Name: "type"},
 			{Name: "limit"},
+			{Name: "headers", Aliases: []string{"include-headers"}, IsBool: true},
 			{Name: "tab", Aliases: []string{"t"}},
 		})
 		if err != nil {
@@ -120,7 +121,11 @@ func newNetworkCommand() *cobra.Command {
 				return errUsage
 			}
 		} else {
-			if err := ExecListNetworkRequests(filterUrl, method, resType, limit, tabID); err != nil {
+			extra := map[string]interface{}{}
+			if cmdArgs.Bool("headers") {
+				extra["includeHeaders"] = true
+			}
+			if err := ExecListNetworkRequests(filterUrl, method, resType, limit, tabID, extra); err != nil {
 				fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 				return errUsage
 			}
@@ -132,6 +137,7 @@ func newNetworkCommand() *cobra.Command {
 	f.String("method", "", "Filter by HTTP method")
 	f.String("type", "", "Filter by resource type")
 	f.Int("limit", 50, "Maximum number of requests")
+	f.Bool("headers", false, "Include full HTTP request and response headers")
 	f.IntP("tab", "t", 0, "Target tab ID")
 	return cmd
 }

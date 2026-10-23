@@ -140,7 +140,9 @@ async function collectPageWebVitalsAndDomProbe(tabId, timeoutMs = DEFAULT_DOM_PR
             return `${tag}${id}${cls}`;
           };
 
-          const perf = window.performance;
+          const perf =
+            (typeof window !== "undefined" && window.performance) ||
+            (typeof performance !== "undefined" ? performance : null);
           const navEntries = perf && typeof perf.getEntriesByType === "function" ? perf.getEntriesByType("navigation") : [];
           const nav = navEntries && navEntries[0] ? navEntries[0] : null;
           const paintEntries = perf && typeof perf.getEntriesByType === "function" ? perf.getEntriesByType("paint") : [];
@@ -265,16 +267,27 @@ async function collectPageWebVitalsAndDomProbe(tabId, timeoutMs = DEFAULT_DOM_PR
           let totalTransferBytes = 0;
           const renderBlockingUrls = [];
           const slowList = [];
+          const byType = {};
           for (const r of resourceEntries || []) {
             const transfer = Number(r.transferSize) || Number(r.encodedBodySize) || 0;
+            const durMs = Math.round(r.duration || 0);
             totalTransferBytes += transfer;
+            const rType = String(r.initiatorType || "other").toLowerCase();
+            if (!byType[rType]) {
+              byType[rType] = { count: 0, transferKB: 0, maxDurationMs: 0 };
+            }
+            byType[rType].count += 1;
+            byType[rType].transferKB = Math.round((byType[rType].transferKB + transfer / 1024) * 10) / 10;
+            if (durMs > byType[rType].maxDurationMs) {
+              byType[rType].maxDurationMs = durMs;
+            }
             if (r.renderBlockingStatus === "blocking" && renderBlockingUrls.length < 10) {
               renderBlockingUrls.push(r.name);
             }
             slowList.push({
               url: String(r.name || "").slice(0, 180),
               initiatorType: r.initiatorType || "other",
-              durationMs: Math.round(r.duration || 0),
+              durationMs: durMs,
               transferKB: Math.round((transfer / 1024) * 10) / 10
             });
           }
@@ -349,6 +362,7 @@ async function collectPageWebVitalsAndDomProbe(tabId, timeoutMs = DEFAULT_DOM_PR
           }
 
           const perfMem = perf && perf.memory ? perf.memory : null;
+          const readyState = typeof document.readyState === "string" ? document.readyState : "complete";
           const visibilityState =
             typeof document.visibilityState === "string" ? document.visibilityState : "visible";
           const visibilityEntries =
@@ -359,6 +373,43 @@ async function collectPageWebVitalsAndDomProbe(tabId, timeoutMs = DEFAULT_DOM_PR
           const lcpTime = lastLcp ? lastLcp.renderTime || lastLcp.loadTime || lastLcp.startTime : undefined;
           const lcpMs = lcpTime !== undefined ? Math.round(lcpTime) : undefined;
           const loadEventMs = nav && nav.loadEventEnd > 0 ? Math.round(nav.loadEventEnd) : undefined;
+          const ttfbMs = nav ? Math.round(Math.max(0, (nav.responseStart || 0) - (nav.requestStart || 0))) : undefined;
+          const navigationTiming = nav
+            ? {
+                type: nav.type || "navigate",
+                ...(nav.nextHopProtocol ? { protocol: nav.nextHopProtocol } : {}),
+                ...(nav.deliveryType ? { deliveryType: nav.deliveryType } : {}),
+                ...(typeof nav.responseStatus === "number" ? { responseStatus: nav.responseStatus } : {}),
+                redirectCount: typeof nav.redirectCount === "number" ? nav.redirectCount : 0,
+                dnsMs: Math.round(Math.max(0, (nav.domainLookupEnd || 0) - (nav.domainLookupStart || 0))),
+                tcpMs: Math.round(Math.max(0, (nav.connectEnd || 0) - (nav.connectStart || 0))),
+                tlsMs:
+                  nav.secureConnectionStart > 0
+                    ? Math.round(Math.max(0, (nav.connectEnd || 0) - nav.secureConnectionStart))
+                    : 0,
+                ttfbMs,
+                responseDownloadMs:
+                  nav.responseEnd > 0 && nav.responseStart > 0
+                    ? Math.round(Math.max(0, nav.responseEnd - nav.responseStart))
+                    : undefined,
+                domInteractiveMs: Math.round(nav.domInteractive || 0),
+                domContentLoadedMs: Math.round(nav.domContentLoadedEventEnd || 0),
+                domCompleteMs: nav.domComplete > 0 ? Math.round(nav.domComplete) : undefined,
+                loadEventMs,
+                transferKB: Math.round(((Number(nav.transferSize) || 0) / 1024) * 10) / 10,
+                encodedBodyKB: Math.round(((Number(nav.encodedBodySize) || 0) / 1024) * 10) / 10,
+                decodedBodyKB: Math.round(((Number(nav.decodedBodySize) || 0) / 1024) * 10) / 10,
+                ...(Array.isArray(nav.serverTiming) && nav.serverTiming.length > 0
+                  ? {
+                      serverTiming: nav.serverTiming.slice(0, 10).map((st) => ({
+                        name: st.name,
+                        durationMs: Math.round((Number(st.duration) || 0) * 10) / 10,
+                        ...(st.description ? { description: st.description } : {})
+                      }))
+                    }
+                  : {})
+              }
+            : undefined;
           const hadHiddenBeforePaint =
             visibilityState === "hidden" ||
             (Array.isArray(visibilityEntries) &&
@@ -380,7 +431,7 @@ async function collectPageWebVitalsAndDomProbe(tabId, timeoutMs = DEFAULT_DOM_PR
 
           return {
             webVitals: {
-              ttfbMs: nav ? Math.round(Math.max(0, (nav.responseStart || 0) - (nav.requestStart || 0))) : undefined,
+              ttfbMs,
               fcpMs,
               lcpMs,
               lcpElement: lastLcp && lastLcp.element ? describeNode(lastLcp.element) : undefined,
@@ -391,7 +442,9 @@ async function collectPageWebVitalsAndDomProbe(tabId, timeoutMs = DEFAULT_DOM_PR
               domInteractiveMs: nav ? Math.round(nav.domInteractive || 0) : undefined,
               domContentLoadedMs: nav ? Math.round(nav.domContentLoadedEventEnd || 0) : undefined,
               loadEventMs,
+              readyState,
               visibilityState,
+              ...(navigationTiming ? { navigationTiming } : {}),
               ...(hadHiddenBeforePaint ? { wasHiddenBeforePaint: true } : {}),
               ...(backgroundTabPaintDeferred ? { backgroundTabPaintDeferred: true } : {}),
               ...(lateForegroundPaint ? { lateForegroundPaint: true, backgroundDwellEstimateMs } : {}),
@@ -403,6 +456,7 @@ async function collectPageWebVitalsAndDomProbe(tabId, timeoutMs = DEFAULT_DOM_PR
             resources: {
               totalCount: resourceEntries ? resourceEntries.length : 0,
               totalTransferKB: Math.round((totalTransferBytes / 1024) * 10) / 10,
+              byType,
               renderBlockingCount: renderBlockingUrls.length,
               renderBlockingUrls,
               slowestResources: slowList.slice(0, 5)
@@ -702,6 +756,15 @@ function buildPerformanceDiagnostics(memory, webVitals, domHealth, resources, ex
   }
 
   if (webVitals) {
+    if (webVitals.readyState && webVitals.readyState !== "complete") {
+      diagnostics.push({
+        severity: "warning",
+        category: "loading",
+        metric: "PageLoadIncomplete",
+        value: webVitals.readyState,
+        message: `Page was still loading (document.readyState='${webVitals.readyState}', loadEventMs=${webVitals.loadEventMs ?? "pending"}) when metrics were sampled; LCP, CLS, and resource totals may still increase.`
+      });
+    }
     if (webVitals.backgroundTabPaintDeferred) {
       diagnostics.push({
         severity: "info",
@@ -1017,6 +1080,7 @@ export async function getPerformanceMetrics(tabId, options = {}) {
     metrics: metricsMap,
     memory,
     webVitals,
+    ...(webVitals?.navigationTiming ? { navigationTiming: webVitals.navigationTiming } : {}),
     resources,
     domHealth,
     ...(runtimeErrors.count > 0 ? { runtimeErrors } : {}),

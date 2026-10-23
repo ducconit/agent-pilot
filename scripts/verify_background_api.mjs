@@ -569,7 +569,7 @@ const mockInlineClient = {
 };
 const inlineMeta = await runInlineWait(mockInlineClient, 501, {
   waitForSelector: ".loaded-panel",
-  waitMs: 15
+  waitMs: 20
 });
 const mergedClick = mergeWaitMeta({ success: true }, inlineMeta);
 
@@ -1660,6 +1660,203 @@ record(
     cdpRuntimeEvalParams?.timeout === 120 &&
     Boolean(evalBlockedErr && String(evalBlockedErr.message).includes("MAIN_THREAD_BLOCKED")),
   `evalFallbackVal=${evalFallbackVal}, cdpTimeout=${cdpRuntimeEvalParams?.timeout}, blockedErr=${evalBlockedErr?.message}`
+);
+
+// 35. collectDevtoolsData infers requestedType='console' when console=true & network=false, and network.listRequests strips bulky headers while enriching cacheStatus/contentEncoding/transferKB/summary
+const { systemHandlers } = await import("../extensions/background/agent-handlers/system.js");
+attachedTabs.add(935);
+devtoolsBuffers.set(935, {
+  console: [
+    { id: "c1", type: "log", text: "boot ok", timestamp: 1000 },
+    { id: "c2", type: "error", text: "failed chunk load", timestamp: 1005 }
+  ],
+  network: new Map([
+    [
+      "n1",
+      {
+        id: "n1",
+        url: "https://lagom.sphoton.com/vi",
+        method: "GET",
+        type: "Document",
+        status: 200,
+        encodedDataLength: 31800,
+        durationMs: 16268,
+        requestHeaders: { "user-agent": "Mozilla/5.0", cookie: "sid=123" },
+        headers: {
+          "cf-cache-status": "DYNAMIC",
+          "x-nextjs-cache": "MISS",
+          "content-encoding": "zstd",
+          "cache-control": "private, no-cache, no-store"
+        }
+      }
+    ],
+    [
+      "n2",
+      {
+        id: "n2",
+        url: "https://lagom.sphoton.com/_next/static/chunks/main.js",
+        method: "GET",
+        type: "Script",
+        status: 200,
+        encodedDataLength: 102400,
+        durationMs: 85,
+        requestHeaders: { "user-agent": "Mozilla/5.0" },
+        headers: {
+          "cf-cache-status": "HIT",
+          "content-encoding": "br"
+        }
+      }
+    ]
+  ])
+});
+const consoleOnlyPayload = await collectDevtoolsData(935, { console: true, network: false });
+const netListCompact = await new Promise((resolve, reject) => {
+  systemHandlers["network.listRequests"](
+    { getTargetTabId: async () => 935 },
+    { tabId: 935 },
+    (res, err) => (err ? reject(err) : resolve(res))
+  );
+});
+const netListWithHeaders = await new Promise((resolve, reject) => {
+  systemHandlers["network.listRequests"](
+    { getTargetTabId: async () => 935 },
+    { tabId: 935, includeHeaders: true },
+    (res, err) => (err ? reject(err) : resolve(res))
+  );
+});
+cleanupTabResources(935);
+record(
+  "35. collectDevtoolsData isolates console-only requests & network.listRequests strips raw headers while enriching cacheStatus/contentEncoding/summary",
+  Array.isArray(consoleOnlyPayload.console) &&
+    consoleOnlyPayload.console.length === 2 &&
+    consoleOnlyPayload.network === undefined &&
+    consoleOnlyPayload.performance === undefined &&
+    netListCompact.summary?.returnedCount === 2 &&
+    netListCompact.summary?.totalTransferKB === 131.1 &&
+    netListCompact.summary?.byType?.Document?.count === 1 &&
+    netListCompact.summary?.byType?.Script?.count === 1 &&
+    netListCompact.requests[0].headers === undefined &&
+    netListCompact.requests[0].requestHeaders === undefined &&
+    netListCompact.requests[0].cacheStatus === "DYNAMIC" &&
+    netListCompact.requests[0].contentEncoding === "zstd" &&
+    netListCompact.requests[0].transferKB === 31.1 &&
+    netListWithHeaders.requests[0].headers?.["cf-cache-status"] === "DYNAMIC" &&
+    netListWithHeaders.requests[0].requestHeaders?.["user-agent"] === "Mozilla/5.0",
+  `consoleOnlyHasPerf=${consoleOnlyPayload.performance !== undefined}, compactHeaders=${netListCompact.requests[0]?.headers}, cacheStatus=${netListCompact.requests[0]?.cacheStatus}, totalKB=${netListCompact.summary?.totalTransferKB}`
+);
+
+// 36. getPerformanceMetrics exposes navigationTiming breakdown, resources.byType, and emits PageLoadIncomplete diagnostic when readyState !== 'complete'
+attachedTabs.add(936);
+globalThis.chrome.scripting = {
+  executeScript: async () => [
+    {
+      result: {
+        webVitals: {
+          ttfbMs: 16188,
+          fcpMs: 16472,
+          lcpMs: 16472,
+          cls: 0,
+          clsCulprits: [],
+          domInteractiveMs: 16349,
+          domContentLoadedMs: 16418,
+          loadEventMs: undefined,
+          readyState: "interactive",
+          visibilityState: "visible",
+          navigationTiming: {
+            type: "navigate",
+            protocol: "h2",
+            responseStatus: 200,
+            redirectCount: 1,
+            dnsMs: 15,
+            tcpMs: 28,
+            tlsMs: 19,
+            ttfbMs: 16188,
+            responseDownloadMs: 80,
+            domInteractiveMs: 16349,
+            domContentLoadedMs: 16418,
+            loadEventMs: undefined,
+            transferKB: 31.1,
+            encodedBodyKB: 30.8,
+            decodedBodyKB: 183.7
+          },
+          longTasksCount: 1,
+          totalBlockingTimeMs: 42,
+          maxLongTaskMs: 92,
+          topLongTasks: []
+        },
+        resources: {
+          totalCount: 3,
+          totalTransferKB: 145.5,
+          byType: {
+            script: { count: 2, transferKB: 120.5, maxDurationMs: 140 },
+            img: { count: 1, transferKB: 25, maxDurationMs: 65 }
+          },
+          renderBlockingCount: 0,
+          renderBlockingUrls: [],
+          slowestResources: []
+        },
+        domHealth: { totalElements: 520, maxDepth: 12, maxChildrenCount: 10, iframeCount: 0, duplicateIds: [] }
+      }
+    }
+  ]
+};
+const perf936 = await cdpManager.getPerformanceMetrics(936, {});
+const diag936 = (perf936.diagnostics || []).map((d) => d.metric);
+cleanupTabResources(936);
+record(
+  "36. getPerformanceMetrics includes navigationTiming, resources.byType, and emits PageLoadIncomplete when readyState !== 'complete'",
+  perf936.navigationTiming?.protocol === "h2" &&
+    perf936.navigationTiming?.ttfbMs === 16188 &&
+    perf936.navigationTiming?.decodedBodyKB === 183.7 &&
+    perf936.resources?.byType?.script?.count === 2 &&
+    perf936.resources?.byType?.img?.transferKB === 25 &&
+    diag936.includes("PageLoadIncomplete") &&
+    inPageProbeResult?.webVitals?.navigationTiming?.ttfbMs === 80 &&
+    inPageProbeResult?.webVitals?.readyState === "complete",
+  `protocol=${perf936.navigationTiming?.protocol}, ttfb=${perf936.navigationTiming?.ttfbMs}, byType=${JSON.stringify(perf936.resources?.byType)}, diag=${diag936.join(",")}`
+);
+
+// 37. waitForTabComplete & tabs.create surface loadTimedOut=true when initial page load exceeds loadTimeout while status is still 'loading'
+const { waitForTabComplete } = await import("../extensions/background/tab-manager.js");
+const { tabsHandlers } = await import("../extensions/background/agent-handlers/tabs.js");
+globalThis.chrome = {
+  runtime: { lastError: null },
+  tabs: {
+    create: (opts, cb) => cb({ id: 937, url: opts.url, status: "loading", active: true, windowId: 1 }),
+    get: async (id) => ({ id, url: "https://lagom.sphoton.com/vi", status: "loading", active: true, windowId: 1 }),
+    onUpdated: {
+      addListener: () => {},
+      removeListener: () => {}
+    }
+  },
+  debugger: {
+    getTargets: (cb) => cb([]),
+    attach: (_t, _v, cb) => cb(),
+    sendCommand: (_t, _m, _p, cb) => cb({})
+  }
+};
+const rawWaitTimeout = await waitForTabComplete(937, 25);
+const createdSlowTab = await new Promise((resolve, reject) => {
+  tabsHandlers["tabs.create"](
+    {
+      getActiveTabId: async () => 937,
+      recordAgentTab: () => {},
+      assignTabToAgentGroup: async () => {},
+      broadcastFn: null
+    },
+    { url: "https://lagom.sphoton.com/vi", active: true, timeoutMs: 25 },
+    (res, err) => (err ? reject(err) : resolve(res))
+  );
+});
+cleanupTabResources(937);
+record(
+  "37. waitForTabComplete & tabs.create surface loadTimedOut=true when page load exceeds timeout while still loading",
+  rawWaitTimeout?.completed === false &&
+    rawWaitTimeout?.timedOut === true &&
+    createdSlowTab?.status === "loading" &&
+    createdSlowTab?.loadTimedOut === true &&
+    createdSlowTab?.loadTimeoutMs === 25,
+  `waitResult=${JSON.stringify(rawWaitTimeout)}, tabStatus=${createdSlowTab?.status}, loadTimedOut=${createdSlowTab?.loadTimedOut}`
 );
 
 recorder.summarize();

@@ -97,7 +97,16 @@ export const SECRET_PATTERNS = [
       return `Bearer ${prefix}******************** [MASKED_SECRET: Bearer Token]`;
     }
   },
-  // 11. URL Query Parameters (api_key=..., token=..., secret=..., password=...)
+  // 11. URL Basic Auth Credentials (https://user:password@host)
+  {
+    name: "URL Basic Auth",
+    regex: /(https?:\/\/[^/\s:@?#"',;<>]+:)([^@\s/?#"',;<>]+)(@)/gi,
+    replacer: (match, prefix, secretVal, suffix) => {
+      if (ALREADY_MASKED_REGEX.test(secretVal.trim())) return match;
+      return `${prefix}******************** [MASKED_SECRET: URL Basic Auth]${suffix}`;
+    }
+  },
+  // 12. URL Query Parameters (api_key=..., token=..., secret=..., password=...)
   {
     name: "URL Secret Parameter",
     regex: /([?&](?:api_key|apikey|access_token|auth_token|token|password|passwd|secret)=)([^&\s]{6,})/gi,
@@ -105,7 +114,7 @@ export const SECRET_PATTERNS = [
       return `${paramKey}******************** [MASKED_SECRET: URL Parameter]`;
     }
   },
-  // 12. JSON / Key-Value Sensitive Properties ("password": "...", "client_secret": "...")
+  // 13. JSON / Key-Value Sensitive Properties ("password": "...", "client_secret": "...")
   {
     name: "Sensitive Key-Value",
     regex: /(["']?(?:password|passwd|secret|client_?secret|access_?token|auth_?token|api_?key|authorization|proxy-authorization|cookie|set-cookie|x-api-key|credentials|token)["']?\s*[:=]\s*["'])([^"'\\,]{4,}?)(["'])/gi,

@@ -22,6 +22,7 @@ import {
   takeHeapSnapshot
 } from "../cdp-manager.js";
 import { sendCdpCommand } from "../cdp-manager.js";
+import { extractPerformanceHeaders } from "../cdp-events.js";
 import {
   extensionProtocolUnavailable,
   isSelfExtension,
@@ -154,11 +155,51 @@ export const systemHandlers = {
     const limit = (!isNaN(rawLimit) && rawLimit > 0)
       ? Math.max(1, Math.min(Math.floor(rawLimit), NETWORK_LIST_LIMIT_MAX))
       : NETWORK_LIST_LIMIT_DEFAULT;
+    const includeHeaders = Boolean(params.includeHeaders);
+    const sliced = requests.slice(-limit);
+    let totalTransferBytes = 0;
+    const statusCounts = {};
+    const byType = {};
+
+    const formattedRequests = sliced.map((r) => {
+      const bytes = Number(r.encodedDataLength) || Number(r.responseSize) || 0;
+      const transferKB = Math.round((bytes / 1024) * 10) / 10;
+      totalTransferBytes += bytes;
+      const statusKey = String(r.status ?? "unknown");
+      statusCounts[statusKey] = (statusCounts[statusKey] || 0) + 1;
+      const typeKey = String(r.type || "Other");
+      if (!byType[typeKey]) {
+        byType[typeKey] = { count: 0, transferKB: 0 };
+      }
+      byType[typeKey].count += 1;
+      byType[typeKey].transferKB = Math.round((byType[typeKey].transferKB + bytes / 1024) * 10) / 10;
+
+      const perfHeaders = r.headers ? extractPerformanceHeaders(r.headers) : {};
+      const item = {
+        ...r,
+        ...perfHeaders,
+        responseSize: bytes,
+        transferKB
+      };
+      delete item.startTimeMs;
+      if (!includeHeaders) {
+        delete item.headers;
+        delete item.requestHeaders;
+      }
+      return item;
+    });
+
     respond({
       tabId,
       totalCaptured: buffer.network.size,
       matchingCount: requests.length,
-      requests: requests.slice(-limit)
+      summary: {
+        returnedCount: formattedRequests.length,
+        totalTransferKB: Math.round((totalTransferBytes / 1024) * 10) / 10,
+        statusCounts,
+        byType
+      },
+      requests: formattedRequests
     });
   },
 
