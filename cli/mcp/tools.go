@@ -14,7 +14,7 @@ type ToolInfo struct {
 var mcpTools = []ToolInfo{
 	{
 		Name:        "browser_run_actions",
-		Description: "Execute an ordered sequence of browser actions in a single tool call (open, navigate, wait, click, type, fill_form, upload, screenshot with step/title/description/highlightSelector & disk path, evaluate, devtools, metrics/performance_metrics, trace/performance_trace, heap/heap_snapshot, close).",
+		Description: "Execute an ordered sequence of browser actions in a single tool call (open, navigate, wait with failure snapshot diagnostics, click, type, fill_form, upload, screenshot with step/title/description/highlightSelector & disk path, evaluate, devtools with detail summary/standard/full, metrics/performance_metrics, trace/performance_trace, heap/heap_snapshot, close).",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -254,6 +254,7 @@ var mcpTools = []ToolInfo{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"type":           map[string]interface{}{"type": "string", "description": "all, console, network, performance"},
+				"detail":         map[string]interface{}{"type": "string", "enum": []string{"summary", "standard", "full"}, "description": "Output detail: summary minimizes tokens, standard preserves normal fields, full returns complete metrics (default: full)"},
 				"filterOrigin":   map[string]interface{}{"type": "boolean", "description": "Filter out internal extension logs/warnings (chrome-extension://*). Default: true"},
 				"errorsOnly":     map[string]interface{}{"type": "boolean", "description": "Only return console errors/assertions and failed/4xx/5xx network requests (default: false)"},
 				"excludeStatic":  map[string]interface{}{"type": "boolean", "description": "Exclude static assets (images, fonts, media, stylesheets) from network requests (default: false)"},

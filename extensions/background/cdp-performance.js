@@ -667,8 +667,81 @@ export async function getPerformanceMetrics(tabId, options = {}) {
  * Collect garbage via CDP HeapProfiler
  */
 export async function collectGarbage(tabId) {
-  await sendCdpCommand(tabId, "HeapProfiler.collectGarbage");
-  return { success: true, tabId, message: "Garbage collection completed" };
+  try {
+    await sendCdpCommand(tabId, "HeapProfiler.collectGarbage");
+    return { success: true, supported: true, tabId, message: "Garbage collection completed" };
+  } catch (error) {
+    if (!isUnsupportedHeapProfilerError(error)) throw error;
+    const fallback = await collectHeapFallbackMetrics(tabId);
+    return {
+      success: true,
+      supported: false,
+      tabId,
+      fallback: "performance.metrics",
+      warning: "HeapProfiler is unavailable through the Chrome extension debugger; runtime metrics were returned instead.",
+      ...fallback
+    };
+  }
+}
+
+export function isUnsupportedHeapProfilerError(error) {
+  const message = String(error?.message || error || "");
+  if (/timed out|timeout|deadline exceeded/i.test(message)) return false;
+  return /-32601\b|unknown method|method not found|not found|not supported|unsupported|unknown command/i.test(message);
+}
+
+async function collectHeapFallbackMetrics(tabId) {
+  const result = await getPerformanceMetrics(tabId, {
+    includeWebVitals: false,
+    includeResources: false,
+    includeDomHealth: false
+  });
+  return {
+    metrics: result.metrics || {},
+    memory: result.memory || null,
+    timestamp: result.timestamp || Date.now()
+  };
+}
+
+async function returnHeapFallback(tabId, action, options, reason) {
+  const fallback = await collectHeapFallbackMetrics(tabId);
+  const currentRecord = {
+    timestamp: fallback.timestamp,
+    metrics: fallback.metrics,
+    heapSummary: null
+  };
+  const previousBaseline = memoryBaselines.get(tabId) || null;
+  const wantsDiff = ["diff", "check_leak", "leak"].includes(action) || Boolean(options?.compareWithBaseline);
+  const firstDiffNeedsBaseline = !previousBaseline && wantsDiff;
+  const wantsBaseline = action === "baseline" || Boolean(options?.recordBaseline) || (!previousBaseline && !wantsDiff) || firstDiffNeedsBaseline;
+  let leakAnalysis;
+  if (wantsBaseline) {
+    memoryBaselines.set(tabId, currentRecord);
+  } else if (wantsDiff && previousBaseline) {
+    leakAnalysis = computeMemoryLeakDiff(previousBaseline, currentRecord);
+  }
+  if (firstDiffNeedsBaseline) {
+    leakAnalysis = {
+      hasBaseline: false,
+      leakSuspected: false,
+      severity: "none",
+      suspectedCauses: ["No prior baseline existed; saved current runtime metrics as the baseline for subsequent diff calls."]
+    };
+  }
+  return {
+    success: true,
+    supported: false,
+    tabId,
+    action,
+    fallback: "performance.metrics",
+    warning: "HeapProfiler is unavailable through the Chrome extension debugger; runtime metrics were returned instead.",
+    unsupportedMethod: reason,
+    metrics: fallback.metrics,
+    memory: fallback.memory,
+    ...(leakAnalysis ? { leakAnalysis } : {}),
+    baselineRecorded: wantsBaseline,
+    timestamp: fallback.timestamp
+  };
 }
 
 /**
@@ -925,10 +998,20 @@ export async function takeHeapSnapshot(tabId, options = {}) {
 
   // Force V8 GC before snapshot/baseline/diff by default so unreferenced objects do not skew leak detection
   const shouldCollectGarbage = options?.collectGarbage !== false && options?.forceGC !== false;
+  let garbageCollected = false;
+  let garbageCollectionWarning;
   if (shouldCollectGarbage) {
-    await sendCdpCommand(tabId, "HeapProfiler.collectGarbage").catch((err) => {
-      logDebug("Pre-snapshot GC error", err);
-    });
+    try {
+      await sendCdpCommand(tabId, "HeapProfiler.collectGarbage");
+      garbageCollected = true;
+    } catch (err) {
+      if (isUnsupportedHeapProfilerError(err)) {
+        garbageCollectionWarning = "HeapProfiler.collectGarbage is unavailable; captured the heap snapshot without forced garbage collection.";
+        logDebug("Pre-snapshot GC unavailable; continuing without forced GC", err);
+      } else {
+        logDebug("Pre-snapshot GC error", err);
+      }
+    }
   }
 
   // Collect live runtime counters alongside the heap snapshot
@@ -954,6 +1037,11 @@ export async function takeHeapSnapshot(tabId, options = {}) {
 
   try {
     await sendCdpCommand(tabId, "HeapProfiler.takeHeapSnapshot", { reportProgress: false });
+  } catch (err) {
+    if (isUnsupportedHeapProfilerError(err)) {
+      return await returnHeapFallback(tabId, action, options, "HeapProfiler.takeHeapSnapshot");
+    }
+    throw err;
   } finally {
     chrome.debugger.onEvent.removeListener(chunkListener);
   }
@@ -974,13 +1062,14 @@ export async function takeHeapSnapshot(tabId, options = {}) {
     action === "check_leak" ||
     action === "leak" ||
     Boolean(options?.compareWithBaseline);
+  const firstDiffNeedsBaseline = !prevBaseline && wantsDiff;
   const wantsBaseline =
-    action === "baseline" || Boolean(options?.recordBaseline) || (!prevBaseline && !wantsDiff);
+    action === "baseline" || Boolean(options?.recordBaseline) || (!prevBaseline && !wantsDiff) || firstDiffNeedsBaseline;
 
   let leakAnalysis = undefined;
   if (prevBaseline && (wantsDiff || !wantsBaseline)) {
     leakAnalysis = computeMemoryLeakDiff(prevBaseline, currentRecord);
-  } else if (wantsDiff && !prevBaseline) {
+  } else if (firstDiffNeedsBaseline) {
     leakAnalysis = {
       hasBaseline: false,
       leakSuspected: Boolean(parsedHeap && parsedHeap.detachedDomNodes.totalCount > 0),
@@ -992,7 +1081,7 @@ export async function takeHeapSnapshot(tabId, options = {}) {
     };
   }
 
-  if (wantsBaseline || (wantsDiff && !prevBaseline)) {
+  if (wantsBaseline || firstDiffNeedsBaseline) {
     memoryBaselines.set(tabId, currentRecord);
   }
 
@@ -1000,8 +1089,9 @@ export async function takeHeapSnapshot(tabId, options = {}) {
     success: true,
     tabId,
     action,
-    garbageCollected: shouldCollectGarbage,
-    baselineRecorded: Boolean(wantsBaseline || (wantsDiff && !prevBaseline)),
+    garbageCollected,
+    ...(garbageCollectionWarning ? { garbageCollectionWarning } : {}),
+    baselineRecorded: Boolean(wantsBaseline || firstDiffNeedsBaseline),
     totalChunks: chunks.length,
     totalBytes: totalLength,
     runtimeCounters: {

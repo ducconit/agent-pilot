@@ -56,16 +56,53 @@ async function resolveStepTabId(ctx, act) {
   });
 }
 
+async function attachWaitFailureDiagnostic(ctx, targetTabId, act, reason) {
+  try {
+    const snapshot = await sendTabMessageWithRetry(targetTabId, {
+      action: "get_snapshot",
+      maxElements: Math.min(Number(act.diagnosticMaxElements) || 20, 50),
+      format: "text"
+    });
+    ctx.stepResult.diagnostics = {
+      reason,
+      tabId: targetTabId,
+      selector: act.selector,
+      text: act.text,
+      state: act.state || "visible",
+      snapshot: snapshot?.result !== undefined ? snapshot.result : snapshot
+    };
+  } catch (diagnosticError) {
+    ctx.stepResult.diagnostics = {
+      reason,
+      tabId: targetTabId,
+      selector: act.selector,
+      text: act.text,
+      state: act.state || "visible",
+      snapshotError: diagnosticError?.message || String(diagnosticError)
+    };
+  }
+}
+
 /** wait_for_selector — poll the content script until the selector matches. */
 async function waitForSelectorAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for wait_for_selector");
-  const res = await sendTabMessageWithRetry(targetTabId, {
-    action: "wait_for_selector",
-    selector: act.selector,
-    timeoutMs: getPositiveNumber(act.timeoutMs, act.timeout) || TIMEOUTS.BATCH_WAIT_SELECTOR_MS
-  });
-  if (!res || !res.success) throw new Error(res?.error || `Selector '${act.selector}' not found within timeout`);
+  let res;
+  try {
+    res = await sendTabMessageWithRetry(targetTabId, {
+      action: "wait_for_selector",
+      selector: act.selector,
+      timeoutMs: getPositiveNumber(act.timeoutMs, act.timeout) || TIMEOUTS.BATCH_WAIT_SELECTOR_MS
+    });
+  } catch (error) {
+    await attachWaitFailureDiagnostic(ctx, targetTabId, act, error?.message || String(error));
+    throw error;
+  }
+  if (!res || !res.success) {
+    const reason = res?.error || `Selector '${act.selector}' not found within timeout`;
+    await attachWaitFailureDiagnostic(ctx, targetTabId, act, reason);
+    throw new Error(reason);
+  }
   ctx.stepResult.success = true;
   ctx.stepResult.found = true;
   ctx.stepResult.details = res.details;
@@ -75,14 +112,24 @@ async function waitForSelectorAction(ctx, act) {
 async function waitForAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for wait_for");
-  const res = await sendTabMessageWithRetry(targetTabId, {
-    action: "wait_for",
-    selector: act.selector,
-    text: act.text,
-    state: act.state || "visible",
-    timeoutMs: getPositiveNumber(act.timeoutMs, act.timeout) || DEFAULTS.WAIT_FOR_TIMEOUT_MS
-  });
-  if (!res || !res.success) throw new Error(res?.error || "Wait timed out");
+  let res;
+  try {
+    res = await sendTabMessageWithRetry(targetTabId, {
+      action: "wait_for",
+      selector: act.selector,
+      text: act.text,
+      state: act.state || "visible",
+      timeoutMs: getPositiveNumber(act.timeoutMs, act.timeout) || DEFAULTS.WAIT_FOR_TIMEOUT_MS
+    });
+  } catch (error) {
+    await attachWaitFailureDiagnostic(ctx, targetTabId, act, error?.message || String(error));
+    throw error;
+  }
+  if (!res || !res.success) {
+    const reason = res?.error || "Wait timed out";
+    await attachWaitFailureDiagnostic(ctx, targetTabId, act, reason);
+    throw new Error(reason);
+  }
   ctx.stepResult.success = true;
   ctx.stepResult.waited = res;
 }
@@ -191,6 +238,7 @@ async function devtoolsAction(ctx, act) {
     {
       type: devType,
       limit: act.limit,
+      detail: act.detail,
       clear: act.clear,
       filterOrigin: act.filterOrigin,
       errorsOnly: act.errorsOnly,

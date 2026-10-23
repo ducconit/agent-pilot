@@ -332,12 +332,12 @@ agent-pilot server
 ```
 Khi chạy đa tác vụ hoặc nhiều cửa sổ IDE, Agent Pilot tự động chuyển sang chế độ **Forwarder**, chuyển tiếp lệnh qua HTTP REST API `http://127.0.0.1:58765/api` mà không bao giờ gặp lỗi xung đột cổng `EADDRINUSE`.
 
-#### Bộ Công Cụ MCP Điều Khiển Trình Duyệt (51 Tools):
-- `browser_run_actions`: Động cơ thực thi chuỗi kịch bản hàng loạt (Batch Engine), tiết kiệm >80% token.
+#### Bộ Công Cụ MCP Điều Khiển Trình Duyệt:
+- `browser_run_actions`: Động cơ thực thi chuỗi kịch bản hàng loạt (Batch Engine), tiết kiệm >80% token; bước `wait` tự đính kèm snapshot chẩn đoán khi timeout.
 - `browser_open_tab`, `browser_list_tabs`, `browser_navigate`: Quản lý và điều hướng các tab trình duyệt (mặc định mở ngầm không cướp focus).
 - `browser_click`, `browser_drag`, `browser_type`, `browser_scroll`: Mô phỏng chuột ảo neon với sóng click ripple. `browser_click`/`browser_drag` hỗ trợ `via: "cdp"` (trusted input cho cross-origin iframe/canvas/WebGL) và drag theo tọa độ `fromX/fromY/toX/toY` + `holdMs` cho game.
 - `browser_get_element`, `browser_pick_color`, `browser_screenshot`: Đọc DOM, trích xuất mã màu pixel, chụp ảnh màn hình ngầm qua CDP.
-- `browser_get_devtools_data`: Bắt log Console, Network requests và Performance RAM/DOM.
+- `browser_get_devtools_data`: Bắt log Console, Network requests và Performance RAM/DOM; dùng `detail: "summary"` để chỉ trả trường cần thiết, giảm payload/token.
 - `browser_list_instances`, `browser_select_instance`: Quản lý đa trình duyệt Chrome đồng thời.
 - `browser_set_busy`: Khóa/mở khóa khiên bảo vệ người dùng thao tác khi Agent chạy kịch bản phức tạp.
 - `browser_wait_for_feedback`: Chờ phản hồi trực quan từ người dùng theo thời gian thực (Channel A).
@@ -353,6 +353,9 @@ Kỹ sư kiểm thử tự động có thể điều khiển trình duyệt tr�
 # 1. Điều hướng và mở tab
 agent-pilot open "https://github.com" --active
 
+# Khởi chạy Chrome profile riêng + extension mới + bridge port riêng
+npm run launch:chrome -- --port 58766 --url "http://127.0.0.1:8765/test-page.html"
+
 # 2. Tương tác chuột & bàn phím
 agent-pilot type "#search-input" "agent pilot" --enter
 agent-pilot click ".repo-item:first-child"
@@ -366,9 +369,11 @@ agent-pilot screenshot -o result.png --mode visible
 
 # 5. Xem danh sách các tab đang hoạt động
 agent-pilot tabs
+agent-pilot tabs --format json       # Payload thuần cho script/agent
 
 # 6. Chạy kịch bản tự động hóa từ tệp JSON
 agent-pilot batch flow_test.json
+agent-pilot batch flow_test.json --format json  # Không có prefix text, dễ parse
 
 # 7. Quản lý phản hồi UI
 agent-pilot feedback list

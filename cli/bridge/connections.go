@@ -426,5 +426,10 @@ func describeClientConnection(c *ClientConnection, activeID string) map[string]i
 	if tabTitle != "" {
 		entry["activeTabTitle"] = tabTitle
 	}
+	for _, key := range []string{"extensionId", "extensionVersion", "bridgePort", "capabilities"} {
+		if value, ok := c.Details[key]; ok && value != nil {
+			entry[key] = value
+		}
+	}
 	return entry
 }

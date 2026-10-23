@@ -45,6 +45,7 @@ export {
   analyzeTraceEvents,
   getPerformanceMetrics,
   collectGarbage,
+  isUnsupportedHeapProfilerError,
   parseV8HeapSnapshot,
   takeHeapSnapshot
 } from "./cdp-performance.js";

@@ -62,6 +62,7 @@ const EXPECTED_CDP_EXPORTS = [
   "stopPerformanceTrace",
   "getPerformanceMetrics",
   "collectGarbage",
+  "isUnsupportedHeapProfilerError",
   "takeHeapSnapshot",
   "analyzeTraceEvents",
   "parseV8HeapSnapshot"
@@ -516,6 +517,12 @@ const nonStaticDevtools = await collectDevtoolsData(302, {
   excludeStatic: true,
   includeHeaders: true
 });
+const summaryDevtools = await collectDevtoolsData(302, {
+  type: "all",
+  detail: "summary",
+  errorsOnly: true,
+  excludeStatic: true
+});
 cleanupTabResources(302);
 record(
   "14. collectDevtoolsData supports errorsOnly, excludeStatic, and strips verbose response headers by default",
@@ -525,8 +532,12 @@ record(
     filteredDevtools.network[0].id === "r3" &&
     filteredDevtools.network[0].headers === undefined &&
     nonStaticDevtools.network.length === 2 &&
-    nonStaticDevtools.network[0].headers?.["content-type"] === "application/json",
-  `errConsole=${filteredDevtools.console.length}, errNet=${filteredDevtools.network.length}, headersStripped=${filteredDevtools.network[0]?.headers === undefined}, nonStaticCount=${nonStaticDevtools.network.length}`
+    nonStaticDevtools.network[0].headers?.["content-type"] === "application/json" &&
+    summaryDevtools.detail === "summary" &&
+    summaryDevtools.console[0].stackTrace === undefined &&
+    summaryDevtools.network[0].headers === undefined &&
+    summaryDevtools.performance.metrics === undefined,
+  `errConsole=${filteredDevtools.console.length}, errNet=${filteredDevtools.network.length}, headersStripped=${filteredDevtools.network[0]?.headers === undefined}, nonStaticCount=${nonStaticDevtools.network.length}, summaryCompact=${summaryDevtools.detail === "summary"}`
 );
 
 // 15. runInlineWait & mergeWaitMeta support waitMs, sleepMs, waitForSelector, waitForText across handlers
@@ -1112,6 +1123,82 @@ record(
     diagMetrics.includes("DOMDepth") &&
     diagMetrics.includes("RenderBlockingResources"),
   `lcpMs=${devtoolsFull.performance?.webVitals?.lcpMs}, cls=${devtoolsFull.performance?.webVitals?.cls}, diagnostics=${diagMetrics.join(",")}`
+);
+
+// 26-28. HeapProfiler degradation paths: fallback baselines, optional GC, and timeout classification
+attachedTabs.add(926);
+let fallbackHeapUsed = 12 * 1024 * 1024;
+globalThis.chrome = {
+  runtime: { lastError: null },
+  debugger: {
+    onEvent: { addListener: () => {}, removeListener: () => {} },
+    sendCommand: (_target, method, _params, cb) => {
+      if (method === "HeapProfiler.collectGarbage" || method === "HeapProfiler.takeHeapSnapshot") {
+        globalThis.chrome.runtime.lastError = { message: "Method not found" };
+        cb({});
+        globalThis.chrome.runtime.lastError = null;
+        return;
+      }
+      if (method === "Performance.getMetrics") {
+        cb({ metrics: [{ name: "JSHeapUsedSize", value: fallbackHeapUsed }, { name: "JSHeapTotalSize", value: 24 * 1024 * 1024 }] });
+        return;
+      }
+      cb({});
+    }
+  }
+};
+const firstFallbackDiff = await cdpManager.takeHeapSnapshot(926, { action: "diff" });
+fallbackHeapUsed = 16 * 1024 * 1024;
+const secondFallbackDiff = await cdpManager.takeHeapSnapshot(926, { action: "diff" });
+record(
+  "26. unsupported HeapProfiler fallback records a first diff baseline and computes later diffs",
+  firstFallbackDiff.success === true &&
+    firstFallbackDiff.supported === false &&
+    firstFallbackDiff.baselineRecorded === true &&
+    firstFallbackDiff.leakAnalysis?.hasBaseline === false &&
+    secondFallbackDiff.leakAnalysis?.hasBaseline === true &&
+    secondFallbackDiff.leakAnalysis?.deltas?.jsHeapUsedMB === 4,
+  `firstBaseline=${firstFallbackDiff.baselineRecorded}, firstHasBaseline=${firstFallbackDiff.leakAnalysis?.hasBaseline}, laterDeltaMB=${secondFallbackDiff.leakAnalysis?.deltas?.jsHeapUsedMB}`
+);
+
+attachedTabs.add(927);
+let snapshotChunks = null;
+globalThis.chrome.debugger.onEvent = {
+  addListener: (listener) => { snapshotChunks = listener; },
+  removeListener: () => { snapshotChunks = null; }
+};
+globalThis.chrome.debugger.sendCommand = (_target, method, _params, cb) => {
+  if (method === "HeapProfiler.collectGarbage") {
+    globalThis.chrome.runtime.lastError = { message: "Method not found" };
+    cb({});
+    globalThis.chrome.runtime.lastError = null;
+  } else if (method === "Performance.getMetrics") {
+    cb({ metrics: [{ name: "JSHeapUsedSize", value: 8 * 1024 * 1024 }, { name: "JSHeapTotalSize", value: 16 * 1024 * 1024 }] });
+  } else if (method === "HeapProfiler.takeHeapSnapshot") {
+    const raw = buildMockV8HeapSnapshot({ cachedItemCount: 2, detachedDivCount: 0 });
+    snapshotChunks?.({ tabId: 927 }, "HeapProfiler.addHeapSnapshotChunk", { chunk: raw });
+    cb({});
+  } else {
+    cb({});
+  }
+};
+const snapshotWithoutGc = await cdpManager.takeHeapSnapshot(927, { action: "baseline" });
+record(
+  "27. unsupported HeapProfiler GC does not prevent an available heap snapshot",
+  snapshotWithoutGc.success === true &&
+    snapshotWithoutGc.totalChunks === 1 &&
+    snapshotWithoutGc.totalBytes > 0 &&
+    snapshotWithoutGc.heapSummary &&
+    snapshotWithoutGc.garbageCollected === false &&
+    snapshotWithoutGc.garbageCollectionWarning,
+  `chunks=${snapshotWithoutGc.totalChunks}, bytes=${snapshotWithoutGc.totalBytes}, garbageCollected=${snapshotWithoutGc.garbageCollected}`
+);
+
+record(
+  "28. HeapProfiler timeout is not misclassified as unsupported",
+  cdpManager.isUnsupportedHeapProfilerError(new Error("CDP command HeapProfiler.takeHeapSnapshot timed out after 15000ms")) === false &&
+    cdpManager.isUnsupportedHeapProfilerError(new Error("-32601 Method not found")) === true,
+  "timeout=false, methodNotFound=true"
 );
 
 recorder.summarize();

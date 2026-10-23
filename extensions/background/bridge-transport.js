@@ -16,6 +16,12 @@ import {
   platformPromise
 } from "./constants.js";
 
+const AGENT_CAPABILITIES = Object.freeze([
+  "tabs", "cdp", "cursor", "type", "click", "scroll", "inspector", "eyedropper", "screenshot",
+  "batch", "devtools", "devtools.css", "devtools.audit", "devtools.metrics", "devtools.heap",
+  "extensions", "network", "console", "performance"
+]);
+
 export function initializeTransport(client, broadcastFn) {
   client.port = DEFAULT_AGENT_PORT;
   client.ws = null;
@@ -136,13 +142,17 @@ export const transportMethods = {
           version: EXTENSION_VERSION,
           agent: "AgentPilot-Extension",
           ...(this.apiKey ? { apiKey: this.apiKey } : {}),
-          capabilities: ["tabs", "cdp", "cursor", "type", "click", "scroll", "inspector", "eyedropper", "screenshot"],
+          capabilities: AGENT_CAPABILITIES,
           details: {
             browser: browserName,
             os: currentPlatform,
+            extensionId: chrome.runtime?.id || "",
+            extensionVersion: EXTENSION_VERSION,
+            bridgePort: this.port,
             windowCount: 1,
             activeTabTitle: "Active Tab",
-            activeTabUrl: ""
+            activeTabUrl: "",
+            capabilities: AGENT_CAPABILITIES
           }
         });
 

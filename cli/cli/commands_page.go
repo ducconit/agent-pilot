@@ -810,7 +810,12 @@ func newInspectCommand() *cobra.Command {
 
 func newTabsCommand() *cobra.Command {
 	return newLeafCommand("tabs", nil, func(args []string) error {
-		if err := ExecListTabs(); err != nil {
+		cmdArgs, err := parseCmdArgs(args, []FlagDef{{Name: "format"}})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecListTabs(strings.EqualFold(cmdArgs.String("format", ""), "json")); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}

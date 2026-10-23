@@ -10,6 +10,36 @@ import { attachDebugger, getPerformanceMetrics } from "../cdp-manager.js";
 const STATIC_RESOURCE_TYPES = new Set(["image", "media", "font", "stylesheet", "manifest"]);
 const STATIC_URL_RE = /\.(?:png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf|eot|css|mp4|webm|mp3|wav)(?:[?#]|$)/i;
 
+const DEVTOOLS_DETAIL_LEVELS = new Set(["summary", "standard", "full"]);
+
+function normalizeDetailLevel(value) {
+  const detail = String(value || "full").trim().toLowerCase();
+  return DEVTOOLS_DETAIL_LEVELS.has(detail) ? detail : "full";
+}
+
+function compactConsoleEntry(entry) {
+  return {
+    id: entry.id,
+    type: entry.type,
+    text: entry.text,
+    url: entry.stackTrace?.callFrames?.find((frame) => frame.url)?.url || entry.url,
+    timestamp: entry.timestamp
+  };
+}
+
+function compactNetworkEntry(entry) {
+  return {
+    id: entry.id,
+    method: entry.method,
+    status: entry.status,
+    statusText: entry.statusText,
+    type: entry.type,
+    url: entry.url,
+    finished: entry.finished,
+    errorText: entry.errorText
+  };
+}
+
 /**
  * Shared DevTools telemetry collector used by both `devtools.getData` and batch `devtools` steps.
  */
@@ -27,6 +57,7 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
   const errorsOnly = Boolean(params.errorsOnly);
   const excludeStatic = Boolean(params.excludeStatic);
   const includeHeaders = Boolean(params.includeHeaders);
+  const detail = normalizeDetailLevel(params.detail);
 
   let consoleData = undefined;
   let networkData = undefined;
@@ -55,6 +86,9 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
       });
     }
     consoleData = logs.slice(-limit);
+    if (detail === "summary") {
+      consoleData = consoleData.map(compactConsoleEntry);
+    }
     if (params.clear) {
       buffer.console = [];
     }
@@ -89,6 +123,9 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
       reqs = reqs.map(({ headers: _headers, ...rest }) => rest);
     }
     networkData = reqs;
+    if (detail === "summary") {
+      networkData = networkData.map(compactNetworkEntry);
+    }
     if (params.clear) {
       buffer.network.clear();
     }
@@ -98,7 +135,15 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
     try {
       const perfDetails = await getPerformanceMetrics(tabId, params);
       const metricsMap = perfDetails.metrics || {};
-      performanceData = {
+      performanceData = detail === "summary" ? {
+        jsHeapUsedMB: perfDetails.memory?.jsHeapUsedMB,
+        jsHeapTotalMB: perfDetails.memory?.jsHeapTotalMB,
+        domNodes: perfDetails.memory?.domNodes,
+        jsEventListeners: perfDetails.memory?.jsEventListeners,
+        documents: perfDetails.memory?.documents,
+        frames: perfDetails.memory?.frames,
+        timestamp: perfDetails.timestamp || Date.now()
+      } : {
         metrics: metricsMap,
         jsHeapUsedMB: perfDetails.memory?.jsHeapUsedMB,
         jsHeapTotalMB: perfDetails.memory?.jsHeapTotalMB,
@@ -147,6 +192,8 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
   if (consoleData !== undefined) responsePayload.console = consoleData;
   if (networkData !== undefined) responsePayload.network = networkData;
   if (performanceData !== undefined) responsePayload.performance = performanceData;
+
+  responsePayload.detail = detail;
 
   return responsePayload;
 }

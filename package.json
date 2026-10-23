@@ -25,6 +25,7 @@
     "test:cli": "go test -race -v ./...",
     "test:all": "npm run test:cli && npm run test:secret && npm run test:item-schema && npm run test:color-utils && npm run test:background-api && npm run test:extension-lifecycle && npm run test:webmcp && npm run test:pwa && npm run test:isolation && npm run test && npm run test:session && npm run test:agent && npm run test:feedback && npm run test:pinned && npm run test:annotator && npm run test:edit-delete",
     "build:cli": "node scripts/build_cli.mjs",
+    "launch:chrome": "node scripts/launch_test_chrome.mjs",
     "server": "./cli/agent-pilot server",
     "lint": "node scripts/lint.mjs",
     "pack": "node scripts/pack_extension.mjs",

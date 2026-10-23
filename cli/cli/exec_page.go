@@ -210,10 +210,18 @@ func ExecInspect(selector string, tabID interface{}, extra ...map[string]interfa
 	return nil
 }
 
-func ExecListTabs() error {
+func ExecListTabs(jsonOutput ...bool) error {
 	res, err := bridge.DispatchCommand("tabs.listAll", map[string]interface{}{}, config.DefaultBridgePort())
 	if err != nil {
 		return err
+	}
+	if len(jsonOutput) > 0 && jsonOutput[0] {
+		payload, marshalErr := json.Marshal(res)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		fmt.Println(string(payload))
+		return nil
 	}
 	fmt.Printf("📑 Open Tabs:\n")
 	var tabs []interface{}

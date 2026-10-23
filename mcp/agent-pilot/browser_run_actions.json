@@ -1,5 +1,5 @@
 {
-  "description": "Execute an ordered sequence of browser actions in a single tool call (open, navigate, wait, click, type, fill_form, upload, screenshot with step/title/description/highlightSelector \u0026 disk path, evaluate, devtools, metrics/performance_metrics, trace/performance_trace, heap/heap_snapshot, close).",
+  "description": "Execute an ordered sequence of browser actions in a single tool call (open, navigate, wait with failure snapshot diagnostics, click, type, fill_form, upload, screenshot with step/title/description/highlightSelector \u0026 disk path, evaluate, devtools with detail summary/standard/full, metrics/performance_metrics, trace/performance_trace, heap/heap_snapshot, close).",
   "inputSchema": {
     "properties": {
       "actions": {

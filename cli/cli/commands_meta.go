@@ -62,15 +62,19 @@ func newServiceCommand() *cobra.Command {
 
 func newBatchCommand() *cobra.Command {
 	return newLeafCommand("batch", nil, func(args []string) error {
-		if len(args) < 1 {
-			fmt.Println("Sử dụng: agent-pilot batch <path-to-script.json>")
+		cmdArgs, parseErr := parseCmdArgs(args, []FlagDef{{Name: "format"}, {Name: "help", Aliases: []string{"h"}, IsBool: true}})
+		if parseErr != nil {
+			return fmt.Errorf("❌ Tham số batch không hợp lệ: %v", parseErr)
+		}
+		if len(cmdArgs.Positional) < 1 {
+			fmt.Println("Sử dụng: agent-pilot batch <path-to-script.json> [--format json]")
 			return errUsage
 		}
-		if args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
-			fmt.Println("Sử dụng: agent-pilot batch <path-to-script.json>")
+		if cmdArgs.Bool("help") || cmdArgs.Positional[0] == "help" {
+			fmt.Println("Sử dụng: agent-pilot batch <path-to-script.json> [--format json]")
 			return nil
 		}
-		filePath := args[0]
+		filePath := cmdArgs.Positional[0]
 		raw, err := os.ReadFile(filePath)
 		if err != nil {
 			return fmt.Errorf("❌ Không thể đọc file: %v", err)
@@ -104,7 +108,11 @@ func newBatchCommand() *cobra.Command {
 		if mErr != nil {
 			fmt.Printf("✅ Kết quả thực thi Batch: %v\n", res)
 		} else {
-			fmt.Printf("✅ Kết quả thực thi Batch:\n%s\n", string(resJSON))
+			if strings.EqualFold(cmdArgs.String("format", ""), "json") {
+				fmt.Println(string(resJSON))
+			} else {
+				fmt.Printf("✅ Kết quả thực thi Batch:\n%s\n", string(resJSON))
+			}
 		}
 		return nil
 	})

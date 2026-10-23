@@ -10,6 +10,15 @@
         "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
       },
+      "detail": {
+        "description": "Output detail: summary minimizes tokens, standard preserves normal fields, full returns complete metrics (default: full)",
+        "enum": [
+          "summary",
+          "standard",
+          "full"
+        ],
+        "type": "string"
+      },
       "errorsOnly": {
         "description": "Only return console errors/assertions and failed/4xx/5xx network requests (default: false)",
         "type": "boolean"
@@ -50,6 +59,15 @@
       },
       "contextId": {
         "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "detail": {
+        "description": "Output detail: summary minimizes tokens, standard preserves normal fields, full returns complete metrics (default: full)",
+        "enum": [
+          "summary",
+          "standard",
+          "full"
+        ],
         "type": "string"
       },
       "errorsOnly": {
