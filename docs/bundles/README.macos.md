@@ -5,16 +5,15 @@ Gói cài đặt chuyên biệt dành cho **macOS ({{ARCH}} — Apple Silicon & 
 ```text
 agent-pilot-{{VERSION}}-{{PLATFORM}}/
 ├── extensions/            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome/Brave/Arc
-├── {{BINARY_NAME}}        Agent Pilot CLI & MCP Server (Mach-O static binary, zero-dependency)
 ├── install.sh             Script cài đặt tự động 1 lệnh cho macOS (tự gỡ Gatekeeper quarantine)
-├── skills/agent-pilot/    Agent Skill (SKILL.md + references + examples)
+├── skills/agent-pilot/    Agent Skill + scripts/{{BINARY_NAME}} native binary
 └── README.md              Tài liệu hướng dẫn cho macOS
 ```
 
 ## Yêu cầu hệ thống
 - **Hệ điều hành**: macOS 12 Monterey trở lên (`darwin-arm64` cho chip M1/M2/M3/M4 hoặc `darwin-amd64` cho chip Intel)
 - **Trình duyệt**: Google Chrome 116+, Brave, Arc hoặc Microsoft Edge (hỗ trợ Side Panel API)
-- **Phụ thuộc**: Không cần cài Node.js hay Go (`{{BINARY_NAME}}` đã được biên dịch độc lập)
+- **Phụ thuộc**: Không cần cài Node.js hay Go (`skills/agent-pilot/scripts/{{BINARY_NAME}}` đã được biên dịch độc lập)
 
 ---
 
@@ -33,6 +32,10 @@ Script `install.sh` sẽ tự động:
 4. Cài đặt Agent Skill vào `~/.agents/skills/agent-pilot` và `~/.gemini/config/skills/agent-pilot` (Antigravity).
 5. In ra đoạn cấu hình JSON MCP với đường dẫn tuyệt đối chuẩn cho macOS.
 
+Binary native cũng có sẵn tại `skills/agent-pilot/scripts/agent-pilot`; skill
+installer tự sao chép nó vào skill đã cài để agent có thể gọi khi GUI IDE không
+truyền đúng `PATH`.
+
 ---
 
 ## 🛠️ Hoặc Cài Đặt Thủ Công Từng Bước
@@ -43,11 +46,11 @@ Script `install.sh` sẽ tự động:
 ```bash
 # 1. Gỡ thuộc tính quarantine của macOS Gatekeeper
 xattr -cr .
-chmod +x ./{{BINARY_NAME}}
+chmod +x ./skills/agent-pilot/scripts/{{BINARY_NAME}}
 
 # 2. Cài vào ~/.local/bin (không cần sudo) hoặc /usr/local/bin
 mkdir -p ~/.local/bin
-cp ./{{BINARY_NAME}} ~/.local/bin/agent-pilot
+cp ./skills/agent-pilot/scripts/{{BINARY_NAME}} ~/.local/bin/agent-pilot
 
 # Đảm bảo ~/.local/bin có trong ~/.zshrc
 export PATH="$HOME/.local/bin:$PATH"
@@ -121,7 +124,7 @@ agent-pilot skill install --agy --force    # Antigravity: ~/.gemini/config/skill
 ## 🔧 Xử Lý Sự Cố Thường Gặp Trên macOS
 | Vấn đề | Nguyên nhân & Cách xử lý trên macOS |
 | :--- | :--- |
-| macOS báo *"agent-pilot cannot be opened because the developer cannot be verified"* | Chạy `xattr -d com.apple.quarantine ./agent-pilot` (hoặc `xattr -cr .` tại thư mục giải nén), hoặc vào **System Settings → Privacy & Security → Allow Anyway**. |
+| macOS báo *"agent-pilot cannot be opened because the developer cannot be verified"* | Chạy `xattr -d com.apple.quarantine ./skills/agent-pilot/scripts/{{BINARY_NAME}}` (hoặc `xattr -cr .` tại thư mục giải nén), hoặc vào **System Settings → Privacy & Security → Allow Anyway**. |
 | MCP báo `spawn agent-pilot ENOENT` trong Claude / Cursor | Do ứng dụng GUI trên macOS không nhận `PATH` của `~/.zshrc`. Hãy đổi `"command": "agent-pilot"` thành đường dẫn tuyệt đối `"/Users/<user>/.local/bin/agent-pilot"` hoặc `"/usr/local/bin/agent-pilot"`. |
 | Phím tắt mở Side Panel bị trùng | Mặc định trên macOS là <kbd>Cmd + Shift + P</kbd>. Bạn có thể đổi tại `chrome://extensions/shortcuts`. |
 | `Another debugger is already attached` | Đóng cửa sổ DevTools (<kbd>Cmd + Option + I</kbd>) trên tab đang điều khiển rồi thử lại. |

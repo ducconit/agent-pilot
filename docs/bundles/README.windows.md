@@ -5,16 +5,15 @@ Gói cài đặt chuyên biệt dành cho **Windows 10 / Windows 11 ({{ARCH}})**
 ```text
 agent-pilot-{{VERSION}}-{{PLATFORM}}\
 ├── extensions\            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome/Edge/Brave
-├── {{BINARY_NAME}}        Agent Pilot CLI & MCP Server (Windows PE static binary, zero-dependency)
 ├── install.ps1            Script PowerShell cài đặt tự động 1 lệnh cho Windows
-├── skills\agent-pilot\    Agent Skill (SKILL.md + references + examples)
+├── skills\agent-pilot\    Agent Skill + scripts\{{BINARY_NAME}} native binary
 └── README.md              Tài liệu hướng dẫn cho Windows
 ```
 
 ## Yêu cầu hệ thống
 - **Hệ điều hành**: Windows 10 / Windows 11 ({{ARCH}})
 - **Trình duyệt**: Google Chrome 116+, Microsoft Edge hoặc Brave (hỗ trợ Side Panel API)
-- **Phụ thuộc**: Không cần cài Node.js hay Go (`{{BINARY_NAME}}` chạy độc lập, không cần quyền Administrator)
+- **Phụ thuộc**: Không cần cài Node.js hay Go (`skills\agent-pilot\scripts\{{BINARY_NAME}}` chạy độc lập, không cần quyền Administrator)
 
 ---
 
@@ -34,6 +33,10 @@ Script `install.ps1` sẽ tự động:
 5. Cài đặt Agent Skill vào `%USERPROFILE%\.agents\skills\agent-pilot` và `%USERPROFILE%\.gemini\config\skills\agent-pilot` (Antigravity).
 6. In ra đoạn cấu hình JSON MCP với đường dẫn `C:\\Users\\...` đã được escape chuẩn cho Windows.
 
+Binary native cũng có sẵn tại `skills\agent-pilot\scripts\agent-pilot.exe`; skill
+installer tự sao chép nó vào skill đã cài để agent có thể gọi khi GUI IDE không
+truyền đúng `PATH`.
+
 ---
 
 ## 🛠️ Hoặc Cài Đặt Thủ Công Từng Bước
@@ -48,12 +51,12 @@ Script `install.ps1` sẽ tự động:
 Chạy trong **PowerShell**:
 ```powershell
 # 1. Gỡ khóa SmartScreen (nếu tải file zip từ trình duyệt)
-Unblock-File -Path .\agent-pilot.exe
+Unblock-File -Path .\skills\agent-pilot\scripts\{{BINARY_NAME}}
 
 # 2. Tạo thư mục cài đặt chuẩn trong AppData\Local\Programs
 $installDir = "$env:LOCALAPPDATA\Programs\agent-pilot"
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-Copy-Item .\agent-pilot.exe -Destination "$installDir\agent-pilot.exe" -Force
+Copy-Item .\skills\agent-pilot\scripts\{{BINARY_NAME}} -Destination "$installDir\agent-pilot.exe" -Force
 
 # 3. Đăng ký và chạy dịch vụ nền qua Windows Task Scheduler
 & "$installDir\agent-pilot.exe" service install
@@ -128,7 +131,7 @@ agent-pilot.exe close
 ## 🔧 Xử Lý Sự Cố Thường Gặp Trên Windows
 | Vấn đề | Nguyên nhân & Cách xử lý trên Windows |
 | :--- | :--- |
-| Windows Defender SmartScreen cảnh báo *"Windows protected your PC"* | Bấm **More info (Thêm thông tin)** → **Run anyway**, hoặc chạy lệnh PowerShell: `Unblock-File .\agent-pilot.exe`. |
+| Windows Defender SmartScreen cảnh báo *"Windows protected your PC"* | Bấm **More info (Thêm thông tin)** → **Run anyway**, hoặc chạy lệnh PowerShell: `Unblock-File .\skills\agent-pilot\scripts\{{BINARY_NAME}}`. |
 | PowerShell báo *"cannot be loaded because running scripts is disabled"* | Chạy kèm cờ bypass: `powershell -ExecutionPolicy Bypass -File .\install.ps1`. |
 | Lỗi JSON cú pháp khi thêm vào `mcp_config.json` | Kiểm tra lại dấu `\` trong đường dẫn `C:\Users\...` — phải viết thành `C:\\Users\\...` trong JSON. |
 | Đổi cổng mặc định `58765` | Đặt biến môi trường trong PowerShell: `$env:AGENT_PILOT_PORT="58765"`. |

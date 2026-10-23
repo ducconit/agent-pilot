@@ -5,7 +5,7 @@
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$BinarySrc = Join-Path $ScriptDir "agent-pilot.exe"
+$BinarySrc = Join-Path $ScriptDir "skills\agent-pilot\scripts\agent-pilot.exe"
 $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\agent-pilot"
 $BinaryDst = Join-Path $InstallDir "agent-pilot.exe"
 

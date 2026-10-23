@@ -6,9 +6,8 @@
  *
  *   agent-pilot-v<version>-<os>-<arch>/
  *   ├── extensions/            Chrome extension (Load unpacked source)
- *   ├── agent-pilot(.exe)      Static CLI / MCP server for that platform
  *   ├── install.sh / .ps1      One-step OS-specific installer script
- *   ├── skills/agent-pilot/    Agent skill bundle
+ *   ├── skills/agent-pilot/    Agent skill bundle + native scripts/ binary
  *   └── README.md              OS-specific installation & MCP guide (docs/bundles/README.<os>.md)
  *
  * Usage:
@@ -261,16 +260,18 @@ for (const platform of platforms) {
   // 1. Extension (same excludes as the Chrome Web Store archive)
   copyFiltered(EXT_DIR, path.join(bundleRoot, "extensions"), DEFAULT_EXCLUDES);
 
-  // 2. Platform binary
-  await buildBinary(platform, path.join(bundleRoot, binaryName(platform)));
+  // 2. Skills bundle and its platform-native CLI/MCP binary
+  fs.cpSync(SKILLS_DIR, path.join(bundleRoot, "skills"), { recursive: true });
+  const skillBinaryPath = path.join(bundleRoot, "skills", "agent-pilot", "scripts", binaryName(platform));
+  await buildBinary(platform, skillBinaryPath);
+  if (platform.goos !== "windows") {
+    fs.chmodSync(skillBinaryPath, 0o755);
+  }
 
   // 3. OS-specific 1-step installer script (install.sh or install.ps1)
   copyOSInstaller(platform, bundleRoot);
 
-  // 4. Skills bundle
-  fs.cpSync(SKILLS_DIR, path.join(bundleRoot, "skills"), { recursive: true });
-
-  // 5. OS-specific installation & MCP server guide
+  // 4. OS-specific installation & MCP server guide
   fs.writeFileSync(path.join(bundleRoot, "README.md"), renderBundleReadme(version, platform), "utf-8");
 
   // 6. Zip the bundle folder (stageBase contains only this platform's folder)

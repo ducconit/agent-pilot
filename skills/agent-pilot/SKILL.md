@@ -17,6 +17,13 @@ than one interface or execution path. It maps each capability to CLI/MCP,
 extension relay/isolated DevTools, required tab IDs, and known capability
 boundaries.
 
+Release bundles include a native CLI/MCP binary in `scripts/` for each target
+OS: Ubuntu/Linux and macOS use `scripts/agent-pilot`; Windows uses
+`scripts/agent-pilot.exe`. Prefer the installed `agent-pilot` command when it
+is on `PATH`; use the skill-local script when an IDE cannot resolve `PATH`.
+The source checkout has only `scripts/README.md`; compiled binaries are
+injected by `npm run pack:bundle` or copied by `agent-pilot skill install`.
+
 ## Default interface recommendation
 
 **Prefer the standalone CLI by default.** It produces substantially smaller

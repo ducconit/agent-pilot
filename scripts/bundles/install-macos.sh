@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BINARY_SRC="${SCRIPT_DIR}/agent-pilot"
+BINARY_SRC="${SCRIPT_DIR}/skills/agent-pilot/scripts/agent-pilot"
 INSTALL_DIR="${HOME}/.local/bin"
 BINARY_DST="${INSTALL_DIR}/agent-pilot"
 

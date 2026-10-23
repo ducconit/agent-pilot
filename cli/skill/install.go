@@ -2,10 +2,12 @@ package skill
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	agentpilot "github.com/ducconit/agent-pilot-extension"
@@ -103,6 +105,50 @@ func EmbeddedSkillFileCount() int {
 	return count
 }
 
+// copyRunningBinary keeps the installed skill self-contained. Release
+// binaries are also the tool agents invoke; placing a copy next to the skill
+// makes it usable when an IDE does not inherit the user's PATH. Go test
+// executables are intentionally ignored by checking the release binary name.
+func copyRunningBinary(target string) (bool, error) {
+	executable, err := os.Executable()
+	if err != nil {
+		return false, nil
+	}
+	baseName := strings.ToLower(filepath.Base(executable))
+	if baseName != "agent-pilot" && baseName != "agent-pilot.exe" {
+		return false, nil
+	}
+	destinationName := "agent-pilot"
+	if runtime.GOOS == "windows" {
+		destinationName += ".exe"
+	}
+	destination := filepath.Join(target, "scripts", destinationName)
+	if filepath.Clean(executable) == filepath.Clean(destination) {
+		return false, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(destination), 0755); err != nil {
+		return false, err
+	}
+	source, err := os.Open(executable)
+	if err != nil {
+		return false, err
+	}
+	defer source.Close()
+	output, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return false, err
+	}
+	_, copyErr := io.Copy(output, source)
+	closeErr := output.Close()
+	if copyErr != nil {
+		return false, copyErr
+	}
+	if closeErr != nil {
+		return false, closeErr
+	}
+	return true, nil
+}
+
 // InstallSkill writes the embedded skill into <root>/agent-pilot.
 // Without force, an existing skill directory causes an error.
 func InstallSkill(root string, force bool) (string, int, error) {
@@ -137,6 +183,11 @@ func InstallSkill(root string, force bool) (string, int, error) {
 		if err := os.WriteFile(dest, data, 0644); err != nil {
 			return target, count, fmt.Errorf("không thể ghi %s: %w", dest, err)
 		}
+		count++
+	}
+	if copied, err := copyRunningBinary(target); err != nil {
+		return target, count, fmt.Errorf("không thể sao chép binary vào skill/scripts: %w", err)
+	} else if copied {
 		count++
 	}
 

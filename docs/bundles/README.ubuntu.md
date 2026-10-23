@@ -5,16 +5,15 @@ Gói cài đặt chuyên biệt dành cho **Ubuntu / Debian / Linux ({{ARCH}})**
 ```text
 agent-pilot-{{VERSION}}-{{PLATFORM}}/
 ├── extensions/            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome/Chromium
-├── {{BINARY_NAME}}        Agent Pilot CLI & MCP Server (ELF static binary, zero-dependency)
 ├── install.sh             Script cài đặt tự động 1 lệnh cho Ubuntu/Linux
-├── skills/agent-pilot/    Agent Skill (SKILL.md + references + examples)
+├── skills/agent-pilot/    Agent Skill + scripts/{{BINARY_NAME}} native binary
 └── README.md              Tài liệu hướng dẫn cho Ubuntu/Linux
 ```
 
 ## Yêu cầu hệ thống
 - **Hệ điều hành**: Ubuntu 20.04+ / Debian / Linux ({{ARCH}}) có `systemd`
 - **Trình duyệt**: Google Chrome 116+, Chromium, Brave hoặc Microsoft Edge (hỗ trợ Side Panel API)
-- **Phụ thuộc**: Không cần cài Node.js hay Go (`{{BINARY_NAME}}` được biên dịch tĩnh `CGO_ENABLED=0`)
+- **Phụ thuộc**: Không cần cài Node.js hay Go (`skills/agent-pilot/scripts/{{BINARY_NAME}}` được biên dịch tĩnh `CGO_ENABLED=0`)
 
 ---
 
@@ -32,6 +31,10 @@ Script `install.sh` sẽ tự động:
 3. Cài đặt Agent Skill vào `~/.agents/skills/agent-pilot` và `~/.gemini/config/skills/agent-pilot` (Antigravity).
 4. In ra đoạn cấu hình JSON MCP kèm đường dẫn chính xác trên máy của bạn.
 
+Binary native cũng có sẵn tại `skills/agent-pilot/scripts/agent-pilot`; skill
+installer tự sao chép nó vào skill đã cài để agent có thể gọi khi GUI IDE không
+truyền đúng `PATH`.
+
 ---
 
 ## 🛠️ Hoặc Cài Đặt Thủ Công Từng Bước
@@ -46,8 +49,8 @@ Script `install.sh` sẽ tự động:
 ```bash
 # Cấp quyền thực thi và cài vào ~/.local/bin (hoặc /usr/local/bin nếu muốn dùng toàn hệ thống)
 mkdir -p ~/.local/bin
-chmod +x ./{{BINARY_NAME}}
-cp ./{{BINARY_NAME}} ~/.local/bin/agent-pilot
+chmod +x ./skills/agent-pilot/scripts/{{BINARY_NAME}}
+cp ./skills/agent-pilot/scripts/{{BINARY_NAME}} ~/.local/bin/agent-pilot
 
 # Đảm bảo ~/.local/bin nằm trong PATH (thêm vào ~/.bashrc nếu chưa có)
 export PATH="$HOME/.local/bin:$PATH"
