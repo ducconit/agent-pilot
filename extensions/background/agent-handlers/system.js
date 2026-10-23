@@ -215,6 +215,7 @@ export const systemHandlers = {
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     respond({
       supported: false,
+      runtimeFallbackSupported: true,
       target: "extension-debugger",
       snapshot: false,
       baseline: false,
@@ -222,7 +223,7 @@ export const systemHandlers = {
       collectGarbage: false,
       code: "HEAPPROFILER_UNAVAILABLE",
       tabId,
-      message: "Chrome's extension debugger does not expose HeapProfiler for this tab. Create an isolated DevTools context and pass its negative tabId for real heap snapshot/baseline/diff support."
+      message: "Chrome's extension debugger does not expose HeapProfiler for this tab (runtime counter baseline/diff fallback is available; create an isolated DevTools context and pass its negative tabId for full V8 heap snapshot/constructor support)."
     });
   },
 

@@ -136,6 +136,58 @@ func newNetworkCommand() *cobra.Command {
 	return cmd
 }
 
+func newConsoleCommand() *cobra.Command {
+	cmd := newLeafCommand("console", []string{"logs"}, func(args []string) error {
+		cmdArgs, err := parseCmdArgs(args, []FlagDef{
+			{Name: "level", Aliases: []string{"type"}},
+			{Name: "limit"},
+			{Name: "clear", IsBool: true},
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		level := strings.ToLower(strings.TrimSpace(cmdArgs.String("level", "")))
+		clearLogs := cmdArgs.Bool("clear")
+		if len(cmdArgs.Positional) > 0 {
+			pos := strings.ToLower(strings.TrimSpace(cmdArgs.Positional[0]))
+			switch pos {
+			case "clear":
+				clearLogs = true
+			case "error", "errors", "err":
+				if level == "" {
+					level = "error"
+				}
+			case "warn", "warning", "warnings":
+				if level == "" {
+					level = "warning"
+				}
+			}
+		}
+		limit, err := cmdArgs.Int("limit", 50)
+		if err != nil || limit <= 0 {
+			return fmt.Errorf("❌ Error: Giới hạn (limit) phải là số nguyên dương: %v", cmdArgs.Flags["limit"])
+		}
+		if err := ExecListConsoleLogs(level, limit, clearLogs, tabID); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		return nil
+	})
+	f := cmd.Flags()
+	f.String("level", "", "Filter console entries by level: error|warn|info|log")
+	f.Int("limit", 50, "Maximum number of console entries")
+	f.Bool("clear", false, "Clear buffered console entries after reading")
+	f.IntP("tab", "t", 0, "Target tab ID")
+	return cmd
+}
+
 func newTraceCommand() *cobra.Command {
 	cmd := newLeafCommand("trace", nil, func(args []string) error {
 		cmdArgs, err := parseCmdArgs(args, []FlagDef{
@@ -174,6 +226,8 @@ func newMetricsCommand() *cobra.Command {
 			{Name: "no-vitals", IsBool: true},
 			{Name: "no-resources", IsBool: true},
 			{Name: "no-dom-health", IsBool: true},
+			{Name: "gc", IsBool: true},
+			{Name: "timeout"},
 			{Name: "tab", Aliases: []string{"t"}},
 		})
 		if err != nil {
@@ -185,10 +239,22 @@ func newMetricsCommand() *cobra.Command {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
+		timeoutMs, err := cmdArgs.Int("timeout", 0)
+		if err != nil || timeoutMs < 0 {
+			fmt.Fprintf(os.Stderr, "❌ Error: giá trị timeout không hợp lệ: %v\n", cmdArgs.Flags["timeout"])
+			return errUsage
+		}
 		includeVitals := !cmdArgs.Bool("no-vitals")
 		includeResources := !cmdArgs.Bool("no-resources")
 		includeDomHealth := !cmdArgs.Bool("no-dom-health")
-		if err := ExecPerformanceMetricsWithOptions(includeVitals, includeResources, includeDomHealth, tabID); err != nil {
+		extra := map[string]interface{}{}
+		if cmdArgs.Bool("gc") {
+			extra["collectGarbage"] = true
+		}
+		if timeoutMs > 0 {
+			extra["timeoutMs"] = timeoutMs
+		}
+		if err := ExecPerformanceMetricsWithOptions(includeVitals, includeResources, includeDomHealth, tabID, extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
@@ -198,6 +264,8 @@ func newMetricsCommand() *cobra.Command {
 	f.Bool("no-vitals", false, "Skip Core Web Vitals probe")
 	f.Bool("no-resources", false, "Skip resource bottleneck probe")
 	f.Bool("no-dom-health", false, "Skip DOM and accessibility health scan")
+	f.Bool("gc", false, "Trigger V8 garbage collection before reading metrics")
+	f.Int("timeout", 0, "Command timeout in milliseconds")
 	f.IntP("tab", "t", 0, "Target tab ID")
 	return cmd
 }

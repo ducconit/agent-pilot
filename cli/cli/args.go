@@ -116,8 +116,14 @@ func ParseSessionArgs(args []string) (string, string, interface{}, error) {
 }
 
 func parseEvalArgs(args []string) (string, interface{}, error) {
+	script, tab, _, err := parseEvalArgsWithTimeout(args)
+	return script, tab, err
+}
+
+func parseEvalArgsWithTimeout(args []string) (string, interface{}, int, error) {
 	var fileArg string
 	var tabID int
+	var timeoutMs int
 	var positional []string
 
 	for i := 0; i < len(args); i++ {
@@ -130,22 +136,38 @@ func parseEvalArgs(args []string) (string, interface{}, error) {
 		} else if strings.HasPrefix(arg, "-f=") || strings.HasPrefix(arg, "--file=") {
 			parts := strings.SplitN(arg, "=", 2)
 			fileArg = parts[1]
-		} else if arg == "-tab" || arg == "--tab" {
+		} else if arg == "-tab" || arg == "--tab" || arg == "-t" {
 			if i+1 < len(args) {
 				id, err := strconv.Atoi(args[i+1])
-				if err != nil || id <= 0 {
-					return "", nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", args[i+1])
+				if err != nil || id == 0 {
+					return "", nil, 0, fmt.Errorf("giá trị tab ID không hợp lệ: %s", args[i+1])
 				}
 				tabID = id
 				i++
 			}
-		} else if strings.HasPrefix(arg, "-tab=") || strings.HasPrefix(arg, "--tab=") {
+		} else if strings.HasPrefix(arg, "-tab=") || strings.HasPrefix(arg, "--tab=") || strings.HasPrefix(arg, "-t=") {
 			parts := strings.SplitN(arg, "=", 2)
 			id, err := strconv.Atoi(parts[1])
-			if err != nil || id <= 0 {
-				return "", nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", parts[1])
+			if err != nil || id == 0 {
+				return "", nil, 0, fmt.Errorf("giá trị tab ID không hợp lệ: %s", parts[1])
 			}
 			tabID = id
+		} else if arg == "-timeout" || arg == "--timeout" {
+			if i+1 < len(args) {
+				ms, err := strconv.Atoi(args[i+1])
+				if err != nil || ms <= 0 {
+					return "", nil, 0, fmt.Errorf("giá trị timeout không hợp lệ: %s", args[i+1])
+				}
+				timeoutMs = ms
+				i++
+			}
+		} else if strings.HasPrefix(arg, "-timeout=") || strings.HasPrefix(arg, "--timeout=") {
+			parts := strings.SplitN(arg, "=", 2)
+			ms, err := strconv.Atoi(parts[1])
+			if err != nil || ms <= 0 {
+				return "", nil, 0, fmt.Errorf("giá trị timeout không hợp lệ: %s", parts[1])
+			}
+			timeoutMs = ms
 		} else {
 			positional = append(positional, arg)
 		}
@@ -155,7 +177,7 @@ func parseEvalArgs(args []string) (string, interface{}, error) {
 	if fileArg != "" {
 		data, err := os.ReadFile(fileArg)
 		if err != nil {
-			return "", nil, fmt.Errorf("không thể đọc file %s: %w", fileArg, err)
+			return "", nil, 0, fmt.Errorf("không thể đọc file %s: %w", fileArg, err)
 		}
 		script = string(data)
 	} else if len(positional) > 0 {
@@ -166,21 +188,21 @@ func parseEvalArgs(args []string) (string, interface{}, error) {
 		if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
 			data, err := io.ReadAll(io.LimitReader(os.Stdin, config.MaxAPIBodyBytes))
 			if err != nil {
-				return "", nil, fmt.Errorf("lỗi đọc stdin: %w", err)
+				return "", nil, 0, fmt.Errorf("lỗi đọc stdin: %w", err)
 			}
 			script = string(data)
 		}
 	}
 
 	if strings.TrimSpace(script) == "" {
-		return "", nil, fmt.Errorf("vui lòng cung cấp mã script, file (-f <path>) hoặc pipe qua stdin")
+		return "", nil, 0, fmt.Errorf("vui lòng cung cấp mã script, file (-f <path>) hoặc pipe qua stdin")
 	}
 
 	var t interface{}
-	if tabID > 0 {
+	if tabID != 0 {
 		t = tabID
 	}
-	return script, t, nil
+	return script, t, timeoutMs, nil
 }
 
 func parseFillArgs(args []string) ([]map[string]interface{}, string, bool, interface{}, error) {

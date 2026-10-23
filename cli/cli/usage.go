@@ -39,6 +39,7 @@ THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT / A
   emulate [tùy chọn]            Giả lập mạng (slow-3g, offline), CPU throttling, theme (dark/light)
   resize <width> <height>       Thay đổi kích thước khung nhìn viewport
   network [list|get <id>]       Xem danh sách request HTTP hoặc lấy response body
+  console [list|errors|clear]   Xem lịch sử Console logs và Page errors (Runtime exceptions)
   trace <start|stop>            Ghi raw trace đầy đủ, bottlenecks và DevTools insights
   devtools <operation>          CSS, Lighthouse, audit drill-down, video, context riêng, worker, AX
   metrics                       Lấy chỉ số chuyên sâu (Core Web Vitals: LCP/CLS/FCP/TTFB/TBT, DOM Health, Heap)

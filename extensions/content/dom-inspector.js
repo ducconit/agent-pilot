@@ -44,10 +44,14 @@
   // Inspector UI Elements
   // =========================================================================
 
+  const existingInspectorBox = document.getElementById("agent-pilot-inspector-box");
+  if (existingInspectorBox) existingInspectorBox.remove();
   const inspectorBox = document.createElement("div");
   inspectorBox.id = "agent-pilot-inspector-box";
   document.documentElement.appendChild(inspectorBox);
 
+  const existingInspectorTooltip = document.getElementById("agent-pilot-inspector-tooltip");
+  if (existingInspectorTooltip) existingInspectorTooltip.remove();
   const inspectorTooltip = document.createElement("div");
   inspectorTooltip.id = "agent-pilot-inspector-tooltip";
   document.documentElement.appendChild(inspectorTooltip);
@@ -715,6 +719,8 @@
   // Region Screenshot Crop Overlay
   // =========================================================================
 
+  const existingCropOverlay = document.getElementById("agent-pilot-crop-overlay");
+  if (existingCropOverlay) existingCropOverlay.remove();
   const cropOverlay = document.createElement("div");
   cropOverlay.id = "agent-pilot-crop-overlay";
   cropOverlay.innerHTML = `
@@ -728,10 +734,10 @@
   `;
   document.documentElement.appendChild(cropOverlay);
 
-  const cropBox = document.getElementById("agent-pilot-crop-box");
-  const cropDims = document.getElementById("agent-pilot-crop-dims");
-  const cropConfirmBtn = document.getElementById("agent-pilot-crop-confirm");
-  const cropCancelBtn = document.getElementById("agent-pilot-crop-cancel");
+  const cropBox = cropOverlay.querySelector("#agent-pilot-crop-box");
+  const cropDims = cropOverlay.querySelector("#agent-pilot-crop-dims");
+  const cropConfirmBtn = cropOverlay.querySelector("#agent-pilot-crop-confirm");
+  const cropCancelBtn = cropOverlay.querySelector("#agent-pilot-crop-cancel");
 
   function startRegionCrop() {
     if (isElementSnapActive) stopElementSnap(false);

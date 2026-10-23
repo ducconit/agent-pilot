@@ -26,7 +26,7 @@ func ExecCdpStatus(tabID interface{}) error {
 	resMap, _ := res.(map[string]interface{})
 	attached, _ := resMap["attached"].(bool)
 	if attached {
-		fmt.Printf("🟢 CDP attached (trusted input available) — tab %v\n", resMap["tabId"])
+		fmt.Printf("🟢 CDP attached (trusted input available) — tab %v\n", formatDisplayValue(resMap["tabId"]))
 	} else {
 		fmt.Printf("🔴 CDP NOT attached — %v\n   Hint: %v\n", resMap["error"], resMap["hint"])
 	}
@@ -47,7 +47,7 @@ func ExecHandleDialog(accept bool, promptText string, tabID interface{}) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Dialog handled (accept=%v): %v\n", accept, res)
+	fmt.Printf("✅ Dialog handled (accept=%v): %v\n", accept, normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 
@@ -84,7 +84,7 @@ func ExecResizePage(width, height int, tabID interface{}) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Viewport resized to %dx%d: %v\n", width, height, res)
+	fmt.Printf("✅ Viewport resized to %dx%d: %v\n", width, height, normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 
@@ -132,6 +132,52 @@ func ExecGetNetworkResponseBody(requestId string, tabID interface{}) error {
 	return dispatchAndPrintJSON("network.getResponseBody", params, tabID)
 }
 
+func ExecListConsoleLogs(level string, limit int, clearLogs bool, tabID interface{}) error {
+	params := map[string]interface{}{
+		"console": true,
+		"network": false,
+		"clear":   clearLogs,
+	}
+	if limit > 0 {
+		params["limit"] = limit
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	res, err := bridge.DispatchCommand("devtools.getData", params, config.DefaultBridgePort())
+	if err != nil {
+		return err
+	}
+	normalizedLevel := strings.ToLower(strings.TrimSpace(level))
+	if normalizedLevel != "" {
+		if resMap, ok := res.(map[string]interface{}); ok {
+			if rawLogs, ok := resMap["console"].([]interface{}); ok {
+				filtered := make([]interface{}, 0, len(rawLogs))
+				for _, item := range rawLogs {
+					entry, ok := item.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					entryLevel := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", entry["level"])))
+					if entryLevel == normalizedLevel || (normalizedLevel == "error" && entryLevel == "exception") || (normalizedLevel == "warn" && entryLevel == "warning") {
+						filtered = append(filtered, item)
+					}
+				}
+				resMap["console"] = filtered
+				resMap["levelFilter"] = normalizedLevel
+				resMap["count"] = len(filtered)
+			}
+		}
+	}
+	jsonB, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		fmt.Printf("%v\n", res)
+		return nil
+	}
+	fmt.Println(string(jsonB))
+	return nil
+}
+
 func ExecPerformanceTrace(action, categories string, tabID interface{}) error {
 	params := map[string]interface{}{
 		"action": action,
@@ -146,12 +192,13 @@ func ExecPerformanceMetrics(tabID interface{}) error {
 	return ExecPerformanceMetricsWithOptions(true, true, true, tabID)
 }
 
-func ExecPerformanceMetricsWithOptions(includeWebVitals, includeResources, includeDomHealth bool, tabID interface{}) error {
+func ExecPerformanceMetricsWithOptions(includeWebVitals, includeResources, includeDomHealth bool, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{
 		"includeWebVitals": includeWebVitals,
 		"includeResources": includeResources,
 		"includeDomHealth": includeDomHealth,
 	}
+	mergeExtraParams(params, extra...)
 	return dispatchAndPrintJSON("performance.metrics", params, tabID)
 }
 

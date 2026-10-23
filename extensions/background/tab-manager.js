@@ -198,7 +198,7 @@ export async function getTargetTabId(requestedTabId, lastAgentTabId = null, opti
       const isAllowed = await isTabInAgentGroup(tab);
       if (!isAllowed) {
         logDebug(`[Security] Target tab ${numId} denied: not in Agent Pilot group`);
-        throw new Error(`Access denied: Tab ${numId} does not belong to the Agent Pilot tab group ('${AGENT_GROUP_TITLE}'). Operations on other tabs or groups are prohibited.`);
+        throw new Error(`Access denied: Tab ${numId} does not belong to the Agent Pilot tab group ('${AGENT_GROUP_TITLE}'). Operations on other tabs or groups are prohibited. Use 'agent-pilot open <url>' (or browser_open_tab) to open a tab in the Agent Pilot group first.`);
       }
       if (!isTabAllowedForAgent(tab.id, options)) {
         throw new Error(`Access denied: Tab ${numId} is owned by another agent session.`);

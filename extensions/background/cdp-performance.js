@@ -7,12 +7,13 @@
  *   3. V8 Heap Snapshot parser & baseline/diff memory leak detector (Detached DOM nodes, growing constructors, listener leaks)
  */
 
-import { activeTracingSessions, attachedTabs, memoryBaselines, TIMEOUTS, logDebug } from "./constants.js";
+import { activeTracingSessions, attachedTabs, devtoolsBuffers, memoryBaselines, TIMEOUTS, logDebug } from "./constants.js";
 import { sendCdpCommand } from "./cdp-connection.js";
 
 const BYTES_PER_KB = 1024;
 const BYTES_PER_MB = 1024 * 1024;
 const LONG_TASK_THRESHOLD_MS = 50;
+const DEFAULT_DOM_PROBE_TIMEOUT_MS = 4500;
 
 function round2(num) {
   return Math.round((Number(num) || 0) * 100) / 100;
@@ -28,22 +29,108 @@ function rateMetric(value, goodMax, poorMin) {
   return "poor";
 }
 
+function getRuntimeErrorsSummary(tabId) {
+  const buf = devtoolsBuffers.get(tabId);
+  if (!buf) {
+    return { count: 0, consoleErrorCount: 0, pageErrorCount: 0, recent: [] };
+  }
+  const consoleList = Array.isArray(buf.console) ? buf.console : [];
+  const errorList = Array.isArray(buf.errors) ? buf.errors : [];
+  const combined = [];
+  const seen = new Set();
+  let consoleErrorCount = 0;
+  let pageErrorCount = 0;
+
+  for (const item of consoleList) {
+    if (!item) continue;
+    const type = String(item.type || item.level || "").toLowerCase();
+    if (type !== "error" && type !== "exception" && type !== "assert") {
+      continue;
+    }
+    const text = String(item.text || item.message || "").trim();
+    if (!text) continue;
+    consoleErrorCount++;
+    const dedupeKey = `${type}:${text}:${item.timestamp || 0}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    combined.push({
+      type,
+      text: text.slice(0, 300),
+      url: item.url || undefined,
+      lineNumber: item.lineNumber ?? undefined,
+      timestamp: item.timestamp || undefined
+    });
+  }
+
+  for (const item of errorList) {
+    if (!item) continue;
+    const type = String(item.type || item.level || "exception").toLowerCase();
+    const text = String(item.text || item.message || "").trim();
+    if (!text) continue;
+    pageErrorCount++;
+    const dedupeKey = `${type}:${text}:${item.timestamp || 0}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    combined.push({
+      type,
+      text: text.slice(0, 300),
+      url: item.url || undefined,
+      lineNumber: item.lineNumber ?? undefined,
+      timestamp: item.timestamp || undefined
+    });
+  }
+
+  return {
+    count: combined.length,
+    consoleErrorCount,
+    pageErrorCount,
+    recent: combined.slice(-5)
+  };
+}
+
 /**
  * Probe Core Web Vitals, Resource timings, and DOM/A11y health in the page's MAIN world.
- * Works even when CDP debugger cannot attach, providing a zero-CDP fallback.
+ * Uses buffered PerformanceObservers so LCP, CLS, Long Tasks, and INP are captured
+ * without triggering Chromium's getEntriesByType deprecation warnings, and filters out
+ * Agent Pilot's own injected overlay nodes from DOM health & duplicate ID checks.
+ * Bounded by an internal timeout so frozen/blocked main threads do not hang metrics calls.
  */
-async function collectPageWebVitalsAndDomProbe(tabId) {
+async function collectPageWebVitalsAndDomProbe(tabId, timeoutMs = DEFAULT_DOM_PROBE_TIMEOUT_MS) {
   if (typeof chrome === "undefined" || !chrome.scripting || typeof chrome.scripting.executeScript !== "function") {
     return null;
   }
+  const effectiveTimeoutMs = Number(timeoutMs) > 0 ? Number(timeoutMs) : DEFAULT_DOM_PROBE_TIMEOUT_MS;
+  let timerId = null;
   try {
-    const results = await chrome.scripting.executeScript({
+    const scriptPromise = chrome.scripting.executeScript({
       target: { tabId },
       world: "MAIN",
-      func: () => {
+      func: async () => {
         try {
+          const isAgentPilotElement = (el) => {
+            if (!el || typeof el !== "object") return false;
+            const id = typeof el.id === "string" ? el.id : "";
+            if (id.startsWith("agent-pilot-") || id === "ap-draft-badge") return true;
+            const cls = typeof el.className === "string" ? el.className : "";
+            if (
+              cls.includes("agent-pilot-") ||
+              /\bap-(badge|pinned-box|pinned-badge|draft-badge)\b/.test(cls)
+            ) {
+              return true;
+            }
+            if (
+              typeof el.closest === "function" &&
+              el.closest(
+                '[id^="agent-pilot-"], .agent-pilot-virtual-cursor, .agent-pilot-toast, .agent-pilot-feedback-pinned-layer'
+              )
+            ) {
+              return true;
+            }
+            return false;
+          };
+
           const describeNode = (el) => {
-            if (!el || !el.tagName) return null;
+            if (!el || !el.tagName || isAgentPilotElement(el)) return null;
             const tag = el.tagName.toLowerCase();
             const id = el.id ? `#${el.id}` : "";
             const cls =
@@ -59,14 +146,65 @@ async function collectPageWebVitalsAndDomProbe(tabId) {
           const paintEntries = perf && typeof perf.getEntriesByType === "function" ? perf.getEntriesByType("paint") : [];
           const fcpEntry = (paintEntries || []).find((e) => e.name === "first-contentful-paint");
 
-          const lcpEntries =
-            perf && typeof perf.getEntriesByType === "function"
-              ? perf.getEntriesByType("largest-contentful-paint")
-              : [];
+          // Install or read buffered PerformanceObserver state to avoid deprecated getEntriesByType("largest-contentful-paint" | "layout-shift" | "longtask")
+          let lcpEntries = [];
+          let layoutShiftEntries = [];
+          let longTaskEntries = [];
+          let eventEntries = [];
+
+          if (typeof PerformanceObserver === "function") {
+            const supported = Array.isArray(PerformanceObserver.supportedEntryTypes)
+              ? PerformanceObserver.supportedEntryTypes
+              : null;
+            const canObserve = (type) => !supported || supported.includes(type);
+
+            if (!window.__AP_PERF_OBSERVER_STATE__) {
+              const state = {
+                lcpEntries: [],
+                layoutShiftEntries: [],
+                longTaskEntries: [],
+                eventEntries: [],
+                pushCapped(list, entries, max = 250) {
+                  for (const e of entries) {
+                    list.push(e);
+                    if (list.length > max) list.shift();
+                  }
+                }
+              };
+              window.__AP_PERF_OBSERVER_STATE__ = state;
+
+              const observeBuffered = (type, targetList, extraOpts = {}) => {
+                if (!canObserve(type)) return;
+                try {
+                  const obs = new PerformanceObserver((list) => {
+                    state.pushCapped(targetList, list.getEntries());
+                  });
+                  obs.observe({ type, buffered: true, ...extraOpts });
+                } catch (_) {}
+              };
+
+              observeBuffered("largest-contentful-paint", state.lcpEntries);
+              observeBuffered("layout-shift", state.layoutShiftEntries);
+              observeBuffered("longtask", state.longTaskEntries);
+              observeBuffered("event", state.eventEntries, { durationThreshold: 16 });
+
+              // Allow buffered PerformanceObserver entries to flush on newly observed page
+              await new Promise((resolve) => setTimeout(resolve, 40));
+            }
+
+            const state = window.__AP_PERF_OBSERVER_STATE__;
+            lcpEntries = state.lcpEntries || [];
+            layoutShiftEntries = state.layoutShiftEntries || [];
+            longTaskEntries = state.longTaskEntries || [];
+            eventEntries = state.eventEntries || [];
+          } else if (perf && typeof perf.getEntriesByType === "function") {
+            lcpEntries = perf.getEntriesByType("largest-contentful-paint") || [];
+            layoutShiftEntries = perf.getEntriesByType("layout-shift") || [];
+            longTaskEntries = perf.getEntriesByType("longtask") || [];
+          }
+
           const lastLcp = lcpEntries && lcpEntries.length > 0 ? lcpEntries[lcpEntries.length - 1] : null;
 
-          const layoutShiftEntries =
-            perf && typeof perf.getEntriesByType === "function" ? perf.getEntriesByType("layout-shift") : [];
           let clsScore = 0;
           const clsCulprits = [];
           for (const entry of layoutShiftEntries || []) {
@@ -83,8 +221,6 @@ async function collectPageWebVitalsAndDomProbe(tabId) {
             }
           }
 
-          const longTaskEntries =
-            perf && typeof perf.getEntriesByType === "function" ? perf.getEntriesByType("longtask") : [];
           let totalBlockingTimeMs = 0;
           let maxLongTaskMs = 0;
           const topLongTasks = [];
@@ -101,6 +237,27 @@ async function collectPageWebVitalsAndDomProbe(tabId) {
             }
           }
           topLongTasks.sort((a, b) => b.durationMs - a.durationMs);
+
+          // Interaction to Next Paint (INP) from Event Timing API
+          let maxInteractionMs = undefined;
+          let slowestInteraction = undefined;
+          for (const ev of eventEntries || []) {
+            const isInteraction =
+              (typeof ev.interactionId === "number" && ev.interactionId > 0) ||
+              ev.name === "click" ||
+              ev.name === "keydown" ||
+              ev.name === "pointerup";
+            if (!isInteraction) continue;
+            const dur = Number(ev.duration) || 0;
+            if (maxInteractionMs === undefined || dur > maxInteractionMs) {
+              maxInteractionMs = Math.round(dur);
+              slowestInteraction = {
+                name: ev.name || "interaction",
+                durationMs: Math.round(dur),
+                target: describeNode(ev.target) || undefined
+              };
+            }
+          }
 
           // Resource bottlenecks
           const resourceEntries =
@@ -123,8 +280,9 @@ async function collectPageWebVitalsAndDomProbe(tabId) {
           }
           slowList.sort((a, b) => b.durationMs - a.durationMs);
 
-          // DOM & Accessibility health scan
+          // DOM & Accessibility health scan (excluding Agent Pilot's own injected UI nodes)
           const allElements = document.querySelectorAll("*");
+          let totalPageElements = 0;
           let maxDepth = 0;
           let maxChildrenCount = 0;
           let maxChildrenSelector = "";
@@ -135,7 +293,17 @@ async function collectPageWebVitalsAndDomProbe(tabId) {
 
           for (let i = 0; i < allElements.length; i++) {
             const el = allElements[i];
-            const childCount = el.children ? el.children.length : 0;
+            if (isAgentPilotElement(el)) continue;
+            totalPageElements++;
+
+            let childCount = 0;
+            if (el.children) {
+              for (let c = 0; c < el.children.length; c++) {
+                if (!isAgentPilotElement(el.children[c])) {
+                  childCount++;
+                }
+              }
+            }
             if (childCount > maxChildrenCount) {
               maxChildrenCount = childCount;
               maxChildrenSelector = describeNode(el) || el.tagName.toLowerCase();
@@ -162,7 +330,7 @@ async function collectPageWebVitalsAndDomProbe(tabId) {
                 Boolean(el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`));
               if (!hasLabel) unlabelledInputs++;
             }
-            if (!el.children || el.children.length === 0) {
+            if (childCount === 0) {
               let depth = 0;
               let curr = el;
               while (curr && depth < 100) {
@@ -181,15 +349,18 @@ async function collectPageWebVitalsAndDomProbe(tabId) {
           }
 
           const perfMem = perf && perf.memory ? perf.memory : null;
+          const lcpTime = lastLcp ? lastLcp.renderTime || lastLcp.loadTime || lastLcp.startTime : undefined;
 
           return {
             webVitals: {
               ttfbMs: nav ? Math.round(Math.max(0, (nav.responseStart || 0) - (nav.requestStart || 0))) : undefined,
               fcpMs: fcpEntry ? Math.round(fcpEntry.startTime) : undefined,
-              lcpMs: lastLcp ? Math.round(lastLcp.startTime) : undefined,
+              lcpMs: lcpTime !== undefined ? Math.round(lcpTime) : undefined,
               lcpElement: lastLcp && lastLcp.element ? describeNode(lastLcp.element) : undefined,
               cls: Math.round(clsScore * 1000) / 1000,
               clsCulprits,
+              inpMs: maxInteractionMs,
+              ...(slowestInteraction ? { slowestInteraction } : {}),
               domInteractiveMs: nav ? Math.round(nav.domInteractive || 0) : undefined,
               domContentLoadedMs: nav ? Math.round(nav.domContentLoadedEventEnd || 0) : undefined,
               loadEventMs: nav && nav.loadEventEnd > 0 ? Math.round(nav.loadEventEnd) : undefined,
@@ -206,7 +377,7 @@ async function collectPageWebVitalsAndDomProbe(tabId) {
               slowestResources: slowList.slice(0, 5)
             },
             domHealth: {
-              totalElements: allElements.length,
+              totalElements: totalPageElements,
               maxDepth,
               maxChildrenCount,
               maxChildrenSelector,
@@ -228,10 +399,20 @@ async function collectPageWebVitalsAndDomProbe(tabId) {
         }
       }
     });
+
+    const timeoutPromise = new Promise((resolve) => {
+      timerId = setTimeout(() => {
+        resolve([{ result: { __probeTimedOut: true, timeoutMs: effectiveTimeoutMs } }]);
+      }, effectiveTimeoutMs);
+    });
+
+    const results = await Promise.race([scriptPromise, timeoutPromise]);
     return results && results[0] ? results[0].result : null;
   } catch (err) {
     logDebug("collectPageWebVitalsAndDomProbe failed", err);
     return null;
+  } finally {
+    if (timerId !== null) clearTimeout(timerId);
   }
 }
 
@@ -475,8 +656,19 @@ export async function stopPerformanceTrace(tabId) {
 /**
  * Build actionable diagnostic warnings from CDP metrics, Web Vitals, and DOM health.
  */
-function buildPerformanceDiagnostics(memory, webVitals, domHealth, resources) {
+function buildPerformanceDiagnostics(memory, webVitals, domHealth, resources, extraContext = {}) {
   const diagnostics = [];
+
+  if (extraContext?.probeTimedOut) {
+    const tMs = extraContext.probeTimeoutMs || DEFAULT_DOM_PROBE_TIMEOUT_MS;
+    diagnostics.push({
+      severity: "critical",
+      category: "responsiveness",
+      metric: "MainThreadBlocked",
+      value: `>${tMs}ms`,
+      message: `Page main thread did not respond to DOM/WebVitals probe within ${tMs}ms (likely blocked by heavy synchronous JavaScript or layout thrashing)`
+    });
+  }
 
   if (webVitals) {
     if (typeof webVitals.lcpMs === "number" && webVitals.lcpMs > 2500) {
@@ -499,6 +691,16 @@ function buildPerformanceDiagnostics(memory, webVitals, domHealth, resources) {
         message: `High Cumulative Layout Shift (${webVitals.cls} > 0.1)`
       });
     }
+    if (typeof webVitals.inpMs === "number" && webVitals.inpMs > 200) {
+      diagnostics.push({
+        severity: webVitals.inpMs > 500 ? "critical" : "warning",
+        category: "inp",
+        metric: "INP",
+        value: `${webVitals.inpMs}ms`,
+        interaction: webVitals.slowestInteraction,
+        message: `Slow Interaction to Next Paint (${webVitals.inpMs}ms > 200ms)${webVitals.slowestInteraction?.target ? ` on ${webVitals.slowestInteraction.target}` : ""}`
+      });
+    }
     if (typeof webVitals.totalBlockingTimeMs === "number" && webVitals.totalBlockingTimeMs > 200) {
       diagnostics.push({
         severity: webVitals.totalBlockingTimeMs > 600 ? "critical" : "warning",
@@ -511,15 +713,54 @@ function buildPerformanceDiagnostics(memory, webVitals, domHealth, resources) {
   }
 
   if (memory) {
-    if (typeof memory.domNodes === "number" && memory.domNodes > 1500) {
+    const liveElements =
+      typeof domHealth?.totalElements === "number"
+        ? domHealth.totalElements
+        : typeof memory.liveDomElements === "number"
+          ? memory.liveDomElements
+          : undefined;
+    const effectiveLiveNodes = liveElements !== undefined ? liveElements : memory.domNodes;
+
+    if (typeof effectiveLiveNodes === "number" && effectiveLiveNodes > 1500) {
       diagnostics.push({
-        severity: memory.domNodes > 3000 ? "critical" : "warning",
+        severity: effectiveLiveNodes > 3000 ? "critical" : "warning",
         category: "dom",
         metric: "DOMNodes",
-        value: memory.domNodes,
-        message: `Large DOM tree (${memory.domNodes} nodes > 1500 recommended threshold)`
+        value: effectiveLiveNodes,
+        message: `Large DOM tree (${effectiveLiveNodes} live nodes > 1500 recommended threshold)`
       });
     }
+
+    if (
+      typeof memory.domNodes === "number" &&
+      typeof liveElements === "number" &&
+      memory.domNodes - liveElements > 500 &&
+      memory.domNodes > liveElements * 1.5
+    ) {
+      const retainedDiff = memory.domNodes - liveElements;
+      diagnostics.push({
+        severity: retainedDiff > 5000 ? "critical" : "warning",
+        category: "memory",
+        metric: "DetachedOrUncollectedNodes",
+        value: retainedDiff,
+        liveDomElements: liveElements,
+        blinkRetainedNodes: memory.domNodes,
+        message: `Blink retains ${memory.domNodes} DOM nodes while live document has only ${liveElements} elements (+${retainedDiff} detached or uncollected nodes waiting for GC)`
+      });
+    }
+
+    const expectedDocs = 1 + (typeof domHealth?.iframeCount === "number" ? domHealth.iframeCount : 0);
+    if (typeof memory.documents === "number" && memory.documents > expectedDocs) {
+      diagnostics.push({
+        severity: memory.documents > expectedDocs + 2 ? "critical" : "warning",
+        category: "memory",
+        metric: "RetainedDocuments",
+        value: memory.documents,
+        expectedDocuments: expectedDocs,
+        message: `Renderer retains ${memory.documents} Document instances for ${expectedDocs} live document/iframe(s) (possible leaked Document or detached DOM reference across navigations)`
+      });
+    }
+
     if (typeof memory.jsHeapUsedMB === "number" && memory.jsHeapUsedMB > 100) {
       diagnostics.push({
         severity: memory.jsHeapUsedMB > 250 ? "critical" : "warning",
@@ -563,6 +804,18 @@ function buildPerformanceDiagnostics(memory, webVitals, domHealth, resources) {
     });
   }
 
+  if (extraContext?.runtimeErrors && extraContext.runtimeErrors.count > 0) {
+    const latest = extraContext.runtimeErrors.recent?.[extraContext.runtimeErrors.recent.length - 1]?.text;
+    diagnostics.push({
+      severity: "warning",
+      category: "runtime",
+      metric: "ConsoleErrors",
+      value: extraContext.runtimeErrors.count,
+      recentErrors: extraContext.runtimeErrors.recent.map((e) => e.text),
+      message: `Captured ${extraContext.runtimeErrors.count} runtime console error(s)/exception(s) on this tab${latest ? ` (latest: ${latest})` : ""}`
+    });
+  }
+
   return diagnostics;
 }
 
@@ -573,8 +826,19 @@ export async function getPerformanceMetrics(tabId, options = {}) {
   const includeWebVitals = options?.includeWebVitals !== false;
   const includeResources = options?.includeResources !== false;
   const includeDomHealth = options?.includeDomHealth !== false;
+  const shouldCollectGarbage = Boolean(options?.collectGarbage || options?.gc);
+  let garbageCollected = false;
+
   const metricsMap = {};
   if (attachedTabs.has(tabId)) {
+    if (shouldCollectGarbage) {
+      try {
+        await sendCdpCommand(tabId, "HeapProfiler.collectGarbage");
+        garbageCollected = true;
+      } catch (gcErr) {
+        logDebug("Pre-metrics HeapProfiler.collectGarbage error (ignored)", gcErr);
+      }
+    }
     try {
       const result = await sendCdpCommand(tabId, "Performance.getMetrics");
       if (result && Array.isArray(result.metrics)) {
@@ -587,16 +851,26 @@ export async function getPerformanceMetrics(tabId, options = {}) {
     }
   }
 
-  const probe =
+  const probeTimeoutMs =
+    Number(options?.probeTimeoutMs) > 0 ? Number(options.probeTimeoutMs) : DEFAULT_DOM_PROBE_TIMEOUT_MS;
+  const rawProbe =
     includeWebVitals || includeResources || includeDomHealth
-      ? await collectPageWebVitalsAndDomProbe(tabId)
+      ? await collectPageWebVitalsAndDomProbe(tabId, probeTimeoutMs)
       : null;
+  const probeTimedOut = Boolean(rawProbe?.__probeTimedOut);
+  const probe = probeTimedOut ? null : rawProbe;
   const fallbackMem = probe?.jsMemoryFallback || null;
 
   const usedBytes = metricsMap.JSHeapUsedSize ?? fallbackMem?.usedJSHeapSize;
   const totalBytes = metricsMap.JSHeapTotalSize ?? fallbackMem?.totalJSHeapSize;
   const limitBytes = fallbackMem?.jsHeapSizeLimit;
-  const domNodes = metricsMap.Nodes ?? probe?.domHealth?.totalElements;
+  const liveDomElements = probe?.domHealth?.totalElements;
+  const blinkRetainedNodes = metricsMap.Nodes;
+  const domNodes = metricsMap.Nodes ?? liveDomElements;
+  const detachedOrUncollectedNodes =
+    typeof blinkRetainedNodes === "number" && typeof liveDomElements === "number"
+      ? Math.max(0, blinkRetainedNodes - liveDomElements)
+      : undefined;
 
   if (metricsMap.JSHeapUsedSize === undefined && usedBytes !== undefined) {
     metricsMap.JSHeapUsedSize = usedBytes;
@@ -615,6 +889,9 @@ export async function getPerformanceMetrics(tabId, options = {}) {
     heapUsagePercent:
       usedBytes !== undefined && totalBytes > 0 ? round2((usedBytes / totalBytes) * 100) : undefined,
     domNodes,
+    ...(liveDomElements !== undefined ? { liveDomElements } : {}),
+    ...(blinkRetainedNodes !== undefined ? { blinkRetainedNodes } : {}),
+    ...(detachedOrUncollectedNodes !== undefined ? { detachedOrUncollectedNodes } : {}),
     jsEventListeners: metricsMap.JSEventListeners,
     documents: metricsMap.Documents,
     frames: metricsMap.Frames,
@@ -641,6 +918,7 @@ export async function getPerformanceMetrics(tabId, options = {}) {
         fcp: rateMetric(wv.fcpMs, 1800, 3000),
         lcp: rateMetric(wv.lcpMs, 2500, 4000),
         cls: rateMetric(wv.cls, 0.1, 0.25),
+        ...(wv.inpMs !== undefined ? { inp: rateMetric(wv.inpMs, 200, 500) } : {}),
         tbt: rateMetric(wv.totalBlockingTimeMs, 200, 600)
       }
     };
@@ -648,16 +926,24 @@ export async function getPerformanceMetrics(tabId, options = {}) {
 
   const resources = includeResources ? probe?.resources || undefined : undefined;
   const domHealth = includeDomHealth ? probe?.domHealth || undefined : undefined;
-  const diagnostics = buildPerformanceDiagnostics(memory, webVitals, domHealth, resources);
+  const runtimeErrors = getRuntimeErrorsSummary(tabId);
+  const diagnostics = buildPerformanceDiagnostics(memory, webVitals, domHealth, resources, {
+    probeTimedOut,
+    probeTimeoutMs,
+    runtimeErrors
+  });
 
   return {
     success: true,
     tabId,
+    ...(shouldCollectGarbage ? { garbageCollected } : {}),
+    ...(probeTimedOut ? { mainThreadBlocked: true, domProbeTimedOut: true } : {}),
     metrics: metricsMap,
     memory,
     webVitals,
     resources,
     domHealth,
+    ...(runtimeErrors.count > 0 ? { runtimeErrors } : {}),
     diagnostics,
     timestamp: Date.now()
   };
@@ -831,9 +1117,29 @@ function computeMemoryLeakDiff(baseline, current) {
   const deltaHeapBytes = (current.metrics.JSHeapUsedSize || 0) - (baseline.metrics.JSHeapUsedSize || 0);
   const deltaHeapMB = round2(deltaHeapBytes / BYTES_PER_MB);
   const deltaDomNodes = (current.metrics.Nodes || 0) - (baseline.metrics.Nodes || 0);
+  const deltaLiveDomElements =
+    typeof current.liveDomElements === "number" && typeof baseline.liveDomElements === "number"
+      ? current.liveDomElements - baseline.liveDomElements
+      : undefined;
+  const prevUncollectedNodes =
+    typeof baseline.metrics.Nodes === "number" && typeof baseline.liveDomElements === "number"
+      ? Math.max(0, baseline.metrics.Nodes - baseline.liveDomElements)
+      : undefined;
+  const currUncollectedNodes =
+    typeof current.metrics.Nodes === "number" && typeof current.liveDomElements === "number"
+      ? Math.max(0, current.metrics.Nodes - current.liveDomElements)
+      : undefined;
+  const deltaUncollectedNodes =
+    currUncollectedNodes !== undefined && prevUncollectedNodes !== undefined
+      ? currUncollectedNodes - prevUncollectedNodes
+      : undefined;
   const deltaEventListeners =
     (current.metrics.JSEventListeners || 0) - (baseline.metrics.JSEventListeners || 0);
   const deltaDocuments = (current.metrics.Documents || 0) - (baseline.metrics.Documents || 0);
+  const deltaRuntimeErrors =
+    typeof current.runtimeErrorsCount === "number" && typeof baseline.runtimeErrorsCount === "number"
+      ? Math.max(0, current.runtimeErrorsCount - baseline.runtimeErrorsCount)
+      : 0;
 
   const prevDetachedCount = baseline.heapSummary?.detachedDomNodes?.totalCount || 0;
   const currDetachedCount = current.heapSummary?.detachedDomNodes?.totalCount || 0;
@@ -874,6 +1180,10 @@ function computeMemoryLeakDiff(baseline, current) {
     );
   } else if (currDetachedCount > 0) {
     suspectedCauses.push(`Found ${currDetachedCount} detached DOM node(s) retained in memory`);
+  } else if (deltaUncollectedNodes !== undefined && deltaUncollectedNodes > 20) {
+    suspectedCauses.push(
+      `Retained Blink DOM nodes grew by +${deltaUncollectedNodes} beyond live DOM elements (live=${current.liveDomElements}, retained=${current.metrics.Nodes}) — suspected detached DOM subtree`
+    );
   }
 
   if (deltaEventListeners > 5) {
@@ -897,19 +1207,36 @@ function computeMemoryLeakDiff(baseline, current) {
       : "";
     suspectedCauses.push(`JS Heap grew by +${deltaHeapMB} MB after forced GC${topGrower}`);
   }
+  if (deltaRuntimeErrors > 0) {
+    suspectedCauses.push(
+      `Captured +${deltaRuntimeErrors} new runtime console error(s)/exception(s) during leak test (total=${current.runtimeErrorsCount})`
+    );
+  }
 
   const leakSuspected =
     deltaDetachedCount > 0 ||
     currDetachedCount > 5 ||
+    (deltaUncollectedNodes !== undefined && deltaUncollectedNodes > 20) ||
     deltaEventListeners > 10 ||
     deltaDocuments > 0 ||
     deltaHeapMB >= 1.0;
 
   let severity = "none";
   if (leakSuspected) {
-    if (deltaHeapMB >= 5.0 || deltaDetachedCount >= 10 || deltaDocuments > 0 || deltaEventListeners >= 50) {
+    if (
+      deltaHeapMB >= 5.0 ||
+      deltaDetachedCount >= 10 ||
+      (deltaUncollectedNodes !== undefined && deltaUncollectedNodes >= 500) ||
+      deltaDocuments > 0 ||
+      deltaEventListeners >= 50
+    ) {
       severity = "high";
-    } else if (deltaHeapMB >= 1.0 || deltaDetachedCount > 0 || deltaEventListeners > 10) {
+    } else if (
+      deltaHeapMB >= 1.0 ||
+      deltaDetachedCount > 0 ||
+      (deltaUncollectedNodes !== undefined && deltaUncollectedNodes > 20) ||
+      deltaEventListeners > 10
+    ) {
       severity = "medium";
     } else {
       severity = "low";
@@ -925,9 +1252,12 @@ function computeMemoryLeakDiff(baseline, current) {
       jsHeapUsedBytes: deltaHeapBytes,
       jsHeapUsedMB: deltaHeapMB,
       domNodes: deltaDomNodes,
+      ...(deltaLiveDomElements !== undefined ? { liveDomElements: deltaLiveDomElements } : {}),
+      ...(deltaUncollectedNodes !== undefined ? { detachedOrUncollectedNodes: deltaUncollectedNodes } : {}),
       jsEventListeners: deltaEventListeners,
       documents: deltaDocuments,
-      detachedDomCount: deltaDetachedCount
+      detachedDomCount: deltaDetachedCount,
+      ...(deltaRuntimeErrors > 0 ? { runtimeErrors: deltaRuntimeErrors } : {})
     },
     growingConstructors: growingConstructors.slice(0, 10),
     suspectedCauses
@@ -937,6 +1267,9 @@ function computeMemoryLeakDiff(baseline, current) {
 /**
  * Take heap snapshot via CDP HeapProfiler, parse constructor & detached DOM breakdown,
  * and optionally record a baseline or compute a memory leak diff against the tab's baseline.
+ * When Chrome's extension debugger blocks HeapProfiler.takeHeapSnapshot on a normal tab
+ * (and no raw .heapsnapshot filePath is requested), falls back to runtime memory/DOM/listener
+ * counters when available so baseline/diff leak workflows still operate on extension tabs.
  */
 export async function takeHeapSnapshot(tabId, options = {}) {
   const action = String(options?.action || "snapshot").toLowerCase().trim();
@@ -983,25 +1316,55 @@ export async function takeHeapSnapshot(tabId, options = {}) {
   };
   chrome.debugger.onEvent.addListener(chunkListener);
 
+  let usedRuntimeFallback = false;
+  let fallbackNotice = undefined;
   try {
     await sendCdpCommand(tabId, "HeapProfiler.takeHeapSnapshot", { reportProgress: false });
   } catch (err) {
     if (isUnsupportedHeapProfilerError(err)) {
-      throw createHeapProfilerUnavailableError("HeapProfiler.takeHeapSnapshot", err);
+      const hasRuntimeCounters =
+        Object.keys(metricsMap).length > 0 &&
+        (metricsMap.JSHeapUsedSize !== undefined || metricsMap.Nodes !== undefined);
+      const canFallback =
+        hasRuntimeCounters && !options?.filePath && options?.allowFallback !== false;
+      if (!canFallback) {
+        throw createHeapProfilerUnavailableError("HeapProfiler.takeHeapSnapshot", err);
+      }
+      usedRuntimeFallback = true;
+      fallbackNotice =
+        "Chrome's extension debugger does not expose HeapProfiler.takeHeapSnapshot on standard tabs; fell back to live CDP Performance.getMetrics + DOM/listener leak counters. Use an isolated DevTools context (negative tabId) if constructor-level V8 retainer graphs are required.";
+    } else {
+      throw err;
     }
-    throw err;
   } finally {
     chrome.debugger.onEvent.removeListener(chunkListener);
   }
 
+  let liveDomElements = undefined;
+  if (usedRuntimeFallback) {
+    const probe = await collectPageWebVitalsAndDomProbe(tabId, 2500);
+    if (probe && !probe.__probeTimedOut) {
+      liveDomElements = probe.domHealth?.totalElements;
+      if (metricsMap.JSHeapUsedSize === undefined && probe.jsMemoryFallback?.usedJSHeapSize !== undefined) {
+        metricsMap.JSHeapUsedSize = probe.jsMemoryFallback.usedJSHeapSize;
+      }
+      if (metricsMap.JSHeapTotalSize === undefined && probe.jsMemoryFallback?.totalJSHeapSize !== undefined) {
+        metricsMap.JSHeapTotalSize = probe.jsMemoryFallback.totalJSHeapSize;
+      }
+    }
+  }
+
   const totalLength = chunks.reduce((acc, c) => acc + (c ? c.length : 0), 0);
-  const parsedHeap = parseV8HeapSnapshot(chunks, options?.maxConstructors);
+  const parsedHeap = usedRuntimeFallback ? null : parseV8HeapSnapshot(chunks, options?.maxConstructors);
+  const runtimeErrors = getRuntimeErrorsSummary(tabId);
   const now = Date.now();
 
   const currentRecord = {
     timestamp: now,
     metrics: metricsMap,
-    heapSummary: parsedHeap
+    heapSummary: parsedHeap,
+    ...(liveDomElements !== undefined ? { liveDomElements } : {}),
+    runtimeErrorsCount: runtimeErrors.count
   };
 
   const prevBaseline = memoryBaselines.get(tabId) || null;
@@ -1033,10 +1396,17 @@ export async function takeHeapSnapshot(tabId, options = {}) {
     memoryBaselines.set(tabId, currentRecord);
   }
 
+  const detachedOrUncollectedNodes =
+    typeof metricsMap.Nodes === "number" && typeof liveDomElements === "number"
+      ? Math.max(0, metricsMap.Nodes - liveDomElements)
+      : undefined;
+
   const response = {
     success: true,
     tabId,
     action,
+    snapshotMode: usedRuntimeFallback ? "runtime-counters-fallback" : "v8-heap-snapshot",
+    ...(usedRuntimeFallback ? { heapProfilerSupported: false, fallbackNotice } : {}),
     garbageCollected,
     ...(garbageCollectionWarning ? { garbageCollectionWarning } : {}),
     baselineRecorded: Boolean(wantsBaseline || firstDiffNeedsBaseline),
@@ -1048,11 +1418,17 @@ export async function takeHeapSnapshot(tabId, options = {}) {
       jsHeapTotalMB:
         metricsMap.JSHeapTotalSize !== undefined ? round2(metricsMap.JSHeapTotalSize / BYTES_PER_MB) : undefined,
       domNodes: metricsMap.Nodes,
+      ...(liveDomElements !== undefined ? { liveDomElements } : {}),
+      ...(detachedOrUncollectedNodes !== undefined ? { detachedOrUncollectedNodes } : {}),
       jsEventListeners: metricsMap.JSEventListeners,
       documents: metricsMap.Documents,
-      frames: metricsMap.Frames
+      frames: metricsMap.Frames,
+      ...(runtimeErrors.count > 0 ? { consoleErrors: runtimeErrors.count } : {})
     },
-    message: `Heap snapshot captured (${totalLength} bytes across ${chunks.length} chunks)`
+    ...(runtimeErrors.count > 0 ? { runtimeErrors } : {}),
+    message: usedRuntimeFallback
+      ? `Captured runtime memory & DOM/listener leak counters (${action})`
+      : `Heap snapshot captured (${totalLength} bytes across ${chunks.length} chunks)`
   };
 
   if (parsedHeap) {

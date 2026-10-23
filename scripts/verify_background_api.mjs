@@ -1207,5 +1207,318 @@ record(
   "timeout=false, methodNotFound=true"
 );
 
+// 29. getPerformanceMetrics distinguishes liveDomElements vs blinkRetainedNodes, supports pre-metrics GC, includes runtimeErrors, and flags INP / DetachedOrUncollectedNodes / RetainedDocuments / ConsoleErrors
+attachedTabs.add(929);
+let gcCalled929 = false;
+devtoolsBuffers.set(929, {
+  console: [{ type: "error", text: "RangeError: Maximum call stack size exceeded", timestamp: Date.now() }],
+  errors: [{ text: "Uncaught ReferenceError: chartInstance is not defined", timestamp: Date.now() }],
+  issues: [],
+  network: new Map()
+});
+globalThis.chrome.debugger.sendCommand = (_target, method, _params, cb) => {
+  if (method === "HeapProfiler.collectGarbage") {
+    gcCalled929 = true;
+    cb({});
+    return;
+  }
+  if (method === "Performance.getMetrics") {
+    cb({
+      metrics: [
+        { name: "JSHeapUsedSize", value: 42 * 1024 * 1024 },
+        { name: "JSHeapTotalSize", value: 64 * 1024 * 1024 },
+        { name: "Nodes", value: 1950 },
+        { name: "Documents", value: 7 },
+        { name: "JSEventListeners", value: 840 }
+      ]
+    });
+    return;
+  }
+  cb({});
+};
+globalThis.chrome.scripting = {
+  executeScript: async () => [
+    {
+      result: {
+        webVitals: {
+          ttfbMs: 120,
+          fcpMs: 450,
+          lcpMs: 1100,
+          lcpElement: "main.dashboard",
+          cls: 0.02,
+          clsCulprits: [],
+          inpMs: 640,
+          slowestInteraction: { name: "click", durationMs: 640, target: "button#stress-btn" },
+          totalBlockingTimeMs: 420,
+          longTasksCount: 3,
+          domContentLoadedMs: 500,
+          loadEventMs: 900
+        },
+        resources: {
+          totalCount: 10,
+          totalTransferKB: 420,
+          renderBlockingCount: 0,
+          renderBlockingUrls: [],
+          slowestResources: []
+        },
+        domHealth: {
+          totalElements: 450,
+          maxDepth: 14,
+          maxChildrenCount: 25,
+          maxChildrenSelector: "div.grid",
+          iframeCount: 0,
+          duplicateIds: [],
+          imagesMissingAlt: 0,
+          unlabelledInputs: 0
+        }
+      }
+    }
+  ]
+};
+const perf929 = await cdpManager.getPerformanceMetrics(929, { collectGarbage: true });
+const diag929 = (perf929.diagnostics || []).map((d) => d.metric);
+record(
+  "29. getPerformanceMetrics separates liveDomElements vs blinkRetainedNodes, runs optional GC, surfaces runtimeErrors, and flags INP/DetachedDOM/RetainedDocuments",
+  gcCalled929 === true &&
+    perf929.garbageCollected === true &&
+    perf929.memory?.liveDomElements === 450 &&
+    perf929.memory?.blinkRetainedNodes === 1950 &&
+    perf929.memory?.detachedOrUncollectedNodes === 1500 &&
+    perf929.webVitals?.inpMs === 640 &&
+    perf929.webVitals?.ratings?.inp === "poor" &&
+    perf929.runtimeErrors?.consoleErrorCount === 1 &&
+    perf929.runtimeErrors?.pageErrorCount === 1 &&
+    diag929.includes("INP") &&
+    diag929.includes("DetachedOrUncollectedNodes") &&
+    diag929.includes("RetainedDocuments") &&
+    diag929.includes("ConsoleErrors"),
+  `live=${perf929.memory?.liveDomElements}, retained=${perf929.memory?.blinkRetainedNodes}, detached=${perf929.memory?.detachedOrUncollectedNodes}, diag=${diag929.join(",")}`
+);
+
+// 30. getPerformanceMetrics survives a frozen main thread when executeScript times out and emits MainThreadBlocked diagnostic
+attachedTabs.add(930);
+globalThis.chrome.scripting = {
+  executeScript: () => new Promise(() => {})
+};
+const perf930 = await cdpManager.getPerformanceMetrics(930, { probeTimeoutMs: 60 });
+const diag930 = (perf930.diagnostics || []).map((d) => d.metric);
+record(
+  "30. getPerformanceMetrics bounds executeScript probe on a frozen main thread and returns MainThreadBlocked diagnostic",
+  perf930.success === true &&
+    perf930.mainThreadBlocked === true &&
+    perf930.domProbeTimedOut === true &&
+    perf930.memory?.blinkRetainedNodes === 1950 &&
+    diag930.includes("MainThreadBlocked"),
+  `mainThreadBlocked=${perf930.mainThreadBlocked}, diag=${diag930.join(",")}`
+);
+
+// 31. takeHeapSnapshot falls back to runtime-counters-fallback on extension tabs when HeapProfiler is unavailable but Performance.getMetrics is present
+attachedTabs.add(931);
+let step931 = 0;
+globalThis.chrome.debugger.sendCommand = (_target, method, _params, cb) => {
+  if (method === "HeapProfiler.collectGarbage" || method === "HeapProfiler.takeHeapSnapshot") {
+    globalThis.chrome.runtime.lastError = { message: "-32601 Method not found" };
+    cb({});
+    globalThis.chrome.runtime.lastError = null;
+    return;
+  }
+  if (method === "Performance.getMetrics") {
+    step931++;
+    if (step931 === 1) {
+      cb({
+        metrics: [
+          { name: "JSHeapUsedSize", value: 12 * 1024 * 1024 },
+          { name: "JSHeapTotalSize", value: 24 * 1024 * 1024 },
+          { name: "Nodes", value: 500 },
+          { name: "Documents", value: 2 },
+          { name: "JSEventListeners", value: 120 }
+        ]
+      });
+    } else {
+      cb({
+        metrics: [
+          { name: "JSHeapUsedSize", value: 22 * 1024 * 1024 },
+          { name: "JSHeapTotalSize", value: 32 * 1024 * 1024 },
+          { name: "Nodes", value: 1400 },
+          { name: "Documents", value: 5 },
+          { name: "JSEventListeners", value: 340 }
+        ]
+      });
+    }
+    return;
+  }
+  cb({});
+};
+globalThis.chrome.scripting = {
+  executeScript: async () => [
+    {
+      result: {
+        domHealth: {
+          totalElements: 420,
+          maxDepth: 10,
+          maxChildrenCount: 15,
+          maxChildrenSelector: "div.app",
+          iframeCount: 0,
+          duplicateIds: [],
+          imagesMissingAlt: 0,
+          unlabelledInputs: 0
+        }
+      }
+    }
+  ]
+};
+const fallbackBaseline = await cdpManager.takeHeapSnapshot(931, { action: "baseline" });
+const fallbackDiff = await cdpManager.takeHeapSnapshot(931, { action: "diff" });
+record(
+  "31. takeHeapSnapshot falls back to runtime-counters-fallback for baseline and diff when HeapProfiler is blocked on extension tabs",
+  fallbackBaseline.success === true &&
+    fallbackBaseline.snapshotMode === "runtime-counters-fallback" &&
+    fallbackBaseline.baselineRecorded === true &&
+    fallbackDiff.success === true &&
+    fallbackDiff.snapshotMode === "runtime-counters-fallback" &&
+    fallbackDiff.leakAnalysis?.hasBaseline === true &&
+    fallbackDiff.leakAnalysis?.leakSuspected === true &&
+    fallbackDiff.leakAnalysis?.deltas?.domNodes === 900 &&
+    fallbackDiff.leakAnalysis?.deltas?.documents === 3 &&
+    fallbackDiff.leakAnalysis?.deltas?.jsEventListeners === 220 &&
+    fallbackDiff.leakAnalysis?.deltas?.detachedOrUncollectedNodes === 900 &&
+    fallbackDiff.runtimeCounters?.detachedOrUncollectedNodes === 980,
+  `mode=${fallbackDiff.snapshotMode}, leakSuspected=${fallbackDiff.leakAnalysis?.leakSuspected}, deltaDom=${fallbackDiff.leakAnalysis?.deltas?.domNodes}, detachedDelta=${fallbackDiff.leakAnalysis?.deltas?.detachedOrUncollectedNodes}`
+);
+
+// 32. collectPageWebVitalsAndDomProbe in-page function filters out #agent-pilot-* / .agent-pilot-* / .ap-* elements and collects buffered PerformanceObserver Web Vitals
+let capturedPageProbeFunc = null;
+attachedTabs.add(932);
+globalThis.chrome.scripting = {
+  executeScript: async ({ func }) => {
+    capturedPageProbeFunc = func;
+    return [{ result: null }];
+  }
+};
+await cdpManager.getPerformanceMetrics(932, {});
+let inPageProbeResult = null;
+if (typeof capturedPageProbeFunc === "function") {
+  const prevWindow = globalThis.window;
+  const prevDocument = globalThis.document;
+  const prevPerformance = globalThis.performance;
+  const prevPerformanceObserver = globalThis.PerformanceObserver;
+  try {
+    const dupBtn1 = { id: "dup-btn", tagName: "BUTTON", className: "btn", children: [], getAttribute: () => null };
+    const dupBtn2 = { id: "dup-btn", tagName: "BUTTON", className: "btn", children: [], getAttribute: () => null };
+    const appMain = {
+      id: "app-main",
+      tagName: "MAIN",
+      className: "dashboard-shell",
+      children: [dupBtn1, dupBtn2],
+      getAttribute: () => null
+    };
+    const injectedRing = { id: "agent-pilot-cursor-ring", tagName: "DIV", className: "", children: [], getAttribute: () => null };
+    const injectedCursor1 = {
+      id: "agent-pilot-cursor-layer",
+      tagName: "DIV",
+      className: "",
+      children: [injectedRing],
+      getAttribute: () => null
+    };
+    const injectedCursor2 = {
+      id: "agent-pilot-cursor-layer",
+      tagName: "DIV",
+      className: "",
+      children: [],
+      getAttribute: () => null
+    };
+    const injectedBadge = {
+      id: "",
+      tagName: "SPAN",
+      className: "ap-badge",
+      children: [],
+      getAttribute: () => null
+    };
+    const bodyEl = {
+      id: "",
+      tagName: "BODY",
+      className: "",
+      children: [appMain, injectedCursor1, injectedCursor2, injectedBadge],
+      getAttribute: () => null
+    };
+    const htmlEl = {
+      id: "",
+      tagName: "HTML",
+      className: "",
+      children: [bodyEl],
+      getAttribute: () => null
+    };
+    const allSyntheticElements = [htmlEl, bodyEl, appMain, dupBtn1, dupBtn2, injectedCursor1, injectedRing, injectedCursor2, injectedBadge];
+    globalThis.window = {};
+    globalThis.document = {
+      documentElement: htmlEl,
+      body: bodyEl,
+      title: "Synthetic Dashboard",
+      readyState: "complete",
+      querySelectorAll: (sel) => (sel === "*" ? allSyntheticElements : []),
+      getElementById: () => null
+    };
+    globalThis.performance = {
+      getEntriesByType: (type) => {
+        if (type === "navigation") {
+          return [{ responseStart: 90, requestStart: 10, domInteractive: 210, domContentLoadedEventEnd: 320, loadEventEnd: 610, transferSize: 12345, encodedBodySize: 12000, decodedBodySize: 28000 }];
+        }
+        if (type === "paint") {
+          return [{ name: "first-paint", startTime: 180 }, { name: "first-contentful-paint", startTime: 240 }];
+        }
+        if (type === "resource") {
+          return [];
+        }
+        return [];
+      }
+    };
+    globalThis.PerformanceObserver = class {
+      constructor(cb) {
+        this.cb = cb;
+      }
+      observe({ type }) {
+        if (type === "largest-contentful-paint") {
+          this.cb({
+            getEntries: () => [{ startTime: 820, size: 48000, element: { tagName: "MAIN", id: "app-main", className: "dashboard-shell" } }]
+          });
+        } else if (type === "layout-shift") {
+          this.cb({
+            getEntries: () => [{ value: 0.04, hadRecentInput: false, sources: [{ node: { tagName: "DIV", id: "banner", className: "" } }] }]
+          });
+        } else if (type === "longtask") {
+          this.cb({
+            getEntries: () => [{ startTime: 300, duration: 130 }]
+          });
+        } else if (type === "event") {
+          this.cb({
+            getEntries: () => [{ name: "click", duration: 280, startTime: 400, interactionId: 7, target: { tagName: "BUTTON", id: "dup-btn", className: "btn" } }]
+          });
+        }
+      }
+      disconnect() {}
+    };
+    inPageProbeResult = await capturedPageProbeFunc();
+  } finally {
+    globalThis.window = prevWindow;
+    globalThis.document = prevDocument;
+    globalThis.performance = prevPerformance;
+    globalThis.PerformanceObserver = prevPerformanceObserver;
+  }
+}
+record(
+  "32. in-page probe excludes #agent-pilot-* / .ap-* overlays from domHealth and collects buffered PerformanceObserver LCP/CLS/INP/LongTasks",
+  inPageProbeResult?.domHealth?.totalElements === 5 &&
+    inPageProbeResult?.domHealth?.duplicateIds?.length === 1 &&
+    inPageProbeResult?.domHealth?.duplicateIds?.[0]?.id === "dup-btn" &&
+    inPageProbeResult?.webVitals?.lcpMs === 820 &&
+    inPageProbeResult?.webVitals?.lcpElement === "main#app-main.dashboard-shell" &&
+    inPageProbeResult?.webVitals?.cls === 0.04 &&
+    inPageProbeResult?.webVitals?.inpMs === 280 &&
+    inPageProbeResult?.webVitals?.slowestInteraction?.target === "button#dup-btn.btn" &&
+    inPageProbeResult?.webVitals?.longTasksCount === 1 &&
+    inPageProbeResult?.webVitals?.totalBlockingTimeMs === 80,
+  `totalElements=${inPageProbeResult?.domHealth?.totalElements}, dupIds=${JSON.stringify(inPageProbeResult?.domHealth?.duplicateIds)}, lcp=${inPageProbeResult?.webVitals?.lcpMs}, inp=${inPageProbeResult?.webVitals?.inpMs}, tbt=${inPageProbeResult?.webVitals?.totalBlockingTimeMs}`
+);
+
 recorder.summarize();
 recorder.exitIfFailed();

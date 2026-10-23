@@ -241,6 +241,9 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 	if baseTimeout <= 0 {
 		baseTimeout = config.DefaultCommandTimeoutMs
 	}
+	if (method == "performance.metrics" || method == "memory.heapSnapshot" || method == "page.screenshot") && baseTimeout < 30000 {
+		baseTimeout = 30000
+	}
 
 	if method == "tabs.create" || method == "tabs.update" {
 		waitUntil := true
@@ -269,6 +272,27 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 			navEffective := loadTo + config.PageWaitBufferMs
 			if navEffective > baseTimeout {
 				baseTimeout = navEffective
+			}
+		}
+	} else if params != nil {
+		hasWaitCondition := false
+		if sel, ok := params["waitForSelector"].(string); ok && strings.TrimSpace(sel) != "" {
+			hasWaitCondition = true
+		}
+		if txt, ok := params["waitForText"].(string); ok && strings.TrimSpace(txt) != "" {
+			hasWaitCondition = true
+		}
+		if !hasWaitCondition {
+			if requested, ok := getIntOrFloat(params, "timeoutMs"); ok && requested > 0 {
+				effective := requested + config.PageWaitBufferMs
+				if defaultTimeoutMs <= 0 || effective > baseTimeout {
+					baseTimeout = effective
+				}
+			} else if requested, ok := getIntOrFloat(params, "timeout"); ok && requested > 0 {
+				effective := requested + config.PageWaitBufferMs
+				if defaultTimeoutMs <= 0 || effective > baseTimeout {
+					baseTimeout = effective
+				}
 			}
 		}
 	}
