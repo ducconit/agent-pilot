@@ -4,7 +4,7 @@ Use the MCP interface for conversational agents and IDEs. The MCP server runs ov
 
 The generated schemas in `mcp/agent-pilot/` are authoritative. This repository currently exports 57 schema files; clients that show an older count or omit newer actions are using a stale provider cache. `browser_run_actions.actions` is an array of action objects (`{"type":"click",...}`), not an array of strings.
 
-Before testing, query `http://127.0.0.1:<port>/health` and confirm the MCP/bridge port plus `clients[].extensionVersion` and `clients[].extensionBuildId`. If the MCP connector reports a different port or build than `/health`, it is stale or attached to another bridge; select the port explicitly with `agent-pilot mcp --bridge-port <port>` and refresh the connector schema.
+Before testing, query `http://127.0.0.1:<port>/health` and confirm the MCP/bridge port plus `clients[].instanceId`, `clients[].bridgePort`, `clients[].extensionVersion`, and `clients[].extensionBuildId`. If the MCP connector reports a different port or build than `/health`, it is stale or attached to another bridge; select the port explicitly with `agent-pilot mcp --bridge-port <port>` and refresh the connector schema. Every MCP response includes compact `_meta` provenance (`bridgePort`, bridge version, instance, extension version/build when available).
 
 ## Minimal workflow
 

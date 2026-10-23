@@ -38,6 +38,21 @@ func ensureEmbeddedBridgeRunning(port int, addr string) {
 
 // DispatchCommand routes the command either via local in-memory bridge or forwarder HTTP
 func DispatchCommand(method string, params map[string]interface{}, port int) (interface{}, error) {
+	if params == nil {
+		params = make(map[string]interface{})
+	}
+	if _, explicitlySelected := params["instanceId"]; !explicitlySelected {
+		if instanceID := config.DefaultInstanceID(); instanceID != "" {
+			// Do not mutate the caller's map: MCP may reuse its argument object
+			// across concurrent requests, and CLI helpers may log it after dispatch.
+			cloned := make(map[string]interface{}, len(params)+1)
+			for key, value := range params {
+				cloned[key] = value
+			}
+			cloned["instanceId"] = instanceID
+			params = cloned
+		}
+	}
 	if port <= 0 {
 		port = config.DefaultBridgePort()
 	}

@@ -15,6 +15,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -29,10 +31,11 @@ const (
 
 	// Optional bridge authentication. Empty API key means auth remains disabled
 	// for backward compatibility with existing local agents and extensions.
-	APIKeyEnvVar   = "AGENT_PILOT_API_KEY"
-	APIKeyHeader   = "X-Agent-Pilot-Key"
-	APITokenScheme = "Bearer"
-	WSAuthTimeout  = 5 * time.Second
+	APIKeyEnvVar     = "AGENT_PILOT_API_KEY"
+	InstanceIDEnvVar = "AGENT_PILOT_INSTANCE_ID"
+	APIKeyHeader     = "X-Agent-Pilot-Key"
+	APITokenScheme   = "Bearer"
+	WSAuthTimeout    = 5 * time.Second
 
 	// --- HTTP server timeouts (StartBridgeServer) ---------------------------
 	HTTPReadHeaderTimeout = 5 * time.Second
@@ -105,6 +108,16 @@ const (
 	TaskNameWindows  = "AgentPilotBridge"
 )
 
+// bridgePortOverride is process-local state used by one-shot CLI invocations
+// that pass --bridge-port. It deliberately has precedence over the environment
+// so a caller can select one bridge without mutating its shell.
+var bridgePortOverride atomic.Int32
+
+var instanceIDOverride struct {
+	sync.RWMutex
+	value string
+}
+
 // BridgeAPIKey returns the optional API key configured for the local bridge.
 // Reading the environment at request time makes tests and long-running service
 // wrappers predictable without ever persisting or logging the secret.
@@ -117,10 +130,49 @@ func BridgeAPIKey() string {
 // or out-of-range override is ignored rather than fatal, so a bad env value
 // degrades to the built-in default.
 func DefaultBridgePort() int {
+	if override := int(bridgePortOverride.Load()); override > 0 {
+		return override
+	}
 	if env := strings.TrimSpace(os.Getenv("AGENT_PILOT_PORT")); env != "" {
 		if p, err := strconv.Atoi(env); err == nil && p > 0 && p < 65536 {
 			return p
 		}
 	}
 	return DefaultPort
+}
+
+// SetBridgePortOverride selects the bridge port for the current CLI process.
+// A zero value clears the override. Invalid non-zero ports are rejected so an
+// explicit selector cannot silently route work to another bridge.
+func SetBridgePortOverride(port int) error {
+	if port == 0 {
+		bridgePortOverride.Store(0)
+		return nil
+	}
+	if port < 1 || port > 65535 {
+		return strconv.ErrRange
+	}
+	bridgePortOverride.Store(int32(port))
+	return nil
+}
+
+// DefaultInstanceID resolves the optional browser instance affinity. An
+// explicit CLI override takes precedence over AGENT_PILOT_INSTANCE_ID.
+func DefaultInstanceID() string {
+	instanceIDOverride.RLock()
+	value := instanceIDOverride.value
+	instanceIDOverride.RUnlock()
+	if value != "" {
+		return value
+	}
+	return strings.TrimSpace(os.Getenv(InstanceIDEnvVar))
+}
+
+// SetInstanceIDOverride selects a browser instance for the current CLI
+// process. An empty value clears the override and returns to the environment
+// fallback.
+func SetInstanceIDOverride(instanceID string) {
+	instanceIDOverride.Lock()
+	instanceIDOverride.value = strings.TrimSpace(instanceID)
+	instanceIDOverride.Unlock()
 }

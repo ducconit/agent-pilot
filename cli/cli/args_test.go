@@ -1,9 +1,17 @@
 package cli
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/ducconit/agent-pilot-extension/cli/config"
 )
 
 func TestParseBusyArgs_Default(t *testing.T) {
@@ -372,6 +380,117 @@ func TestExecScreenshotWithOptions_ClipValidation(t *testing.T) {
 	err = ExecScreenshotWithOptions("region", "", "10,20,0,40", "", nil)
 	if err == nil || !strings.Contains(err.Error(), "width and height must be > 0") {
 		t.Fatalf("expected dimensions > 0 error, got: %v", err)
+	}
+}
+
+func TestExtractBridgePort(t *testing.T) {
+	args, port, err := extractBridgePort([]string{"https://example.test", "--bridge-port", "58766", "--format", "json"})
+	if err != nil {
+		t.Fatalf("extractBridgePort failed: %v", err)
+	}
+	if port != 58766 {
+		t.Fatalf("port = %d, want 58766", port)
+	}
+	if len(args) != 3 || args[1] != "--format" || args[2] != "json" {
+		t.Fatalf("filtered args = %#v", args)
+	}
+
+	_, _, err = extractBridgePort([]string{"--bridge-port=invalid"})
+	if err == nil {
+		t.Fatal("expected invalid bridge port to fail")
+	}
+}
+
+func TestExtractBridgePortSupportsPortAlias(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want int
+	}{
+		{name: "long alias", args: []string{"--port", "58767", "tabs"}, want: 58767},
+		{name: "equals alias", args: []string{"--port=58768", "#app"}, want: 58768},
+		{name: "legacy single dash alias", args: []string{"-port", "58769", "#app"}, want: 58769},
+		{name: "legacy equals alias", args: []string{"-port=58770", "#app"}, want: 58770},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args, port, err := extractBridgePort(tt.args)
+			if err != nil {
+				t.Fatalf("extractBridgePort failed: %v", err)
+			}
+			if port != tt.want {
+				t.Fatalf("port = %d, want %d", port, tt.want)
+			}
+			if len(args) != 1 || args[0] != tt.args[len(tt.args)-1] {
+				t.Fatalf("filtered args = %#v", args)
+			}
+		})
+	}
+}
+
+func TestExplicitPortOverrideWinsForBrowserCommand(t *testing.T) {
+	t.Setenv("AGENT_PILOT_PORT", "58765")
+	t.Cleanup(func() { _ = config.SetBridgePortOverride(0) })
+
+	args, port, err := extractBridgePort([]string{"--port", "58766", "tabs"})
+	if err != nil {
+		t.Fatalf("extractBridgePort failed: %v", err)
+	}
+	if len(args) != 1 || args[0] != "tabs" {
+		t.Fatalf("filtered args = %#v", args)
+	}
+	if err := config.SetBridgePortOverride(port); err != nil {
+		t.Fatalf("SetBridgePortOverride failed: %v", err)
+	}
+	if got := config.DefaultBridgePort(); got != 58766 {
+		t.Fatalf("selected bridge port = %d, want 58766", got)
+	}
+}
+
+func TestTabsCommandUsesExplicitPortAlias(t *testing.T) {
+	requests := make(chan map[string]interface{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Errorf("decode request: %v", err)
+			return
+		}
+		requests <- request
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"result":[]}`))
+	}))
+	defer server.Close()
+
+	serverURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parse test server URL: %v", err)
+	}
+	port, err := strconv.Atoi(serverURL.Port())
+	if err != nil {
+		t.Fatalf("parse test server port: %v", err)
+	}
+
+	t.Setenv("AGENT_PILOT_PORT", "1")
+	_ = config.SetBridgePortOverride(0)
+	t.Cleanup(func() { _ = config.SetBridgePortOverride(0) })
+
+	root := newRootCommand()
+	root.SetArgs([]string{"tabs", "--port", strconv.Itoa(port), "--instance-id", "browser-test"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("tabs command failed: %v", err)
+	}
+
+	select {
+	case request := <-requests:
+		if request["method"] != "tabs.listAll" {
+			t.Fatalf("method = %v, want tabs.listAll", request["method"])
+		}
+		params, ok := request["params"].(map[string]interface{})
+		if !ok || params["instanceId"] != "browser-test" {
+			t.Fatalf("params instanceId = %#v, want browser-test", params["instanceId"])
+		}
+	case <-time.After(time.Second):
+		t.Fatal("tabs command did not reach the explicitly selected bridge port")
 	}
 }
 

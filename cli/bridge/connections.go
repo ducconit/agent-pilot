@@ -93,6 +93,9 @@ func getClientByID(instanceID string) *ClientConnection {
 		if c, ok := clients[instanceID]; ok {
 			return c
 		}
+		// An explicit instance selector is an affinity contract. Never fall
+		// back to the active browser when it is stale or mistyped.
+		return nil
 	}
 	if activeClientID != "" {
 		if c, ok := clients[activeClientID]; ok {
@@ -451,14 +454,15 @@ func BridgeMetadata(instanceID string, requestedPort int) map[string]interface{}
 	var client *ClientConnection
 	if instanceID != "" {
 		client = clients[instanceID]
-	}
-	if client == nil && activeClientID != "" {
-		client = clients[activeClientID]
-	}
-	if client == nil {
-		for _, candidate := range clients {
-			client = candidate
-			break
+	} else {
+		if activeClientID != "" {
+			client = clients[activeClientID]
+		}
+		if client == nil {
+			for _, candidate := range clients {
+				client = candidate
+				break
+			}
 		}
 	}
 	if client != nil {
@@ -478,7 +482,7 @@ func BridgeMetadata(instanceID string, requestedPort int) map[string]interface{}
 	// that forwarder arrangement this process has no local WebSocket client to
 	// inspect, so use the selected bridge's health endpoint for provenance.
 	if _, hasExtensionVersion := metadata["extensionVersion"]; !hasExtensionVersion {
-		if healthMetadata := remoteBridgeMetadata(requestedPort); healthMetadata != nil {
+		if healthMetadata := remoteBridgeMetadata(requestedPort, instanceID); healthMetadata != nil {
 			for key, value := range healthMetadata {
 				if _, exists := metadata[key]; !exists || metadata[key] == "" {
 					metadata[key] = value
@@ -489,7 +493,7 @@ func BridgeMetadata(instanceID string, requestedPort int) map[string]interface{}
 	return metadata
 }
 
-func remoteBridgeMetadata(port int) map[string]interface{} {
+func remoteBridgeMetadata(port int, instanceID string) map[string]interface{} {
 	client := &http.Client{Timeout: 500 * time.Millisecond}
 	response, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/health", port))
 	if err != nil {
@@ -517,6 +521,14 @@ func remoteBridgeMetadata(port int) map[string]interface{} {
 	}
 	var selected map[string]interface{}
 	for _, candidate := range health.Clients {
+		if instanceID != "" {
+			candidateID, _ := candidate["instanceId"].(string)
+			if candidateID != instanceID {
+				continue
+			}
+			selected = candidate
+			break
+		}
 		if active, _ := candidate["isActive"].(bool); active {
 			selected = candidate
 			break

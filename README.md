@@ -355,6 +355,8 @@ agent-pilot open "https://github.com" --active
 
 # Khởi chạy Chrome profile riêng + extension mới + bridge port riêng
 npm run launch:chrome -- --port 58766 --url "http://127.0.0.1:8765/test-page.html"
+# Launcher chỉ báo Ready sau khi /health xác nhận đúng port + extension build ID;
+# dùng --ready-timeout <ms> khi Chrome khởi động chậm.
 
 # 2. Tương tác chuột & bàn phím
 agent-pilot type "#search-input" "agent pilot" --enter
@@ -370,6 +372,7 @@ agent-pilot screenshot -o result.png --mode visible
 # 5. Xem danh sách các tab đang hoạt động
 agent-pilot tabs
 agent-pilot tabs --format json       # Payload thuần cho script/agent
+agent-pilot tabs --port 58766 --instance-id browser_... --format json  # Pin Chrome/bridge cụ thể
 
 # 6. Chạy kịch bản tự động hóa từ tệp JSON
 agent-pilot batch flow_test.json
@@ -388,6 +391,70 @@ agent-pilot skill install              # ~/.agents/skills/agent-pilot
 agent-pilot skill install --agy        # ~/.gemini/config/skills/agent-pilot (Antigravity)
 agent-pilot skill install --path ~/my-skills --force
 ```
+
+### 4. So sánh thực tế MCP và CLI trên cùng một tác vụ
+
+Để tránh so sánh cảm tính, repo có kèm hai video và screenshot được ghi trên
+cùng Chrome/extension, cùng bridge `58766`, cùng URL `example.com` và cùng
+chuỗi thao tác: **mở tab → snapshot tối đa 20 phần tử → scroll 300px →
+evaluate title/links/text length → đọc performance metrics → screenshot →
+đóng tab**.
+
+- [Video workflow qua MCP](artifacts/browser-comparison/mcp-example-com.mp4) · [screenshot MCP](artifacts/browser-comparison/mcp-example-com.png)
+- [Video workflow qua CLI](artifacts/browser-comparison/cli-example-com.mp4) · [screenshot CLI](artifacts/browser-comparison/cli-example-com.png)
+
+“Token” trong bảng là **output-size proxy**, không phải số token billing của
+model: MCP tính toàn bộ JSON-RPC response UTF-8 (kèm metadata provenance), CLI
+tính stdout/stderr; quy đổi gần đúng `ceil(bytes / 4)`. Cách đo này cho biết
+agent phải đọc bao nhiêu dữ liệu, nhưng không bao gồm token của system prompt,
+tool schema hoặc hidden reasoning.
+
+#### Kết quả tổng hợp
+
+| Kênh | Call/lệnh thành công | Lỗi / retry | Tổng call/lệnh | Output thô | Token proxy | Thời gian xử lý | Video |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| MCP stdio → bridge 58766 | 7 | 0 | 7 | 8,361 bytes | ≈2,091 | 1.419 s | 68.1 s |
+| CLI → bridge 58766 | 7 | 1 / 1 | 8 | 3,992 bytes | ≈998 | 1.329 s | 61.1 s |
+
+CLI đọc ít hơn khoảng **52.3% output** và nhanh hơn khoảng **6.3%** trong
+lượt đo này. Tuy nhiên đây không phải thắng tuyệt đối: CLI phát hiện một lỗi
+interface (`scroll` chưa hỗ trợ `--format json`) nên phải retry; MCP có ít
+request hơn khi agent dùng đúng schema.
+
+Số call/lệnh ở trên không tính MCP `initialize`/`initialized` handshake. Thời
+gian là tổng latency của từng request/command đo bằng đồng hồ đơn điệu; thời
+lượng video chỉ là khoảng thời gian cửa sổ ghi màn hình mở, có cả thời gian
+chuẩn bị và không nên dùng thay cho latency xử lý.
+
+#### Chi tiết từng bước
+
+| Bước | MCP: ms / bytes | CLI: ms / bytes | Ghi chú |
+| :--- | ---: | ---: | :--- |
+| open | 1,148 / 1,186 | 1,157 / 531 | Cùng chờ tab hoàn tất |
+| snapshot | 5 / 782 | 10 / 417 | MCP response có `_meta` provenance |
+| scroll | 154 / 667 | 4 / 44 | CLI lần đầu fail vì `--format` không hợp lệ |
+| scroll retry | — | 7 / 67 | CLI cần thêm lệnh |
+| evaluate | 4 / 842 | 8 / 231 | Cùng trả title, URL, links, text length |
+| performance metrics | 5 / 3,404 | 9 / 2,519 | Cùng bật web vitals/resources/DOM health |
+| screenshot | 95 / 842 | 123 / 133 | Payload CLI gọn hơn |
+| close | 8 / 638 | 11 / 50 | MCP vẫn kèm metadata |
+
+Diễn giải đúng kết quả:
+
+- **CLI phù hợp cho agent cần tiết kiệm context**: output nhỏ, dễ pipe vào
+  script và không lặp metadata bridge ở mỗi dòng. Nên dùng `--format json` ở
+  những command đã hỗ trợ và kiểm tra capability trước khi áp dụng hàng loạt.
+- **MCP phù hợp cho agent tool-native**: schema mô tả rõ input/output và có
+  provenance `bridgePort`, `instanceId`, `extensionBuildId` trong response,
+  nhưng metadata lặp lại làm payload lớn hơn. Agent nên gọi tuần tự các action
+  có quan hệ trạng thái; gửi `screenshot` và `close` đồng thời đã tái hiện race
+  khiến screenshot fail vì tab bị đóng trước.
+- Hai video dùng **FFmpeg X11 screen capture** để ghi lại cùng browser. Native
+  `screencast.record` có implementation trong DevTools runtime nhưng qua
+  extension relay hiện còn treo/không ổn định; đây là giới hạn riêng của đường
+  relay, không nên coi video FFmpeg là bằng chứng native screencast đã hoạt động.
+- Lượt đo chỉ có một tab/Chrome. Khi chạy nhiều agent, luôn ghim cả
+  `--port`/`--bridge-port` và `--instance-id`; không dựa vào active tab mặc định.
 
 ---
 

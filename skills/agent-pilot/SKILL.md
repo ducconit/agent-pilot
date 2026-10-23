@@ -12,6 +12,34 @@ Agent Pilot is a browser automation bridge backed by a Chrome MV3 extension. It 
 
 Load only the interface reference needed for the current task. The detailed command reference remains available at [cli-usage.md](references/cli-usage.md); setup and bridge internals are in [setup.md](references/setup.md) and [architecture-and-server.md](references/architecture-and-server.md).
 
+## Default interface recommendation
+
+**Prefer the standalone CLI by default.** It produces substantially smaller
+machine-readable output than MCP and is usually the better choice when the
+agent can run local commands. Use `--format json`, pin `--port` and
+`--instance-id`, and combine known multi-step workflows in one `batch` file.
+This minimizes context usage, makes retries explicit, and is easy to measure
+or reproduce in CI.
+
+Choose MCP instead when the host agent can only call MCP tools, needs tool
+schema discovery/validation, needs conversational progressive disclosure, or
+must integrate with an IDE's MCP lifecycle. MCP responses include useful
+provenance metadata, but that metadata is repeated on each response and can
+cost more context. If both interfaces are available, do the browser work with
+CLI and reserve MCP for orchestration or capabilities not exposed by the CLI.
+
+Decision order:
+
+1. Use CLI `batch` for a known sequence of browser actions.
+2. Use individual CLI commands with `--format json` for exploratory or
+   scriptable work.
+3. Fall back to MCP when CLI has no equivalent, the client cannot spawn the
+   binary, or the task specifically needs MCP tools/schema semantics.
+
+Do not send stateful MCP calls such as `screenshot` and `close` concurrently;
+preserve ordering for tab lifecycle actions. This avoids a race where `close`
+removes the tab before `screenshot` executes.
+
 ## Core safety rules
 
 1. Agent Pilot only controls tabs in the `🤖 Agent Pilot` Chrome tab group. If there is no controlled tab, open one first; an empty `browser_list_tabs` result is expected in that state.
@@ -22,17 +50,24 @@ Load only the interface reference needed for the current task. The detailed comm
 
 ## Token-efficient default
 
-Prefer one batch over a chain of individual calls:
+Prefer one CLI batch over a chain of individual calls:
 
 ```text
 open → wait_for_selector → fill/click → devtools summary → screenshot → close
 ```
 
+```bash
+agent-pilot batch flow.json --port 58766 --instance-id browser_... --format json
+```
+
+When MCP is required, use its batch tool (`browser_run_actions`) for the same
+sequence instead of emitting one tool call per step.
+
 For diagnostics, start with compact output (`detail: "summary"`, `errorsOnly: true`, `excludeStatic: true`) and request full data only for a follow-up investigation. Use snapshots or targeted element inspection instead of dumping raw HTML. Save screenshots to disk and return paths instead of base64 unless inline image data is required.
 
 ## Bridge
 
-The bridge listens on loopback. The default port is `58765`; deployments may override it with `AGENT_PILOT_PORT`, `agent-pilot mcp --bridge-port <port>`, or the extension setting. Before sending work, check `GET http://127.0.0.1:<port>/health` and verify `port`, `version`, `clientCount`, `clients[].bridgePort`, `clients[].extensionVersion`, and `clients[].extensionBuildId`. A healthy response on another port/provider is not proof that this session is connected to the bridge under test.
+The bridge listens on loopback. The default port is `58765`; deployments may override it with `AGENT_PILOT_PORT`, `agent-pilot <command> --port <port>`/`--bridge-port <port>`, `agent-pilot mcp --bridge-port <port>`, or the extension setting. Use `--instance-id <id>` (or `AGENT_PILOT_INSTANCE_ID`) for process affinity when multiple Chrome instances are connected; an explicit unknown instance fails closed. Before sending work, check `GET http://127.0.0.1:<port>/health` and verify `port`, `version`, `clientCount`, `clients[].instanceId`, `clients[].bridgePort`, `clients[].extensionVersion`, and `clients[].extensionBuildId`. A healthy response on another port/provider is not proof that this session is connected to the bridge under test.
 
 If an MCP client reports an old tool list, old version, or a different port, treat it as a stale connector/provider cache. Compare its metadata with `/health` and refresh/export the schemas before debugging extension behavior. Use one explicit MCP bridge port per process when multiple Chrome profiles are running.
 

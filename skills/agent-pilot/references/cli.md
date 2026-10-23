@@ -1,6 +1,16 @@
 # Agent Pilot CLI Reference
 
-Use the standalone `agent-pilot` binary for shell, CI, test harnesses, and deterministic browser workflows. It talks to the same local bridge as the MCP server and does not require Node.js at runtime. Set `AGENT_PILOT_PORT` when the bridge is not on the default port.
+Use the standalone `agent-pilot` binary as the preferred interface when the
+agent can run local commands: it is compact, deterministic, easy to script,
+and measured output is typically much smaller than the equivalent MCP JSON-RPC
+responses. It is suitable for shell, CI, test harnesses, and repetitive browser
+workflows. It talks to the same local bridge as the MCP server and does not
+require Node.js at runtime. Set `AGENT_PILOT_PORT` when the bridge is not on the
+default port, or select it per command with `--port`/`--bridge-port`.
+
+Use MCP when the host cannot spawn the binary, needs MCP schema discovery, or
+requires an IDE/conversational tool lifecycle. Otherwise prefer CLI `batch`
+for known sequences and `--format json` for individual commands.
 
 ## Fast path
 
@@ -18,9 +28,9 @@ agent-pilot close --tab 123 --format json
 agent-pilot emulate --theme dark --format json
 
 # Prefer explicit targeting in multi-agent/browser sessions
-agent-pilot snapshot --tab 123 --format json
-agent-pilot fill fields.json --tab 123
-agent-pilot click '#submit' --tab 123
+agent-pilot snapshot --tab 123 --port 58766 --instance-id browser_... --format json
+agent-pilot fill fields.json --tab 123 --port 58766 --instance-id browser_...
+agent-pilot click '#submit' --tab 123 --port 58766 --instance-id browser_...
 
 # Compact diagnostics
 agent-pilot devtools status --tab 123
@@ -30,6 +40,8 @@ agent-pilot close --tab 123
 ```
 
 If `tabs` returns an empty list, it normally means no tab has been opened or granted to the `🤖 Agent Pilot` group. Use `open`, or ask the user to move an existing tab into that group / attach it from the side panel.
+
+`--port` is an alias for `--bridge-port` and applies to every browser command, including `tabs`, `open`, `cdp`, and `batch`. `--instance-id` pins dispatch to one connected Chrome process; an unknown explicit instance fails closed instead of falling back to the active browser. `AGENT_PILOT_INSTANCE_ID` provides the same pin for scripts that cannot add a flag.
 
 ## Choose the execution engine
 
@@ -95,6 +107,7 @@ agent-pilot service install
 agent-pilot service status
 agent-pilot service restart
 agent-pilot mcp
+agent-pilot mcp --bridge-port 58766
 agent-pilot export-mcp mcp/agent-pilot
 ```
 

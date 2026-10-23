@@ -114,6 +114,29 @@ func TestBridgeCommandRoundTripAndTimeout(t *testing.T) {
 	}
 }
 
+func TestBridgeExplicitUnknownInstanceFailsClosed(t *testing.T) {
+	_, wsURL := startTestBridgeWS(t)
+	called := make(chan struct{}, 1)
+	conn := dialFakeExtension(t, wsURL, func(method string, id interface{}) (map[string]interface{}, bool) {
+		called <- struct{}{}
+		return map[string]interface{}{"unexpected": true}, true
+	})
+	defer conn.Close()
+	waitForClientCount(t, 1)
+
+	_, err := SendCommandToExtension("should.not.route", map[string]interface{}{
+		"instanceId": "browser-does-not-exist",
+	}, 250)
+	if err == nil || !strings.Contains(err.Error(), "no Chrome Extension connected") {
+		t.Fatalf("expected explicit unknown instance to fail closed, got: %v", err)
+	}
+	select {
+	case <-called:
+		t.Fatal("command was routed to the active client after an explicit instance miss")
+	default:
+	}
+}
+
 func TestBridgeCommandFailsFastOnClientDisconnect(t *testing.T) {
 	_, wsURL := startTestBridgeWS(t)
 
