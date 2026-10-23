@@ -577,13 +577,17 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_manage_extensions",
-		Description: "List, enable/disable, toggle, or uninstall browser extensions via chrome.management.",
+		Description: "List, enable/disable, toggle, install, reload, trigger, or uninstall browser extensions. Uses chrome.management for profile-safe management and the Chrome DevTools Protocol Extensions domain for unpacked-extension lifecycle actions.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"action":      map[string]interface{}{"type": "string", "enum": []string{"list", "setEnabled", "toggle", "uninstall"}, "description": "Action: list, setEnabled, toggle, or uninstall"},
-				"extensionId": map[string]interface{}{"type": "string", "description": "Extension ID to enable or disable"},
-				"enabled":     map[string]interface{}{"type": "boolean", "description": "Target enabled state for setEnabled action"},
+				"action":            map[string]interface{}{"type": "string", "enum": []string{"list", "setEnabled", "toggle", "install", "reload", "triggerAction", "uninstall"}, "description": "Action to perform"},
+				"extensionId":       map[string]interface{}{"type": "string", "description": "Extension ID for enable/disable/toggle/reload/trigger/uninstall"},
+				"enabled":           map[string]interface{}{"type": "boolean", "description": "Target enabled state for setEnabled action"},
+				"path":              map[string]interface{}{"type": "string", "description": "Absolute path to an unpacked extension directory for install"},
+				"enableInIncognito": map[string]interface{}{"type": "boolean", "description": "Enable an installed unpacked extension in incognito windows"},
+				"tabId":             map[string]interface{}{"type": "integer", "description": "Target tab used for CDP Extensions commands and triggerAction"},
+				"confirmSelf":       map[string]interface{}{"type": "boolean", "description": "Explicitly allow uninstalling Agent Pilot itself"},
 			},
 		},
 	},

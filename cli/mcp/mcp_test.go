@@ -180,6 +180,8 @@ func TestMCPToolDispatchTargetsExist(t *testing.T) {
 		"lighthouse.audit": true, "lighthouse.analyze": true, "performance.analyzeInsight": true,
 		"memory.analyzeSnapshot": true,
 		"developerTools.list":    true, "developerTools.execute": true,
+		"webmcp.list": true, "webmcp.execute": true,
+		"pwa.getOsAppState": true, "pwa.install": true, "pwa.launch": true, "pwa.uninstall": true,
 		"instances.list":   true,
 		"instances.select": true,
 	}

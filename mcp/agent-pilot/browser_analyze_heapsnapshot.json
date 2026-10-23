@@ -1,52 +1,220 @@
 {
-  "description": "Analyze a saved V8 heap snapshot: summary, object queries, edges, retainers, retaining paths, duplicate strings, contexts, and constructor diffs.",
+  "description": "Analyze a saved V8 heap snapshot: summary, object queries, outgoing edges, retainers, retaining paths, duplicate strings, native contexts, and constructor diffs. The snapshot is read by the embedded runtime and never sent to a remote service.",
   "inputSchema": {
-    "type": "object",
     "properties": {
-      "filePath": { "type": "string", "description": "Path to a .heapsnapshot JSON file; omit for compare" },
-      "action": { "type": "string", "enum": ["summary", "query", "details", "edges", "retainers", "retaining_paths", "dominators", "duplicate_strings", "contexts", "compare"] },
-      "baseFilePath": { "type": "string", "description": "Earlier snapshot path for compare" },
-      "currentFilePath": { "type": "string", "description": "Later snapshot path for compare" },
-      "nodeId": { "type": "integer", "description": "Heap node index or V8 node id" },
-      "className": { "type": "string" },
-      "name": { "type": "string" },
-      "nodeType": { "type": "string" },
-      "propertyName": { "type": "string" },
-      "isDetached": { "type": "boolean" },
-      "selfSize": { "type": "string" },
-      "maxSelfSize": { "type": "string" },
-      "sortBy": { "type": "string", "enum": ["selfSize", "name", "edgeCount"] },
-      "pageIdx": { "type": "integer" },
-      "pageSize": { "type": "integer" },
-      "maxItems": { "type": "integer" },
-      "maxDepth": { "type": "integer" },
-      "maxNodes": { "type": "integer" },
-      "maxSiblings": { "type": "integer" }
-    }
+      "action": {
+        "description": "Analysis operation",
+        "enum": [
+          "summary",
+          "query",
+          "details",
+          "edges",
+          "retainers",
+          "retaining_paths",
+          "dominators",
+          "dominator_chain",
+          "duplicate_strings",
+          "contexts",
+          "class_nodes",
+          "class_details",
+          "analyze_contexts",
+          "context_analysis",
+          "close",
+          "compare"
+        ],
+        "type": "string"
+      },
+      "baseFilePath": {
+        "description": "Earlier snapshot path for compare",
+        "type": "string"
+      },
+      "className": {
+        "description": "Name substring or /regex/ filter",
+        "type": "string"
+      },
+      "currentFilePath": {
+        "description": "Later snapshot path for compare",
+        "type": "string"
+      },
+      "exact": {
+        "description": "For class_nodes, require an exact constructor name; default true",
+        "type": "boolean"
+      },
+      "filePath": {
+        "description": "Path to a .heapsnapshot JSON file",
+        "type": "string"
+      },
+      "isDetached": {
+        "description": "Filter detached DOM nodes",
+        "type": "boolean"
+      },
+      "maxDepth": {
+        "description": "Maximum retaining-path depth",
+        "type": "integer"
+      },
+      "maxItems": {
+        "description": "Maximum summary/detail rows",
+        "type": "integer"
+      },
+      "maxNodes": {
+        "description": "Maximum retaining paths",
+        "type": "integer"
+      },
+      "maxSelfSize": {
+        "description": "Maximum self size, e.g. 10MB",
+        "type": "string"
+      },
+      "maxSiblings": {
+        "description": "Maximum incoming edges explored per node",
+        "type": "integer"
+      },
+      "name": {
+        "description": "Node name substring or /regex/ filter",
+        "type": "string"
+      },
+      "nodeId": {
+        "description": "Heap node index or V8 node id for details/edges/retainers/paths",
+        "type": "integer"
+      },
+      "nodeType": {
+        "description": "V8 node type filter",
+        "type": "string"
+      },
+      "pageIdx": {
+        "description": "Zero-based result page",
+        "type": "integer"
+      },
+      "pageSize": {
+        "description": "Result page size",
+        "type": "integer"
+      },
+      "propertyName": {
+        "description": "Outgoing property name filter",
+        "type": "string"
+      },
+      "selfSize": {
+        "description": "Minimum self size, e.g. 1MB",
+        "type": "string"
+      },
+      "sortBy": {
+        "description": "Query sort field",
+        "enum": [
+          "selfSize",
+          "name",
+          "edgeCount"
+        ],
+        "type": "string"
+      }
+    },
+    "type": "object"
   },
   "name": "browser_analyze_heapsnapshot",
   "parameters": {
-    "type": "object",
     "properties": {
-      "filePath": { "type": "string" },
-      "action": { "type": "string", "enum": ["summary", "query", "details", "edges", "retainers", "retaining_paths", "dominators", "duplicate_strings", "contexts", "compare"] },
-      "baseFilePath": { "type": "string" },
-      "currentFilePath": { "type": "string" },
-      "nodeId": { "type": "integer" },
-      "className": { "type": "string" },
-      "name": { "type": "string" },
-      "nodeType": { "type": "string" },
-      "propertyName": { "type": "string" },
-      "isDetached": { "type": "boolean" },
-      "selfSize": { "type": "string" },
-      "maxSelfSize": { "type": "string" },
-      "sortBy": { "type": "string", "enum": ["selfSize", "name", "edgeCount"] },
-      "pageIdx": { "type": "integer" },
-      "pageSize": { "type": "integer" },
-      "maxItems": { "type": "integer" },
-      "maxDepth": { "type": "integer" },
-      "maxNodes": { "type": "integer" },
-      "maxSiblings": { "type": "integer" }
-    }
+      "action": {
+        "description": "Analysis operation",
+        "enum": [
+          "summary",
+          "query",
+          "details",
+          "edges",
+          "retainers",
+          "retaining_paths",
+          "dominators",
+          "dominator_chain",
+          "duplicate_strings",
+          "contexts",
+          "class_nodes",
+          "class_details",
+          "analyze_contexts",
+          "context_analysis",
+          "close",
+          "compare"
+        ],
+        "type": "string"
+      },
+      "baseFilePath": {
+        "description": "Earlier snapshot path for compare",
+        "type": "string"
+      },
+      "className": {
+        "description": "Name substring or /regex/ filter",
+        "type": "string"
+      },
+      "currentFilePath": {
+        "description": "Later snapshot path for compare",
+        "type": "string"
+      },
+      "exact": {
+        "description": "For class_nodes, require an exact constructor name; default true",
+        "type": "boolean"
+      },
+      "filePath": {
+        "description": "Path to a .heapsnapshot JSON file",
+        "type": "string"
+      },
+      "isDetached": {
+        "description": "Filter detached DOM nodes",
+        "type": "boolean"
+      },
+      "maxDepth": {
+        "description": "Maximum retaining-path depth",
+        "type": "integer"
+      },
+      "maxItems": {
+        "description": "Maximum summary/detail rows",
+        "type": "integer"
+      },
+      "maxNodes": {
+        "description": "Maximum retaining paths",
+        "type": "integer"
+      },
+      "maxSelfSize": {
+        "description": "Maximum self size, e.g. 10MB",
+        "type": "string"
+      },
+      "maxSiblings": {
+        "description": "Maximum incoming edges explored per node",
+        "type": "integer"
+      },
+      "name": {
+        "description": "Node name substring or /regex/ filter",
+        "type": "string"
+      },
+      "nodeId": {
+        "description": "Heap node index or V8 node id for details/edges/retainers/paths",
+        "type": "integer"
+      },
+      "nodeType": {
+        "description": "V8 node type filter",
+        "type": "string"
+      },
+      "pageIdx": {
+        "description": "Zero-based result page",
+        "type": "integer"
+      },
+      "pageSize": {
+        "description": "Result page size",
+        "type": "integer"
+      },
+      "propertyName": {
+        "description": "Outgoing property name filter",
+        "type": "string"
+      },
+      "selfSize": {
+        "description": "Minimum self size, e.g. 1MB",
+        "type": "string"
+      },
+      "sortBy": {
+        "description": "Query sort field",
+        "enum": [
+          "selfSize",
+          "name",
+          "edgeCount"
+        ],
+        "type": "string"
+      }
+    },
+    "type": "object"
   }
 }

@@ -1,0 +1,52 @@
+{
+  "description": "Install a PWA by manifest ID through the browser-scoped PWA CDP domain.",
+  "inputSchema": {
+    "properties": {
+      "displayMode": {
+        "description": "Optional post-install display mode",
+        "enum": [
+          "browser",
+          "standalone"
+        ],
+        "type": "string"
+      },
+      "installUrlOrBundleUrl": {
+        "description": "Optional install URL or bundle URL",
+        "type": "string"
+      },
+      "manifestId": {
+        "description": "PWA manifest ID",
+        "type": "string"
+      }
+    },
+    "required": [
+      "manifestId"
+    ],
+    "type": "object"
+  },
+  "name": "browser_install_pwa",
+  "parameters": {
+    "properties": {
+      "displayMode": {
+        "description": "Optional post-install display mode",
+        "enum": [
+          "browser",
+          "standalone"
+        ],
+        "type": "string"
+      },
+      "installUrlOrBundleUrl": {
+        "description": "Optional install URL or bundle URL",
+        "type": "string"
+      },
+      "manifestId": {
+        "description": "PWA manifest ID",
+        "type": "string"
+      }
+    },
+    "required": [
+      "manifestId"
+    ],
+    "type": "object"
+  }
+}

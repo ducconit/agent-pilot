@@ -70,6 +70,14 @@ function nodeSummary(snapshot, index) {
   };
 }
 
+function nodeIndexForParam(snapshot, value) {
+  const nodeId = numberOr(value, -1);
+  if (nodeId >= 0 && nodeId < snapshot.nodeCount) return nodeId * snapshot.nodeStride;
+  return snapshot.nodes.findIndex((entry, offset) => (
+    offset % snapshot.nodeStride === snapshot.offsets.node.id && entry === nodeId
+  ));
+}
+
 function edgeLabel(snapshot, type, value) {
   if (["element", "hidden"].includes(type)) return String(value);
   return String(snapshot.strings[value] ?? value);
@@ -241,9 +249,36 @@ function query(snapshot, params) {
   return { total: rows.length, pageIdx, pageSize, objects: rows.slice(pageIdx * pageSize, (pageIdx + 1) * pageSize) };
 }
 
+function classNodes(snapshot, params) {
+  const className = params.className ?? params.name;
+  if (className === undefined || className === null || className === "") throw new Error("className is required");
+  const exact = params.exact !== false;
+  const nodes = [];
+  for (let index = 0; index < snapshot.nodes.length; index += snapshot.nodeStride) {
+    const item = nodeSummary(snapshot, index);
+    const matches = exact ? item.name === String(className) : matchesText(item.name, className);
+    if (matches) nodes.push(item);
+  }
+  const pageSize = Math.min(1000, Math.max(1, Number(params.pageSize) || 50));
+  const pageIdx = Math.max(0, Number(params.pageIdx) || 0);
+  const page = nodes.slice(pageIdx * pageSize, (pageIdx + 1) * pageSize);
+  const selfSize = nodes.reduce((total, item) => total + item.selfSize, 0);
+  return {
+    className: String(className),
+    exact,
+    total: nodes.length,
+    count: nodes.length,
+    selfSize,
+    selfSizeKB: round(selfSize / 1024),
+    selfSizeMB: round(selfSize / (1024 * 1024)),
+    pageIdx,
+    pageSize,
+    nodes: page
+  };
+}
+
 function details(snapshot, params) {
-  const nodeIndex = numberOr(params.nodeId, -1);
-  const index = nodeIndex < snapshot.nodeCount ? nodeIndex * snapshot.nodeStride : snapshot.nodes.findIndex((value, offset) => offset % snapshot.nodeStride === snapshot.offsets.node.id && value === nodeIndex);
+  const index = nodeIndexForParam(snapshot, params.nodeId);
   if (index < 0 || index >= snapshot.nodes.length) throw new Error(`Heap node not found: ${params.nodeId}`);
   const incoming = incomingEdges(snapshot)[Math.floor(index / snapshot.nodeStride)] || [];
   return {
@@ -254,15 +289,14 @@ function details(snapshot, params) {
 }
 
 function edges(snapshot, params) {
-  const nodeIndex = numberOr(params.nodeId, -1);
-  const index = nodeIndex < snapshot.nodeCount ? nodeIndex * snapshot.nodeStride : snapshot.nodes.findIndex((value, offset) => offset % snapshot.nodeStride === snapshot.offsets.node.id && value === nodeIndex);
+  const index = nodeIndexForParam(snapshot, params.nodeId);
   if (index < 0) throw new Error(`Heap node not found: ${params.nodeId}`);
   return { node: nodeSummary(snapshot, index), edges: outgoingEdges(snapshot, index).map(edge => edgeSummary(snapshot, edge)) };
 }
 
 function retainingPaths(snapshot, params) {
   const target = numberOr(params.nodeId, -1);
-  const targetIndex = target < snapshot.nodeCount ? target * snapshot.nodeStride : snapshot.nodes.findIndex((value, offset) => offset % snapshot.nodeStride === snapshot.offsets.node.id && value === target);
+  const targetIndex = nodeIndexForParam(snapshot, target);
   if (targetIndex < 0) throw new Error(`Heap node not found: ${params.nodeId}`);
   const incoming = incomingEdges(snapshot);
   const maxDepth = Math.min(50, Math.max(1, Number(params.maxDepth) || 8));
@@ -388,7 +422,92 @@ function dominators(snapshot, params) {
     });
   }
   rows.sort((a, b) => b.retainedSize - a.retainedSize || b.selfSize - a.selfSize);
+  if (params.nodeId !== undefined && params.nodeId !== null) {
+    const targetIndex = nodeIndexForParam(snapshot, params.nodeId);
+    if (targetIndex < 0) throw new Error(`Heap node not found: ${params.nodeId}`);
+    const target = Math.floor(targetIndex / snapshot.nodeStride);
+    const chain = [];
+    const seen = new Set();
+    let current = target;
+    while (current >= 0 && current !== virtualRoot && !seen.has(current)) {
+      seen.add(current);
+      chain.push(rows.find(item => item.nodeIndex === current * snapshot.nodeStride));
+      current = immediateDominator[current];
+    }
+    chain.reverse();
+    const node = rows.find(item => item.nodeIndex === targetIndex);
+    return {
+      rootCount: roots.length,
+      reachableNodeCount: rpo.length - 1,
+      node,
+      dominatorChain: chain,
+      retainedSize: node?.retainedSize ?? 0,
+      retainedSizeKB: node?.retainedSizeKB ?? 0,
+      retainedSizeMB: node?.retainedSizeMB ?? 0
+    };
+  }
   return { rootCount: roots.length, reachableNodeCount: rpo.length - 1, dominators: rows.slice(0, maxItems) };
+}
+
+function contextAnalysis(snapshot, params) {
+  const incoming = incomingEdges(snapshot);
+  const adjacency = Array.from({ length: snapshot.nodeCount }, () => []);
+  const contexts = [];
+  for (let ordinal = 0; ordinal < snapshot.nodeCount; ordinal++) {
+    const index = ordinal * snapshot.nodeStride;
+    const item = nodeSummary(snapshot, index);
+    const outgoing = outgoingEdges(snapshot, index);
+    adjacency[ordinal] = outgoing.map(edge => Math.floor(edge.toNode / snapshot.nodeStride));
+    if (!/context/i.test(item.name)) continue;
+    contexts.push({ ordinal, item, outgoing });
+  }
+
+  const roots = [];
+  for (let ordinal = 0; ordinal < snapshot.nodeCount; ordinal++) {
+    const item = nodeSummary(snapshot, ordinal * snapshot.nodeStride);
+    if (item.type === "synthetic" && /root|gc roots/i.test(item.name)) roots.push(ordinal);
+  }
+  if (!roots.length) {
+    for (let ordinal = 0; ordinal < snapshot.nodeCount; ordinal++) if (!incoming[ordinal]?.length) roots.push(ordinal);
+  }
+  const reachable = new Set(roots);
+  const queue = [...roots];
+  while (queue.length) {
+    for (const target of adjacency[queue.shift()] || []) {
+      if (target < 0 || target >= snapshot.nodeCount || reachable.has(target)) continue;
+      reachable.add(target);
+      queue.push(target);
+    }
+  }
+
+  const rows = contexts.map(({ ordinal, item, outgoing }) => {
+    const captured = outgoing
+      .filter(edge => (snapshot.edgeTypes[edge.type] || String(edge.type)) === "context")
+      .map(edge => edgeSummary(snapshot, edge));
+    const retainers = (incoming[ordinal] || []).map(edge => ({
+      fromNode: edge.fromNode,
+      ...edgeSummary(snapshot, edge)
+    }));
+    const dead = !reachable.has(ordinal) && captured.length > 0;
+    return {
+      ...item,
+      reachable: reachable.has(ordinal),
+      deadCaptured: dead,
+      captured,
+      retainers
+    };
+  });
+  const className = params.className === undefined ? null : String(params.className);
+  const filtered = className === null ? rows : rows.filter(row => matchesText(row.name, className));
+  const maxItems = Math.min(1000, Math.max(1, Number(params.maxItems) || 100));
+  return {
+    heuristic: true,
+    note: "Dead captured contexts are inferred from graph reachability and context edges in the snapshot.",
+    total: filtered.length,
+    deadCapturedCount: filtered.filter(row => row.deadCaptured).length,
+    contexts: filtered.slice(0, maxItems),
+    deadCapturedContexts: filtered.filter(row => row.deadCaptured).slice(0, maxItems)
+  };
 }
 
 function duplicateStrings(snapshot, params) {
@@ -437,8 +556,22 @@ async function loadSnapshot(filePath) {
   return snapshot;
 }
 
+function closeSnapshot(filePath) {
+  let removedEntries = 0;
+  for (const [key, snapshot] of snapshotCache) {
+    if (snapshot.filePath !== filePath) continue;
+    snapshotCache.delete(key);
+    removedEntries += 1;
+  }
+  return { filePath, closed: removedEntries > 0, removedEntries };
+}
+
 export async function analyzeHeapSnapshot(params = {}) {
   const action = String(params.action || "summary").toLowerCase().replace(/-/g, "_");
+  if (action === "close" || action === "close_snapshot") {
+    if (!params.filePath) throw new Error("filePath is required for close");
+    return closeSnapshot(params.filePath);
+  }
   if (action === "compare") {
     if (!params.baseFilePath || !params.currentFilePath) throw new Error("baseFilePath and currentFilePath are required for compare");
     return compareSnapshots(await loadSnapshot(params.baseFilePath), await loadSnapshot(params.currentFilePath), params);
@@ -450,14 +583,15 @@ export async function analyzeHeapSnapshot(params = {}) {
   if (action === "edges") return edges(snapshot, params);
   if (action === "retainers") {
     const incoming = incomingEdges(snapshot);
-    const nodeIndex = numberOr(params.nodeId, -1);
-    const index = nodeIndex < snapshot.nodeCount ? nodeIndex * snapshot.nodeStride : snapshot.nodes.findIndex((value, offset) => offset % snapshot.nodeStride === snapshot.offsets.node.id && value === nodeIndex);
+    const index = nodeIndexForParam(snapshot, params.nodeId);
     if (index < 0) throw new Error(`Heap node not found: ${params.nodeId}`);
     return { node: nodeSummary(snapshot, index), retainers: (incoming[Math.floor(index / snapshot.nodeStride)] || []).map(edge => ({ fromNode: edge.fromNode, ...edgeSummary(snapshot, edge) })) };
   }
   if (action === "retaining_paths" || action === "dominator") return retainingPaths(snapshot, params);
-  if (action === "dominators") return dominators(snapshot, params);
+  if (action === "dominators" || action === "dominator_chain") return dominators(snapshot, params);
   if (action === "duplicate_strings") return duplicateStrings(snapshot, params);
+  if (action === "class_nodes" || action === "class_details") return classNodes(snapshot, params);
   if (action === "contexts") return query(snapshot, { ...params, nodeType: "native", className: params.className || "context" });
+  if (action === "analyze_contexts" || action === "context_analysis") return contextAnalysis(snapshot, params);
   throw new Error(`Unsupported heap analysis action: ${action}`);
 }

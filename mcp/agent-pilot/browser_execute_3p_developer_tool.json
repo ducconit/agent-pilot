@@ -1,26 +1,60 @@
 {
-  "description": "Execute a developer tool exposed by the current page through devtoolstooldiscovery.",
+  "description": "Execute one developer tool exposed by the current page through devtoolstooldiscovery. The tool runs in the page context and grants no privileges beyond page JavaScript.",
   "inputSchema": {
-    "type": "object",
-    "required": ["toolName"],
     "properties": {
-      "tabId": { "type": "integer", "description": "Target tab ID" },
-      "contextId": { "type": "string", "description": "Optional isolated context" },
-      "toolName": { "type": "string", "description": "Page-defined developer tool name" },
-      "input": { "type": "object", "description": "JSON input passed to the page tool" },
-      "params": { "type": "string", "description": "JSON-stringified input alias" }
-    }
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "input": {
+        "description": "JSON input passed to the page tool",
+        "type": "object"
+      },
+      "params": {
+        "description": "JSON-stringified input alias",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "toolName": {
+        "description": "Page-defined developer tool name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "toolName"
+    ],
+    "type": "object"
   },
   "name": "browser_execute_3p_developer_tool",
   "parameters": {
-    "type": "object",
-    "required": ["toolName"],
     "properties": {
-      "tabId": { "type": "integer" },
-      "contextId": { "type": "string" },
-      "toolName": { "type": "string" },
-      "input": { "type": "object" },
-      "params": { "type": "string" }
-    }
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "input": {
+        "description": "JSON input passed to the page tool",
+        "type": "object"
+      },
+      "params": {
+        "description": "JSON-stringified input alias",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "toolName": {
+        "description": "Page-defined developer tool name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "toolName"
+    ],
+    "type": "object"
   }
 }

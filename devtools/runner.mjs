@@ -7,6 +7,7 @@ import { runAudit, analyzeAudit } from "./audits.mjs";
 import { performanceTrace, analyzeInsight } from "./traces.mjs";
 import { screencast, stopAllRecordings } from "./video.mjs";
 import { analyzeHeapSnapshot } from "./heap-analysis.mjs";
+import { createPwaAdapterFromBrowser } from "./pwa.mjs";
 
 const require = createRequire(import.meta.url);
 const extensionPending = new Map();
@@ -52,6 +53,16 @@ async function workers(params) {
 async function dispatch(method, params) {
   if (method === "devtools.runtime") return { embedded: true, nodeVersion: process.version, lighthouseVersion: require("lighthouse/package.json").version, puppeteerVersion: require("puppeteer-core/package.json").version, systemNodeRequired: false, ffmpegRequired: false };
   if (method === "memory.analyzeSnapshot") return analyzeHeapSnapshot(params);
+  if (method.startsWith("pwa.")) {
+    const adapter = createPwaAdapterFromBrowser(await browsers.browser(params));
+    const action = method.slice(4);
+    if (action === "probe") return adapter.probe(params);
+    if (action === "getOsAppState") return adapter.getOsAppState(params);
+    if (action === "install") return adapter.install(params);
+    if (action === "launch") return adapter.launch(params);
+    if (action === "uninstall") return adapter.uninstall(params);
+    throw new Error(`Unsupported PWA action: ${action}`);
+  }
   if (method.startsWith("contexts.")) return browsers.context(method.slice(9), params);
   if (method === "lighthouse.analyze") return analyzeAudit(params);
   if (method === "performance.analyzeInsight") return analyzeInsight(params);

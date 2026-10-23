@@ -21,12 +21,79 @@ import {
   collectGarbage,
   takeHeapSnapshot
 } from "../cdp-manager.js";
+import { sendCdpCommand } from "../cdp-manager.js";
+import {
+  extensionProtocolUnavailable,
+  isSelfExtension,
+  normalizeExtensionAction,
+  selectTabTargetId,
+  validateExtensionId,
+  validateUnpackedExtensionPath
+} from "../extension-lifecycle.js";
 
 // Network request listing defaults (agent-facing cap, independent of the capture buffer)
 const NETWORK_LIST_LIMIT_DEFAULT = 100;
 const NETWORK_LIST_LIMIT_MAX = 1000;
 // Short delay so the "reloading" response reaches the agent before the socket dies
 const RELOAD_RESPONSE_DELAY_MS = 150;
+
+function invokeManagement(method, ...args) {
+  const api = chrome.management?.[method];
+  if (typeof api !== "function") {
+    throw new Error(`chrome.management.${method} API is not available`);
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      const lastError = chrome.runtime?.lastError;
+      if (lastError) reject(new Error(lastError.message || `chrome.management.${method} failed`));
+      else callback(value);
+    };
+    const callback = (value) => finish(resolve, value);
+    try {
+      const result = api.call(chrome.management, ...args, callback);
+      if (result && typeof result.then === "function") {
+        result.then(value => finish(resolve, value), error => finish(reject, error));
+      }
+    } catch (error) {
+      finish(reject, error);
+    }
+  });
+}
+
+async function withExtensionProtocolTarget(client, params, action, operation) {
+  const tabId = await client.getTargetTabId(params.tabId, params.agentId);
+  if (!tabId) throw new Error(NO_TARGET_TAB_ERROR);
+  const attached = await attachDebugger(tabId, client.broadcastFn);
+  if (!attached || attached.success === false) {
+    throw new Error(`Extension lifecycle action "${action}" requires a debugger target: ${attached?.error || "attach failed"}`);
+  }
+  return client.runWithTabLock(tabId, `extensions.${action}`, () => operation(tabId));
+}
+
+async function sendExtensionProtocol(tabId, action, method, params = {}) {
+  try {
+    return await sendCdpCommand(tabId, method, params);
+  } catch (error) {
+    throw extensionProtocolUnavailable(action, method, error);
+  }
+}
+
+async function extensionTabTargetIdForTab(tabId, action) {
+  const response = await sendExtensionProtocol(tabId, action, "Target.getTargets", {
+    filter: [{ type: "tab", exclude: false }]
+  });
+  const targetInfos = response?.targetInfos || [];
+  try {
+    return selectTabTargetId(targetInfos);
+  } catch (error) {
+    if (!chrome.tabs?.get || !Array.isArray(targetInfos) || targetInfos.filter(target => target?.type === "tab").length < 2) throw error;
+    const tab = await chrome.tabs.get(tabId);
+    return selectTabTargetId(targetInfos, { url: tab?.url, title: tab?.title });
+  }
+}
 
 export const systemHandlers = {
   "emulation.set": async (client, params, respond) => {
@@ -158,54 +225,101 @@ export const systemHandlers = {
     if (!chrome.management) {
       return respond(null, new Error("chrome.management API is not available"));
     }
-    const rawAction = (params.action || "list").toLowerCase();
-    let action = rawAction;
-    if (rawAction === "enable") {
-      action = "setEnabled";
+    const rawAction = params.action || "list";
+    const action = normalizeExtensionAction(rawAction);
+    if (String(rawAction).toLowerCase() === "enable") {
       params.enabled = true;
-    } else if (rawAction === "disable") {
-      action = "setEnabled";
+    } else if (String(rawAction).toLowerCase() === "disable") {
       params.enabled = false;
-    } else if (rawAction === "setenabled") {
-      action = "setEnabled";
     }
 
     if (action === "list") {
-      chrome.management.getAll((extList) => {
-        if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
-        const list = (extList || []).map(e => ({
+      invokeManagement("getAll")
+        .then(extList => {
+          const list = (extList || []).map(e => ({
           id: e.id,
           name: e.name,
           version: e.version,
           enabled: e.enabled,
           type: e.type,
-          installType: e.installType
-        }));
-        respond({ total: list.length, extensions: list });
-      });
+          installType: e.installType,
+          mayDisable: e.mayDisable,
+          mayEnable: e.mayEnable
+          }));
+          respond({ total: list.length, extensions: list });
+        })
+        .catch(error => respond(null, error));
     } else if (action === "setEnabled") {
-      if (!params.extensionId) return respond(null, new Error("extensionId is required"));
+      let extensionId;
+      try { extensionId = validateExtensionId(params.extensionId); } catch (error) { return respond(null, error); }
       const enabled = params.enabled !== false;
-      chrome.management.setEnabled(params.extensionId, enabled, () => {
-        if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
-        respond({ success: true, extensionId: params.extensionId, enabled });
-      });
+      invokeManagement("setEnabled", extensionId, enabled)
+        .then(() => respond({ success: true, extensionId, enabled }))
+        .catch(error => respond(null, error));
     } else if (action === "toggle") {
-      if (!params.extensionId) return respond(null, new Error("extensionId is required"));
-      chrome.management.get(params.extensionId, (info) => {
-        if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
+      let extensionId;
+      try { extensionId = validateExtensionId(params.extensionId); } catch (error) { return respond(null, error); }
+      invokeManagement("get", extensionId).then(info => {
         const targetEnabled = !info.enabled;
-        chrome.management.setEnabled(params.extensionId, targetEnabled, () => {
-          if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
-          respond({ success: true, extensionId: params.extensionId, enabled: targetEnabled });
-        });
-      });
+        return invokeManagement("setEnabled", extensionId, targetEnabled)
+          .then(() => respond({ success: true, extensionId, enabled: targetEnabled }));
+      }).catch(error => respond(null, error));
     } else if (action === "uninstall") {
-      if (!params.extensionId) return respond(null, new Error("extensionId is required"));
-      chrome.management.uninstall(params.extensionId, { showConfirmDialog: false }, () => {
-        if (chrome.runtime.lastError) return respond(null, chrome.runtime.lastError);
-        respond({ success: true, extensionId: params.extensionId, uninstalled: true });
-      });
+      let extensionId;
+      try { extensionId = validateExtensionId(params.extensionId); } catch (error) { return respond(null, error); }
+      if (isSelfExtension(extensionId, chrome.runtime?.id) && params.confirmSelf !== true) {
+        return respond(null, new Error("Refusing to uninstall Agent Pilot itself; pass confirmSelf=true to confirm"));
+      }
+      invokeManagement("get", extensionId)
+        .then(info => {
+          if (info?.mayDisable === false) {
+            throw new Error(`Extension ${extensionId} cannot be uninstalled in this Chrome profile (managed or policy-controlled)`);
+          }
+          return invokeManagement("uninstall", extensionId, { showConfirmDialog: false });
+        })
+        .then(() => respond({ success: true, extensionId, uninstalled: true }))
+        .catch(error => respond(null, error));
+    } else if (action === "install") {
+      let extensionPath;
+      try { extensionPath = validateUnpackedExtensionPath(params.path); } catch (error) { return respond(null, error); }
+      withExtensionProtocolTarget(client, params, action, tabId => sendExtensionProtocol(
+        tabId,
+        action,
+        "Extensions.loadUnpacked",
+        { path: extensionPath, ...(params.enableInIncognito !== undefined ? { enableInIncognito: Boolean(params.enableInIncognito) } : {}) }
+      ))
+        .then(result => respond({ success: true, action, path: extensionPath, extensionId: result?.id, protocol: "Extensions.loadUnpacked" }))
+        .catch(error => respond(null, error));
+    } else if (action === "reload") {
+      let extensionId;
+      try { extensionId = validateExtensionId(params.extensionId); } catch (error) { return respond(null, error); }
+      if (isSelfExtension(extensionId, chrome.runtime?.id)) {
+        respond({ success: true, action, extensionId, reloading: true, protocol: "chrome.runtime.reload" });
+        setTimeout(() => chrome.runtime.reload(), RELOAD_RESPONSE_DELAY_MS);
+        return;
+      }
+      withExtensionProtocolTarget(client, params, action, async tabId => {
+        const extensions = await sendExtensionProtocol(tabId, action, "Extensions.getExtensions");
+        const extension = (extensions?.extensions || []).find(item => item.id === extensionId);
+        if (!extension?.path) {
+          throw new Error(`UNSUPPORTED_EXTENSION_API: reload only supports unpacked extensions exposed by Extensions.getExtensions (${extensionId})`);
+        }
+        await sendExtensionProtocol(tabId, action, "Extensions.uninstall", { id: extensionId });
+        const installed = await sendExtensionProtocol(tabId, action, "Extensions.loadUnpacked", { path: extension.path });
+        return { path: extension.path, extensionId: installed?.id || extensionId };
+      })
+        .then(result => respond({ success: true, action, extensionId: result.extensionId, path: result.path, reloaded: true, protocol: "Extensions.uninstall+Extensions.loadUnpacked" }))
+        .catch(error => respond(null, error));
+    } else if (action === "triggerAction") {
+      let extensionId;
+      try { extensionId = validateExtensionId(params.extensionId); } catch (error) { return respond(null, error); }
+      withExtensionProtocolTarget(client, params, action, async tabId => {
+        const targetId = await extensionTabTargetIdForTab(tabId, action);
+        await sendExtensionProtocol(tabId, action, "Extensions.triggerAction", { id: extensionId, targetId });
+        return { targetId };
+      })
+        .then(result => respond({ success: true, action, extensionId, targetId: result.targetId, triggered: true, protocol: "Extensions.triggerAction" }))
+        .catch(error => respond(null, error));
     } else {
       respond(null, new Error(`Unsupported extension action: ${action}`));
     }

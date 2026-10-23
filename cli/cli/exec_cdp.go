@@ -182,7 +182,7 @@ func ExecTakeHeapSnapshotWithOptions(action string, collectGarbage bool, maxCons
 	return dispatchAndPrintJSON("memory.heapSnapshot", params, tabID)
 }
 
-func ExecManageExtensions(action, extensionID string, enabled *bool) error {
+func ExecManageExtensions(action, extensionID, extensionPath string, enabled *bool, tabID interface{}, enableInIncognito, confirmSelf bool) error {
 	params := map[string]interface{}{
 		"action": action,
 	}
@@ -191,6 +191,18 @@ func ExecManageExtensions(action, extensionID string, enabled *bool) error {
 	}
 	if enabled != nil {
 		params["enabled"] = *enabled
+	}
+	if extensionPath != "" {
+		params["path"] = extensionPath
+	}
+	if tabID != nil {
+		params["tabId"] = tabID
+	}
+	if enableInIncognito {
+		params["enableInIncognito"] = true
+	}
+	if confirmSelf {
+		params["confirmSelf"] = true
 	}
 	return dispatchAndPrintJSON("extensions.manage", params, nil)
 }

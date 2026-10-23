@@ -1,0 +1,36 @@
+{
+  "description": "Launch an installed PWA through the browser-scoped PWA CDP domain.",
+  "inputSchema": {
+    "properties": {
+      "manifestId": {
+        "description": "PWA manifest ID",
+        "type": "string"
+      },
+      "url": {
+        "description": "Optional URL to open in the PWA",
+        "type": "string"
+      }
+    },
+    "required": [
+      "manifestId"
+    ],
+    "type": "object"
+  },
+  "name": "browser_launch_pwa",
+  "parameters": {
+    "properties": {
+      "manifestId": {
+        "description": "PWA manifest ID",
+        "type": "string"
+      },
+      "url": {
+        "description": "Optional URL to open in the PWA",
+        "type": "string"
+      }
+    },
+    "required": [
+      "manifestId"
+    ],
+    "type": "object"
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "description": "Get request metadata plus request/response bodies for a captured network request, optionally saving bodies to artifact files.",
+  "description": "Get the full response body (JSON/Text) and details for a specific captured network request ID via CDP Network.getResponseBody.",
   "inputSchema": {
     "properties": {
       "contextId": {
@@ -14,16 +14,16 @@
         "description": "Include the response body (default: true)",
         "type": "boolean"
       },
+      "requestFilePath": {
+        "description": "Save the request body to a .network-request file; supported by the embedded runtime",
+        "type": "string"
+      },
       "requestId": {
         "description": "The unique request ID obtained from browser_list_network_requests or devtools data",
         "type": "string"
       },
-      "requestFilePath": {
-        "description": "Save the request body to a .network-request file",
-        "type": "string"
-      },
       "responseFilePath": {
-        "description": "Save the response body to a .network-response file",
+        "description": "Save the response body to a .network-response file; supported by the embedded runtime",
         "type": "string"
       },
       "tabId": {
@@ -51,16 +51,16 @@
         "description": "Include the response body (default: true)",
         "type": "boolean"
       },
+      "requestFilePath": {
+        "description": "Save the request body to a .network-request file; supported by the embedded runtime",
+        "type": "string"
+      },
       "requestId": {
         "description": "The unique request ID obtained from browser_list_network_requests or devtools data",
         "type": "string"
       },
-      "requestFilePath": {
-        "description": "Save the request body to a .network-request file",
-        "type": "string"
-      },
       "responseFilePath": {
-        "description": "Save the response body to a .network-response file",
+        "description": "Save the response body to a .network-response file; supported by the embedded runtime",
         "type": "string"
       },
       "tabId": {

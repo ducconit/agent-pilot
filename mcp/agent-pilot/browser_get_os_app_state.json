@@ -1,0 +1,28 @@
+{
+  "description": "Read Chromium's OS-level state for an installed PWA by manifest ID. Requires a Chrome build exposing the browser-scoped PWA CDP domain.",
+  "inputSchema": {
+    "properties": {
+      "manifestId": {
+        "description": "PWA manifest ID",
+        "type": "string"
+      }
+    },
+    "required": [
+      "manifestId"
+    ],
+    "type": "object"
+  },
+  "name": "browser_get_os_app_state",
+  "parameters": {
+    "properties": {
+      "manifestId": {
+        "description": "PWA manifest ID",
+        "type": "string"
+      }
+    },
+    "required": [
+      "manifestId"
+    ],
+    "type": "object"
+  }
+}

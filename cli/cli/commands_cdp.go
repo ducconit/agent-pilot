@@ -290,6 +290,9 @@ func newExtensionsCommand() *cobra.Command {
 	cmd := newLeafCommand("extensions", []string{"ext"}, func(args []string) error {
 		cmdArgs, err := parseCmdArgs(args, []FlagDef{
 			{Name: "enabled", Aliases: []string{"e"}, IsBool: true},
+			{Name: "path", Aliases: []string{"p"}},
+			{Name: "enable-incognito", IsBool: true},
+			{Name: "confirm-self", IsBool: true},
 			{Name: "tab", Aliases: []string{"t"}},
 		})
 		if err != nil {
@@ -298,6 +301,7 @@ func newExtensionsCommand() *cobra.Command {
 		}
 		action := "list"
 		extID := ""
+		extensionPath := cmdArgs.String("path", "")
 		var enabled *bool
 		if len(cmdArgs.Positional) > 0 {
 			sub := strings.ToLower(cmdArgs.Positional[0])
@@ -343,15 +347,39 @@ func newExtensionsCommand() *cobra.Command {
 				if len(cmdArgs.Positional) > 1 {
 					extID = cmdArgs.Positional[1]
 				}
+			case "install":
+				action = "install"
+				if extensionPath == "" && len(cmdArgs.Positional) > 1 {
+					extensionPath = cmdArgs.Positional[1]
+				}
+			case "reload":
+				action = "reload"
+				if len(cmdArgs.Positional) > 1 {
+					extID = cmdArgs.Positional[1]
+				}
+			case "trigger", "trigger-action", "trigger_action":
+				action = "triggerAction"
+				if len(cmdArgs.Positional) > 1 {
+					extID = cmdArgs.Positional[1]
+				}
 			default:
 				extID = cmdArgs.Positional[0]
 			}
 		}
-		if (action == "setEnabled" || action == "toggle" || action == "uninstall") && extID == "" {
+		if (action == "setEnabled" || action == "toggle" || action == "uninstall" || action == "reload" || action == "triggerAction") && extID == "" {
 			fmt.Printf("Sử dụng: agent-pilot extensions %s <extensionId>\n", action)
 			return errUsage
 		}
-		if err := ExecManageExtensions(action, extID, enabled); err != nil {
+		if action == "install" && extensionPath == "" {
+			fmt.Println("Sử dụng: agent-pilot extensions install <absolute-extension-path>")
+			return errUsage
+		}
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		if err := ExecManageExtensions(action, extID, extensionPath, enabled, tabID, cmdArgs.Bool("enable-incognito"), cmdArgs.Bool("confirm-self")); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
@@ -359,6 +387,9 @@ func newExtensionsCommand() *cobra.Command {
 	})
 	f := cmd.Flags()
 	f.BoolP("enabled", "e", false, "Enable/disable value for setEnabled")
+	f.StringP("path", "p", "", "Absolute path to an unpacked extension directory for install")
+	f.Bool("enable-incognito", false, "Enable an installed unpacked extension in incognito windows")
+	f.Bool("confirm-self", false, "Allow uninstalling Agent Pilot itself")
 	f.IntP("tab", "t", 0, "Target tab ID")
 	return cmd
 }

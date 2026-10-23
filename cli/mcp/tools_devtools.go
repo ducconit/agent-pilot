@@ -45,7 +45,7 @@ func init() {
 		devtoolsTool("browser_devtools_status", "Report the versions of the runtime embedded in the MCP binary. Works without a system Node or FFmpeg installation.", map[string]interface{}{}),
 		devtoolsTool("browser_analyze_heapsnapshot", "Analyze a saved V8 heap snapshot: summary, object queries, outgoing edges, retainers, retaining paths, duplicate strings, native contexts, and constructor diffs. The snapshot is read by the embedded runtime and never sent to a remote service.", map[string]interface{}{
 			"filePath":        field("string", "Path to a .heapsnapshot JSON file"),
-			"action":          choices("Analysis operation", "summary", "query", "details", "edges", "retainers", "retaining_paths", "dominators", "duplicate_strings", "contexts", "compare"),
+			"action":          choices("Analysis operation", "summary", "query", "details", "edges", "retainers", "retaining_paths", "dominators", "dominator_chain", "duplicate_strings", "contexts", "class_nodes", "class_details", "analyze_contexts", "context_analysis", "close", "compare"),
 			"baseFilePath":    field("string", "Earlier snapshot path for compare"),
 			"currentFilePath": field("string", "Later snapshot path for compare"),
 			"nodeId":          field("integer", "Heap node index or V8 node id for details/edges/retainers/paths"),
@@ -63,6 +63,7 @@ func init() {
 			"maxDepth":        field("integer", "Maximum retaining-path depth"),
 			"maxNodes":        field("integer", "Maximum retaining paths"),
 			"maxSiblings":     field("integer", "Maximum incoming edges explored per node"),
+			"exact":           field("boolean", "For class_nodes, require an exact constructor name; default true"),
 		}),
 		devtoolsTool("browser_list_3p_developer_tools", "Discover developer tools exposed by the current page through the devtoolstooldiscovery event. Returns page-defined names, descriptions and input schemas without executing them.", map[string]interface{}{
 			"tabId": field("integer", "Target tab ID"),
@@ -73,6 +74,29 @@ func init() {
 			"input":    map[string]interface{}{"type": "object", "description": "JSON input passed to the page tool"},
 			"params":   field("string", "JSON-stringified input alias"),
 		}, "toolName"),
+		devtoolsTool("browser_list_webmcp_tools", "List WebMCP tools exposed by the current page through Chrome's WebMCP runtime without executing them.", map[string]interface{}{
+			"tabId": field("integer", "Target tab ID"),
+		}),
+		devtoolsTool("browser_execute_webmcp_tool", "Execute one WebMCP tool exposed by the current page. Input is validated as a JSON object and the page runtime returns a structured invocation result.", map[string]interface{}{
+			"tabId":    field("integer", "Target tab ID"),
+			"toolName": field("string", "WebMCP tool name"),
+			"input":    map[string]interface{}{"type": "object", "description": "JSON input passed to the WebMCP tool"},
+		}, "toolName"),
+		devtoolsTool("browser_get_os_app_state", "Read Chromium's OS-level state for an installed PWA by manifest ID. Requires a Chrome build exposing the browser-scoped PWA CDP domain.", map[string]interface{}{
+			"manifestId": field("string", "PWA manifest ID"),
+		}, "manifestId"),
+		devtoolsTool("browser_install_pwa", "Install a PWA by manifest ID through the browser-scoped PWA CDP domain.", map[string]interface{}{
+			"manifestId":            field("string", "PWA manifest ID"),
+			"installUrlOrBundleUrl": field("string", "Optional install URL or bundle URL"),
+			"displayMode":           choices("Optional post-install display mode", "browser", "standalone"),
+		}, "manifestId"),
+		devtoolsTool("browser_launch_pwa", "Launch an installed PWA through the browser-scoped PWA CDP domain.", map[string]interface{}{
+			"manifestId": field("string", "PWA manifest ID"),
+			"url":        field("string", "Optional URL to open in the PWA"),
+		}, "manifestId"),
+		devtoolsTool("browser_uninstall_pwa", "Uninstall a PWA by manifest ID through the browser-scoped PWA CDP domain.", map[string]interface{}{
+			"manifestId": field("string", "PWA manifest ID"),
+		}, "manifestId"),
 	)
 	for i := range mcpTools {
 		tool := &mcpTools[i]

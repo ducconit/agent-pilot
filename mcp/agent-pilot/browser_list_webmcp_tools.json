@@ -1,0 +1,30 @@
+{
+  "description": "List WebMCP tools exposed by the current page through Chrome's WebMCP runtime without executing them.",
+  "inputSchema": {
+    "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_list_webmcp_tools",
+  "parameters": {
+    "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

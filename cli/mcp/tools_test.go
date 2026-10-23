@@ -2,12 +2,14 @@ package mcp
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 )
 
 func TestMCPToolsRegistry(t *testing.T) {
-	expectedCount := 51
+	expectedCount := 57
 	if len(mcpTools) != expectedCount {
 		t.Fatalf("expected %d tools, got %d", expectedCount, len(mcpTools))
 	}
@@ -18,6 +20,8 @@ func TestMCPToolsRegistry(t *testing.T) {
 		"browser_create_context", "browser_list_contexts", "browser_close_context",
 		"browser_service_workers", "browser_accessibility_snapshot", "browser_devtools_status", "browser_analyze_heapsnapshot",
 		"browser_list_3p_developer_tools", "browser_execute_3p_developer_tool",
+		"browser_list_webmcp_tools", "browser_execute_webmcp_tool",
+		"browser_get_os_app_state", "browser_install_pwa", "browser_launch_pwa", "browser_uninstall_pwa",
 		"browser_run_actions", "browser_open_tab", "browser_close_tab", "browser_list_tabs", "browser_navigate",
 		"browser_click", "browser_type", "browser_scroll", "browser_snapshot", "browser_fill_form",
 		"browser_get_element", "browser_screenshot", "browser_get_devtools_data", "browser_pick_color",
@@ -46,6 +50,15 @@ func TestMCPToolsRegistry(t *testing.T) {
 	for _, name := range requiredTools {
 		if _, ok := toolMap[name]; !ok {
 			t.Errorf("missing expected tool: %s", name)
+		}
+	}
+
+	extensionTool := toolMap["browser_manage_extensions"]
+	properties, _ := extensionTool.InputSchema["properties"].(map[string]interface{})
+	actionSchema := fmt.Sprint(properties["action"])
+	for _, action := range []string{"install", "reload", "triggerAction", "uninstall"} {
+		if !strings.Contains(actionSchema, action) {
+			t.Errorf("browser_manage_extensions schema missing action %q", action)
 		}
 	}
 

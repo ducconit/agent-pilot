@@ -42,7 +42,7 @@ func useDevtoolsHost(method string, params map[string]interface{}) bool {
 			return true
 		}
 	}
-	if strings.HasPrefix(method, "lighthouse.") || strings.HasPrefix(method, "contexts.") || strings.HasPrefix(method, "screencast.") || strings.HasPrefix(method, "developerTools.") || method == "performance.trace" || method == "performance.analyzeInsight" || method == "accessibility.snapshot" || method == "devtools.runtime" {
+	if strings.HasPrefix(method, "lighthouse.") || strings.HasPrefix(method, "contexts.") || strings.HasPrefix(method, "screencast.") || strings.HasPrefix(method, "developerTools.") || strings.HasPrefix(method, "webmcp.") || strings.HasPrefix(method, "pwa.") || method == "performance.trace" || method == "performance.analyzeInsight" || method == "accessibility.snapshot" || method == "devtools.runtime" {
 		return true
 	}
 	if context, _ := params["isolatedContext"].(string); context != "" {

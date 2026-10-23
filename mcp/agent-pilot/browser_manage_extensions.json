@@ -1,24 +1,47 @@
 {
-  "description": "List, enable/disable, toggle, or uninstall browser extensions via chrome.management.",
+  "description": "List, enable/disable, toggle, install, reload, trigger, or uninstall browser extensions. Uses chrome.management for profile-safe management and the Chrome DevTools Protocol Extensions domain for unpacked-extension lifecycle actions.",
   "inputSchema": {
     "properties": {
       "action": {
-        "description": "Action: list, setEnabled, toggle, or uninstall",
+        "description": "Action to perform",
         "enum": [
           "list",
           "setEnabled",
           "toggle",
+          "install",
+          "reload",
+          "triggerAction",
           "uninstall"
         ],
         "type": "string"
+      },
+      "confirmSelf": {
+        "description": "Explicitly allow uninstalling Agent Pilot itself",
+        "type": "boolean"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "enableInIncognito": {
+        "description": "Enable an installed unpacked extension in incognito windows",
+        "type": "boolean"
       },
       "enabled": {
         "description": "Target enabled state for setEnabled action",
         "type": "boolean"
       },
       "extensionId": {
-        "description": "Extension ID to enable or disable",
+        "description": "Extension ID for enable/disable/toggle/reload/trigger/uninstall",
         "type": "string"
+      },
+      "path": {
+        "description": "Absolute path to an unpacked extension directory for install",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab used for CDP Extensions commands and triggerAction",
+        "type": "integer"
       }
     },
     "type": "object"
@@ -27,22 +50,45 @@
   "parameters": {
     "properties": {
       "action": {
-        "description": "Action: list, setEnabled, toggle, or uninstall",
+        "description": "Action to perform",
         "enum": [
           "list",
           "setEnabled",
           "toggle",
+          "install",
+          "reload",
+          "triggerAction",
           "uninstall"
         ],
         "type": "string"
+      },
+      "confirmSelf": {
+        "description": "Explicitly allow uninstalling Agent Pilot itself",
+        "type": "boolean"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "enableInIncognito": {
+        "description": "Enable an installed unpacked extension in incognito windows",
+        "type": "boolean"
       },
       "enabled": {
         "description": "Target enabled state for setEnabled action",
         "type": "boolean"
       },
       "extensionId": {
-        "description": "Extension ID to enable or disable",
+        "description": "Extension ID for enable/disable/toggle/reload/trigger/uninstall",
         "type": "string"
+      },
+      "path": {
+        "description": "Absolute path to an unpacked extension directory for install",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab used for CDP Extensions commands and triggerAction",
+        "type": "integer"
       }
     },
     "type": "object"

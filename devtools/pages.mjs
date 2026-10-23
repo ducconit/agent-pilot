@@ -3,6 +3,7 @@ import { applyEmulation } from "../extensions/background/cdp-emulation.js";
 import { collectCssStyles } from "../extensions/background/cdp-css.js";
 import { outputPath, writeArtifact } from "./artifacts.mjs";
 import { normalizeUrl } from "../extensions/background/constants.js";
+import { executeWebMcpTool, listWebMcpTools } from "./webmcp.mjs";
 
 export async function element(tab, selector) {
   if (!selector) throw new Error("selector is required");
@@ -88,6 +89,8 @@ export async function pageCommand(tab, method, p) {
   const { page, client } = tab;
   switch (method) {
     case "page.evaluate": return evaluateInTab(tab, p.expression || p.script || p.code);
+    case "webmcp.list": return listWebMcpTools(page);
+    case "webmcp.execute": return executeWebMcpTool(page, p);
     case "developerTools.list": return { tools: await discoverPageDeveloperTools(tab) };
     case "developerTools.execute": return { toolName: p.toolName, result: await executePageDeveloperTool(tab, p) };
     case "tabs.update":

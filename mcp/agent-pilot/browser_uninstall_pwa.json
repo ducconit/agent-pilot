@@ -1,0 +1,28 @@
+{
+  "description": "Uninstall a PWA by manifest ID through the browser-scoped PWA CDP domain.",
+  "inputSchema": {
+    "properties": {
+      "manifestId": {
+        "description": "PWA manifest ID",
+        "type": "string"
+      }
+    },
+    "required": [
+      "manifestId"
+    ],
+    "type": "object"
+  },
+  "name": "browser_uninstall_pwa",
+  "parameters": {
+    "properties": {
+      "manifestId": {
+        "description": "PWA manifest ID",
+        "type": "string"
+      }
+    },
+    "required": [
+      "manifestId"
+    ],
+    "type": "object"
+  }
+}

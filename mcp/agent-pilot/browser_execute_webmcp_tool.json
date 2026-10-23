@@ -1,0 +1,52 @@
+{
+  "description": "Execute one WebMCP tool exposed by the current page. Input is validated as a JSON object and the page runtime returns a structured invocation result.",
+  "inputSchema": {
+    "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "input": {
+        "description": "JSON input passed to the WebMCP tool",
+        "type": "object"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "toolName": {
+        "description": "WebMCP tool name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "toolName"
+    ],
+    "type": "object"
+  },
+  "name": "browser_execute_webmcp_tool",
+  "parameters": {
+    "properties": {
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "input": {
+        "description": "JSON input passed to the WebMCP tool",
+        "type": "object"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "toolName": {
+        "description": "WebMCP tool name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "toolName"
+    ],
+    "type": "object"
+  }
+}

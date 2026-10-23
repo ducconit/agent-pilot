@@ -1,18 +1,30 @@
 {
-  "description": "Discover developer tools exposed by the current page through the devtoolstooldiscovery event.",
+  "description": "Discover developer tools exposed by the current page through the devtoolstooldiscovery event. Returns page-defined names, descriptions and input schemas without executing them.",
   "inputSchema": {
-    "type": "object",
     "properties": {
-      "tabId": { "type": "integer", "description": "Target tab ID" },
-      "contextId": { "type": "string", "description": "Optional isolated context" }
-    }
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
   },
   "name": "browser_list_3p_developer_tools",
   "parameters": {
-    "type": "object",
     "properties": {
-      "tabId": { "type": "integer" },
-      "contextId": { "type": "string" }
-    }
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
   }
 }
