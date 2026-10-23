@@ -51,7 +51,7 @@ func ExecHandleDialog(accept bool, promptText string, tabID interface{}) error {
 	return nil
 }
 
-func ExecEmulate(network, cpu, theme string, tabID interface{}) error {
+func ExecEmulate(network, cpu, theme string, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{}
 	if network != "" {
 		params["networkConditions"] = network
@@ -69,8 +69,7 @@ func ExecEmulate(network, cpu, theme string, tabID interface{}) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Emulation configured: %v\n", res)
-	return nil
+	return printCommandResult(commandOutputFormat(extra...), "✅ Emulation configured: %v\n", res)
 }
 
 func ExecResizePage(width, height int, tabID interface{}) error {

@@ -29,9 +29,23 @@ func TestDevtoolsRouting(t *testing.T) {
 }
 
 func TestAdvancedCommandTimeouts(t *testing.T) {
-	for _, method := range []string{"lighthouse.audit", "lighthouse.analyze", "contexts.create", "screencast.record", "performance.trace", "performance.analyzeInsight", "accessibility.snapshot", "devtools.runtime"} {
+	for _, method := range []string{"contexts.create", "screencast.record", "performance.trace", "performance.analyzeInsight", "accessibility.snapshot", "devtools.runtime"} {
 		if got := DeriveCommandTimeout(method, nil, 30000); got < 180000 {
 			t.Errorf("%s budget=%d, expected at least 180s", method, got)
+		}
+		if got := DeriveCommandTimeout(method, map[string]interface{}{"timeoutMs": 240000}, 30000); got != 240000 {
+			t.Errorf("%s explicit budget=%d, expected 240000", method, got)
+		}
+	}
+	for _, method := range []string{"lighthouse.audit", "lighthouse.analyze"} {
+		if got := DeriveCommandTimeout(method, nil, 30000); got != 60000 {
+			t.Errorf("%s budget=%d, expected 60s default", method, got)
+		}
+		if got := DeriveCommandTimeout(method, map[string]interface{}{"timeoutMs": 15000}, 0); got != 15000 {
+			t.Errorf("%s short explicit budget=%d, expected 15000", method, got)
+		}
+		if got := DeriveCommandTimeout(method, map[string]interface{}{"timeoutMs": 5000}, 30000); got != 5000 {
+			t.Errorf("%s forwarded short budget=%d, expected 5000", method, got)
 		}
 		if got := DeriveCommandTimeout(method, map[string]interface{}{"timeoutMs": 240000}, 30000); got != 240000 {
 			t.Errorf("%s explicit budget=%d, expected 240000", method, got)

@@ -162,7 +162,20 @@ func deriveInlineWaitBudgetMs(params map[string]interface{}) int {
 
 // DeriveCommandTimeout derives the appropriate RPC/HTTP timeout in ms based on command type and params
 func DeriveCommandTimeout(method string, params map[string]interface{}, defaultTimeoutMs int) int {
-	if strings.HasPrefix(method, "lighthouse.") || strings.HasPrefix(method, "contexts.") || strings.HasPrefix(method, "screencast.") || method == "performance.trace" || method == "performance.analyzeInsight" || method == "accessibility.snapshot" || method == "devtools.runtime" {
+	if strings.HasPrefix(method, "lighthouse.") {
+		// Lighthouse can wedge while waiting for lifecycle/runtime events over
+		// the extension transport. Keep the default bounded and honor a caller's
+		// shorter timeout so a failed audit cannot monopolize the runtime queue.
+		if requested, ok := getIntOrFloat(params, "timeoutMs"); ok && requested > 0 {
+			return requested
+		}
+		budget := 60000
+		if defaultTimeoutMs > budget {
+			budget = defaultTimeoutMs
+		}
+		return budget
+	}
+	if strings.HasPrefix(method, "contexts.") || strings.HasPrefix(method, "screencast.") || method == "performance.trace" || method == "performance.analyzeInsight" || method == "accessibility.snapshot" || method == "devtools.runtime" {
 		budget := 180000
 		if requested, ok := getIntOrFloat(params, "timeoutMs"); ok && requested > budget {
 			budget = requested

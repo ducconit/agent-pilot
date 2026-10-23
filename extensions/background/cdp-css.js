@@ -80,6 +80,55 @@ export function formatMatchedStyles(matched, computed, headers = new Map(), laye
   return { rules, computed: Object.fromEntries((computed.computedStyle || []).map(p => [p.name, p.value])), registeredProperties: matched.cssPropertyRegistrations || [], pseudoElements: matched.pseudoElements || [], keyframes: matched.cssKeyframesRules || [] };
 }
 
+const CSS_PROPERTY_GROUPS = {
+  layout: [
+    "display", "position", "inset", "top", "right", "bottom", "left", "z-index", "box-sizing", "width", "min-width", "max-width", "height", "min-height", "max-height", "overflow", "overflow-x", "overflow-y", "visibility", "float", "clear", "flex", "flex-direction", "flex-wrap", "flex-grow", "flex-shrink", "flex-basis", "grid", "grid-template-columns", "grid-template-rows", "grid-column", "grid-row", "align-items", "align-content", "align-self", "justify-items", "justify-content", "justify-self", "order"
+  ],
+  box: [
+    "margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "padding", "padding-top", "padding-right", "padding-bottom", "padding-left", "border", "border-width", "border-style", "border-color", "border-radius", "box-shadow", "outline", "outline-width", "outline-style", "outline-color"
+  ],
+  typography: [
+    "font", "font-family", "font-size", "font-weight", "font-style", "font-variant", "line-height", "letter-spacing", "text-align", "text-decoration", "text-transform", "text-indent", "text-overflow", "white-space", "word-break", "word-wrap"
+  ],
+  color: ["color", "background", "background-color", "background-image", "background-position", "background-size", "background-repeat", "opacity"],
+  effects: ["transform", "transform-origin", "transition", "transition-duration", "transition-property", "animation", "animation-name", "animation-duration", "filter", "backdrop-filter", "cursor", "pointer-events"]
+};
+
+const SUMMARY_PROPERTIES = [
+  ...CSS_PROPERTY_GROUPS.layout.slice(0, 18),
+  ...CSS_PROPERTY_GROUPS.box.slice(0, 10),
+  ...CSS_PROPERTY_GROUPS.typography.slice(0, 8),
+  ...CSS_PROPERTY_GROUPS.color,
+  ...CSS_PROPERTY_GROUPS.effects.slice(0, 6)
+];
+
+function selectedCssProperties(computed, options, detail) {
+  const requested = Array.isArray(options.properties) ? options.properties.map(String).filter(Boolean) : [];
+  const requestedGroups = Array.isArray(options.groups) ? options.groups.map(String) : [];
+  const groupNames = requestedGroups.includes("all") ? Object.keys(CSS_PROPERTY_GROUPS) : requestedGroups.filter(name => CSS_PROPERTY_GROUPS[name]);
+  const names = requested.length || groupNames.length
+    ? [...new Set([...requested, ...groupNames.flatMap(name => CSS_PROPERTY_GROUPS[name])])]
+    : detail === "computed" ? Object.keys(computed) : SUMMARY_PROPERTIES;
+  return Object.fromEntries(names.filter(name => Object.prototype.hasOwnProperty.call(computed, name)).map(name => [name, computed[name]]));
+}
+
+function compactRule(rule, includeDeclarations) {
+  if (includeDeclarations) return rule;
+  const { declarations: _declarations, ...metadata } = rule;
+  return metadata;
+}
+
+function inheritanceSummary(rules) {
+  const directRules = rules.filter(rule => rule.inheritedDepth === 0);
+  const inheritedRules = rules.filter(rule => rule.inheritedDepth > 0);
+  const uniqueSources = [...new Map(inheritedRules.map(rule => [
+    `${rule.inheritedDepth}:${rule.selector}:${rule.sourceURL}:${rule.line || 0}`,
+    { selector: rule.selector, inheritedDepth: rule.inheritedDepth, origin: rule.origin, sourceURL: rule.sourceURL, line: rule.line, column: rule.column }
+  ])).values()];
+  const sources = uniqueSources.slice(0, 8);
+  return { directRuleCount: directRules.length, inheritedRuleCount: inheritedRules.length, inheritedSources: sources, hasMoreSources: sources.length < uniqueSources.length };
+}
+
 export async function collectCssStyles(send, options, headers = new Map()) {
   await send("DOM.enable", {});
   const { root } = await send("DOM.getDocument", { depth: 0 });
@@ -100,7 +149,33 @@ export async function collectCssStyles(send, options, headers = new Map()) {
     send("CSS.getLayersForNode", { nodeId }).catch(() => null)
   ]);
   const result = formatMatchedStyles(matched, computed, headers, layers?.rootLayer);
+  const detail = ["summary", "computed", "rules", "full"].includes(String(options.detail || "").toLowerCase()) ? String(options.detail || "").toLowerCase() : "summary";
   const pageSize = Math.min(100, Math.max(1, Number(options.pageSize) || 10));
   const pageIdx = Math.max(0, Number(options.pageIdx) || 0);
-  return { nodeId, ...result, rules: result.rules.slice(pageIdx * pageSize, (pageIdx + 1) * pageSize), totalRules: result.rules.length, pageIdx, pageSize, hasMore: (pageIdx + 1) * pageSize < result.rules.length, cascadeNote: "Declaration status is resolved within each inherited scope; computed contains Chrome's final values. Scoping, animations and container-query evaluation may affect the final cascade." };
+  const inheritance = inheritanceSummary(result.rules);
+  const includeInherited = options.includeInherited === true || detail === "full";
+  const visibleRules = includeInherited ? result.rules : result.rules.filter(rule => rule.inheritedDepth === 0);
+  const includeDeclarations = options.includeDeclarations === true || detail === "rules" || detail === "full";
+  const pagedRules = visibleRules.slice(pageIdx * pageSize, (pageIdx + 1) * pageSize).map(rule => compactRule(rule, includeDeclarations));
+  const common = {
+    nodeId,
+    detail,
+    inheritance,
+    cascadeNote: "Declaration status is resolved within each inherited scope; computed contains Chrome's final values. Scoping, animations and container-query evaluation may affect the final cascade."
+  };
+  if (detail === "full") {
+    return { nodeId, ...result, rules: result.rules.slice(pageIdx * pageSize, (pageIdx + 1) * pageSize), totalRules: result.rules.length, pageIdx, pageSize, hasMore: (pageIdx + 1) * pageSize < result.rules.length, detail, inheritance, cascadeNote: common.cascadeNote };
+  }
+  if (detail === "computed") {
+    return { ...common, computed: selectedCssProperties(result.computed, options, detail) };
+  }
+  if (detail === "rules") {
+    return { ...common, rules: pagedRules, totalRules: visibleRules.length, pageIdx, pageSize, hasMore: (pageIdx + 1) * pageSize < visibleRules.length };
+  }
+  return {
+    ...common,
+    computed: selectedCssProperties(result.computed, options, detail),
+    matchedRules: { direct: inheritance.directRuleCount, inherited: inheritance.inheritedRuleCount },
+    rulePage: { items: pagedRules.slice(0, Math.min(5, pagedRules.length)), total: visibleRules.length, pageIdx: 0, pageSize: Math.min(5, pageSize) }
+  };
 }

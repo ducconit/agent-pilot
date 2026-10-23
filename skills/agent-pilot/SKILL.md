@@ -32,13 +32,17 @@ For diagnostics, start with compact output (`detail: "summary"`, `errorsOnly: tr
 
 ## Bridge
 
-The bridge listens on loopback. The default port is `58765`; deployments may override it with `AGENT_PILOT_PORT` or the extension setting. Multiple clients share the first bridge through forwarder mode, so a second client should reuse the active bridge instead of starting another one.
+The bridge listens on loopback. The default port is `58765`; deployments may override it with `AGENT_PILOT_PORT`, `agent-pilot mcp --bridge-port <port>`, or the extension setting. Before sending work, check `GET http://127.0.0.1:<port>/health` and verify `port`, `version`, `clientCount`, `clients[].bridgePort`, `clients[].extensionVersion`, and `clients[].extensionBuildId`. A healthy response on another port/provider is not proof that this session is connected to the bridge under test.
+
+If an MCP client reports an old tool list, old version, or a different port, treat it as a stale connector/provider cache. Compare its metadata with `/health` and refresh/export the schemas before debugging extension behavior. Use one explicit MCP bridge port per process when multiple Chrome profiles are running.
 
 ## Capability notes
 
-- HeapProfiler may be unavailable through Chrome's extension debugger. Heap actions can return `supported: false` with a performance-metrics fallback; do not retry blindly.
+- HeapProfiler is unavailable on ordinary extension-debugger tabs in the current Chrome path. Heap actions fail with `HEAPPROFILER_UNAVAILABLE` instead of fabricating a metrics baseline; use an isolated DevTools context when a real `.heapsnapshot` is required.
 - CDP can be temporarily unavailable when another debugger is attached. Prefer synthetic actions where possible and inspect `cdp.status`/`browser_devtools_status` only when a CDP operation is actually needed.
 - The generated MCP schemas under `mcp/agent-pilot/` are the source of truth for current tool names and parameters; do not rely on an old provider schema or a stale tool-count claim.
+- Batch `actions` are objects, not strings. For example: `{"actions":[{"type":"performance_metrics"},{"type":"performance_trace","action":"start"},{"type":"performance_trace","action":"stop"}]}`. A `heap_snapshot` action is exposed consistently, but ordinary extension-debugger tabs may return `HEAPPROFILER_UNAVAILABLE`.
+- Snapshot/capture actions on `data:` URLs can fail because the page has no normal extension content receiver. Use an HTTP/localhost page or an isolated DevTools context when testing snapshots, heap, or other page-context features.
 
 ## References
 

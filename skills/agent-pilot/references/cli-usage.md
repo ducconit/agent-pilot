@@ -8,7 +8,7 @@ The `agent-pilot` standalone binary is a zero-dependency CLI written in Go for c
 
 - **Default Port**: `58765` (WebSocket: `ws://127.0.0.1:58765`, HTTP: `http://127.0.0.1:58765`)
 - **Target Tab (`--tab <id>`) & Group Isolation (`🤖 Agent Pilot`)**: Commands strictly target tabs belonging to the `🤖 Agent Pilot` tab group. They never hijack the user's personal active tab outside the group. Specify `--tab <id>` to explicitly target a specific tab within the group, and always run `agent-pilot close` when finished testing to free RAM.
-- **Output Format**: Commands output user-friendly icons (`✅`, `❌`, `🌐`) with structured JSON results where applicable.
+- **Output Format**: Commands output user-friendly icons (`✅`, `❌`, `🌐`) by default. `open`, `navigate`, `click`, `close`, and `emulate` accept `--format json` for machine-readable output without Go map formatting; `batch` and DevTools commands already emit JSON.
 
 ### 1.1 CDP Requirement Matrix (Mandatory vs Optional)
 
@@ -121,6 +121,11 @@ agent-pilot close [--tab <id>]
 
 # List all open tabs across all browser windows
 agent-pilot tabs
+
+# Machine-readable results for scripts and agents
+agent-pilot open https://example.com --format json
+agent-pilot navigate https://example.com/checkout --tab 12345 --format json
+agent-pilot close --tab 12345 --format json
 ```
 
 ---
@@ -262,9 +267,14 @@ agent-pilot heap diff --tab 12345
 agent-pilot heap snapshot [--max-constructors 25] [--tab 12345]
 agent-pilot heap gc [--tab 12345]
 
+# Native extension-debugger tabs return HEAPPROFILER_UNAVAILABLE; no metrics fallback baseline is created.
+# Use an isolated DevTools context when a real .heapsnapshot is required.
+
 # All-in-one DevTools snapshot (Console errors, failed Network requests, Web Vitals, DOM health, diagnostics)
 agent-pilot devtools [--tab 12345]
 ```
+
+CSS inspection defaults to a compact summary. Use `agent-pilot devtools css --params '{"selector":"#app","detail":"computed","groups":["layout","typography"]}'` for targeted values, `detail:"rules"` with `includeInherited:true` for paginated cascade declarations, or `detail:"full"` only for the complete payload.
 
 ---
 

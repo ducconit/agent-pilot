@@ -208,6 +208,7 @@ function sha256File(filePath) {
 }
 
 const options = parseArgs(process.argv.slice(2));
+execFileSync(process.execPath, [path.join(ROOT_DIR, "scripts", "update_extension_build_id.mjs")], { cwd: ROOT_DIR, stdio: "inherit" });
 const version = readVersion();
 checkPrerequisites();
 

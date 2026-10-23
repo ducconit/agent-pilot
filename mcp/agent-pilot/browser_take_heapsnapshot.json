@@ -1,9 +1,9 @@
 {
-  "description": "Capture a V8 heap memory snapshot, parse top object constructors \u0026 Detached DOM nodes, and detect memory leaks via baseline/diff comparison. Automatically triggers V8 Garbage Collection before snapshot unless collectGarbage: false.",
+  "description": "Capture a real V8 heap memory snapshot, parse top object constructors \u0026 Detached DOM nodes, and detect memory leaks via baseline/diff comparison. Ordinary extension-debugger tabs return HEAPPROFILER_UNAVAILABLE instead of a metrics fallback; use an isolated DevTools context for native heap snapshots. Garbage collection is attempted before snapshot unless collectGarbage: false.",
   "inputSchema": {
     "properties": {
       "action": {
-        "description": "Memory action: 'baseline' (record GC'd baseline for tab), 'diff' / 'check_leak' (compare current GC'd heap against tab baseline to pinpoint growing constructors, detached DOM nodes, and listener leaks), 'snapshot' (default, parse heap \u0026 compare if baseline exists), or 'gc' (trigger V8 GC only)",
+        "description": "Memory action: 'baseline' (record a real heap baseline), 'diff' / 'check_leak' (compare against a real tab baseline), 'snapshot' (default), or 'gc' (trigger V8 GC only). Unsupported extension-debugger tabs fail clearly.",
         "enum": [
           "snapshot",
           "baseline",
@@ -14,7 +14,7 @@
         "type": "string"
       },
       "collectGarbage": {
-        "description": "Trigger V8 Garbage Collection before capturing snapshot (default: true)",
+        "description": "Attempt V8 Garbage Collection before capturing a supported snapshot (default: true); GC failure does not fabricate a snapshot",
         "type": "boolean"
       },
       "compareWithBaseline": {
@@ -52,7 +52,7 @@
   "parameters": {
     "properties": {
       "action": {
-        "description": "Memory action: 'baseline' (record GC'd baseline for tab), 'diff' / 'check_leak' (compare current GC'd heap against tab baseline to pinpoint growing constructors, detached DOM nodes, and listener leaks), 'snapshot' (default, parse heap \u0026 compare if baseline exists), or 'gc' (trigger V8 GC only)",
+        "description": "Memory action: 'baseline' (record a real heap baseline), 'diff' / 'check_leak' (compare against a real tab baseline), 'snapshot' (default), or 'gc' (trigger V8 GC only). Unsupported extension-debugger tabs fail clearly.",
         "enum": [
           "snapshot",
           "baseline",
@@ -63,7 +63,7 @@
         "type": "string"
       },
       "collectGarbage": {
-        "description": "Trigger V8 Garbage Collection before capturing snapshot (default: true)",
+        "description": "Attempt V8 Garbage Collection before capturing a supported snapshot (default: true); GC failure does not fabricate a snapshot",
         "type": "boolean"
       },
       "compareWithBaseline": {

@@ -113,8 +113,16 @@ try {
   });
   const opened = await extension("tabs.create", { url, agentId: "test-agent" });
   const tabId = opened.id;
+  await test("CSS summary is compact and reports direct/inherited sources", async () => {
+    const result = await extension("css.getStyles", { tabId, selector: "#target" });
+    assert.equal(result.detail, "summary");
+    assert(result.computed.display);
+    assert(result.matchedRules.direct >= 1);
+    assert(Array.isArray(result.inheritance.inheritedSources));
+    assert(!result.computed["--agent-pilot-nonexistent"]);
+  });
   await test("matched CSS includes cascade, source lines and Chrome computed values", async () => {
-    const result = await extension("css.getStyles", { tabId, selector: "#target", pageSize: 100 });
+    const result = await extension("css.getStyles", { tabId, selector: "#target", detail: "full", pageSize: 100 });
     assert.equal(result.computed.color, "rgb(0, 128, 0)");
     assert(result.rules.some(r => r.declarations.some(p => p.name === "color" && p.important)));
     assert(result.rules.some(r => r.line > 0));
@@ -134,7 +142,7 @@ try {
     assert(tree.nodes.some(n => n.role === "heading" && n.name === "DevTools fixture"));
     assert(tree.nodes.some(n => n.backendNodeId));
     const button = tree.nodes.find(n => n.role === "button");
-    const styles = await extension("css.getStyles", { tabId, backendNodeId: button.backendNodeId });
+    const styles = await extension("css.getStyles", { tabId, backendNodeId: button.backendNodeId, detail: "computed", groups: ["layout"] });
     assert(styles.computed.display);
   });
   await test("page developer tools are discoverable and executable", async () => {

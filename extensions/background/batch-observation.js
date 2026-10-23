@@ -263,7 +263,7 @@ async function performanceTraceAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for performance_trace");
   await attachDebugger(targetTabId, ctx.bridgeClient?.broadcastFn);
-  const traceAct = String(act.traceAction || act.subAction || act.mode || "start").toLowerCase().trim();
+  const traceAct = String(act.traceAction || act.subAction || act.mode || (act.action && act.action !== act.type ? act.action : "start")).toLowerCase().trim();
   const payload =
     traceAct === "stop" || traceAct === "end"
       ? await stopPerformanceTrace(targetTabId)
@@ -276,7 +276,7 @@ async function heapSnapshotAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for heap_snapshot");
   await attachDebugger(targetTabId, ctx.bridgeClient?.broadcastFn);
-  const heapAct = act.heapAction || act.subAction || act.mode || (act.recordBaseline ? "baseline" : act.compareWithBaseline ? "diff" : "snapshot");
+  const heapAct = act.heapAction || act.subAction || act.mode || (act.action && act.action !== act.type ? act.action : null) || (act.recordBaseline ? "baseline" : act.compareWithBaseline ? "diff" : "snapshot");
   const payload = await takeHeapSnapshot(targetTabId, {
     ...act,
     action: heapAct

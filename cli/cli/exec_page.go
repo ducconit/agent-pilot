@@ -18,9 +18,38 @@ import (
 func mergeExtraParams(params map[string]interface{}, extra ...map[string]interface{}) {
 	for _, m := range extra {
 		for k, v := range m {
+			if k == "format" {
+				continue
+			}
 			params[k] = v
 		}
 	}
+}
+
+// commandOutputFormat reads the CLI-only output selector carried in the
+// optional extra map. Keeping it alongside the bridge params lets the legacy
+// Exec* signatures remain source-compatible while making interaction commands
+// useful to scripts and agents.
+func commandOutputFormat(extra ...map[string]interface{}) string {
+	for _, m := range extra {
+		if value, ok := m["format"].(string); ok && strings.EqualFold(strings.TrimSpace(value), "json") {
+			return "json"
+		}
+	}
+	return "text"
+}
+
+func printCommandResult(format, text string, result interface{}) error {
+	if strings.EqualFold(format, "json") {
+		payload, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(payload))
+		return nil
+	}
+	fmt.Printf(text, result)
+	return nil
 }
 
 func ExecClick(selector string, x, y float64, via string, tabID interface{}, extra ...map[string]interface{}) error {
@@ -37,8 +66,7 @@ func ExecClick(selector string, x, y float64, via string, tabID interface{}, ext
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Clicked successfully: %v\n", res)
-	return nil
+	return printCommandResult(commandOutputFormat(extra...), "✅ Clicked successfully: %v\n", res)
 }
 
 func ExecType(selector, text string, clear, enter bool, tabID interface{}, extra ...map[string]interface{}) error {
@@ -89,8 +117,7 @@ func ExecOpen(url string, active bool, extra ...map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Opened tab: %v\n", res)
-	return nil
+	return printCommandResult(commandOutputFormat(extra...), "✅ Opened tab: %v\n", res)
 }
 
 func ExecNavigate(url string, tabID interface{}, extra ...map[string]interface{}) error {
@@ -105,11 +132,14 @@ func ExecNavigate(url string, tabID interface{}, extra ...map[string]interface{}
 	if err != nil {
 		return err
 	}
+	if strings.EqualFold(commandOutputFormat(extra...), "json") {
+		return printCommandResult("json", "", res)
+	}
 	fmt.Printf("✅ Navigated to '%s': %v\n", url, res)
 	return nil
 }
 
-func ExecClose(tabID interface{}) error {
+func ExecClose(tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{}
 	if tabID != nil {
 		params["tabId"] = tabID
@@ -118,8 +148,7 @@ func ExecClose(tabID interface{}) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Closed tab: %v\n", res)
-	return nil
+	return printCommandResult(commandOutputFormat(extra...), "✅ Closed tab: %v\n", res)
 }
 
 func ExecScreenshot(mode, selector, outputPath string, tabID interface{}) error {

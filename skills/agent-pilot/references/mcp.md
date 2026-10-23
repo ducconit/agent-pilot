@@ -2,7 +2,9 @@
 
 Use the MCP interface for conversational agents and IDEs. The MCP server runs over stdio (`agent-pilot mcp`) while the Go bridge and Chrome extension remain shared local services.
 
-The generated schemas in `mcp/agent-pilot/` are authoritative. This repository currently exports 57 schema files; clients that show an older count or omit newer actions are using a stale provider cache.
+The generated schemas in `mcp/agent-pilot/` are authoritative. This repository currently exports 57 schema files; clients that show an older count or omit newer actions are using a stale provider cache. `browser_run_actions.actions` is an array of action objects (`{"type":"click",...}`), not an array of strings.
+
+Before testing, query `http://127.0.0.1:<port>/health` and confirm the MCP/bridge port plus `clients[].extensionVersion` and `clients[].extensionBuildId`. If the MCP connector reports a different port or build than `/health`, it is stale or attached to another bridge; select the port explicitly with `agent-pilot mcp --bridge-port <port>` and refresh the connector schema.
 
 ## Minimal workflow
 
@@ -24,6 +26,19 @@ Use `browser_run_actions` for a complete test whenever the steps are known in ad
 ```
 
 For exploratory work, call `browser_open_tab`, save the returned `tabId`, and pass it explicitly to subsequent tools. Do not use `browser_list_tabs` as a required preflight; an empty result is expected when no Agent Pilot tab exists.
+
+For a compact DevTools batch, use action objects:
+
+```json
+{
+  "actions": [
+    {"type": "performance_metrics"},
+    {"type": "performance_trace", "action": "start"},
+    {"type": "performance_trace", "action": "stop"},
+    {"type": "heap_snapshot", "stopOnError": false}
+  ]
+}
+```
 
 ## Tool selection
 
@@ -60,12 +75,16 @@ Start with the smallest response that answers the question:
 
 Prefer `browser_snapshot` with a bounded `maxElements` and `waitForSelector` over raw HTML. Prefer `browser_get_element` with `includeStyles: false`; enable styles only for UI or contrast inspection. Screenshots should use a filesystem `path`; request `base64: true` only when the image must remain inline.
 
-## CDP and fallback semantics
+## CDP and capability boundaries
 
 - Synthetic DOM actions do not require CDP and are safer for ordinary pages.
 - Use `via: "cdp"` for trusted input, cross-origin frames, canvas, and WebGL. Use `via: "auto"` when a synthetic fallback is acceptable.
 - CDP-dependent actions can fail if another debugger is attached. Check `browser_devtools_status` only when the requested operation needs CDP.
-- HeapProfiler is not available in every Chrome extension-debugger path. A heap response with `supported: false` and performance-metrics fallback is expected; do not retry blindly.
+- HeapProfiler is not available on ordinary extension-debugger tabs. `browser_take_heapsnapshot` returns `HEAPPROFILER_UNAVAILABLE` and does not save a fake performance-metrics baseline. Use an isolated DevTools context when a real heap snapshot is required.
+- Heap baseline/diff is not emulated on ordinary extension-debugger tabs. Treat `HEAPPROFILER_UNAVAILABLE` or protocol `-32601` as an explicit capability boundary; do not interpret runtime metrics as a heap snapshot or leak diff.
+- `browser_get_css_styles` is compact by default (`detail: "summary"`). Use `detail: "computed"` with `groups`/`properties`, `detail: "rules"` with `includeInherited`, or `detail: "full"` only when the complete cascade is needed. The response reports direct rules and inherited sources separately.
+- Lighthouse uses a bounded runtime budget and resets the private DevTools process after a timeout; a timed-out audit should be retried once only after inspecting the returned error. `browser_accessibility_snapshot` uses a separate path and remains callable after audit recovery.
+- Snapshot/capture operations on `data:` URLs may fail with a missing content receiver. Reproduce them on an HTTP/localhost page or in an isolated DevTools context.
 
 ## Extension manager actions
 

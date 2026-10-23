@@ -1,5 +1,5 @@
 {
-  "description": "Inspect matched CSS rules, inline/inherited styles, specificity, important declarations, cascade layers, source locations and final computed styles. Paginated; accepts a CSS selector, snapshot @ref or backendNodeId.",
+  "description": "Inspect CSS progressively without flooding the model. Default summary returns compact final computed values plus direct-rule and inherited-rule/source counts. Use detail computed for selected properties, rules for paginated declarations, or full for the complete cascade.",
   "inputSchema": {
     "properties": {
       "backendNodeId": {
@@ -10,6 +10,40 @@
         "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
       },
+      "detail": {
+        "description": "Response detail; summary is compact and the default",
+        "enum": [
+          "summary",
+          "computed",
+          "rules",
+          "full"
+        ],
+        "type": "string"
+      },
+      "groups": {
+        "description": "Groups included by summary/computed",
+        "items": {
+          "description": "Computed CSS group",
+          "enum": [
+            "layout",
+            "box",
+            "typography",
+            "color",
+            "effects",
+            "all"
+          ],
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "includeDeclarations": {
+        "description": "Include declaration arrays in rule results; default false for summary",
+        "type": "boolean"
+      },
+      "includeInherited": {
+        "description": "Include ancestor rules; default false except full",
+        "type": "boolean"
+      },
       "pageIdx": {
         "description": "Zero-based rule page",
         "type": "integer"
@@ -17,6 +51,14 @@
       "pageSize": {
         "description": "Rules per page, default 10, maximum 100",
         "type": "integer"
+      },
+      "properties": {
+        "description": "Exact computed properties; takes precedence over the default summary set",
+        "items": {
+          "description": "Exact computed CSS property name",
+          "type": "string"
+        },
+        "type": "array"
       },
       "selector": {
         "description": "CSS selector or snapshot @ref",
@@ -40,6 +82,40 @@
         "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
       },
+      "detail": {
+        "description": "Response detail; summary is compact and the default",
+        "enum": [
+          "summary",
+          "computed",
+          "rules",
+          "full"
+        ],
+        "type": "string"
+      },
+      "groups": {
+        "description": "Groups included by summary/computed",
+        "items": {
+          "description": "Computed CSS group",
+          "enum": [
+            "layout",
+            "box",
+            "typography",
+            "color",
+            "effects",
+            "all"
+          ],
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "includeDeclarations": {
+        "description": "Include declaration arrays in rule results; default false for summary",
+        "type": "boolean"
+      },
+      "includeInherited": {
+        "description": "Include ancestor rules; default false except full",
+        "type": "boolean"
+      },
       "pageIdx": {
         "description": "Zero-based rule page",
         "type": "integer"
@@ -47,6 +123,14 @@
       "pageSize": {
         "description": "Rules per page, default 10, maximum 100",
         "type": "integer"
+      },
+      "properties": {
+        "description": "Exact computed properties; takes precedence over the default summary set",
+        "items": {
+          "description": "Exact computed CSS property name",
+          "type": "string"
+        },
+        "type": "array"
       },
       "selector": {
         "description": "CSS selector or snapshot @ref",

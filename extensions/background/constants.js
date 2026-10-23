@@ -2,6 +2,8 @@
  * Agent Pilot - Background Service Worker Constants & Shared State
  */
 
+import { EXTENSION_BUILD_ID } from "./build-info.js";
+
 // Track attached debugger sessions and buffered devtools events
 export const attachedTabs = new Set();
 export const devtoolsBuffers = new Map(); // tabId -> { console: [], network: Map, performance: {} }
@@ -29,6 +31,7 @@ export const MAX_DEVTOOLS_NETWORK_ENTRIES = 300;
 export const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
   ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
   : "1.0.10-beta";
+export { EXTENSION_BUILD_ID };
 
 /**
  * Centralized timing configuration (milliseconds).

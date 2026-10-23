@@ -672,15 +672,7 @@ export async function collectGarbage(tabId) {
     return { success: true, supported: true, tabId, message: "Garbage collection completed" };
   } catch (error) {
     if (!isUnsupportedHeapProfilerError(error)) throw error;
-    const fallback = await collectHeapFallbackMetrics(tabId);
-    return {
-      success: true,
-      supported: false,
-      tabId,
-      fallback: "performance.metrics",
-      warning: "HeapProfiler is unavailable through the Chrome extension debugger; runtime metrics were returned instead.",
-      ...fallback
-    };
+    throw createHeapProfilerUnavailableError("HeapProfiler.collectGarbage", error);
   }
 }
 
@@ -690,58 +682,14 @@ export function isUnsupportedHeapProfilerError(error) {
   return /-32601\b|unknown method|method not found|not found|not supported|unsupported|unknown command/i.test(message);
 }
 
-async function collectHeapFallbackMetrics(tabId) {
-  const result = await getPerformanceMetrics(tabId, {
-    includeWebVitals: false,
-    includeResources: false,
-    includeDomHealth: false
-  });
-  return {
-    metrics: result.metrics || {},
-    memory: result.memory || null,
-    timestamp: result.timestamp || Date.now()
-  };
-}
-
-async function returnHeapFallback(tabId, action, options, reason) {
-  const fallback = await collectHeapFallbackMetrics(tabId);
-  const currentRecord = {
-    timestamp: fallback.timestamp,
-    metrics: fallback.metrics,
-    heapSummary: null
-  };
-  const previousBaseline = memoryBaselines.get(tabId) || null;
-  const wantsDiff = ["diff", "check_leak", "leak"].includes(action) || Boolean(options?.compareWithBaseline);
-  const firstDiffNeedsBaseline = !previousBaseline && wantsDiff;
-  const wantsBaseline = action === "baseline" || Boolean(options?.recordBaseline) || (!previousBaseline && !wantsDiff) || firstDiffNeedsBaseline;
-  let leakAnalysis;
-  if (wantsBaseline) {
-    memoryBaselines.set(tabId, currentRecord);
-  } else if (wantsDiff && previousBaseline) {
-    leakAnalysis = computeMemoryLeakDiff(previousBaseline, currentRecord);
-  }
-  if (firstDiffNeedsBaseline) {
-    leakAnalysis = {
-      hasBaseline: false,
-      leakSuspected: false,
-      severity: "none",
-      suspectedCauses: ["No prior baseline existed; saved current runtime metrics as the baseline for subsequent diff calls."]
-    };
-  }
-  return {
-    success: true,
-    supported: false,
-    tabId,
-    action,
-    fallback: "performance.metrics",
-    warning: "HeapProfiler is unavailable through the Chrome extension debugger; runtime metrics were returned instead.",
-    unsupportedMethod: reason,
-    metrics: fallback.metrics,
-    memory: fallback.memory,
-    ...(leakAnalysis ? { leakAnalysis } : {}),
-    baselineRecorded: wantsBaseline,
-    timestamp: fallback.timestamp
-  };
+function createHeapProfilerUnavailableError(method, cause) {
+  const error = new Error(
+    `HEAPPROFILER_UNAVAILABLE: ${method} is not supported by Chrome's extension debugger for this tab; use an isolated DevTools context for heap snapshots.`
+  );
+  error.code = "HEAPPROFILER_UNAVAILABLE";
+  error.method = method;
+  error.cause = cause;
+  return error;
 }
 
 /**
@@ -1039,7 +987,7 @@ export async function takeHeapSnapshot(tabId, options = {}) {
     await sendCdpCommand(tabId, "HeapProfiler.takeHeapSnapshot", { reportProgress: false });
   } catch (err) {
     if (isUnsupportedHeapProfilerError(err)) {
-      return await returnHeapFallback(tabId, action, options, "HeapProfiler.takeHeapSnapshot");
+      throw createHeapProfilerUnavailableError("HeapProfiler.takeHeapSnapshot", err);
     }
     throw err;
   } finally {

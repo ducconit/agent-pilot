@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createZip, DEFAULT_EXCLUDES } from "./lib/zip.mjs";
 import { validateManifestReferences } from "./lib/manifest.mjs";
@@ -21,6 +22,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
 const EXT_DIR = path.join(ROOT_DIR, "extensions");
 const DIST_DIR = path.join(ROOT_DIR, "dist");
+
+execFileSync(process.execPath, [path.join(ROOT_DIR, "scripts", "update_extension_build_id.mjs")], { cwd: ROOT_DIR, stdio: "inherit" });
 
 // Fail fast when the manifest points at files that do not exist.
 function assertManifestReferences(extDir, manifest) {

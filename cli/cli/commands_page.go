@@ -33,13 +33,14 @@ func newOpenCommand() *cobra.Command {
 			FlagDef{Name: "active", IsBool: true},
 			FlagDef{Name: "username", Aliases: []string{"user", "u"}},
 			FlagDef{Name: "password", Aliases: []string{"pass"}},
+			FlagDef{Name: "format"},
 		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
 		if len(cmdArgs.Positional) < 1 {
-			fmt.Println("Sử dụng: agent-pilot open <url> [--active] [--user <username>] [--password <password>] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			fmt.Println("Sử dụng: agent-pilot open <url> [--active] [--format json] [--user <username>] [--password <password>] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
 			return errUsage
 		}
 		extra := map[string]interface{}{}
@@ -53,6 +54,7 @@ func newOpenCommand() *cobra.Command {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
+		extra["format"] = cmdArgs.String("format", "text")
 		if err := ExecOpen(cmdArgs.Positional[0], cmdArgs.Bool("active"), extra); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
@@ -62,6 +64,7 @@ func newOpenCommand() *cobra.Command {
 	f.Bool("active", false, "Make tab active")
 	f.StringP("user", "u", "", "Optional HTTP Basic Auth username")
 	f.String("password", "", "Optional HTTP Basic Auth password")
+	f.String("format", "text", "Output format: text or json")
 	registerInlineWaitPflags(cmd)
 	return cmd
 }
@@ -72,6 +75,7 @@ func newNavigateCommand() *cobra.Command {
 			FlagDef{Name: "tab", Aliases: []string{"t"}},
 			FlagDef{Name: "username", Aliases: []string{"user", "u"}},
 			FlagDef{Name: "password", Aliases: []string{"pass"}},
+			FlagDef{Name: "format"},
 		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -97,6 +101,7 @@ func newNavigateCommand() *cobra.Command {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
+		extra["format"] = cmdArgs.String("format", "text")
 		if err := ExecNavigate(cmdArgs.Positional[0], tabID, extra); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
@@ -106,6 +111,7 @@ func newNavigateCommand() *cobra.Command {
 	f.IntP("tab", "t", 0, "Target tab ID")
 	f.StringP("user", "u", "", "Optional HTTP Basic Auth username")
 	f.String("password", "", "Optional HTTP Basic Auth password")
+	f.String("format", "text", "Output format: text or json")
 	registerInlineWaitPflags(cmd)
 	return cmd
 }
@@ -114,6 +120,7 @@ func newCloseCommand() *cobra.Command {
 	cmd := newLeafCommand("close", []string{"close-tab"}, func(args []string) error {
 		cmdArgs, err := parseCmdArgs(args, []FlagDef{
 			{Name: "tab", Aliases: []string{"t"}},
+			{Name: "format"},
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -132,12 +139,13 @@ func newCloseCommand() *cobra.Command {
 			}
 			tabID = parsed
 		}
-		if err := ExecClose(tabID); err != nil {
+		if err := ExecClose(tabID, map[string]interface{}{"format": cmdArgs.String("format", "text")}); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
 		return nil
 	})
 	cmd.Flags().IntP("tab", "t", 0, "Target tab ID in Agent Pilot group to close")
+	cmd.Flags().String("format", "text", "Output format: text or json")
 	return cmd
 }
 
@@ -148,6 +156,7 @@ func newClickCommand() *cobra.Command {
 			FlagDef{Name: "x"},
 			FlagDef{Name: "y"},
 			FlagDef{Name: "via"},
+			FlagDef{Name: "format"},
 		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -177,6 +186,7 @@ func newClickCommand() *cobra.Command {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
+		extra["format"] = cmdArgs.String("format", "text")
 		if err := ExecClick(selector, x, y, cmdArgs.String("via", "synthetic"), tabID, extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -188,6 +198,7 @@ func newClickCommand() *cobra.Command {
 	f.Float64("x", 0, "X coordinate (with --y)")
 	f.Float64("y", 0, "Y coordinate (with --x)")
 	f.String("via", "synthetic", "Input backend: synthetic|cdp|auto")
+	f.String("format", "text", "Output format: text or json")
 	registerInlineWaitPflags(cmd)
 	return cmd
 }

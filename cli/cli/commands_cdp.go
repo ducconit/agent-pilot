@@ -24,6 +24,7 @@ func newEmulateCommand() *cobra.Command {
 			{Name: "cpu"},
 			{Name: "theme"},
 			{Name: "tab", Aliases: []string{"t"}},
+			{Name: "format"},
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -37,7 +38,7 @@ func newEmulateCommand() *cobra.Command {
 		network := cmdArgs.String("network", "")
 		cpu := cmdArgs.String("cpu", "")
 		theme := cmdArgs.String("theme", "")
-		if err := ExecEmulate(network, cpu, theme, tabID); err != nil {
+		if err := ExecEmulate(network, cpu, theme, tabID, map[string]interface{}{"format": cmdArgs.String("format", "text")}); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
@@ -48,6 +49,7 @@ func newEmulateCommand() *cobra.Command {
 	f.String("cpu", "", "CPU throttling rate, e.g. 4x")
 	f.String("theme", "", "Color scheme: dark|light")
 	f.IntP("tab", "t", 0, "Target tab ID")
+	f.String("format", "text", "Output format: text or json")
 	return cmd
 }
 

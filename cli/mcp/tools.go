@@ -20,7 +20,16 @@ var mcpTools = []ToolInfo{
 			"properties": map[string]interface{}{
 				"actions": map[string]interface{}{
 					"type":        "array",
-					"description": "List of actions to execute sequentially",
+					"description": "List of action objects to execute sequentially. Each item uses type or action plus operation-specific fields.",
+					"items": map[string]interface{}{
+						"type":                 "object",
+						"description":          "Browser action object, e.g. {type: 'click', selector: '#submit'} or {type: 'performance_trace', action: 'start'}",
+						"additionalProperties": true,
+						"properties": map[string]interface{}{
+							"type":   map[string]interface{}{"type": "string", "description": "Action type or alias"},
+							"action": map[string]interface{}{"type": "string", "description": "Action type alias or operation such as start/stop"},
+						},
+					},
 				},
 				"tabId": map[string]interface{}{
 					"type":        "integer",
@@ -562,12 +571,12 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_take_heapsnapshot",
-		Description: "Capture a V8 heap memory snapshot, parse top object constructors & Detached DOM nodes, and detect memory leaks via baseline/diff comparison. Automatically triggers V8 Garbage Collection before snapshot unless collectGarbage: false.",
+		Description: "Capture a real V8 heap memory snapshot, parse top object constructors & Detached DOM nodes, and detect memory leaks via baseline/diff comparison. Ordinary extension-debugger tabs return HEAPPROFILER_UNAVAILABLE instead of a metrics fallback; use an isolated DevTools context for native heap snapshots. Garbage collection is attempted before snapshot unless collectGarbage: false.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"action":              map[string]interface{}{"type": "string", "enum": []string{"snapshot", "baseline", "diff", "check_leak", "gc"}, "description": "Memory action: 'baseline' (record GC'd baseline for tab), 'diff' / 'check_leak' (compare current GC'd heap against tab baseline to pinpoint growing constructors, detached DOM nodes, and listener leaks), 'snapshot' (default, parse heap & compare if baseline exists), or 'gc' (trigger V8 GC only)"},
-				"collectGarbage":      map[string]interface{}{"type": "boolean", "description": "Trigger V8 Garbage Collection before capturing snapshot (default: true)"},
+				"action":              map[string]interface{}{"type": "string", "enum": []string{"snapshot", "baseline", "diff", "check_leak", "gc"}, "description": "Memory action: 'baseline' (record a real heap baseline), 'diff' / 'check_leak' (compare against a real tab baseline), 'snapshot' (default), or 'gc' (trigger V8 GC only). Unsupported extension-debugger tabs fail clearly."},
+				"collectGarbage":      map[string]interface{}{"type": "boolean", "description": "Attempt V8 Garbage Collection before capturing a supported snapshot (default: true); GC failure does not fabricate a snapshot"},
 				"forceGC":             map[string]interface{}{"type": "boolean", "description": "Alias for collectGarbage: trigger V8 Garbage Collection before snapshot (default: true)"},
 				"recordBaseline":      map[string]interface{}{"type": "boolean", "description": "Explicitly save this snapshot as the new per-tab memory baseline"},
 				"compareWithBaseline": map[string]interface{}{"type": "boolean", "description": "Compare this snapshot against the stored per-tab baseline to detect memory leaks"},

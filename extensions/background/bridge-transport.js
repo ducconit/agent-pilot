@@ -9,6 +9,7 @@
 import {
   BRIDGE,
   DEFAULT_AGENT_PORT,
+  EXTENSION_BUILD_ID,
   EXTENSION_VERSION,
   LIMITS,
   currentPlatform,
@@ -148,6 +149,7 @@ export const transportMethods = {
             os: currentPlatform,
             extensionId: chrome.runtime?.id || "",
             extensionVersion: EXTENSION_VERSION,
+            extensionBuildId: EXTENSION_BUILD_ID,
             bridgePort: this.port,
             windowCount: 1,
             activeTabTitle: "Active Tab",

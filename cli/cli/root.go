@@ -161,7 +161,7 @@ var legacyLongFlags = []string{
 	"max", "format", "mode", "o", "output", "clip", "text", "state", "timeout",
 	"wait", "sleep", "wait-ms", "sleep-ms", "wait-for", "wait-text", "ms",
 	"dx", "dy", "styles", "include-styles", "submit",
-	"action", "name", "network", "cpu", "theme", "filter", "method", "type",
+	"action", "name", "network", "cpu", "theme", "filter", "method", "type", "bridge-port",
 	"limit", "categories", "enabled", "path", "force", "agy", "antigravity",
 	"gc", "port",
 }

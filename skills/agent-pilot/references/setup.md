@@ -8,7 +8,7 @@ This reference guide provides end-to-end instructions for installing, configurin
 
 Agent Pilot consists of two core components:
 1. **Chrome Extension (Manifest V3)**: Injected into the browser to control DOM, mouse cursor, screenshots, and DevTools via CDP.
-2. **Standalone Go CLI & MCP Server (`agent-pilot`)**: High-performance local bridge running as a user background service on port `58765`.
+2. **Standalone Go CLI & MCP Server (`agent-pilot`)**: High-performance local bridge running as a user background service on the configured port (default `58765`).
 
 ### 1.1 Agent Skills Installation
 
@@ -110,7 +110,7 @@ agent-pilot service uninstall
 
 ## 4. MCP (Model Context Protocol) Client Setup
 
-To equip AI coding agents with the 36 Agent Pilot browser tools over `stdio`, add the following snippet to your IDE's MCP configuration:
+To equip AI coding agents with the exported Agent Pilot browser tools over `stdio`, add the following snippet to your IDE's MCP configuration:
 
 ### Google Antigravity / AGK
 Add to `~/.gemini/config/mcp_config.json`:
@@ -150,18 +150,19 @@ In Cursor Settings -> Features -> MCP Servers -> Add New MCP Server:
 
 ## 5. Troubleshooting & Diagnostics
 
-### Issue 1: `WebSocket connection to 'ws://127.0.0.1:58765/' failed: ERR_CONNECTION_REFUSED`
-* **Root Cause**: The Agent Pilot background bridge server is not running on port 58765.
+### Issue 1: `WebSocket connection to 'ws://127.0.0.1:<port>/' failed: ERR_CONNECTION_REFUSED`
+* **Root Cause**: The Agent Pilot background bridge server is not running on the selected port.
 * **Fix**:
   ```bash
   agent-pilot service install
   agent-pilot service start
   agent-pilot service status
   ```
-  Verify port 58765 is active:
+  Verify the default port is active:
   ```bash
   curl http://127.0.0.1:58765/health
-  # Expected: {"status":"ok","name":"Agent Pilot Go Bridge Server","port":58765,"extensionConnected":true,"clientCount":1,"version":"1.0.10-beta","clients":[{"instanceId":"<id>","browser":"Chromium","os":"linux","isActive":true,"connectedAt":1789295000000}]}
+  # Verify status=ok, port=58765, extensionConnected=true, and clients[].bridgePort,
+  # clients[].extensionVersion, clients[].extensionBuildId match the artifact under test.
   # NOTE: `clients` is an ARRAY of connected extension client objects (may be empty).
   ```
 
@@ -172,10 +173,10 @@ In Cursor Settings -> Features -> MCP Servers -> Add New MCP Server:
   3. Check console logs in `chrome://extensions` -> click "Inspect views: service worker" on Agent Pilot.
 
 ### Issue 3: Multi-Agent Port Collision (`EADDRINUSE`)
-* **Behavior**: When running multiple agents concurrently (Antigravity, Codex, CLI), other tools crash trying to bind port 58765.
+* **Behavior**: When running multiple agents concurrently (Antigravity, Codex, CLI), other tools crash trying to bind the same bridge port.
 * **Resolution**: Agent Pilot has built-in **Dual Mode**:
-  - The Master Bridge Service holds port 58765.
-  - All subsequent CLI and MCP invocations detect the master service and forward commands over HTTP (`/api`) or stdio without binding 58765.
+  - The Master Bridge Service holds its configured port.
+  - All subsequent CLI and MCP invocations detect the master service and forward commands over HTTP (`/api`) or stdio without binding the same port.
 
 ### Issue 4: `CDP_UNAVAILABLE` / CDP-required command fails
 * **Root Cause**: The debugger cannot attach to the tab. Common causes:

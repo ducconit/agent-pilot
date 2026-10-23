@@ -3,7 +3,22 @@
   "inputSchema": {
     "properties": {
       "actions": {
-        "description": "List of actions to execute sequentially",
+        "description": "List of action objects to execute sequentially. Each item uses type or action plus operation-specific fields.",
+        "items": {
+          "additionalProperties": true,
+          "description": "Browser action object, e.g. {type: 'click', selector: '#submit'} or {type: 'performance_trace', action: 'start'}",
+          "properties": {
+            "action": {
+              "description": "Action type alias or operation such as start/stop",
+              "type": "string"
+            },
+            "type": {
+              "description": "Action type or alias",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "type": "array"
       },
       "contextId": {
@@ -32,7 +47,22 @@
   "parameters": {
     "properties": {
       "actions": {
-        "description": "List of actions to execute sequentially",
+        "description": "List of action objects to execute sequentially. Each item uses type or action plus operation-specific fields.",
+        "items": {
+          "additionalProperties": true,
+          "description": "Browser action object, e.g. {type: 'click', selector: '#submit'} or {type: 'performance_trace', action: 'start'}",
+          "properties": {
+            "action": {
+              "description": "Action type alias or operation such as start/stop",
+              "type": "string"
+            },
+            "type": {
+              "description": "Action type or alias",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "type": "array"
       },
       "contextId": {

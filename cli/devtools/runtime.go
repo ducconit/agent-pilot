@@ -35,6 +35,7 @@ type Host struct {
 	writeMu   sync.Mutex
 	cmd       *exec.Cmd
 	stdin     io.WriteCloser
+	done      chan struct{}
 	pending   map[int64]chan response
 	sequence  atomic.Int64
 	extension ExtensionRequest
@@ -154,8 +155,9 @@ func (h *Host) start() error {
 		stdin.Close()
 		return err
 	}
-	h.cmd, h.stdin = cmd, stdin
-	go h.read(cmd, stdout)
+	done := make(chan struct{})
+	h.cmd, h.stdin, h.done = cmd, stdin, done
+	go h.read(cmd, stdout, done)
 	return nil
 }
 
@@ -171,7 +173,7 @@ func (h *Host) write(value interface{}) error {
 	return json.NewEncoder(input).Encode(value)
 }
 
-func (h *Host) read(cmd *exec.Cmd, stdout io.Reader) {
+func (h *Host) read(cmd *exec.Cmd, stdout io.Reader, done chan struct{}) {
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 65536), 64*1024*1024)
 	for scanner.Scan() {
@@ -216,12 +218,36 @@ func (h *Host) read(cmd *exec.Cmd, stdout io.Reader) {
 	h.mu.Lock()
 	if h.cmd == cmd {
 		h.cmd, h.stdin = nil, nil
+		h.done = nil
 		for id, channel := range h.pending {
 			channel <- response{nil, err}
 			delete(h.pending, id)
 		}
 	}
 	h.mu.Unlock()
+	close(done)
+}
+
+// abort stops a wedged private runtime and waits until its reader has released
+// all pending calls. Without this, a timed-out Lighthouse command leaves the
+// line-oriented runner alive with a serialized queue, so later AX/DevTools
+// calls appear to hang even though Chrome itself is healthy.
+func (h *Host) abort() {
+	h.mu.Lock()
+	cmd, input, done := h.cmd, h.stdin, h.done
+	h.mu.Unlock()
+	if input != nil {
+		_ = input.Close()
+	}
+	if cmd != nil && cmd.Process != nil {
+		_ = cmd.Process.Kill()
+	}
+	if done != nil {
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+		}
+	}
 }
 
 func (h *Host) Call(method string, params map[string]interface{}, timeout time.Duration) (interface{}, error) {
@@ -243,6 +269,7 @@ func (h *Host) Call(method string, params map[string]interface{}, timeout time.D
 	case result := <-channel:
 		return result.result, result.err
 	case <-timer.C:
+		h.abort()
 		return nil, fmt.Errorf("DevTools command timed out: %s", method)
 	}
 }

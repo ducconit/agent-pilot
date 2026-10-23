@@ -1,5 +1,5 @@
 {
-  "description": "Run real Lighthouse on the current authenticated tab without opening a debugging port. Returns category scores, failing audits, flagged DOM nodes, and HTML/JSON reports. Navigation reloads the tab; snapshot audits its current state. Built-in runtime; no Node installation required.",
+  "description": "Run real Lighthouse on the current authenticated tab without opening a debugging port. Returns category scores, failing audits, flagged DOM nodes, and HTML/JSON reports. Navigation reloads the tab; snapshot audits its current state. Built-in runtime; no Node installation required. A bounded timeout resets a wedged private runtime so later AX calls remain usable.",
   "inputSchema": {
     "properties": {
       "categories": {
@@ -46,6 +46,10 @@
       },
       "tabId": {
         "description": "Target tab ID",
+        "type": "integer"
+      },
+      "timeoutMs": {
+        "description": "Audit timeout; default 60000ms, can be shortened for a quick capability probe",
         "type": "integer"
       }
     },
@@ -98,6 +102,10 @@
       },
       "tabId": {
         "description": "Target tab ID",
+        "type": "integer"
+      },
+      "timeoutMs": {
+        "description": "Audit timeout; default 60000ms, can be shortened for a quick capability probe",
         "type": "integer"
       }
     },

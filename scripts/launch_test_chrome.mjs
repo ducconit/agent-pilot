@@ -8,7 +8,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveChromiumBin, getChromiumLaunchArgs } from "./browser_resolver.mjs";
 
@@ -26,6 +26,7 @@ function readOption(args, name, fallback) {
 }
 
 const args = process.argv.slice(2);
+execFileSync(process.execPath, [path.join(ROOT_DIR, "scripts", "update_extension_build_id.mjs")], { cwd: ROOT_DIR, stdio: "inherit" });
 const port = Number(readOption(args, "--port", process.env.AGENT_PILOT_PORT || "58766"));
 const profile = readOption(args, "--profile", path.join(os.tmpdir(), `agent-pilot-chrome-${port}-${Date.now()}`));
 const url = readOption(args, "--url", "about:blank");

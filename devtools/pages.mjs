@@ -233,9 +233,29 @@ export async function pageCommand(tab, method, p) {
       const file = await fs.open(filePath, "wx", 0o600); let writes = Promise.resolve();
       const listener = e => { writes = writes.then(() => file.write(e.chunk)); };
       client.on("HeapProfiler.addHeapSnapshotChunk", listener);
-      try { if (p.collectGarbage !== false) await client.send("HeapProfiler.collectGarbage"); await client.send("HeapProfiler.takeHeapSnapshot", { reportProgress: false }); await writes; }
+      let garbageCollected = false;
+      let garbageCollectionWarning;
+      try {
+        if (p.collectGarbage !== false) {
+          try { await client.send("HeapProfiler.collectGarbage"); garbageCollected = true; }
+          catch (error) {
+            if (!/timed out|timeout|deadline exceeded/i.test(String(error?.message || error)) && /-32601|unknown method|method not found|not found|not supported|unsupported/i.test(String(error?.message || error))) {
+              garbageCollectionWarning = "HeapProfiler.collectGarbage is unavailable; captured the snapshot without forced garbage collection.";
+            } else throw error;
+          }
+        }
+        try { await client.send("HeapProfiler.takeHeapSnapshot", { reportProgress: false }); }
+        catch (error) {
+          const message = String(error?.message || error);
+          if (/-32601|unknown method|method not found|not found|not supported|unsupported/i.test(message) && !/timed out|timeout|deadline exceeded/i.test(message)) {
+            throw new Error("HEAPPROFILER_UNAVAILABLE: HeapProfiler.takeHeapSnapshot is not supported by this DevTools target");
+          }
+          throw error;
+        }
+        await writes;
+      }
       finally { client.off("HeapProfiler.addHeapSnapshotChunk", listener); await file.close(); }
-      return { path: filePath, bytes: (await fs.stat(filePath)).size };
+      return { path: filePath, bytes: (await fs.stat(filePath)).size, garbageCollected, ...(garbageCollectionWarning ? { garbageCollectionWarning } : {}) };
     }
     case "session.start": case "page.setBusy": return { success: true, tabId: tab.tabId };
     case "session.end": if (p.closeTab) await page.close(); return { success: true, tabId: tab.tabId };

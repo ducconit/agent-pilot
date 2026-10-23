@@ -1,6 +1,6 @@
 # Agent Pilot CLI Reference
 
-Use the standalone `agent-pilot` binary for shell, CI, test harnesses, and deterministic browser workflows. It talks to the same local bridge as the MCP server and does not require Node.js at runtime.
+Use the standalone `agent-pilot` binary for shell, CI, test harnesses, and deterministic browser workflows. It talks to the same local bridge as the MCP server and does not require Node.js at runtime. Set `AGENT_PILOT_PORT` when the bridge is not on the default port.
 
 ## Fast path
 
@@ -10,6 +10,12 @@ agent-pilot service status
 
 # Always create a controlled tab first; capture the returned tab id
 agent-pilot open http://127.0.0.1:3000
+
+# Machine-readable interaction output
+agent-pilot open http://127.0.0.1:3000 --format json
+agent-pilot click '#submit' --tab 123 --format json
+agent-pilot close --tab 123 --format json
+agent-pilot emulate --theme dark --format json
 
 # Prefer explicit targeting in multi-agent/browser sessions
 agent-pilot snapshot --tab 123 --format json
@@ -55,6 +61,8 @@ Put a complete test in a JSON file and run it once:
 agent-pilot batch flow.json --format json
 ```
 
+Batch `actions` must contain objects. For DevTools use `{ "type": "performance_metrics" }`, `{ "type": "performance_trace", "action": "start" }`, `{ "type": "performance_trace", "action": "stop" }`, or `{ "type": "heap_snapshot" }`; unsupported heap capture reports `HEAPPROFILER_UNAVAILABLE` rather than a fake fallback.
+
 Use inline `waitMs`, `waitForSelector`, or `waitForText` on navigation and interaction commands instead of a separate sleep/wait command. Batch screenshots are written to disk and should not be returned as base64 unless explicitly needed.
 
 ## Compact DevTools workflow
@@ -68,7 +76,15 @@ agent-pilot heap baseline --tab 123
 agent-pilot heap diff --tab 123
 ```
 
-HeapProfiler support depends on Chrome. A response with `supported: false` and `fallback: "performance.metrics"` is a handled capability downgrade, not a reason to retry repeatedly.
+HeapProfiler support depends on Chrome. Ordinary extension-debugger tabs return `HEAPPROFILER_UNAVAILABLE` and do not create a metrics fallback baseline. Use an isolated DevTools context for a real heap snapshot.
+
+Snapshot operations on `data:` URLs can fail because there is no normal content receiver. Use an HTTP/localhost page for live smoke tests.
+
+CSS inspection is progressive to keep responses close to Chrome MCP's compact default:
+
+- `agent-pilot devtools css --params '{"selector":"#app"}'` returns a compact summary with selected computed values and direct/inherited rule sources.
+- Add `"detail":"computed"` plus `"groups":["layout","typography"]` or `"properties":["display","color"]` for targeted computed CSS.
+- Add `"detail":"rules","includeInherited":true` for paginated cascade declarations, or `"detail":"full"` only for the complete payload.
 
 For the complete command list and flags, see [cli-usage.md](cli-usage.md).
 

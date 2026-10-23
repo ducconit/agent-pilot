@@ -25,6 +25,12 @@ var (
 	mcpSessionInstanceID string
 )
 
+func mcpSessionInstance() string {
+	mcpSessionMu.Lock()
+	defer mcpSessionMu.Unlock()
+	return mcpSessionInstanceID
+}
+
 func prepareSessionArgs(raw map[string]interface{}) map[string]interface{} {
 	cloned := make(map[string]interface{}, len(raw)+3)
 	for k, v := range raw {
@@ -174,7 +180,7 @@ var mcpToolBridgeMap = map[string]string{
 
 func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool) {
 	args := prepareSessionArgs(rawArgs)
-	port := config.DefaultBridgePort()
+	port := BridgePort()
 	if name == "browser_screencast_start" {
 		args["action"] = "start"
 	}

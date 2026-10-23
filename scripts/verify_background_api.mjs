@@ -1125,9 +1125,8 @@ record(
   `lcpMs=${devtoolsFull.performance?.webVitals?.lcpMs}, cls=${devtoolsFull.performance?.webVitals?.cls}, diagnostics=${diagMetrics.join(",")}`
 );
 
-// 26-28. HeapProfiler degradation paths: fallback baselines, optional GC, and timeout classification
+// 26-28. HeapProfiler support boundary: unsupported native tabs fail clearly, available snapshots survive optional GC failure, and timeouts stay distinct
 attachedTabs.add(926);
-let fallbackHeapUsed = 12 * 1024 * 1024;
 globalThis.chrome = {
   runtime: { lastError: null },
   debugger: {
@@ -1139,26 +1138,20 @@ globalThis.chrome = {
         globalThis.chrome.runtime.lastError = null;
         return;
       }
-      if (method === "Performance.getMetrics") {
-        cb({ metrics: [{ name: "JSHeapUsedSize", value: fallbackHeapUsed }, { name: "JSHeapTotalSize", value: 24 * 1024 * 1024 }] });
-        return;
-      }
       cb({});
     }
   }
 };
-const firstFallbackDiff = await cdpManager.takeHeapSnapshot(926, { action: "diff" });
-fallbackHeapUsed = 16 * 1024 * 1024;
-const secondFallbackDiff = await cdpManager.takeHeapSnapshot(926, { action: "diff" });
+let unsupportedHeapError;
+try {
+  await cdpManager.takeHeapSnapshot(926, { action: "diff" });
+} catch (error) {
+  unsupportedHeapError = error;
+}
 record(
-  "26. unsupported HeapProfiler fallback records a first diff baseline and computes later diffs",
-  firstFallbackDiff.success === true &&
-    firstFallbackDiff.supported === false &&
-    firstFallbackDiff.baselineRecorded === true &&
-    firstFallbackDiff.leakAnalysis?.hasBaseline === false &&
-    secondFallbackDiff.leakAnalysis?.hasBaseline === true &&
-    secondFallbackDiff.leakAnalysis?.deltas?.jsHeapUsedMB === 4,
-  `firstBaseline=${firstFallbackDiff.baselineRecorded}, firstHasBaseline=${firstFallbackDiff.leakAnalysis?.hasBaseline}, laterDeltaMB=${secondFallbackDiff.leakAnalysis?.deltas?.jsHeapUsedMB}`
+  "26. unsupported HeapProfiler returns a clear error without creating a fake baseline",
+  unsupportedHeapError?.code === "HEAPPROFILER_UNAVAILABLE" && !memoryBaselines.has(926),
+  `code=${unsupportedHeapError?.code}, baseline=${memoryBaselines.has(926)}`
 );
 
 attachedTabs.add(927);

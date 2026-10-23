@@ -20,6 +20,7 @@ import (
 
 	"github.com/ducconit/agent-pilot-extension/cli/config"
 	"github.com/ducconit/agent-pilot-extension/cli/feedback"
+	"github.com/ducconit/agent-pilot-extension/cli/version"
 	"github.com/gorilla/websocket"
 )
 
@@ -426,10 +427,117 @@ func describeClientConnection(c *ClientConnection, activeID string) map[string]i
 	if tabTitle != "" {
 		entry["activeTabTitle"] = tabTitle
 	}
-	for _, key := range []string{"extensionId", "extensionVersion", "bridgePort", "capabilities"} {
+	for _, key := range []string{"extensionId", "extensionVersion", "extensionBuildId", "bridgePort", "capabilities"} {
 		if value, ok := c.Details[key]; ok && value != nil {
 			entry[key] = value
 		}
 	}
 	return entry
+}
+
+// BridgeMetadata returns the compact provenance block attached to MCP tool
+// responses. The build ID is intentionally separate from the version because
+// unpacked extension reloads often keep the same manifest version.
+func BridgeMetadata(instanceID string, requestedPort int) map[string]interface{} {
+	if requestedPort <= 0 {
+		requestedPort = ActiveBridgePort()
+	}
+	metadata := map[string]interface{}{
+		"bridgePort":    requestedPort,
+		"bridgeVersion": version.Raw(),
+		"instanceId":    instanceID,
+	}
+	clientsLock.RLock()
+	var client *ClientConnection
+	if instanceID != "" {
+		client = clients[instanceID]
+	}
+	if client == nil && activeClientID != "" {
+		client = clients[activeClientID]
+	}
+	if client == nil {
+		for _, candidate := range clients {
+			client = candidate
+			break
+		}
+	}
+	if client != nil {
+		metadata["instanceId"] = client.ID
+		for _, key := range []string{"extensionId", "extensionVersion", "extensionBuildId", "capabilities"} {
+			if value, ok := client.Details[key]; ok && value != nil {
+				metadata[key] = value
+			}
+		}
+		if extensionPort, ok := client.Details["bridgePort"]; ok && extensionPort != nil {
+			metadata["extensionBridgePort"] = extensionPort
+		}
+	}
+	clientsLock.RUnlock()
+
+	// MCP commonly runs as a separate process from the long-lived bridge. In
+	// that forwarder arrangement this process has no local WebSocket client to
+	// inspect, so use the selected bridge's health endpoint for provenance.
+	if _, hasExtensionVersion := metadata["extensionVersion"]; !hasExtensionVersion {
+		if healthMetadata := remoteBridgeMetadata(requestedPort); healthMetadata != nil {
+			for key, value := range healthMetadata {
+				if _, exists := metadata[key]; !exists || metadata[key] == "" {
+					metadata[key] = value
+				}
+			}
+		}
+	}
+	return metadata
+}
+
+func remoteBridgeMetadata(port int) map[string]interface{} {
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+	response, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/health", port))
+	if err != nil {
+		return nil
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil
+	}
+
+	var health struct {
+		Version string                   `json:"version"`
+		Port    int                      `json:"port"`
+		Clients []map[string]interface{} `json:"clients"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&health); err != nil {
+		return nil
+	}
+	metadata := map[string]interface{}{}
+	if health.Port > 0 {
+		metadata["bridgePort"] = health.Port
+	}
+	if health.Version != "" {
+		metadata["bridgeVersion"] = health.Version
+	}
+	var selected map[string]interface{}
+	for _, candidate := range health.Clients {
+		if active, _ := candidate["isActive"].(bool); active {
+			selected = candidate
+			break
+		}
+		if selected == nil {
+			selected = candidate
+		}
+	}
+	if selected == nil {
+		return metadata
+	}
+	if instance, ok := selected["instanceId"]; ok {
+		metadata["instanceId"] = instance
+	}
+	for _, key := range []string{"extensionId", "extensionVersion", "extensionBuildId", "capabilities"} {
+		if value, ok := selected[key]; ok && value != nil {
+			metadata[key] = value
+		}
+	}
+	if extensionPort, ok := selected["bridgePort"]; ok && extensionPort != nil {
+		metadata["extensionBridgePort"] = extensionPort
+	}
+	return metadata
 }

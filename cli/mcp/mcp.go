@@ -24,6 +24,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ducconit/agent-pilot-extension/cli/bridge"
 	"github.com/ducconit/agent-pilot-extension/cli/config"
@@ -33,6 +34,7 @@ import (
 // mcpWriteMu serialises stdout writes so concurrent handlers do not interleave
 // partial JSON-RPC lines.
 var mcpWriteMu sync.Mutex
+var mcpBridgePort atomic.Int64
 
 type JSONRPCRequest struct {
 	JSONRPC string                 `json:"jsonrpc"`
@@ -48,10 +50,32 @@ type JSONRPCResponse struct {
 	Error   interface{} `json:"error,omitempty"`
 }
 
-func RunMCPServer() {
-	// Automatically ensure bridge server is listening on port 58765 in background
+// SetBridgePort selects the bridge used by this MCP process. A single MCP
+// process owns one bridge target, which prevents an already-initialized
+// connector from silently falling back to the default 58765 server.
+func SetBridgePort(port int) {
+	if port <= 0 {
+		port = config.DefaultBridgePort()
+	}
+	mcpBridgePort.Store(int64(port))
+}
+
+func BridgePort() int {
+	if port := int(mcpBridgePort.Load()); port > 0 {
+		return port
+	}
+	return config.DefaultBridgePort()
+}
+
+func RunMCPServer(ports ...int) {
+	port := config.DefaultBridgePort()
+	if len(ports) > 0 && ports[0] > 0 {
+		port = ports[0]
+	}
+	SetBridgePort(port)
+	// Automatically ensure bridge server is listening on the selected port.
 	go func() {
-		if err := bridge.StartBridgeServer(config.DefaultBridgePort()); err != nil {
+		if err := bridge.StartBridgeServer(port); err != nil {
 			log.Printf("[MCP] Embedded bridge server error: %v", err)
 		}
 	}()
@@ -189,6 +213,7 @@ func handleMCPRequest(req *JSONRPCRequest) {
 			"capabilities": map[string]interface{}{
 				"tools": map[string]interface{}{},
 			},
+			"_meta": bridge.BridgeMetadata(mcpSessionInstance(), BridgePort()),
 		}, nil)
 
 	case "notifications/initialized":
@@ -197,6 +222,7 @@ func handleMCPRequest(req *JSONRPCRequest) {
 	case "tools/list":
 		sendMCPResponse(req.ID, map[string]interface{}{
 			"tools": mcpTools,
+			"_meta": bridge.BridgeMetadata(mcpSessionInstance(), BridgePort()),
 		}, nil)
 
 	case "tools/call":
@@ -215,6 +241,7 @@ func handleMCPRequest(req *JSONRPCRequest) {
 					},
 				},
 				"isError": true,
+				"_meta":   bridge.BridgeMetadata(mcpSessionInstance(), BridgePort()),
 			}, nil)
 			return
 		}
@@ -228,6 +255,7 @@ func handleMCPRequest(req *JSONRPCRequest) {
 				},
 			},
 			"isError": isErr,
+			"_meta":   bridge.BridgeMetadata(mcpSessionInstance(), BridgePort()),
 		}, nil)
 
 	default:
