@@ -36,6 +36,22 @@ func ensureEmbeddedBridgeRunning(port int, addr string) {
 	}
 }
 
+// BridgeReachable reports whether a bridge is already listening on the target
+// port. Keeping the probe in one place prevents MCP startup and command
+// dispatch from each implementing slightly different EADDRINUSE handling.
+func BridgeReachable(port int) bool {
+	if port <= 0 {
+		port = config.DefaultBridgePort()
+	}
+	addr := net.JoinHostPort(config.DefaultHost, strconv.Itoa(port))
+	conn, err := net.DialTimeout("tcp", addr, config.MasterProbeDialTimeout)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
 // DispatchCommand routes the command either via local in-memory bridge or forwarder HTTP
 func DispatchCommand(method string, params map[string]interface{}, port int) (interface{}, error) {
 	if params == nil {
@@ -58,9 +74,7 @@ func DispatchCommand(method string, params map[string]interface{}, port int) (in
 	}
 
 	addr := net.JoinHostPort(config.DefaultHost, strconv.Itoa(port))
-	conn, err := net.DialTimeout("tcp", addr, config.MasterProbeDialTimeout)
-	if err == nil {
-		_ = conn.Close()
+	if BridgeReachable(port) {
 		// Master bridge is running on port -> forward via HTTP
 		return ForwardCommandToActiveServer(method, params, port)
 	}
@@ -100,16 +114,14 @@ func DispatchFeedbackWait(timeout int, tabID interface{}, port int) (interface{}
 		return feedback.WaitForFeedback(timeout, tabID), nil
 	}
 
-	addr := net.JoinHostPort(config.DefaultHost, strconv.Itoa(port))
-	conn, err := net.DialTimeout("tcp", addr, config.MasterProbeDialTimeout)
-	if err == nil {
-		_ = conn.Close()
+	if BridgeReachable(port) {
 		return ForwardCommandToActiveServer("feedback.wait", map[string]interface{}{
 			"timeout": timeout,
 			"tabId":   tabID,
 		}, port)
 	}
 
+	addr := net.JoinHostPort(config.DefaultHost, strconv.Itoa(port))
 	ensureEmbeddedBridgeRunning(port, addr)
 	return feedback.WaitForFeedback(timeout, tabID), nil
 }

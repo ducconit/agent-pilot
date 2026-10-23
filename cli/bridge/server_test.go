@@ -3,10 +3,37 @@ package bridge
 import (
 	"bytes"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 )
+
+func TestBridgeReachable(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen on ephemeral port: %v", err)
+	}
+	defer listener.Close()
+
+	_, portText, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatalf("split listener address: %v", err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatalf("parse listener port: %v", err)
+	}
+	if !BridgeReachable(port) {
+		t.Fatalf("expected listening bridge probe on port %d", port)
+	}
+
+	listener.Close()
+	if BridgeReachable(port) {
+		t.Fatalf("expected closed bridge probe on port %d to fail", port)
+	}
+}
 
 func TestHealthReportsActiveBridgePort(t *testing.T) {
 	original := ActiveBridgePort()

@@ -73,12 +73,16 @@ func RunMCPServer(ports ...int) {
 		port = ports[0]
 	}
 	SetBridgePort(port)
-	// Automatically ensure bridge server is listening on the selected port.
-	go func() {
-		if err := bridge.StartBridgeServer(port); err != nil {
-			log.Printf("[MCP] Embedded bridge server error: %v", err)
-		}
-	}()
+	// Automatically ensure bridge server is listening only when no master bridge
+	// already owns the selected port. MCP commonly runs beside a long-lived
+	// bridge; probing first avoids a misleading EADDRINUSE log on every startup.
+	if !bridge.BridgeReachable(port) {
+		go func() {
+			if err := bridge.StartBridgeServer(port); err != nil {
+				log.Printf("[MCP] Embedded bridge server error: %v", err)
+			}
+		}()
+	}
 
 	reader := bufio.NewReaderSize(os.Stdin, 64*1024)
 

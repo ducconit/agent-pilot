@@ -62,6 +62,20 @@ var (
 	secretFilterOn int32 = 1 // default true
 )
 
+var provenanceKeys = [...]string{"extensionId", "extensionVersion", "extensionBuildId", "capabilities"}
+
+const remoteMetadataCacheTTL = 500 * time.Millisecond
+
+var remoteMetadataCache = struct {
+	sync.Mutex
+	entries map[string]metadataCacheEntry
+}{entries: make(map[string]metadataCacheEntry)}
+
+type metadataCacheEntry struct {
+	fetchedAt time.Time
+	metadata  map[string]interface{}
+}
+
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
@@ -88,24 +102,7 @@ func IsOriginAllowed(origin string) bool {
 func getClientByID(instanceID string) *ClientConnection {
 	clientsLock.RLock()
 	defer clientsLock.RUnlock()
-
-	if instanceID != "" {
-		if c, ok := clients[instanceID]; ok {
-			return c
-		}
-		// An explicit instance selector is an affinity contract. Never fall
-		// back to the active browser when it is stale or mistyped.
-		return nil
-	}
-	if activeClientID != "" {
-		if c, ok := clients[activeClientID]; ok {
-			return c
-		}
-	}
-	for _, c := range clients {
-		return c
-	}
-	return nil
+	return selectClientLocked(instanceID)
 }
 
 // SendCommandToExtension dispatches a command to a connected extension and
@@ -451,30 +448,10 @@ func BridgeMetadata(instanceID string, requestedPort int) map[string]interface{}
 		"instanceId":    instanceID,
 	}
 	clientsLock.RLock()
-	var client *ClientConnection
-	if instanceID != "" {
-		client = clients[instanceID]
-	} else {
-		if activeClientID != "" {
-			client = clients[activeClientID]
-		}
-		if client == nil {
-			for _, candidate := range clients {
-				client = candidate
-				break
-			}
-		}
-	}
+	client := selectClientLocked(instanceID)
 	if client != nil {
 		metadata["instanceId"] = client.ID
-		for _, key := range []string{"extensionId", "extensionVersion", "extensionBuildId", "capabilities"} {
-			if value, ok := client.Details[key]; ok && value != nil {
-				metadata[key] = value
-			}
-		}
-		if extensionPort, ok := client.Details["bridgePort"]; ok && extensionPort != nil {
-			metadata["extensionBridgePort"] = extensionPort
-		}
+		mergeProvenance(metadata, client.Details)
 	}
 	clientsLock.RUnlock()
 
@@ -482,7 +459,7 @@ func BridgeMetadata(instanceID string, requestedPort int) map[string]interface{}
 	// that forwarder arrangement this process has no local WebSocket client to
 	// inspect, so use the selected bridge's health endpoint for provenance.
 	if _, hasExtensionVersion := metadata["extensionVersion"]; !hasExtensionVersion {
-		if healthMetadata := remoteBridgeMetadata(requestedPort, instanceID); healthMetadata != nil {
+		if healthMetadata := cachedRemoteBridgeMetadata(requestedPort, instanceID); healthMetadata != nil {
 			for key, value := range healthMetadata {
 				if _, exists := metadata[key]; !exists || metadata[key] == "" {
 					metadata[key] = value
@@ -491,6 +468,69 @@ func BridgeMetadata(instanceID string, requestedPort int) map[string]interface{}
 		}
 	}
 	return metadata
+}
+
+func selectClientLocked(instanceID string) *ClientConnection {
+	if instanceID != "" {
+		// An explicit instance selector is an affinity contract. Never fall
+		// back to the active browser when it is stale or mistyped.
+		return clients[instanceID]
+	}
+	if activeClientID != "" {
+		if client := clients[activeClientID]; client != nil {
+			return client
+		}
+	}
+	for _, client := range clients {
+		return client
+	}
+	return nil
+}
+
+func mergeProvenance(metadata map[string]interface{}, details map[string]interface{}) {
+	for _, key := range provenanceKeys {
+		if value, ok := details[key]; ok && value != nil {
+			metadata[key] = value
+		}
+	}
+	if extensionPort, ok := details["bridgePort"]; ok && extensionPort != nil {
+		metadata["extensionBridgePort"] = extensionPort
+	}
+}
+
+func cachedRemoteBridgeMetadata(port int, instanceID string) map[string]interface{} {
+	cacheKey := fmt.Sprintf("%d:%s", port, instanceID)
+	now := time.Now()
+	remoteMetadataCache.Lock()
+	if entry, ok := remoteMetadataCache.entries[cacheKey]; ok && now.Sub(entry.fetchedAt) < remoteMetadataCacheTTL {
+		metadata := cloneMetadata(entry.metadata)
+		remoteMetadataCache.Unlock()
+		return metadata
+	}
+	remoteMetadataCache.Unlock()
+
+	metadata := remoteBridgeMetadata(port, instanceID)
+	if metadata == nil {
+		return nil
+	}
+	remoteMetadataCache.Lock()
+	remoteMetadataCache.entries[cacheKey] = metadataCacheEntry{
+		fetchedAt: time.Now(),
+		metadata:  cloneMetadata(metadata),
+	}
+	remoteMetadataCache.Unlock()
+	return metadata
+}
+
+func cloneMetadata(metadata map[string]interface{}) map[string]interface{} {
+	if metadata == nil {
+		return nil
+	}
+	cloned := make(map[string]interface{}, len(metadata))
+	for key, value := range metadata {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func remoteBridgeMetadata(port int, instanceID string) map[string]interface{} {
@@ -543,13 +583,6 @@ func remoteBridgeMetadata(port int, instanceID string) map[string]interface{} {
 	if instance, ok := selected["instanceId"]; ok {
 		metadata["instanceId"] = instance
 	}
-	for _, key := range []string{"extensionId", "extensionVersion", "extensionBuildId", "capabilities"} {
-		if value, ok := selected[key]; ok && value != nil {
-			metadata[key] = value
-		}
-	}
-	if extensionPort, ok := selected["bridgePort"]; ok && extensionPort != nil {
-		metadata["extensionBridgePort"] = extensionPort
-	}
+	mergeProvenance(metadata, selected)
 	return metadata
 }

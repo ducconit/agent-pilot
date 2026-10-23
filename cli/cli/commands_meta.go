@@ -10,7 +10,6 @@ package cli
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -29,36 +28,19 @@ import (
 // newMCPCommand launches the stdio MCP server. The root command also defaults to
 // this when the CLI is invoked with no subcommand over a pipe.
 func newMCPCommand() *cobra.Command {
-	cmd := newLeafCommand("mcp", nil, func(args []string) error {
-		cmdArgs, err := parseCmdArgs(args, []FlagDef{{Name: "bridge-port", Aliases: []string{"port"}}})
-		if err != nil {
-			return fmt.Errorf("❌ MCP arguments invalid: %v", err)
-		}
-		port, err := cmdArgs.Int("bridge-port", config.DefaultBridgePort())
-		if err != nil || port < 1 || port > 65535 {
-			return fmt.Errorf("❌ Invalid bridge port: %s", cmdArgs.String("bridge-port", ""))
-		}
-		mcp.RunMCPServer(port)
+	return newLeafCommand("mcp", nil, func(args []string) error {
+		mcp.RunMCPServer(config.DefaultBridgePort())
 		return nil
 	})
-	cmd.Flags().Int("bridge-port", config.DefaultBridgePort(), "Bridge port used by this MCP process (overrides AGENT_PILOT_PORT)")
-	return cmd
 }
 
 func newServerCommand() *cobra.Command {
-	cmd := newLeafCommand("server", nil, func(args []string) error {
-		serverFlags := flag.NewFlagSet("server", flag.ExitOnError)
-		port := serverFlags.Int("port", config.DefaultBridgePort(), "Port to listen on")
-		if err := serverFlags.Parse(args); err != nil {
-			return errUsage
-		}
-		if err := bridge.StartBridgeServer(*port); err != nil {
+	return newLeafCommand("server", nil, func(args []string) error {
+		if err := bridge.StartBridgeServer(config.DefaultBridgePort()); err != nil {
 			return fmt.Errorf("❌ Server error: %v", err)
 		}
 		return nil
 	})
-	cmd.Flags().Int("port", config.DefaultBridgePort(), "Port to listen on")
-	return cmd
 }
 
 func newServiceCommand() *cobra.Command {

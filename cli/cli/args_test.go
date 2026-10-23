@@ -384,9 +384,9 @@ func TestExecScreenshotWithOptions_ClipValidation(t *testing.T) {
 }
 
 func TestExtractBridgePort(t *testing.T) {
-	args, port, err := extractBridgePort([]string{"https://example.test", "--bridge-port", "58766", "--format", "json"})
+	args, port, _, err := extractBridgeOptions([]string{"https://example.test", "--bridge-port", "58766", "--format", "json"})
 	if err != nil {
-		t.Fatalf("extractBridgePort failed: %v", err)
+		t.Fatalf("extractBridgeOptions failed: %v", err)
 	}
 	if port != 58766 {
 		t.Fatalf("port = %d, want 58766", port)
@@ -395,7 +395,7 @@ func TestExtractBridgePort(t *testing.T) {
 		t.Fatalf("filtered args = %#v", args)
 	}
 
-	_, _, err = extractBridgePort([]string{"--bridge-port=invalid"})
+	_, _, _, err = extractBridgeOptions([]string{"--bridge-port=invalid"})
 	if err == nil {
 		t.Fatal("expected invalid bridge port to fail")
 	}
@@ -414,9 +414,9 @@ func TestExtractBridgePortSupportsPortAlias(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args, port, err := extractBridgePort(tt.args)
+			args, port, _, err := extractBridgeOptions(tt.args)
 			if err != nil {
-				t.Fatalf("extractBridgePort failed: %v", err)
+				t.Fatalf("extractBridgeOptions failed: %v", err)
 			}
 			if port != tt.want {
 				t.Fatalf("port = %d, want %d", port, tt.want)
@@ -432,9 +432,9 @@ func TestExplicitPortOverrideWinsForBrowserCommand(t *testing.T) {
 	t.Setenv("AGENT_PILOT_PORT", "58765")
 	t.Cleanup(func() { _ = config.SetBridgePortOverride(0) })
 
-	args, port, err := extractBridgePort([]string{"--port", "58766", "tabs"})
+	args, port, _, err := extractBridgeOptions([]string{"--port", "58766", "tabs"})
 	if err != nil {
-		t.Fatalf("extractBridgePort failed: %v", err)
+		t.Fatalf("extractBridgeOptions failed: %v", err)
 	}
 	if len(args) != 1 || args[0] != "tabs" {
 		t.Fatalf("filtered args = %#v", args)

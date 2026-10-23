@@ -105,26 +105,17 @@ func newLeafCommand(name string, aliases []string, run func(args []string) error
 	}
 	// Leaf commands retain the historical runtime parser. These declarations are
 	// for discoverability in generated help; RunE strips and applies the flags.
-	// The server command owns --port for its listen address, and MCP keeps its
-	// own explicit parser, so do not register duplicate Cobra flags there.
-	if name != "mcp" && name != "server" {
-		cmd.Flags().Int("bridge-port", 0, "Bridge port to target (overrides AGENT_PILOT_PORT)")
-		cmd.Flags().Int("port", 0, "Alias for --bridge-port")
-		cmd.Flags().String("instance-id", "", "Browser instance ID to target")
-	}
+	// The same selector parser owns --port/--bridge-port for every subcommand,
+	// including `server` and `mcp`, so command implementations do not duplicate
+	// bridge selection logic.
+	cmd.Flags().Int("bridge-port", 0, "Bridge port to target (overrides AGENT_PILOT_PORT)")
+	cmd.Flags().Int("port", 0, "Alias for --bridge-port")
+	cmd.Flags().String("instance-id", "", "Browser instance ID to target")
 	return cmd
 }
 
-// extractBridgePort removes the process-level selector before legacy command
-// parsers see it, including bespoke parsers that do not use parseCmdArgs.
-func extractBridgePort(args []string) ([]string, int, error) {
-	filtered, port, _, err := extractBridgeOptions(args)
-	return filtered, port, err
-}
-
 // extractBridgeOptions removes process-level bridge and instance selectors
-// before legacy command parsers see them. The bridge-port wrapper above keeps
-// existing parser tests and callers source-compatible.
+// before legacy command parsers see them.
 func extractBridgeOptions(args []string) ([]string, int, string, error) {
 	filtered := make([]string, 0, len(args))
 	port := 0

@@ -254,7 +254,8 @@ async function main() {
     });
     bridge.on("exit", (code, signal) => {
       if (!shuttingDown) {
-        console.error(`[Agent Pilot] Bridge exited before readiness (code=${code ?? "null"}, signal=${signal || "none"}).`);
+        const phase = ready ? "after readiness" : "before readiness";
+        console.error(`[Agent Pilot] Bridge exited ${phase} (code=${code ?? "null"}, signal=${signal || "none"}).`);
         requestShutdown(1);
       }
     });
