@@ -1520,5 +1520,147 @@ record(
   `totalElements=${inPageProbeResult?.domHealth?.totalElements}, dupIds=${JSON.stringify(inPageProbeResult?.domHealth?.duplicateIds)}, lcp=${inPageProbeResult?.webVitals?.lcpMs}, inp=${inPageProbeResult?.webVitals?.inpMs}, tbt=${inPageProbeResult?.webVitals?.totalBlockingTimeMs}`
 );
 
+// 33. Background tab paint starvation (visibilityState='hidden') & late-foreground LCP inflation detection + bringToFront support
+attachedTabs.add(933);
+let bringToFrontCdpCalls = 0;
+let bringToFrontTabUpdates = 0;
+globalThis.chrome.tabs = {
+  update: async (_tid, props) => {
+    if (props?.active === true) bringToFrontTabUpdates++;
+    return { id: 933, active: true };
+  }
+};
+globalThis.chrome.debugger.sendCommand = (_target, method, _params, cb) => {
+  globalThis.chrome.runtime.lastError = null;
+  if (method === "Page.bringToFront") {
+    bringToFrontCdpCalls++;
+    cb({});
+    return;
+  }
+  if (method === "Performance.getMetrics") {
+    cb({
+      metrics: [
+        { name: "JSHeapUsedSize", value: 18 * 1024 * 1024 },
+        { name: "JSHeapTotalSize", value: 32 * 1024 * 1024 },
+        { name: "Nodes", value: 380 },
+        { name: "Documents", value: 1 }
+      ]
+    });
+    return;
+  }
+  cb({});
+};
+let probeMode933 = "hidden";
+globalThis.chrome.scripting = {
+  executeScript: async () => {
+    if (probeMode933 === "hidden") {
+      return [
+        {
+          result: {
+            webVitals: {
+              ttfbMs: 12,
+              fcpMs: undefined,
+              lcpMs: undefined,
+              cls: 0,
+              clsCulprits: [],
+              domInteractiveMs: 85,
+              domContentLoadedMs: 120,
+              loadEventMs: 368,
+              visibilityState: "hidden",
+              wasHiddenBeforePaint: true,
+              backgroundTabPaintDeferred: true,
+              longTasksCount: 0,
+              totalBlockingTimeMs: 0,
+              maxLongTaskMs: 0,
+              topLongTasks: []
+            },
+            domHealth: { totalElements: 376, maxDepth: 11, maxChildrenCount: 8, iframeCount: 0, duplicateIds: [] }
+          }
+        }
+      ];
+    }
+    return [
+      {
+        result: {
+          webVitals: {
+            ttfbMs: 12,
+            fcpMs: 34008,
+            lcpMs: 34008,
+            lcpElement: "h1.hero-title",
+            cls: 0,
+            clsCulprits: [],
+            domInteractiveMs: 85,
+            domContentLoadedMs: 120,
+            loadEventMs: 368,
+            visibilityState: "visible",
+            wasHiddenBeforePaint: true,
+            lateForegroundPaint: true,
+            backgroundDwellEstimateMs: 33640,
+            longTasksCount: 0,
+            totalBlockingTimeMs: 0,
+            maxLongTaskMs: 0,
+            topLongTasks: []
+          },
+          domHealth: { totalElements: 376, maxDepth: 11, maxChildrenCount: 8, iframeCount: 0, duplicateIds: [] }
+        }
+      }
+    ];
+  }
+};
+const hiddenMetrics = await cdpManager.getPerformanceMetrics(933, {});
+probeMode933 = "late-foreground";
+const lateForegroundMetrics = await cdpManager.getPerformanceMetrics(933, { bringToFront: true });
+record(
+  "33. getPerformanceMetrics flags BackgroundTabPaintDeferred & LateForegroundPaintInflation without false-positive Slow LCP and supports bringToFront",
+  hiddenMetrics.webVitals?.ratings?.fcp === "deferred-background-tab" &&
+    hiddenMetrics.webVitals?.ratings?.lcp === "deferred-background-tab" &&
+    hiddenMetrics.diagnostics.some((d) => d.metric === "BackgroundTabPaintDeferred") &&
+    !hiddenMetrics.diagnostics.some((d) => d.metric === "LCP") &&
+    lateForegroundMetrics.broughtToFront === true &&
+    bringToFrontCdpCalls === 1 &&
+    bringToFrontTabUpdates === 1 &&
+    lateForegroundMetrics.webVitals?.ratings?.lcp === "deferred-background-tab" &&
+    lateForegroundMetrics.diagnostics.some((d) => d.metric === "LateForegroundPaintInflation" && d.backgroundDwellEstimateMs === 33640) &&
+    !lateForegroundMetrics.diagnostics.some((d) => d.metric === "LCP"),
+  `hiddenDiag=${JSON.stringify(hiddenMetrics.diagnostics.map((d) => d.metric))}, lateDiag=${JSON.stringify(lateForegroundMetrics.diagnostics.map((d) => d.metric))}, broughtToFront=${lateForegroundMetrics.broughtToFront}`
+);
+
+// 34. evaluateInTab bounds wedged MAIN-world executeScript with fast timeout and passes timeout to CDP Runtime.evaluate (or throws MAIN_THREAD_BLOCKED)
+attachedTabs.add(934);
+let cdpRuntimeEvalParams = null;
+let cdpEvalShouldFail = false;
+globalThis.chrome.scripting = {
+  executeScript: () => new Promise(() => {}) // Simulate infinite loop on main thread
+};
+globalThis.chrome.debugger.sendCommand = (_target, method, params, cb) => {
+  globalThis.chrome.runtime.lastError = null;
+  if (method === "Runtime.evaluate") {
+    cdpRuntimeEvalParams = params;
+    if (cdpEvalShouldFail) {
+      globalThis.chrome.runtime.lastError = { message: "Execution was terminated" };
+      cb({});
+      return;
+    }
+    cb({ result: { type: "string", value: "fallback-ok" } });
+    return;
+  }
+  cb({});
+};
+const evalFallbackVal = await evaluateInTab(934, "document.title", null, { timeoutMs: 150 });
+cdpEvalShouldFail = true;
+let evalBlockedErr = null;
+try {
+  await evaluateInTab(934, "while(true){}", null, { timeoutMs: 120 });
+} catch (err) {
+  evalBlockedErr = err;
+}
+record(
+  "34. evaluateInTab times out wedged executeScript quickly, passes V8 timeout to CDP Runtime.evaluate, and reports MAIN_THREAD_BLOCKED when wedged",
+  evalFallbackVal === "fallback-ok" &&
+    cdpRuntimeEvalParams?.timeout === 120 &&
+    Boolean(evalBlockedErr && String(evalBlockedErr.message).includes("MAIN_THREAD_BLOCKED")),
+  `evalFallbackVal=${evalFallbackVal}, cdpTimeout=${cdpRuntimeEvalParams?.timeout}, blockedErr=${evalBlockedErr?.message}`
+);
+
 recorder.summarize();
 recorder.exitIfFailed();

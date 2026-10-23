@@ -95,8 +95,12 @@ func TestConsoleAndMetricsCommandsDispatchExpectedPayloads(t *testing.T) {
 	err1 := root1.Execute()
 
 	root2 := newRootCommand()
-	root2.SetArgs([]string{"metrics", "--gc", "--timeout", "45000", "--no-resources", "--tab", "1103687522", "--port", strconv.Itoa(port)})
+	root2.SetArgs([]string{"metrics", "--gc", "--bring-to-front", "--timeout", "45000", "--no-resources", "--tab", "1103687522", "--port", strconv.Itoa(port)})
 	err2 := root2.Execute()
+
+	root3 := newRootCommand()
+	root3.SetArgs([]string{"navigate", "http://localhost:5173/products", "--tab", "1103687583", "--port", strconv.Itoa(port)})
+	err3 := root3.Execute()
 
 	_ = wPipe.Close()
 	os.Stdout = oldStdout
@@ -107,10 +111,13 @@ func TestConsoleAndMetricsCommandsDispatchExpectedPayloads(t *testing.T) {
 		t.Fatalf("console errors command failed: %v", err1)
 	}
 	if err2 != nil {
-		t.Fatalf("metrics --gc --timeout command failed: %v", err2)
+		t.Fatalf("metrics --gc --bring-to-front --timeout command failed: %v", err2)
 	}
-	if len(received) != 2 {
-		t.Fatalf("expected 2 bridge requests, got %d", len(received))
+	if err3 != nil {
+		t.Fatalf("navigate <url> --tab command failed: %v", err3)
+	}
+	if len(received) != 3 {
+		t.Fatalf("expected 3 bridge requests, got %d", len(received))
 	}
 
 	req1Params, _ := received[0]["params"].(map[string]interface{})
@@ -124,8 +131,16 @@ func TestConsoleAndMetricsCommandsDispatchExpectedPayloads(t *testing.T) {
 	req2Params, _ := received[1]["params"].(map[string]interface{})
 	if received[1]["method"] != "performance.metrics" ||
 		req2Params["collectGarbage"] != true ||
+		req2Params["bringToFront"] != true ||
 		req2Params["timeoutMs"] != float64(45000) ||
 		req2Params["includeResources"] != false {
 		t.Fatalf("unexpected metrics request: %#v", received[1])
+	}
+
+	req3Params, _ := received[2]["params"].(map[string]interface{})
+	if received[2]["method"] != "tabs.update" ||
+		req3Params["url"] != "http://localhost:5173/products" ||
+		req3Params["tabId"] != float64(1103687583) {
+		t.Fatalf("unexpected navigate request (expected tabId=1103687583 after positional URL): %#v", received[2])
 	}
 }

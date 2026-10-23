@@ -548,7 +548,7 @@ func TestPerformanceAndHeapSnapshotSchemas(t *testing.T) {
 	if !ok {
 		t.Fatalf("browser_performance_metrics missing properties")
 	}
-	for _, key := range []string{"includeWebVitals", "includeResources", "includeDomHealth", "tabId"} {
+	for _, key := range []string{"includeWebVitals", "includeResources", "includeDomHealth", "collectGarbage", "forceGC", "bringToFront", "timeoutMs", "tabId"} {
 		if _, exists := metricsProps[key]; !exists {
 			t.Errorf("browser_performance_metrics schema missing %q property", key)
 		}

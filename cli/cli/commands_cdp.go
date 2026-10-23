@@ -227,6 +227,7 @@ func newMetricsCommand() *cobra.Command {
 			{Name: "no-resources", IsBool: true},
 			{Name: "no-dom-health", IsBool: true},
 			{Name: "gc", IsBool: true},
+			{Name: "bring-to-front", Aliases: []string{"foreground", "activate"}, IsBool: true},
 			{Name: "timeout"},
 			{Name: "tab", Aliases: []string{"t"}},
 		})
@@ -251,6 +252,9 @@ func newMetricsCommand() *cobra.Command {
 		if cmdArgs.Bool("gc") {
 			extra["collectGarbage"] = true
 		}
+		if cmdArgs.Bool("bring-to-front") {
+			extra["bringToFront"] = true
+		}
 		if timeoutMs > 0 {
 			extra["timeoutMs"] = timeoutMs
 		}
@@ -265,6 +269,7 @@ func newMetricsCommand() *cobra.Command {
 	f.Bool("no-resources", false, "Skip resource bottleneck probe")
 	f.Bool("no-dom-health", false, "Skip DOM and accessibility health scan")
 	f.Bool("gc", false, "Trigger V8 garbage collection before reading metrics")
+	f.Bool("bring-to-front", false, "Activate tab before reading metrics so Chromium computes FCP and LCP")
 	f.Int("timeout", 0, "Command timeout in milliseconds")
 	f.IntP("tab", "t", 0, "Target tab ID")
 	return cmd

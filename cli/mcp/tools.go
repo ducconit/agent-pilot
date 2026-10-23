@@ -558,13 +558,17 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_performance_metrics",
-		Description: "Retrieve comprehensive runtime & debugging metrics: CDP counters (JSHeapUsedMB, Nodes, JSEventListeners, LayoutCount, ScriptDuration), Core Web Vitals (TTFB, FCP, LCP + target element, CLS + shifting elements, TBT + long tasks), Resource bottlenecks (slowest & render-blocking URLs), DOM/A11y health (max depth, duplicate IDs, missing alt/labels), and automated diagnostic warnings.",
+		Description: "Retrieve comprehensive runtime & debugging metrics: CDP counters (JSHeapUsedMB, Nodes, JSEventListeners, LayoutCount, ScriptDuration), Core Web Vitals (TTFB, FCP, LCP + target element, CLS + shifting elements, INP, TBT + long tasks), Resource bottlenecks (slowest & render-blocking URLs), DOM/A11y health (liveDomElements vs blinkRetainedNodes, detachedOrUncollectedNodes, max depth, duplicate IDs, missing alt/labels), runtime console errors, and automated diagnostic warnings.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"includeWebVitals": map[string]interface{}{"type": "boolean", "description": "Collect Core Web Vitals (TTFB, FCP, LCP, CLS, TBT) (default: true)"},
+				"includeWebVitals": map[string]interface{}{"type": "boolean", "description": "Collect Core Web Vitals (TTFB, FCP, LCP, CLS, INP, TBT) (default: true)"},
 				"includeResources": map[string]interface{}{"type": "boolean", "description": "Collect resource bottleneck metrics (slowest & render-blocking URLs) (default: true)"},
 				"includeDomHealth": map[string]interface{}{"type": "boolean", "description": "Collect DOM depth, duplicate IDs, and accessibility health metrics (default: true)"},
+				"collectGarbage":   map[string]interface{}{"type": "boolean", "description": "Attempt V8 garbage collection before reading metrics to distinguish true detached DOM leaks from uncollected garbage (default: false)"},
+				"forceGC":          map[string]interface{}{"type": "boolean", "description": "Alias for collectGarbage: trigger V8 garbage collection before reading metrics (default: false)"},
+				"bringToFront":     map[string]interface{}{"type": "boolean", "description": "Activate and bring the tab to front before probing Web Vitals so Chromium paints FCP/LCP on background-opened tabs (default: false)"},
+				"timeoutMs":        map[string]interface{}{"type": "integer", "description": "Optional timeout in milliseconds for the metrics probe"},
 				"tabId":            map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
 		},

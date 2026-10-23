@@ -349,13 +349,40 @@ async function collectPageWebVitalsAndDomProbe(tabId, timeoutMs = DEFAULT_DOM_PR
           }
 
           const perfMem = perf && perf.memory ? perf.memory : null;
+          const visibilityState =
+            typeof document.visibilityState === "string" ? document.visibilityState : "visible";
+          const visibilityEntries =
+            perf && typeof perf.getEntriesByType === "function"
+              ? perf.getEntriesByType("visibility-state") || []
+              : [];
+          const fcpMs = fcpEntry ? Math.round(fcpEntry.startTime) : undefined;
           const lcpTime = lastLcp ? lastLcp.renderTime || lastLcp.loadTime || lastLcp.startTime : undefined;
+          const lcpMs = lcpTime !== undefined ? Math.round(lcpTime) : undefined;
+          const loadEventMs = nav && nav.loadEventEnd > 0 ? Math.round(nav.loadEventEnd) : undefined;
+          const hadHiddenBeforePaint =
+            visibilityState === "hidden" ||
+            (Array.isArray(visibilityEntries) &&
+              visibilityEntries.some(
+                (e) => e && e.name === "hidden" && (fcpMs === undefined || (Number(e.startTime) || 0) <= fcpMs)
+              ));
+          const backgroundTabPaintDeferred =
+            visibilityState === "hidden" && fcpMs === undefined && lcpMs === undefined;
+          const lateForegroundPaint = Boolean(
+            fcpMs !== undefined &&
+              loadEventMs !== undefined &&
+              loadEventMs > 0 &&
+              fcpMs - loadEventMs > 2500 &&
+              (hadHiddenBeforePaint || fcpMs > loadEventMs * 3)
+          );
+          const backgroundDwellEstimateMs = lateForegroundPaint
+            ? Math.max(0, fcpMs - loadEventMs)
+            : undefined;
 
           return {
             webVitals: {
               ttfbMs: nav ? Math.round(Math.max(0, (nav.responseStart || 0) - (nav.requestStart || 0))) : undefined,
-              fcpMs: fcpEntry ? Math.round(fcpEntry.startTime) : undefined,
-              lcpMs: lcpTime !== undefined ? Math.round(lcpTime) : undefined,
+              fcpMs,
+              lcpMs,
               lcpElement: lastLcp && lastLcp.element ? describeNode(lastLcp.element) : undefined,
               cls: Math.round(clsScore * 1000) / 1000,
               clsCulprits,
@@ -363,7 +390,11 @@ async function collectPageWebVitalsAndDomProbe(tabId, timeoutMs = DEFAULT_DOM_PR
               ...(slowestInteraction ? { slowestInteraction } : {}),
               domInteractiveMs: nav ? Math.round(nav.domInteractive || 0) : undefined,
               domContentLoadedMs: nav ? Math.round(nav.domContentLoadedEventEnd || 0) : undefined,
-              loadEventMs: nav && nav.loadEventEnd > 0 ? Math.round(nav.loadEventEnd) : undefined,
+              loadEventMs,
+              visibilityState,
+              ...(hadHiddenBeforePaint ? { wasHiddenBeforePaint: true } : {}),
+              ...(backgroundTabPaintDeferred ? { backgroundTabPaintDeferred: true } : {}),
+              ...(lateForegroundPaint ? { lateForegroundPaint: true, backgroundDwellEstimateMs } : {}),
               longTasksCount: longTaskEntries ? longTaskEntries.length : 0,
               totalBlockingTimeMs: Math.round(totalBlockingTimeMs),
               maxLongTaskMs: Math.round(maxLongTaskMs),
@@ -671,7 +702,26 @@ function buildPerformanceDiagnostics(memory, webVitals, domHealth, resources, ex
   }
 
   if (webVitals) {
-    if (typeof webVitals.lcpMs === "number" && webVitals.lcpMs > 2500) {
+    if (webVitals.backgroundTabPaintDeferred) {
+      diagnostics.push({
+        severity: "info",
+        category: "lcp",
+        metric: "BackgroundTabPaintDeferred",
+        value: webVitals.visibilityState || "hidden",
+        message:
+          "Tab is in the background (visibilityState='hidden'); Chromium defers FCP and LCP until the tab is foregrounded. Open with --active or run metrics with --bring-to-front (bringToFront: true) for accurate paint timings."
+      });
+    } else if (webVitals.lateForegroundPaint) {
+      diagnostics.push({
+        severity: "warning",
+        category: "lcp",
+        metric: "LateForegroundPaintInflation",
+        value: `${webVitals.lcpMs ?? webVitals.fcpMs}ms`,
+        loadEventMs: webVitals.loadEventMs,
+        backgroundDwellEstimateMs: webVitals.backgroundDwellEstimateMs,
+        message: `FCP (${webVitals.fcpMs}ms) and LCP (${webVitals.lcpMs ?? webVitals.fcpMs}ms) occurred ${webVitals.backgroundDwellEstimateMs}ms after loadEventEnd (${webVitals.loadEventMs}ms) because the tab was opened in the background; paint timings reflect background dwell time rather than page render speed.`
+      });
+    } else if (typeof webVitals.lcpMs === "number" && webVitals.lcpMs > 2500) {
       diagnostics.push({
         severity: webVitals.lcpMs > 4000 ? "critical" : "warning",
         category: "lcp",
@@ -826,8 +876,32 @@ export async function getPerformanceMetrics(tabId, options = {}) {
   const includeWebVitals = options?.includeWebVitals !== false;
   const includeResources = options?.includeResources !== false;
   const includeDomHealth = options?.includeDomHealth !== false;
-  const shouldCollectGarbage = Boolean(options?.collectGarbage || options?.gc);
+  const shouldCollectGarbage = Boolean(options?.collectGarbage || options?.gc || options?.forceGC);
+  const shouldBringToFront = Boolean(options?.bringToFront || options?.foreground || options?.activate);
   let garbageCollected = false;
+  let broughtToFront = false;
+
+  if (shouldBringToFront) {
+    if (typeof chrome !== "undefined" && chrome.tabs && typeof chrome.tabs.update === "function") {
+      try {
+        await chrome.tabs.update(tabId, { active: true });
+        broughtToFront = true;
+      } catch (tabUpdateErr) {
+        logDebug("Pre-metrics chrome.tabs.update(active: true) error (ignored)", tabUpdateErr);
+      }
+    }
+    if (attachedTabs.has(tabId)) {
+      try {
+        await sendCdpCommand(tabId, "Page.bringToFront");
+        broughtToFront = true;
+      } catch (bringErr) {
+        logDebug("Pre-metrics Page.bringToFront error (ignored)", bringErr);
+      }
+    }
+    if (broughtToFront) {
+      await new Promise((r) => setTimeout(r, 120));
+    }
+  }
 
   const metricsMap = {};
   if (attachedTabs.has(tabId)) {
@@ -911,12 +985,13 @@ export async function getPerformanceMetrics(tabId, options = {}) {
   let webVitals = undefined;
   if (includeWebVitals && probe?.webVitals) {
     const wv = probe.webVitals;
+    const isDeferredPaint = Boolean(wv.backgroundTabPaintDeferred || wv.lateForegroundPaint);
     webVitals = {
       ...wv,
       ratings: {
         ttfb: rateMetric(wv.ttfbMs, 800, 1800),
-        fcp: rateMetric(wv.fcpMs, 1800, 3000),
-        lcp: rateMetric(wv.lcpMs, 2500, 4000),
+        fcp: isDeferredPaint ? "deferred-background-tab" : rateMetric(wv.fcpMs, 1800, 3000),
+        lcp: isDeferredPaint ? "deferred-background-tab" : rateMetric(wv.lcpMs, 2500, 4000),
         cls: rateMetric(wv.cls, 0.1, 0.25),
         ...(wv.inpMs !== undefined ? { inp: rateMetric(wv.inpMs, 200, 500) } : {}),
         tbt: rateMetric(wv.totalBlockingTimeMs, 200, 600)
@@ -937,6 +1012,7 @@ export async function getPerformanceMetrics(tabId, options = {}) {
     success: true,
     tabId,
     ...(shouldCollectGarbage ? { garbageCollected } : {}),
+    ...(shouldBringToFront ? { broughtToFront } : {}),
     ...(probeTimedOut ? { mainThreadBlocked: true, domProbeTimedOut: true } : {}),
     metrics: metricsMap,
     memory,
