@@ -2,6 +2,7 @@ import path from "node:path";
 import { EDIT_DELETE_HTTP_PORT, ROOT_DIR, ASSETS_DIR, NAV_WAIT_UNTIL, TIMEOUTS, SEPARATOR } from "./lib/config.mjs";
 import {
   startStaticServer,
+  closeHttpServer,
   launchExtensionBrowser,
   waitForServiceWorker,
   extensionIdFromTarget,
@@ -163,7 +164,15 @@ async function run() {
 
     const sidepanelCountAfterDel = await sidepanelPage.$eval("#feedback-items-counter", el => el.textContent.trim());
     console.log("- Sidepanel counter after delete:", sidepanelCountAfterDel);
+    const pageStateAfterSidepanelDelete = await page.evaluate(() => ({
+      boxes: [...document.querySelectorAll(".ap-pinned-box:not(.draft)")].map(box => box.dataset.id || null),
+      feedbackCoordinatorInitialized: Boolean(window.__AP_INTERNAL__?.__guards?.fsIndex)
+    }));
+    console.log("- Page state after Side Panel delete:", pageStateAfterSidepanelDelete);
     if (sidepanelCountAfterDel !== "0") throw new Error("Counter should be 0 after delete!");
+    if (pageStateAfterSidepanelDelete.boxes.length !== 0) {
+      throw new Error(`Side Panel delete left pinned boxes rendered on the source page: ${JSON.stringify(pageStateAfterSidepanelDelete.boxes)}`);
+    }
 
     // 6. Test In-Page Delete via .ap-pinned-del-btn
     console.log("6. Testing In-Page Delete via pinned badge ✕ button...");
@@ -181,6 +190,11 @@ async function run() {
     await sleep(400);
 
     const pageBoxCountBefore = await page.$$eval(".ap-pinned-box:not(.draft)", els => els.length);
+    const pageStateBeforeInPageDelete = await page.evaluate(() => ({
+      boxes: [...document.querySelectorAll(".ap-pinned-box:not(.draft)")].map(box => box.dataset.id || null),
+      feedbackCoordinatorInitialized: Boolean(window.__AP_INTERNAL__?.__guards?.fsIndex)
+    }));
+    console.log("- Page state before in-page delete:", pageStateBeforeInPageDelete);
     console.log("- Page boxes before in-page delete:", pageBoxCountBefore);
     if (pageBoxCountBefore !== 1) throw new Error("Should have 1 box before delete!");
 
@@ -212,7 +226,7 @@ async function run() {
   } finally {
     // Browser + server are always released, and the run reports via exitCode.
     await close();
-    server.close();
+    await closeHttpServer(server);
   }
 }
 

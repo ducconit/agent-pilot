@@ -1,6 +1,6 @@
 import path from "node:path";
 import { PINNED_HTTP_PORT, ROOT_DIR, ASSETS_DIR, NAV_WAIT_UNTIL, TIMEOUTS, SEPARATOR } from "./lib/config.mjs";
-import { startStaticServer, launchExtensionBrowser, waitForServiceWorker, sleep } from "./lib/harness.mjs";
+import { startStaticServer, closeHttpServer, launchExtensionBrowser, waitForServiceWorker, sleep } from "./lib/harness.mjs";
 
 async function main() {
   console.log(SEPARATOR);
@@ -262,7 +262,7 @@ async function main() {
   } finally {
     // Browser + server are released on every path (success or failure).
     await close();
-    server.close();
+    await closeHttpServer(server);
   }
 }
 

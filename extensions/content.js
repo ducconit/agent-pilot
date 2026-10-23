@@ -79,7 +79,7 @@
 
   const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
     ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
-    : "1.0.10-beta";
+    : "1.0.11-beta";
 
   function resolveTargetElement(selector) {
     if (!selector) return null;
@@ -138,7 +138,7 @@
     virtual_mouse_move: (d) => cursor.moveVirtualMouse(d.x, d.y, d.duration),
     virtual_mouse_click: (d) => cursor.virtualClick(d.x, d.y),
     animate_cursor_click: (d) => cursor.animateCursorClick(d.x, d.y, d.selector),
-    virtual_type: (d) => cursor.virtualType(d.selector, d.text),
+    virtual_type: (d) => cursor.virtualType(d.selector, d.text, d.clear),
     virtual_scroll: (d) => cursor.virtualScroll(d.deltaX, d.deltaY),
     virtual_hover: (d) => cursor.virtualHover(d.selector),
     virtual_drag: (d) => cursor.virtualDrag(d.from, d.to, d.steps),
@@ -202,9 +202,20 @@
 
   // Shared handlers for Background & Side Panel runtime messages
   const moveCursorHandler = (req) => cursor.moveVirtualMouse(req.x, req.y, req.duration || MOUSE_MOVE_DEFAULT_MS);
-  const clickCursorHandler = (req) => cursor.virtualClick(req.x, req.y, req.selector, req.fallbackHints || null);
+  const clickCursorHandler = (req) => cursor.virtualClick(
+    req.x,
+    req.y,
+    req.selector,
+    req.fallbackHints || null,
+    req.clickCount
+  );
   const typeTextHandler = (req) => cursor.virtualType(req.selector, req.text, req.clear, req.pressEnter, req.fallbackHints || null);
-  const pressKeyHandler = (req) => cursor.dispatchKey(req.key, req.code, req.keyCode, req.selector);
+  const pressKeyHandler = (req) => {
+    if (req.eventType && typeof cursor.dispatchKeyEvent === "function") {
+      return cursor.dispatchKeyEvent(req.key, req.code, req.keyCode, req.selector, req.eventType, req.modifiers);
+    }
+    return cursor.dispatchKey(req.key, req.code, req.keyCode, req.selector);
+  };
   const hoverHandler = (req) => cursor.virtualHover(req.selector, { dispatchSynthetic: req.dispatchSynthetic });
   const dragHandler = (req) => cursor.virtualDrag(req.fromSelector || req.from, req.toSelector || req.to, req.steps);
   const scrollHandler = (req) => cursor.virtualScroll(req.deltaX, req.deltaY);

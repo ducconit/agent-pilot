@@ -74,6 +74,14 @@ export async function run({ page, sidepanelPage, tabInfo, record }) {
   });
 
   // Test real Delegated Clipboard write in content script via chrome.tabs.sendMessage
+  // Clipboard writes are permission gated and the test invokes the content
+  // handler asynchronously (without a user gesture). Grant the secure test
+  // origin permission explicitly so CI scheduling/focus does not decide the
+  // result of an otherwise valid PNG write.
+  const pageOrigin = new URL(page.url()).origin;
+  await page.browserContext().overridePermissions(pageOrigin, ["clipboard-read", "clipboard-write"]);
+  await page.bringToFront();
+  await page.waitForFunction(() => document.hasFocus());
   const delegatedCopyTest = await sidepanelPage.evaluate(async (targetTabId, sampleDataUrl) => {
     return new Promise((resolve) => {
       chrome.tabs.sendMessage(targetTabId, {
@@ -115,6 +123,6 @@ export async function run({ page, sidepanelPage, tabInfo, record }) {
     fs.writeFileSync(outPath, buf);
     record("14. Screenshot Suite (Capture, Region Crop, Element Snap, Delegated Clipboard & Auto-Copy)", true, `Kích thước: ${buf.length} bytes, Crop: true, Snap Auto-Off: ${elementSnapTest.autoTurnOff}, Clipboard: ${delegatedCopyTest.success}, Auto-Copy: ${autoCopyToggleTest.canToggle}`);
   } else {
-    record("14. Screenshot Suite (Capture, Region Crop, Element Snap, Delegated Clipboard & Auto-Copy)", false, shotRes?.error || regionCropTest?.error || `Crop: ${regionCropTest?.validDimensions}, Snap: ${elementSnapTest?.autoTurnOff}, Clipboard: ${delegatedCopyTest?.success}, Auto-Copy: ${autoCopyToggleTest?.canToggle}`);
+    record("14. Screenshot Suite (Capture, Region Crop, Element Snap, Delegated Clipboard & Auto-Copy)", false, shotRes?.error || regionCropTest?.error || `Crop: ${regionCropTest?.validDimensions}, Snap: ${elementSnapTest?.autoTurnOff}, Clipboard: ${delegatedCopyTest?.success} (${delegatedCopyTest?.error || "no error detail"}), Auto-Copy: ${autoCopyToggleTest?.canToggle}`);
   }
 }

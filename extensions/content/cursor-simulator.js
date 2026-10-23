@@ -27,6 +27,7 @@
   let currentMouseY = 100;
   let cursorHideTimeout = null;
   let isSessionActive = false;
+  let virtualTypeQueue = Promise.resolve();
 
   // Create Cursor Layer
   const cursorLayer = document.createElement("div");
@@ -343,7 +344,7 @@
   /**
    * Trigger click animation & dispatch synthetic events on DOM element
    */
-  async function virtualClick(x, y, selector = null, fallbackHints = null) {
+  async function virtualClick(x, y, selector = null, fallbackHints = null, clickCount = 1) {
     let el = null;
     if (selector || fallbackHints) {
       el = resolveElement(selector, { ...fallbackHints, action: "click" });
@@ -401,19 +402,35 @@
         clientY: y,
         screenX: x + window.screenX,
         screenY: y + window.screenY,
-        button: 0
+        button: 0,
+        buttons: 1
       };
 
       try {
         setDispatching(true);
-        el.dispatchEvent(new PointerEvent("pointerdown", eventInit));
-        el.dispatchEvent(new MouseEvent("mousedown", eventInit));
-        el.dispatchEvent(new PointerEvent("pointerup", eventInit));
-        el.dispatchEvent(new MouseEvent("mouseup", eventInit));
-        if (typeof el.click === "function") {
-          el.click();
+        const clickCycles = Number(clickCount) === 2 ? 2 : 1;
+        if (clickCycles === 1) {
+          el.dispatchEvent(new PointerEvent("pointerdown", eventInit));
+          el.dispatchEvent(new MouseEvent("mousedown", eventInit));
+          el.dispatchEvent(new PointerEvent("pointerup", { ...eventInit, buttons: 0 }));
+          el.dispatchEvent(new MouseEvent("mouseup", { ...eventInit, buttons: 0 }));
+          // Preserve the established click() activation path for all existing callers.
+          if (typeof el.click === "function") {
+            el.click();
+          } else {
+            el.dispatchEvent(new MouseEvent("click", { ...eventInit, buttons: 0 }));
+          }
         } else {
-          el.dispatchEvent(new MouseEvent("click", eventInit));
+          for (let index = 0; index < clickCycles; index++) {
+            const detail = index + 1;
+            const cycleEventInit = { ...eventInit, detail };
+            el.dispatchEvent(new PointerEvent("pointerdown", cycleEventInit));
+            el.dispatchEvent(new MouseEvent("mousedown", cycleEventInit));
+            el.dispatchEvent(new PointerEvent("pointerup", { ...cycleEventInit, buttons: 0 }));
+            el.dispatchEvent(new MouseEvent("mouseup", { ...cycleEventInit, buttons: 0 }));
+            el.dispatchEvent(new MouseEvent("click", { ...cycleEventInit, buttons: 0 }));
+          }
+          el.dispatchEvent(new MouseEvent("dblclick", { ...eventInit, detail: 2, buttons: 0 }));
         }
       } finally {
         setDispatching(false);
@@ -436,7 +453,16 @@
   /**
    * Virtual Type text into an element with human-like typing
    */
-  async function virtualType(selector, text, clear = false, pressEnter = false, fallbackHints = null) {
+  function virtualType(selector, text, clear = false, pressEnter = false, fallbackHints = null) {
+    // Main-world calls and extension commands can reach this content script at
+    // the same time. Concurrent character loops on one input interleave writes
+    // and produce corrupted text, so serialize typing operations per document.
+    const operation = virtualTypeQueue.then(() => performVirtualType(selector, text, clear, pressEnter, fallbackHints));
+    virtualTypeQueue = operation.catch(() => {});
+    return operation;
+  }
+
+  async function performVirtualType(selector, text, clear = false, pressEnter = false, fallbackHints = null) {
     activateCursor();
     let el = null;
     if (selector || fallbackHints) {
@@ -641,6 +667,7 @@
         left: deltaX,
         behavior: document.hidden ? "auto" : "smooth"
       });
+      window.__AP_INTERNAL__.inspector?.recordViewportScroll?.();
     } finally {
       setDispatching(false);
     }
@@ -697,6 +724,76 @@
         }
       }
       return { success: true, key: actualKey, modifiers: { ctrlKey, shiftKey, altKey, metaKey } };
+    } finally {
+      setDispatching(false);
+    }
+  }
+
+  /**
+   * Dispatch one Recorder keyboard event. Unlike dispatchKey, this does not
+   * synthesize the rest of the key lifecycle or submit forms.
+   */
+  function dispatchKeyEvent(key = "Enter", code = null, keyCode = null, selector = null, eventType = "keyDown", modifiers = null) {
+    const normalizedType = eventType === "keyDown" ? "keydown" : eventType === "keyUp" ? "keyup" : null;
+    if (!normalizedType) {
+      return { success: false, error: `Unsupported keyboard eventType: ${eventType}` };
+    }
+
+    let target = selector ? resolveElement(selector) : null;
+    if (selector && !target) {
+      return { success: false, error: `Element not found for selector: ${selector}` };
+    }
+    if (!target) {
+      target = document.activeElement && document.activeElement !== document.body ? document.activeElement : document.body;
+    }
+
+    let ctrlKey = false, shiftKey = false, altKey = false, metaKey = false;
+    let actualKey = key;
+    if (typeof key === "string" && key.includes("+")) {
+      const parts = key.split("+");
+      actualKey = parts.pop().trim();
+      for (const part of parts) {
+        const modifier = part.trim().toLowerCase();
+        if (modifier === "control" || modifier === "ctrl") ctrlKey = true;
+        else if (modifier === "shift") shiftKey = true;
+        else if (modifier === "alt") altKey = true;
+        else if (modifier === "meta" || modifier === "cmd" || modifier === "command") metaKey = true;
+      }
+    }
+
+    if (typeof modifiers === "number") {
+      ctrlKey = ctrlKey || Boolean(modifiers & 2);
+      altKey = altKey || Boolean(modifiers & 1);
+      metaKey = metaKey || Boolean(modifiers & 4);
+      shiftKey = shiftKey || Boolean(modifiers & 8);
+    } else if (modifiers && typeof modifiers === "object") {
+      ctrlKey = ctrlKey || Boolean(modifiers.ctrlKey || modifiers.control);
+      shiftKey = shiftKey || Boolean(modifiers.shiftKey || modifiers.shift);
+      altKey = altKey || Boolean(modifiers.altKey || modifiers.alt);
+      metaKey = metaKey || Boolean(modifiers.metaKey || modifiers.meta);
+    }
+
+    const keyCodeMap = { Enter: 13, Escape: 27, Tab: 9, Backspace: 8, ArrowDown: 40, ArrowUp: 38, ArrowLeft: 37, ArrowRight: 39, Space: 32 };
+    const finalCode = code || (actualKey.length === 1 ? `Key${actualKey.toUpperCase()}` : actualKey);
+    const finalKeyCode = keyCode || keyCodeMap[actualKey] || (actualKey.length === 1 ? actualKey.toUpperCase().charCodeAt(0) : 0);
+    const eventInit = {
+      key: actualKey,
+      code: finalCode,
+      keyCode: finalKeyCode,
+      which: finalKeyCode,
+      ctrlKey,
+      shiftKey,
+      altKey,
+      metaKey,
+      bubbles: true,
+      cancelable: true
+    };
+
+    try {
+      setDispatching(true);
+      const event = new KeyboardEvent(normalizedType, eventInit);
+      target.dispatchEvent(event);
+      return { success: true, eventType, key: actualKey, modifiers: { ctrlKey, shiftKey, altKey, metaKey } };
     } finally {
       setDispatching(false);
     }
@@ -873,6 +970,7 @@
     virtualDrag,
     waitFor,
     dispatchKey,
+    dispatchKeyEvent,
     resolveElement,
     activateCursor,
     hideCursor,

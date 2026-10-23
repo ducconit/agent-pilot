@@ -13,8 +13,8 @@ import path from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
 
 import { resolveChromiumBin } from "./browser_resolver.mjs";
-import { BRIDGE_PORT, HTTP_PORT, ROOT_DIR, TIMEOUTS, SEPARATOR } from "./lib/config.mjs";
-import { createRecorder, startStaticServer, launchExtensionBrowser } from "./lib/harness.mjs";
+import { BRIDGE_PORT, ROOT_DIR, TIMEOUTS, SEPARATOR } from "./lib/config.mjs";
+import { createRecorder, startStaticServer, closeHttpServer, launchExtensionBrowser } from "./lib/harness.mjs";
 
 import * as agentCdp from "./features/agent-cdp.mjs";
 import * as agentBackground from "./features/agent-background.mjs";
@@ -193,8 +193,9 @@ async function run() {
     });
   }
 
-  const httpServer = await startStaticServer(HTTP_PORT, ROOT_DIR);
-  console.log(`[Test Server] Listening on http://127.0.0.1:${HTTP_PORT}`);
+  const httpServer = await startStaticServer(0, ROOT_DIR);
+  const httpPort = httpServer.address().port;
+  console.log(`[Test Server] Listening on http://127.0.0.1:${httpPort}`);
   let browser = null;
   let closeBrowser = null;
 
@@ -220,7 +221,7 @@ async function run() {
     record("2. Agent Ping/Pong Heartbeat", pingRes?.pong === true, `Latency: ${Date.now() - pingRes?.timestamp}ms, Version: ${pingRes?.version}`);
 
     // 3. Test Agent Command: tabs.create (Open Test Page in background without focus)
-    const newTab = await sendAgentCommand("tabs.create", { url: `http://127.0.0.1:${HTTP_PORT}/test-page.html` });
+    const newTab = await sendAgentCommand("tabs.create", { url: `http://127.0.0.1:${httpPort}/test-page.html` });
     const isBgByDefault = newTab?.active === false;
     record("3. Agent Command: tabs.create (Background by default)", !!newTab?.id && isBgByDefault, `Created Tab ID: ${newTab?.id}, active: ${newTab?.active} (No focus stealing)`);
     // Find testPage and wait for content script injection
@@ -294,7 +295,7 @@ async function run() {
     record("7. Lock Persistence Across Action", lockSurvivesAction, `Lock maintained after moveMouse (150ms timeout did not destroy explicit lock)`);
 
     // 8. Test: Lock Persistence Across Navigation (Finding 2)
-    await sendAgentCommand("tabs.update", { tabId, url: `http://127.0.0.1:${HTTP_PORT}/test-page.html?reloaded=1` });
+    await sendAgentCommand("tabs.update", { tabId, url: `http://127.0.0.1:${httpPort}/test-page.html?reloaded=1` });
     await new Promise(r => setTimeout(r, 600));
     let lockSurvivesNav = false;
     if (testPage) {
@@ -389,7 +390,7 @@ async function run() {
       record,
       sendAgentCommand,
       bridgePort: BRIDGE_PORT,
-      httpPort: HTTP_PORT,
+      httpPort,
       getSelectedInstanceId: () => selectedTestInstanceId
     };
 
@@ -425,9 +426,9 @@ async function run() {
     // Cleanup in `finally` (exitCode, never process.exit) guarantees the browser,
     // bridge and page server are always released even when an assertion throws.
     if (closeBrowser) await closeBrowser();
-    if (wss) wss.close();
-    if (bridgeServer) bridgeServer.close();
-    if (httpServer) httpServer.close();
+    if (wss) await new Promise((resolve) => wss.close(resolve));
+    if (bridgeServer) await closeHttpServer(bridgeServer);
+    if (httpServer) await closeHttpServer(httpServer);
   }
 }
 

@@ -2,7 +2,7 @@
 
 Use the MCP interface for conversational agents and IDEs. The MCP server runs over stdio (`agent-pilot mcp`) while the Go bridge and Chrome extension remain shared local services.
 
-The generated schemas in `mcp/agent-pilot/` are authoritative. This repository currently exports 58 schema files; clients that show an older count or omit newer actions are using a stale provider cache. `browser_run_actions.actions` is an array of action objects (`{"type":"click",...}`), not an array of strings.
+The generated schemas in `mcp/agent-pilot/` are authoritative. This repository currently exports 67 schema files; clients that show an older count or omit newer actions are using a stale provider cache. `browser_run_actions.actions` is an array of action objects (`{"type":"click",...}`), not an array of strings.
 
 Before testing, query `http://127.0.0.1:<port>/health` and confirm the MCP/bridge port plus `clients[].instanceId`, `clients[].bridgePort`, `clients[].extensionVersion`, and `clients[].extensionBuildId`. If the MCP connector reports a different port or build than `/health`, it is stale or attached to another bridge; select the port explicitly with `agent-pilot mcp --bridge-port <port>` and refresh the connector schema. Every MCP response includes compact `_meta` provenance (`bridgePort`, bridge version, instance, extension version/build when available).
 
@@ -55,6 +55,7 @@ For a compact DevTools batch, use action objects:
 | Trace / Web Vitals / heap | `browser_performance_trace`, `browser_performance_metrics`, `browser_heap_capability`, `browser_take_heapsnapshot`, `browser_analyze_heapsnapshot` |
 | Advanced DevTools | `browser_lighthouse_audit`, `browser_lighthouse_analyze_audit`, `browser_performance_analyze_insight`, `browser_accessibility_snapshot`, `browser_service_workers` |
 | Extension lifecycle | `browser_manage_extensions` |
+| Chrome Recorder flow | `browser_recorder_start/stop/state/replay/measure/export/import/edit/clear` |
 
 ## Token-efficient observation
 
@@ -87,6 +88,7 @@ Prefer `browser_snapshot` with a bounded `maxElements` and `waitForSelector` ove
 - Lighthouse uses a bounded runtime budget and resets the private DevTools process after a timeout; a timed-out audit should be retried once only after inspecting the returned error. `browser_accessibility_snapshot` uses a separate path and remains callable after audit recovery.
 - Extension-backed snapshot/screenshot and batch capture on `data:` URLs return `DATA_URL_UNSUPPORTED`: Chrome does not inject the Agent Pilot content receiver into a `data:` document. Use HTTP/localhost for those operations; the isolated DevTools runtime can inspect `data:` URLs through CDP.
 - Native MP4 screencast, PWA install/launch/uninstall, WebMCP and third-party developer-tool discovery/execution are exposed in both MCP and CLI. Availability of PWA/WebMCP remains dependent on the Chrome build/page APIs.
+- Chrome Recorder flows are exposed in both MCP and CLI. The extension records navigation, clicks, input changes, Enter keys and settled viewport scroll positions. Import/export preserves the JSON fields; unsupported iframe/target, viewport and advanced assertion steps fail explicitly on replay. Use `browser_recorder_measure` with a positive Chrome tab ID for trace → replay → trace stop in one call; it returns compact trace data by default and accepts `includeEvents: true` for raw event summaries.
 
 ## Extension manager actions
 
@@ -115,3 +117,7 @@ npm run build:cli
 ```
 
 See [setup.md](setup.md) for client-specific configuration and [architecture-and-server.md](architecture-and-server.md) for bridge, REST, and concurrency details.
+
+For the complete decision table covering CLI/MCP, positive extension tabs,
+negative isolated tabs, page-provided tools, capability errors, and token-safe
+defaults, read [tool-routing.md](tool-routing.md).

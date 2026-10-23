@@ -1,0 +1,22 @@
+{
+  "description": "Export the current flow as Chrome Recorder JSON plus Agent Pilot batch and Playwright formats.",
+  "inputSchema": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_recorder_export",
+  "parameters": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

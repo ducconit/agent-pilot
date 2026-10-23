@@ -133,7 +133,9 @@ export function initCdpEventListeners(broadcastFn) {
         url: params.request.url,
         method: params.request.method,
         requestHeaders: params.request.headers,
-        postData: params.request.postData,
+        // Request bodies are fetched on demand by network.getRequestDetail.
+        // Retaining/broadcasting them here duplicates potentially large uploads
+        // in the MV3 buffer and every DevTools event payload.
         hasUserGesture: params.request.hasUserGesture,
         initiator: params.initiator,
         type: params.type || "Other",

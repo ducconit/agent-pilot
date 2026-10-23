@@ -177,16 +177,37 @@ var mcpToolBridgeMap = map[string]string{
 	"browser_performance_trace":           "performance.trace",
 	"browser_performance_metrics":         "performance.metrics",
 	"browser_manage_extensions":           "extensions.manage",
+	"browser_recorder_start":              "flow.record",
+	"browser_recorder_stop":               "flow.record",
+	"browser_recorder_state":              "flow.state",
+	"browser_recorder_replay":             "flow.replay",
+	"browser_recorder_export":             "flow.export",
+	"browser_recorder_import":             "flow.import",
+	"browser_recorder_edit":               "flow.edit",
+	"browser_recorder_clear":              "flow.clear",
 }
 
 func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool) {
 	args := prepareSessionArgs(rawArgs)
 	port := BridgePort()
+	if name == "browser_recorder_measure" {
+		if !bridge.ValidRecorderMeasureTabID(args["tabId"]) {
+			return `Error: browser_recorder_measure requires a positive integer tabId`, true
+		}
+		measureResult, measureErr := bridge.RunRecorderMeasure(args["tabId"], args, port, bridge.DispatchCommand)
+		return formatRecorderMeasureResult(measureResult, measureErr)
+	}
 	if name == "browser_screencast_start" {
 		args["action"] = "start"
 	}
 	if name == "browser_screencast_stop" {
 		args["action"] = "stop"
+	}
+	if name == "browser_recorder_start" {
+		args["enabled"] = true
+	}
+	if name == "browser_recorder_stop" {
+		args["enabled"] = false
 	}
 
 	if bridgeMethod, ok := mcpToolBridgeMap[name]; ok {
@@ -199,6 +220,9 @@ func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool)
 			}
 		}
 		res, err := bridge.DispatchCommand(bridgeMethod, args, port)
+		if strings.HasPrefix(name, "browser_recorder_") {
+			return formatRecorderToolResult(res, err)
+		}
 		return formatToolResult(res, err)
 	}
 
@@ -307,6 +331,29 @@ func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool)
 	default:
 		return fmt.Sprintf("Unknown tool: %s", name), true
 	}
+}
+
+func formatRecorderMeasureResult(result map[string]interface{}, err error) (string, bool) {
+	encoded, marshalErr := json.MarshalIndent(result, "", "  ")
+	if marshalErr != nil {
+		return fmt.Sprintf("Error: could not encode recorder measure result: %v", marshalErr), true
+	}
+	success, hasSuccess := result["success"].(bool)
+	return string(encoded), err != nil || !hasSuccess || !success
+}
+
+func formatRecorderToolResult(result interface{}, err error) (string, bool) {
+	if err != nil {
+		return formatToolResult(result, err)
+	}
+	if bridge.RecorderResultFailure(result) == nil {
+		return formatToolResult(result, nil)
+	}
+	encoded, marshalErr := json.MarshalIndent(result, "", "  ")
+	if marshalErr != nil {
+		return fmt.Sprintf("Error: could not encode recorder result: %v", marshalErr), true
+	}
+	return string(encoded), true
 }
 
 func formatToolResult(res interface{}, err error) (string, bool) {

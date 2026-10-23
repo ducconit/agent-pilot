@@ -42,7 +42,7 @@
 
   const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
     ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
-    : "1.0.10-beta";
+    : "1.0.11-beta";
 
   window.__AGENT_PILOT__ = window.__AGENT_PILOT__ || {};
   const pageApi = {
@@ -50,7 +50,7 @@
     moveMouse: (x, y, duration) => sendBridgeRequest("virtual_mouse_move", { x, y, duration }),
     click: (x, y) => sendBridgeRequest("virtual_mouse_click", { x, y }),
     animateClick: (x, y, selector) => sendBridgeRequest("animate_cursor_click", { x, y, selector }),
-    type: (selector, text) => sendBridgeRequest("virtual_type", { selector, text }),
+    type: (selector, text, clear = false) => sendBridgeRequest("virtual_type", { selector, text, clear }),
     scroll: (deltaX, deltaY) => sendBridgeRequest("virtual_scroll", { deltaX, deltaY }),
     hover: (selector) => sendBridgeRequest("virtual_hover", { selector }),
     drag: (from, to, steps) => sendBridgeRequest("virtual_drag", { from, to, steps }),

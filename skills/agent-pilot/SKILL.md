@@ -12,6 +12,11 @@ Agent Pilot is a browser automation bridge backed by a Chrome MV3 extension. It 
 
 Load only the interface reference needed for the current task. The detailed command reference remains available at [cli-usage.md](references/cli-usage.md); setup and bridge internals are in [setup.md](references/setup.md) and [architecture-and-server.md](references/architecture-and-server.md).
 
+Use [tool-routing.md](references/tool-routing.md) when the task could use more
+than one interface or execution path. It maps each capability to CLI/MCP,
+extension relay/isolated DevTools, required tab IDs, and known capability
+boundaries.
+
 ## Default interface recommendation
 
 **Prefer the standalone CLI by default.** It produces substantially smaller
@@ -48,6 +53,21 @@ removes the tab before `screenshot` executes.
 4. Use extension `reload` to reload an unpacked extension. Do not disable/enable it as a reload workaround because that can drop the bridge connection.
 5. Synthetic DOM input is the default. Use CDP only for trusted input, cross-origin iframes, canvas/WebGL, background screenshots, tracing, metrics, heap, and other CDP-only operations.
 
+## Fast routing decision
+
+1. Check `/health` on the exact bridge port and verify the instance, extension
+version, and build ID before browser work.
+2. Use CLI `batch` for a known sequence, or individual CLI commands with
+`--format json` for exploratory work. Use MCP when the host cannot run the
+binary or needs MCP schemas and tool lifecycle.
+3. Use a positive Chrome tab ID for extension-backed tabs. Use a negative tab ID
+or `contextId` for an isolated DevTools context. Never treat these IDs as
+interchangeable.
+4. Use the extension relay for ordinary DOM work and Recorder. Use isolated
+DevTools for Lighthouse, AX, MP4, PWA, WebMCP, third-party page tools, and
+real heap files. Read [tool-routing.md](references/tool-routing.md) before an
+advanced operation.
+
 ## Token-efficient default
 
 Prefer one CLI batch over a chain of individual calls:
@@ -80,6 +100,7 @@ If an MCP client reports an old tool list, old version, or a different port, tre
 - Batch `actions` are objects, not strings. For example: `{"actions":[{"type":"performance_metrics"},{"type":"performance_trace","action":"start"},{"type":"performance_trace","action":"stop"}]}`. A `heap_snapshot` action is exposed consistently, but ordinary extension-debugger tabs may return `HEAPPROFILER_UNAVAILABLE`.
 - Extension page snapshot/screenshot and batch capture on `data:` URLs fail early with `DATA_URL_UNSUPPORTED`: Chrome does not inject Agent Pilot's content receiver into a `data:` document. Use an HTTP/localhost page for extension-backed DOM capture, or an isolated DevTools context for CDP/AX/CSS/video/heap operations; the private Puppeteer path can inspect `data:` URLs.
 - Native MP4 screencast, PWA install/launch/uninstall, WebMCP, and page developer-tool discovery are available from both MCP and the CLI. The CLI aliases are `devtools video-start/video-stop`, `pwa-probe/pwa-state/pwa-install/pwa-launch/pwa-uninstall`, `webmcp-list/webmcp-execute`, and `3p-list/3p-execute`; pass MCP-shaped JSON through `--params`.
+- Chrome Recorder flows are available from both interfaces: CLI `recorder start|stop|state|replay|measure|export|import|edit|clear` and MCP `browser_recorder_start|stop|state|replay|measure|export|import|edit|clear`. Prefer CLI for long recordings and save the exported JSON. Replay is limited to supported main-frame steps; imported iframe/viewport/advanced assertion steps are preserved in JSON and rejected explicitly during replay. `measure` requires a positive Chrome tab ID, combines replay with a trace, and returns a compact trace by default.
 
 ## References
 

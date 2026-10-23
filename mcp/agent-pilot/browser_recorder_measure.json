@@ -1,0 +1,52 @@
+{
+  "description": "Measure a recorded flow by starting a complete Chrome trace, replaying the flow, and stopping the trace. Returns replay results and compact trace insights; set includeEvents to include the larger raw event summary.",
+  "inputSchema": {
+    "properties": {
+      "includeEvents": {
+        "description": "Include raw trace event summaries in the response; default false",
+        "type": "boolean"
+      },
+      "steps": {
+        "description": "Optional Recorder-compatible steps",
+        "items": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "tabId": {
+        "description": "Positive Chrome tab ID; required so trace and replay stay on the same tab. Negative isolated-context IDs are unsupported because replay may replace tabs that Chrome tabs.get cannot resolve.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tabId"
+    ],
+    "type": "object"
+  },
+  "name": "browser_recorder_measure",
+  "parameters": {
+    "properties": {
+      "includeEvents": {
+        "description": "Include raw trace event summaries in the response; default false",
+        "type": "boolean"
+      },
+      "steps": {
+        "description": "Optional Recorder-compatible steps",
+        "items": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "tabId": {
+        "description": "Positive Chrome tab ID; required so trace and replay stay on the same tab. Negative isolated-context IDs are unsupported because replay may replace tabs that Chrome tabs.get cannot resolve.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tabId"
+    ],
+    "type": "object"
+  }
+}

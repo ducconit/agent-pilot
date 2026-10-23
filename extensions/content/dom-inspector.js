@@ -848,6 +848,7 @@
     const prev = reproSteps[reproSteps.length - 1];
     if (
       prev &&
+      stepPayload.action !== "scroll" &&
       prev.action === stepPayload.action &&
       prev.selector === stepPayload.selector &&
       ((stepPayload.action === "type" || stepPayload.action === "select") ||
@@ -894,6 +895,42 @@
       handleFieldValueEvent({ type: "change", target, isTrusted: true });
     }
   }
+
+  let flowScrollTimer = null;
+  let lastRecordedViewportScroll = {
+    x: Math.round(window.scrollX || 0),
+    y: Math.round(window.scrollY || 0)
+  };
+
+  function scheduleViewportScrollRecording() {
+    if (isOverlayModeBusy()) return;
+    if (flowScrollTimer) clearTimeout(flowScrollTimer);
+    flowScrollTimer = setTimeout(() => {
+      flowScrollTimer = null;
+      if (isOverlayModeBusy()) return;
+      const position = {
+        x: Math.round(window.scrollX || 0),
+        y: Math.round(window.scrollY || 0)
+      };
+      if (position.x === lastRecordedViewportScroll.x && position.y === lastRecordedViewportScroll.y) return;
+      lastRecordedViewportScroll = position;
+      recordReproStep({
+        action: "scroll",
+        ...position,
+        description: `Scroll tới ${position.x},${position.y}`
+      });
+    }, 350);
+  }
+
+  document.addEventListener("scroll", (event) => {
+    const scrollTarget = event.target;
+    const isDocumentScroll = scrollTarget === document ||
+      scrollTarget === document.documentElement ||
+      scrollTarget === document.body ||
+      scrollTarget === document.scrollingElement;
+    if (!isDocumentScroll) return;
+    scheduleViewportScrollRecording();
+  }, true);
 
   document.addEventListener("click", (e) => {
     try {
@@ -1167,6 +1204,7 @@
     stopElementSnap,
     isElementSnapActive: () => isElementSnapActive,
     getReproSteps,
+    recordViewportScroll: scheduleViewportScrollRecording,
     clearReproSteps,
     exportReproBatchJson,
     queryPageDiagnostics

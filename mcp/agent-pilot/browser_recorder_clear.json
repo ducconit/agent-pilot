@@ -1,0 +1,22 @@
+{
+  "description": "Clear the stored flow steps for a tab.",
+  "inputSchema": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_recorder_clear",
+  "parameters": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

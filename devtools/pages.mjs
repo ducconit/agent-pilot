@@ -230,16 +230,34 @@ export async function pageCommand(tab, method, p) {
     case "devtools.getData": return { tabId: tab.tabId, console: tab.console.slice(-(p.limit || 100)), network: [...tab.requests.values()].slice(-(p.limit || 100)) };
     case "performance.metrics": await client.send("Performance.enable"); return { metrics: Object.fromEntries((await client.send("Performance.getMetrics")).metrics.map(m => [m.name, m.value])) };
     case "memory.collectGarbage": await client.send("HeapProfiler.collectGarbage"); break;
-    case "memory.heapCapability": return {
-      supported: true,
-      target: "isolated-devtools",
-      snapshot: true,
-      baseline: true,
-      diff: true,
-      collectGarbage: true,
-      requiresFilePath: true,
-      message: "Heap snapshot, baseline and diff use the isolated DevTools HeapProfiler and save real .heapsnapshot files."
-    };
+    case "memory.heapCapability": {
+      try {
+        // Probe the actual target. A managed context can still be backed by a
+        // Chromium build/target that omits HeapProfiler methods.
+        await client.send("HeapProfiler.enable");
+        return {
+          supported: true,
+          target: "isolated-devtools",
+          snapshot: true,
+          baseline: true,
+          diff: true,
+          collectGarbage: true,
+          requiresFilePath: true,
+          message: "HeapProfiler is available on this isolated DevTools target; snapshots are saved as real .heapsnapshot files."
+        };
+      } catch (error) {
+        return {
+          supported: false,
+          target: "isolated-devtools",
+          snapshot: false,
+          baseline: false,
+          diff: false,
+          collectGarbage: false,
+          code: "HEAPPROFILER_UNAVAILABLE",
+          message: `This isolated DevTools target does not expose HeapProfiler: ${error.message}`
+        };
+      }
+    }
     case "memory.heapSnapshot": {
       if (Number(tab.tabId) >= 0) {
         throw new Error("HEAPPROFILER_UNAVAILABLE: real .heapsnapshot files require an isolated DevTools context and a negative tabId");
@@ -252,7 +270,16 @@ export async function pageCommand(tab, method, p) {
       client.on("HeapProfiler.addHeapSnapshotChunk", listener);
       let garbageCollected = false;
       let garbageCollectionWarning;
+      let snapshotComplete = false;
       try {
+        try { await client.send("HeapProfiler.enable"); }
+        catch (error) {
+          const message = String(error?.message || error);
+          if (/-32601|unknown method|method not found|not found|not supported|unsupported/i.test(message) && !/timed out|timeout|deadline exceeded/i.test(message)) {
+            throw new Error("HEAPPROFILER_UNAVAILABLE: HeapProfiler.enable is not supported by this DevTools target");
+          }
+          throw error;
+        }
         if (p.collectGarbage !== false) {
           try { await client.send("HeapProfiler.collectGarbage"); garbageCollected = true; }
           catch (error) {
@@ -270,8 +297,13 @@ export async function pageCommand(tab, method, p) {
           throw error;
         }
         await writes;
+        snapshotComplete = true;
       }
-      finally { client.off("HeapProfiler.addHeapSnapshotChunk", listener); await file.close(); }
+      finally {
+        client.off("HeapProfiler.addHeapSnapshotChunk", listener);
+        await file.close();
+        if (!snapshotComplete) await fs.unlink(filePath).catch(() => {});
+      }
       const baselineKey = `${tab.contextId}:${tab.tabId}`;
       const previousBaseline = isolatedHeapBaselines.get(baselineKey) || null;
       const wantsDiff = ["diff", "check_leak", "leak"].includes(action) || Boolean(p.compareWithBaseline);

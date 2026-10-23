@@ -47,7 +47,8 @@ async function tool(name, args = {}) {
 }
 try {
   await rpc("initialize", { protocolVersion: "2024-11-05", clientInfo: { name: "packaged-test", version: "1" }, capabilities: {} });
-	const list = await rpc("tools/list"); assert.equal(list.tools.length, 58);
+  const expectedSchemaCount = (await fs.readdir(path.join(ROOT_DIR, "mcp", "agent-pilot"))).filter(name => name.endsWith(".json")).length;
+  const list = await rpc("tools/list"); assert.equal(list.tools.length, expectedSchemaCount);
   const status = await tool("browser_devtools_status");
   assert(status.embedded); assert.equal(status.systemNodeRequired, false); assert.equal(status.ffmpegRequired, false);
   console.log("PASS packaged MCP starts its embedded runtime with Node/npm absent from PATH");

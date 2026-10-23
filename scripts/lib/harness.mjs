@@ -102,7 +102,7 @@ export function createRecorder({
  * their real content type from STATIC_CONTENT_TYPES.
  */
 export function startStaticServer(port, rootDir = ROOT_DIR) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       const sanitizedUrl = path
         .normalize(req.url === "/" ? "/test-page.html" : req.url.split("?")[0])
@@ -115,7 +115,23 @@ export function startStaticServer(port, rootDir = ROOT_DIR) {
       res.writeHead(200, { "Content-Type": STATIC_CONTENT_TYPES[ext] || "text/plain" });
       res.end(fs.readFileSync(filePath));
     });
-    server.listen(port, LOCAL_HOST, () => resolve(server));
+    const onError = (error) => reject(error);
+    server.once("error", onError);
+    server.listen(port, LOCAL_HOST, () => {
+      server.removeListener("error", onError);
+      resolve(server);
+    });
+  });
+}
+
+/** Close a Node HTTP server and wait until its listening socket is released. */
+export function closeHttpServer(server) {
+  if (!server || !server.listening) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve());
+    // Closing idle keep-alive sockets prevents a test browser from delaying the
+    // close callback after its page has already been torn down.
+    server.closeAllConnections?.();
   });
 }
 

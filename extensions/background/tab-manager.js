@@ -200,6 +200,9 @@ export async function getTargetTabId(requestedTabId, lastAgentTabId = null, opti
         logDebug(`[Security] Target tab ${numId} denied: not in Agent Pilot group`);
         throw new Error(`Access denied: Tab ${numId} does not belong to the Agent Pilot tab group ('${AGENT_GROUP_TITLE}'). Operations on other tabs or groups are prohibited.`);
       }
+      if (!isTabAllowedForAgent(tab.id, options)) {
+        throw new Error(`Access denied: Tab ${numId} is owned by another agent session.`);
+      }
       return tab.id;
     } catch (err) {
       if (err && err.message && err.message.startsWith("Access denied")) {

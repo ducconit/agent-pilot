@@ -8,10 +8,11 @@
  */
 
 import { resolveChromiumBin } from "./browser_resolver.mjs";
-import { HTTP_PORT, ROOT_DIR, NAV_WAIT_UNTIL, TIMEOUTS, SEPARATOR } from "./lib/config.mjs";
+import { ROOT_DIR, NAV_WAIT_UNTIL, TIMEOUTS, SEPARATOR } from "./lib/config.mjs";
 import {
   createRecorder,
   startStaticServer,
+  closeHttpServer,
   launchExtensionBrowser,
   waitForServiceWorker,
   extensionIdFromTarget
@@ -29,8 +30,9 @@ async function run() {
   console.log("🧪 BẮT ĐẦU XÁC THỰC TOÀN BỘ CÁC CHỨC NĂNG CỦA AGENT PILOT EXTENSION");
   console.log(`${SEPARATOR}\n`);
 
-  const server = await startStaticServer(HTTP_PORT, ROOT_DIR);
-  console.log(`[HTTP Server] Listening on http://127.0.0.1:${HTTP_PORT}`);
+  const server = await startStaticServer(0, ROOT_DIR);
+  const httpPort = server.address().port;
+  console.log(`[HTTP Server] Listening on http://127.0.0.1:${httpPort}`);
 
   const recorder = createRecorder({
     title: "📊 BẢNG TỔNG KẾT KẾT QUẢ KIỂM THỬ HOẠT ĐỘNG THỰC TẾ:",
@@ -60,10 +62,10 @@ async function run() {
     const sw = await swTarget.worker();
 
     const page = await launched.browser.newPage();
-    await page.goto(`http://127.0.0.1:${HTTP_PORT}/test-page.html`, { waitUntil: NAV_WAIT_UNTIL });
+    await page.goto(`http://127.0.0.1:${httpPort}/test-page.html`, { waitUntil: NAV_WAIT_UNTIL });
 
     // Shared context threaded through the feature sections (page, worker, recorder…).
-    const ctx = { browser: launched.browser, sw, page, extId, recorder, record, httpPort: HTTP_PORT };
+    const ctx = { browser: launched.browser, sw, page, extId, recorder, record, httpPort };
 
     await basicInput.run(ctx);
     await inspector.run(ctx);
@@ -85,7 +87,7 @@ async function run() {
     // Cleanup lives in `finally` and sets process.exitCode (never process.exit) so
     // the browser and server are always torn down, even after a failed assertion.
     if (closeBrowser) await closeBrowser();
-    server.close();
+    await closeHttpServer(server);
   }
 }
 

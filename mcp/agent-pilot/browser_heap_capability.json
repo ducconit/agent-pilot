@@ -1,5 +1,5 @@
 {
-  "description": "Probe real heap support before taking a snapshot. Ordinary extension-debugger tabs return supported=false with HEAPPROFILER_UNAVAILABLE; isolated DevTools context tabs support snapshot, baseline and diff when a filePath is provided.",
+  "description": "Probe the target's actual HeapProfiler support before taking a snapshot. Ordinary extension-debugger tabs return supported=false with HEAPPROFILER_UNAVAILABLE; isolated DevTools tabs are probed against Chrome and support snapshot, baseline and diff only when the protocol is available.",
   "inputSchema": {
     "properties": {
       "contextId": {

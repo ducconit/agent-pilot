@@ -40,12 +40,26 @@ export async function run({ page, record }) {
   record("4. Virtual Mouse Click & Synthetic DOM Events", clickOk, clickRes);
 
   // 5. Human-like typing into an input
+  const concurrentTypeRes = await page.evaluate(async () => {
+    const first = window.__AGENT_PILOT__.type("#test-search-input", "First concurrent value", true);
+    const second = window.__AGENT_PILOT__.type("#test-search-input", "Second concurrent value", true);
+    const results = await Promise.all([first, second]);
+    return {
+      results,
+      value: document.getElementById("test-search-input")?.value
+    };
+  });
+  const concurrentTypeOk = concurrentTypeRes.value === "Second concurrent value" &&
+    concurrentTypeRes.results.every(result => result?.success === true);
+  record("5a. Concurrent Virtual Typing Is Serialized", concurrentTypeOk,
+    `Value: "${concurrentTypeRes.value}", results: ${concurrentTypeRes.results.map(result => Boolean(result?.success)).join(",")}`);
+
   const typeRes = await page.evaluate(async () => {
-    await window.__AGENT_PILOT__.type("#test-search-input", "Agent Pilot Antigravity Verified");
+    const result = await window.__AGENT_PILOT__.type("#test-search-input", "Agent Pilot Antigravity Verified", true);
     const val = document.getElementById("test-search-input")?.value;
     const badge = document.getElementById("typing-result-badge")?.textContent;
-    return { val, badge };
+    return { val, badge, result };
   });
-  const typeOk = typeRes.val === "Agent Pilot Antigravity Verified";
+  const typeOk = typeRes.result?.success === true && typeRes.val === "Agent Pilot Antigravity Verified";
   record("5. Virtual Typing (Human-like Typing into Inputs)", typeOk, `Value: "${typeRes.val}"`);
 }

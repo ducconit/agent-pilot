@@ -3,7 +3,7 @@
  */
 import path from "node:path";
 import { ANNOTATOR_HTTP_PORT, ROOT_DIR, ASSETS_DIR, NAV_WAIT_UNTIL, TIMEOUTS, SEPARATOR } from "./lib/config.mjs";
-import { startStaticServer, launchExtensionBrowser, sleep } from "./lib/harness.mjs";
+import { startStaticServer, closeHttpServer, launchExtensionBrowser, sleep } from "./lib/harness.mjs";
 
 async function run() {
   console.log(SEPARATOR);
@@ -175,7 +175,7 @@ async function run() {
   } finally {
     // Always close the browser and server, then report via exitCode.
     await close();
-    server.close();
+    await closeHttpServer(server);
   }
 }
 

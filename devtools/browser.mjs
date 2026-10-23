@@ -74,7 +74,9 @@ export class Browsers {
     tab.client = client;
     await client.send("Network.enable");
     client.on("Network.requestWillBeSent", event => {
-      tab.requests.set(event.requestId, { id: event.requestId, url: event.request.url, method: event.request.method, type: event.type, requestHeaders: event.request.headers, postData: event.request.postData, status: "pending" });
+      // Keep request listings small. Consumers can retrieve the upload body
+      // explicitly through network.getResponseBody when they need it.
+      tab.requests.set(event.requestId, { id: event.requestId, url: event.request.url, method: event.request.method, type: event.type, requestHeaders: event.request.headers, status: "pending" });
       if (tab.requests.size > 1000) tab.requests.delete(tab.requests.keys().next().value);
     });
     client.on("Network.responseReceived", event => { const req = tab.requests.get(event.requestId); if (req) Object.assign(req, { status: event.response.status, responseHeaders: event.response.headers, mimeType: event.response.mimeType }); });

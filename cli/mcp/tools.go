@@ -571,7 +571,7 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_heap_capability",
-		Description: "Probe real heap support before taking a snapshot. Ordinary extension-debugger tabs return supported=false with HEAPPROFILER_UNAVAILABLE; isolated DevTools context tabs support snapshot, baseline and diff when a filePath is provided.",
+		Description: "Probe the target's actual HeapProfiler support before taking a snapshot. Ordinary extension-debugger tabs return supported=false with HEAPPROFILER_UNAVAILABLE; isolated DevTools tabs are probed against Chrome and support snapshot, baseline and diff only when the protocol is available.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -591,7 +591,7 @@ var mcpTools = []ToolInfo{
 				"recordBaseline":      map[string]interface{}{"type": "boolean", "description": "Explicitly save this snapshot as the new per-tab memory baseline"},
 				"compareWithBaseline": map[string]interface{}{"type": "boolean", "description": "Compare this snapshot against the stored per-tab baseline to detect memory leaks"},
 				"maxConstructors":     map[string]interface{}{"type": "integer", "description": "Maximum number of top object constructors to return (default: 20)"},
-				"filePath":            map[string]interface{}{"type": "string", "description": "Required for isolated DevTools tabs; saves the real .heapsnapshot and enables baseline/diff comparison"},
+				"filePath":            map[string]interface{}{"type": "string", "description": "Required for isolated DevTools tabs; saves a real .heapsnapshot and enables baseline/diff comparison. Ordinary extension-debugger tabs do not support snapshots."},
 				"tabId":               map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
 		},

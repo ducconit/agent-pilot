@@ -38,8 +38,8 @@ func TestAdvancedCommandTimeouts(t *testing.T) {
 		}
 	}
 	for _, method := range []string{"lighthouse.audit", "lighthouse.analyze"} {
-		if got := DeriveCommandTimeout(method, nil, 30000); got != 60000 {
-			t.Errorf("%s budget=%d, expected 60s default", method, got)
+		if got := DeriveCommandTimeout(method, nil, 30000); got != 120000 {
+			t.Errorf("%s budget=%d, expected 120s default", method, got)
 		}
 		if got := DeriveCommandTimeout(method, map[string]interface{}{"timeoutMs": 15000}, 0); got != 15000 {
 			t.Errorf("%s short explicit budget=%d, expected 15000", method, got)

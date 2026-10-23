@@ -1,0 +1,38 @@
+{
+  "description": "Replay a recorded flow with the Agent Pilot virtual cursor. Pass steps to replay an imported flow without storing it first.",
+  "inputSchema": {
+    "properties": {
+      "steps": {
+        "description": "Optional Recorder-compatible steps",
+        "items": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_recorder_replay",
+  "parameters": {
+    "properties": {
+      "steps": {
+        "description": "Optional Recorder-compatible steps",
+        "items": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

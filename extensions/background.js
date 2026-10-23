@@ -38,6 +38,7 @@ import { AgentBridgeClient } from "./background/bridge-client.js";
 import { sanitizeData } from "./background/secret-sanitizer.js";
 import {
   initFlowRecorder,
+  ensureFlowRecorderHydrated,
   removeFlowSession,
   recordTabNavigation,
   getFlowState,
@@ -45,8 +46,7 @@ import {
   setFlowRecording,
   deleteFlowStep,
   clearFlowSteps,
-  exportFlowAsBatch,
-  exportFlowAsPlaywright,
+  exportFlowFormats,
   replayRecordedFlow
 } from "./background/flow-recorder.js";
 // Side-effect import: exposes globalThis.__AP_FEEDBACK_ITEM_SCHEMA__ for payload validation
@@ -176,8 +176,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 // Clean up memory when tab is closed
-chrome.tabs.onRemoved.addListener((tabId) => {
+chrome.tabs.onRemoved.addListener(async (tabId) => {
   cleanupTabResources(tabId);
+  await ensureFlowRecorderHydrated();
   removeFlowSession(tabId);
   if (agentBridge) {
     if (typeof agentBridge.clearAgentTab === "function") {
@@ -215,8 +216,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     agentBridge.requestReconnect();
   }
   if (changeInfo.url) {
+    await ensureFlowRecorderHydrated();
     recordTabNavigation(tabId, changeInfo.url);
   } else if (changeInfo.status === "complete" && tab?.url) {
+    await ensureFlowRecorderHydrated();
     recordTabNavigation(tabId, tab.url);
   }
   // If user manually ungroups a tab or moves it into a non-Agent tab group, revoke agent access
@@ -468,45 +471,50 @@ const BACKGROUND_ACTION_HANDLERS = {
   },
 
   // 9. Persistent Cross-Page Flow Recorder Actions
-  record_flow_step: (request, sender) => {
+  record_flow_step: async (request, sender) => {
+    await ensureFlowRecorderHydrated();
     const tabId = sender?.tab?.id || request.tabId;
     const step = appendFlowStep(tabId, request.step);
     return { success: Boolean(step), step, state: getFlowState(tabId) };
   },
 
-  get_flow_recorder_state: (request, sender) => {
+  get_flow_recorder_state: async (request, sender) => {
+    await ensureFlowRecorderHydrated();
     const tabId = sender?.tab?.id || request.tabId;
     return { success: true, ...getFlowState(tabId) };
   },
 
   set_flow_recording: async (request, sender) => {
+    await ensureFlowRecorderHydrated();
     const tabId = sender?.tab?.id || request.tabId || (await getActiveTabId());
-    return await setFlowRecording(tabId, request.enabled, request.url);
+    return await setFlowRecording(tabId, request.enabled, request.url, request.title || request.name || "");
   },
 
-  delete_flow_step: (request, sender) => {
+  delete_flow_step: async (request, sender) => {
+    await ensureFlowRecorderHydrated();
     const tabId = sender?.tab?.id || request.tabId;
     return deleteFlowStep(tabId, request.stepId);
   },
 
-  clear_flow_steps: (request, sender) => {
+  clear_flow_steps: async (request, sender) => {
+    await ensureFlowRecorderHydrated();
     const tabId = sender?.tab?.id || request.tabId;
     return clearFlowSteps(tabId);
   },
 
-  export_flow_recorder: (request, sender) => {
+  export_flow_recorder: async (request, sender) => {
+    await ensureFlowRecorderHydrated();
     const tabId = sender?.tab?.id || request.tabId || null;
-    const batch = exportFlowAsBatch(tabId, request.url, request.title, request.steps || null);
-    const playwright = exportFlowAsPlaywright(tabId, request.url, request.steps || null);
+    const formats = exportFlowFormats(tabId, request.url, request.title || request.name || "", request.steps || null);
     return {
       success: true,
-      batch,
-      playwright,
+      ...formats,
       ...getFlowState(tabId)
     };
   },
 
   replay_flow_recorder: async (request, sender) => {
+    await ensureFlowRecorderHydrated();
     const tabId = sender?.tab?.id || request.tabId || (await getActiveTabId());
     const runReplay = () => replayRecordedFlow(tabId, request.steps || null);
     return tabId

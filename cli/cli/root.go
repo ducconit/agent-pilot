@@ -193,6 +193,7 @@ func newRootCommand() *cobra.Command {
 
 	root.AddCommand(
 		newDevtoolsCommand(),
+		newRecorderCommand(),
 		newOpenCommand(),
 		newNavigateCommand(),
 		newCloseCommand(),
@@ -243,7 +244,7 @@ var legacyLongFlags = []string{
 	"dx", "dy", "styles", "include-styles", "submit",
 	"action", "name", "network", "cpu", "theme", "filter", "method", "type", "bridge-port", "instance-id",
 	"limit", "categories", "enabled", "path", "force", "agy", "antigravity",
-	"gc", "port",
+	"gc", "port", "step", "step-id", "operation", "index", "title", "url", "steps",
 }
 
 // normalizeLegacyFlags rewrites any token that is exactly "-<name>" or starts

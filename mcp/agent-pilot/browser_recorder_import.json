@@ -1,0 +1,80 @@
+{
+  "description": "Import a Chrome DevTools Recorder JSON object or steps array into the extension flow state.",
+  "inputSchema": {
+    "properties": {
+      "flow": {
+        "additionalProperties": true,
+        "description": "Chrome DevTools Recorder-compatible flow object with title and steps",
+        "properties": {
+          "steps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "steps": {
+        "description": "Alternative to flow: Recorder-compatible steps",
+        "items": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "title": {
+        "description": "Override the imported title",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_recorder_import",
+  "parameters": {
+    "properties": {
+      "flow": {
+        "additionalProperties": true,
+        "description": "Chrome DevTools Recorder-compatible flow object with title and steps",
+        "properties": {
+          "steps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "steps": {
+        "description": "Alternative to flow: Recorder-compatible steps",
+        "items": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "title": {
+        "description": "Override the imported title",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}

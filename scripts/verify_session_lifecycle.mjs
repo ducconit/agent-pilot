@@ -8,7 +8,7 @@
  */
 
 import { SESSION_HTTP_PORT, ROOT_DIR, NAV_WAIT_UNTIL, TIMEOUTS } from "./lib/config.mjs";
-import { startStaticServer, launchExtensionBrowser, waitForServiceWorker, sleep } from "./lib/harness.mjs";
+import { startStaticServer, closeHttpServer, launchExtensionBrowser, waitForServiceWorker, sleep } from "./lib/harness.mjs";
 
 async function runSessionTest() {
   const server = await startStaticServer(SESSION_HTTP_PORT, ROOT_DIR);
@@ -148,7 +148,7 @@ async function runSessionTest() {
     // Always release the browser and server; exitCode (not process.exit) keeps the
     // numeric semantics while still letting this cleanup run.
     await close();
-    server.close();
+    await closeHttpServer(server);
   }
 }
 

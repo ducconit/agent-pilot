@@ -39,6 +39,29 @@ agent-pilot devtools status --tab 123
 agent-pilot close --tab 123
 ```
 
+### Chrome Recorder flows
+
+Use the extension-backed Recorder lifecycle for a compact, agent-controlled
+user flow. The CLI is the preferred interface for recording because it keeps
+the flow JSON on disk instead of returning a large step payload on every
+browser action:
+
+```bash
+agent-pilot recorder start --tab 123 --title "Checkout flow"
+agent-pilot click "[data-testid=add]" --tab 123
+agent-pilot recorder stop --tab 123
+agent-pilot recorder export --tab 123 --format json > checkout.recorder.json
+agent-pilot recorder replay --file checkout.recorder.json --format json
+agent-pilot recorder measure --file checkout.recorder.json --tab 123 --format json
+```
+
+`recorder import`, `state`, `edit`, and `clear` support JSON editing without
+opening DevTools. `recorder measure` combines trace start, flow replay and
+trace stop in one CLI command. It requires a positive Chrome tab ID and returns
+a compact trace by default; add `--include-events` for the full event summary.
+Imported iframe/target, viewport, and advanced assertion steps remain in the
+exported JSON but fail explicitly when the extension cannot replay them.
+
 If `tabs` returns an empty list, it normally means no tab has been opened or granted to the `🤖 Agent Pilot` group. Use `open`, or ask the user to move an existing tab into that group / attach it from the side panel.
 
 `--port` is an alias for `--bridge-port` and applies to every browser command, including `tabs`, `open`, `cdp`, and `batch`. `--instance-id` pins dispatch to one connected Chrome process; an unknown explicit instance fails closed instead of falling back to the active browser. `AGENT_PILOT_INSTANCE_ID` provides the same pin for scripts that cannot add a flag.
@@ -138,6 +161,10 @@ agent-pilot export-mcp mcp/agent-pilot
 ```
 
 Use the generated files in `mcp/agent-pilot/` when configuring or validating an MCP client. If a client shows fewer capabilities than those schemas, refresh its provider/tool cache before debugging the extension.
+
+For the complete decision table covering CLI/MCP, positive extension tabs,
+negative isolated tabs, page-provided tools, capability errors, and token-safe
+defaults, read [tool-routing.md](tool-routing.md).
 
 ## Extension lifecycle
 

@@ -286,7 +286,33 @@ CSS inspection defaults to a compact summary. Use `agent-pilot devtools css --pa
 
 ---
 
-## 8. Batch Automation (`batch`)
+## 8. Chrome Recorder flows (`recorder`)
+
+Agent Pilot exposes the Chrome DevTools Recorder flow lifecycle without opening DevTools. The extension records navigation, clicks, input changes, Enter keys and settled scroll positions, then exports/imports Chrome Recorder-compatible JSON. Use `--format json` for machine-readable output:
+
+```bash
+agent-pilot recorder start --tab 123 --title "Checkout flow"
+agent-pilot click "[data-testid=add]" --tab 123
+agent-pilot recorder stop --tab 123
+agent-pilot recorder export --tab 123 --format json > checkout.recorder.json
+agent-pilot recorder replay --file checkout.recorder.json --format json
+agent-pilot recorder measure --file checkout.recorder.json --tab 123 --format json
+```
+
+Import, inspect and edit a flow without the Recorder panel:
+
+```bash
+agent-pilot recorder import --file checkout.recorder.json --tab 123
+agent-pilot recorder state --tab 123 --format json
+agent-pilot recorder edit --tab 123 --operation delete --step-id step_3
+agent-pilot recorder clear --tab 123
+```
+
+`recorder measure` combines trace start, flow replay and trace stop on one positive Chrome tab ID; it uses the existing trace engine, returns compact insights by default, and reports `failurePhase` if any phase fails or replay moves to another tab. Add `--include-events` to include the larger raw event summary. The JSON import/export preserves Recorder fields, but replay is limited to supported main-frame steps; unsupported viewport, iframe/target and advanced assertion steps fail explicitly.
+
+---
+
+## 9. Batch Automation (`batch`)
 
 Execute an ordered sequence of browser actions in a single atomic network round-trip, saving ~80% context tokens and eliminating network round-trips. Any `screenshot` step in the batch with `path` (or `savePath`) is automatically saved to disk and its raw `dataUrl` is stripped from the JSON response (unless `base64: true`):
 
@@ -317,7 +343,7 @@ agent-pilot batch ./skills/agent-pilot/examples/step-recording-booking-flow.json
 
 ---
 
-## 9. Visual UI Feedback Studio (`feedback`)
+## 10. Visual UI Feedback Studio (`feedback`)
 
 Query and interact with the 3-Channel Visual UI Feedback System:
 

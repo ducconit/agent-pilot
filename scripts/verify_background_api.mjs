@@ -330,6 +330,9 @@ const targetCAfterStealAttempt = await mockBridge.getTargetTabId(undefined, "age
 
 const targetA = await mockBridge.getTargetTabId(undefined, "agent_conv_A");
 const targetB = await mockBridge.getTargetTabId(undefined, "agent_conv_B");
+const explicitCrossOwnerDenied = await mockBridge.getTargetTabId(101, "agent_conv_B")
+  .then(() => false)
+  .catch((error) => String(error?.message || "").includes("owned by another agent"));
 // Simulate Agent B closing its own tab (102), then calling an implicit command or close again:
 mockBridge.clearAgentTab(102);
 agentControlledTabs.delete(102);
@@ -343,6 +346,7 @@ record(
     targetCAfterStealAttempt === null &&
     targetA === 101 &&
     targetB === 102 &&
+    explicitCrossOwnerDenied &&
     targetBAfterClose === null &&
     targetBFallbackBlocked === null &&
     targetAStillIntact === 101,
@@ -358,12 +362,15 @@ const {
   removeFlowSession,
   exportFlowAsBatch,
   exportFlowAsPlaywright,
+  exportFlowAsRecorder,
+  importFlow,
+  editFlowStep,
   clearFlowSteps
 } = await import("../extensions/background/flow-recorder.js");
 
 // 12. Persistent Cross-Page Flow Recorder (navigation persistence, deduplication, Batch & Playwright export)
 clearFlowSteps(101);
-await setFlowRecording(101, true, "https://example.com/login");
+await setFlowRecording(101, true, "https://example.com/login", "Login flow");
 appendFlowStep(101, {
   action: "type",
   tagName: "input",
@@ -407,6 +414,9 @@ deleteFlowStep(101, extraStep.id);
 const flowState = getFlowState(101);
 const exportedBatch = exportFlowAsBatch(101);
 const exportedPw = exportFlowAsPlaywright(101);
+const exportedRecorder = exportFlowAsRecorder(101, "Login flow");
+const importedFlow = importFlow(202, exportedRecorder, "Imported login flow");
+const editedImportedFlow = editFlowStep(202, "replace", importedFlow.steps[1].id, { value: "edited" });
 
 // Simulate original tab #101 closing -> flow should remain preserved in lastRecordedFlow for auto-new-tab Replay
 removeFlowSession(101);
@@ -435,6 +445,9 @@ record(
     exportedPw.includes("await page.getByTestId(\"username\").fill(\"tester_admin\");") &&
     exportedPw.includes("await page.getByRole(\"button\", { name: \"Đăng nhập\" }).click();") &&
     exportedPw.includes("await page.goto(\"https://example.com/dashboard\");") &&
+    exportedRecorder.title === "Login flow" &&
+    exportedRecorder.steps.map((step) => step.type).join(",") === "navigate,change,click,navigate" &&
+    editedImportedFlow.steps[1].value === "edited" &&
     fallbackAfterClose.steps.length === 4 &&
     fallbackBatchAfterClose.actions.length === 4,
   `steps=${flowState.steps.length}, batchActions=${exportedBatch.actions.length}, survivedTabClose=${fallbackAfterClose.steps.length === 4}`

@@ -1,0 +1,22 @@
+{
+  "description": "Stop the active flow recording and return its current steps.",
+  "inputSchema": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_recorder_stop",
+  "parameters": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

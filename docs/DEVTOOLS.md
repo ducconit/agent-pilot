@@ -22,6 +22,7 @@ Runtime và các thư viện đã khóa phiên bản được nhúng trong binar
 | `browser_list_webmcp_tools`, `browser_execute_webmcp_tool` | Discover và gọi WebMCP tools mà trang expose qua Puppeteer WebMCP runtime; không mở thêm quyền ngoài trang. |
 | `browser_get_os_app_state`, `browser_install_pwa`, `browser_launch_pwa`, `browser_uninstall_pwa` | Đọc và quản lý PWA qua browser-scoped `PWA.*` CDP domain. Chỉ hoạt động trên Chrome build có experimental PWA domain; không chạy qua extension relay. |
 | `browser_get_network_request` | Ngoài metadata và response body, có thể lấy request POST body, tắt từng body, và lưu request/response ra file `.network-request`/`.network-response`. |
+| `browser_recorder_start`, `browser_recorder_stop`, `browser_recorder_state`, `browser_recorder_replay`, `browser_recorder_measure`, `browser_recorder_export`, `browser_recorder_import`, `browser_recorder_edit`, `browser_recorder_clear` | Ghi, replay, chỉnh sửa, đo performance và trao đổi user flow theo JSON của Chrome DevTools Recorder. JSON giữ thuộc tính gốc; replay chỉ hỗ trợ tập step phù hợp với main-frame extension tab. |
 
 Các thao tác quản lý extension qua `browser_manage_extensions` hỗ trợ `list`, `setEnabled`, `toggle`, `install`, `reload`, `triggerAction` và `uninstall`. Các thao tác lifecycle cần Chrome CDP Extensions domain; extension managed/policy-controlled có thể từ chối. `uninstall` yêu cầu agent truyền xác nhận rõ ràng khi nhắm chính Agent Pilot.
 
@@ -38,6 +39,10 @@ Các thao tác quản lý extension qua `browser_manage_extensions` hỗ trợ `
 {"tool":"browser_performance_analyze_insight","arguments":{"traceId":"<traceId>","insightSetId":"<id from trace>","insightName":"LCPBreakdown"}}
 {"tool":"browser_screencast_start","arguments":{"tabId":123,"filePath":"/absolute/path/demo.mp4"}}
 {"tool":"browser_screencast_stop","arguments":{"tabId":123}}
+{"tool":"browser_recorder_start","arguments":{"tabId":123,"title":"Checkout flow"}}
+{"tool":"browser_recorder_export","arguments":{"tabId":123}}
+{"tool":"browser_recorder_replay","arguments":{"tabId":123}}
+{"tool":"browser_recorder_measure","arguments":{"tabId":123}}
 {"tool":"browser_analyze_heapsnapshot","arguments":{"action":"compare","baseFilePath":"/tmp/before.heapsnapshot","currentFilePath":"/tmp/after.heapsnapshot"}}
 {"tool":"browser_list_3p_developer_tools","arguments":{"tabId":123}}
 {"tool":"browser_execute_3p_developer_tool","arguments":{"tabId":123,"toolName":"component_state","input":{"id":"checkout"}}}
@@ -88,11 +93,16 @@ agent-pilot devtools audit --tab 123 --params '{"mode":"snapshot"}'
 agent-pilot devtools audit-details --params '{"filePath":"/path/report.json","auditId":"image-alt"}'
 agent-pilot devtools video-start --tab 123
 agent-pilot devtools video-stop --tab 123
+agent-pilot recorder start --tab 123 --title "Checkout flow"
+agent-pilot recorder export --tab 123 --format json > checkout.recorder.json
+agent-pilot recorder replay --file checkout.recorder.json --tab 123 --format json
 agent-pilot devtools context-create --params '{"name":"account-a"}'
 agent-pilot devtools workers --params '{"action":"list"}'
 ```
 
 Lệnh start/stop nhiều bước cần cùng một bridge/MCP server đang chạy để giữ state, như các phiên MCP bình thường.
+
+Recorder dùng `chrome.storage` để khôi phục flow khi service worker thức dậy. `browser_recorder_measure` cần tab ID Chrome dương, trả `failurePhase` nếu trace/replay lỗi hoặc replay chuyển sang tab khác; mặc định lược `eventsSummary` để giảm payload (`includeEvents: true` để nhận đầy đủ). Import/export giữ metadata của Chrome Recorder, nhưng replay trên extension tab từ chối các step không hỗ trợ như iframe/target khác, viewport và assertion nâng cao thay vì báo thành công giả.
 
 ## Dành cho người build
 

@@ -179,7 +179,7 @@ flowchart LR
 ### 1. Cài Đặt Chrome Extension
 
 #### Cách A: Cài đặt từ Bản Phát Hành (Khuyên dùng)
-1. Tải **gói bundle** cho đúng nền tảng của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) — ví dụ `agent-pilot-v1.0.10-beta-linux-amd64.zip` (đã gồm sẵn extension + CLI + skills + README hướng dẫn), hoặc tệp chỉ-chứa-extension `agent-pilot-v1.0.10-beta.zip` nếu bạn chỉ cần phần Chrome.
+1. Tải **gói bundle** cho đúng nền tảng của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) — ví dụ `agent-pilot-v1.0.11-beta-linux-amd64.zip` (đã gồm sẵn extension + CLI + skills + README hướng dẫn), hoặc tệp chỉ-chứa-extension `agent-pilot-v1.0.11-beta.zip` nếu bạn chỉ cần phần Chrome.
 2. Giải nén tệp `.zip` ra một thư mục cố định.
 3. Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
 4. Gạt bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải.
@@ -212,9 +212,9 @@ Mỗi bundle chứa sẵn `extensions/` + binary đúng nền tảng + script c�
 
 | Bản Hệ Điều Hành | Kiến Trúc | Tên Tệp Tải Về | Cài Đặt 1 Lệnh & Tài Liệu Riêng |
 | :--- | :--- | :--- | :--- |
-| 🐧 **Ubuntu / Linux** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.10-beta-linux-amd64.zip`<br/>`agent-pilot-v1.0.10-beta-linux-arm64.zip` | `./install.sh` • [📄 Tài liệu Ubuntu](docs/bundles/README.ubuntu.md) |
-| 🍎 **macOS** | Apple Silicon (`arm64`) / Intel (`amd64`) | `agent-pilot-v1.0.10-beta-darwin-arm64.zip`<br/>`agent-pilot-v1.0.10-beta-darwin-amd64.zip` | `./install.sh` *(tự gỡ `xattr`)* • [📄 Tài liệu macOS](docs/bundles/README.macos.md) |
-| 🪟 **Windows** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.10-beta-windows-amd64.zip`<br/>`agent-pilot-v1.0.10-beta-windows-arm64.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` • [📄 Tài liệu Windows](docs/bundles/README.windows.md) |
+| 🐧 **Ubuntu / Linux** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.11-beta-linux-amd64.zip`<br/>`agent-pilot-v1.0.11-beta-linux-arm64.zip` | `./install.sh` • [📄 Tài liệu Ubuntu](docs/bundles/README.ubuntu.md) |
+| 🍎 **macOS** | Apple Silicon (`arm64`) / Intel (`amd64`) | `agent-pilot-v1.0.11-beta-darwin-arm64.zip`<br/>`agent-pilot-v1.0.11-beta-darwin-amd64.zip` | `./install.sh` *(tự gỡ `xattr`)* • [📄 Tài liệu macOS](docs/bundles/README.macos.md) |
+| 🪟 **Windows** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.11-beta-windows-amd64.zip`<br/>`agent-pilot-v1.0.11-beta-windows-arm64.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` • [📄 Tài liệu Windows](docs/bundles/README.windows.md) |
 
 Trong mỗi bundle, binary nằm ngay cạnh `extensions/`. Nạp extension rồi trỏ cấu hình MCP vào binary là dùng được, không cần chạy script cài đặt. Script chỉ hỗ trợ đưa binary vào PATH và cài service nếu muốn.
 
@@ -342,6 +342,7 @@ Khi chạy đa tác vụ hoặc nhiều cửa sổ IDE, Agent Pilot tự động
 - `browser_set_busy`: Khóa/mở khóa khiên bảo vệ người dùng thao tác khi Agent chạy kịch bản phức tạp.
 - `browser_wait_for_feedback`: Chờ phản hồi trực quan từ người dùng theo thời gian thực (Channel A).
 - `browser_get_pending_feedback`: Đọc danh sách phản hồi UI trong Inbox cục bộ (Channel B).
+- `browser_recorder_start`, `browser_recorder_stop`, `browser_recorder_state`, `browser_recorder_replay`, `browser_recorder_measure`, `browser_recorder_export`, `browser_recorder_import`, `browser_recorder_edit`, `browser_recorder_clear`: Ghi và điều khiển flow Recorder từ agent; JSON import/export giữ các thuộc tính gốc, còn replay chỉ thực hiện các step hỗ trợ trên tab chính và báo lỗi rõ cho step chưa hỗ trợ.
 
 ---
 
@@ -381,7 +382,14 @@ agent-pilot batch flow_test.json --format json  # Không có prefix text, dễ p
 # 7. Quản lý phản hồi UI
 agent-pilot feedback list
 
-# 8. Trusted CDP input cho cross-origin iframe / canvas / WebGL game (tùy chọn)
+# 8. Chrome Recorder: ghi, xuất JSON, nhập và replay flow
+agent-pilot recorder start --tab 123 --title "Checkout flow"
+agent-pilot recorder stop --tab 123
+agent-pilot recorder export --tab 123 --format json > checkout.recorder.json
+agent-pilot recorder replay --file checkout.recorder.json --format json
+agent-pilot recorder measure --file checkout.recorder.json --tab 123 --format json
+
+# 9. Trusted CDP input cho cross-origin iframe / canvas / WebGL game (tùy chọn)
 agent-pilot cdp status --tab 12345
 agent-pilot click -x 733 -y 668 --via cdp --tab 12345
 agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --hold 800 --via cdp --tab 12345
@@ -391,6 +399,8 @@ agent-pilot skill install              # ~/.agents/skills/agent-pilot
 agent-pilot skill install --agy        # ~/.gemini/config/skills/agent-pilot (Antigravity)
 agent-pilot skill install --path ~/my-skills --force
 ```
+
+Recorder replay trên tab extension hiện hỗ trợ luồng DOM ở main frame; các step iframe/target khác, viewport và một số assertion nâng cao được giữ trong JSON nhưng trả lỗi khi replay. `measure` yêu cầu tab ID Chrome dương và mặc định rút gọn danh sách trace events; dùng `--include-events` khi cần đầy đủ.
 
 ### 4. So sánh thực tế MCP và CLI trên cùng một tác vụ
 

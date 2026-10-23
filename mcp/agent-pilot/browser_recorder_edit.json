@@ -1,0 +1,76 @@
+{
+  "description": "Edit a stored flow step without opening DevTools. Supports replace/update, insert, delete and set operations.",
+  "inputSchema": {
+    "properties": {
+      "index": {
+        "description": "Insertion index for insert",
+        "type": "integer"
+      },
+      "operation": {
+        "description": "Edit operation",
+        "enum": [
+          "replace",
+          "update",
+          "insert",
+          "delete",
+          "set"
+        ],
+        "type": "string"
+      },
+      "step": {
+        "additionalProperties": true,
+        "description": "Recorder step for replace/update/insert, or steps array for set",
+        "type": [
+          "object",
+          "array"
+        ]
+      },
+      "stepId": {
+        "description": "Existing step ID for replace/update/delete/insert",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_recorder_edit",
+  "parameters": {
+    "properties": {
+      "index": {
+        "description": "Insertion index for insert",
+        "type": "integer"
+      },
+      "operation": {
+        "description": "Edit operation",
+        "enum": [
+          "replace",
+          "update",
+          "insert",
+          "delete",
+          "set"
+        ],
+        "type": "string"
+      },
+      "step": {
+        "additionalProperties": true,
+        "description": "Recorder step for replace/update/insert, or steps array for set",
+        "type": [
+          "object",
+          "array"
+        ]
+      },
+      "stepId": {
+        "description": "Existing step ID for replace/update/delete/insert",
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  }
+}

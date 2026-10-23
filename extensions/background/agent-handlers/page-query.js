@@ -8,11 +8,13 @@ import { waitForTabComplete } from "../tab-manager.js";
 import { assertContentReceiverAvailable } from "../page-receiver.js";
 import { runInlineWait, mergeWaitMeta } from "./page-input.js";
 import {
+  ensureFlowRecorderHydrated,
   getFlowState,
   setFlowRecording,
   clearFlowSteps,
-  exportFlowAsBatch,
-  exportFlowAsPlaywright,
+  exportFlowFormats,
+  importFlow,
+  editFlowStep,
   replayRecordedFlow
 } from "../flow-recorder.js";
 
@@ -106,7 +108,8 @@ export const pageQueryHandlers = {
 
   "flow.record": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
-    setFlowRecording(tabId || params.tabId || null, params.enabled !== false, params.url || "")
+    await ensureFlowRecorderHydrated();
+    setFlowRecording(tabId || params.tabId || null, params.enabled !== false, params.url || "", params.title || params.name || "")
       .then((res) => {
         if (res?.tabId && typeof client.registerAgentTab === "function") {
           client.registerAgentTab(res.tabId, params.agentId);
@@ -119,6 +122,7 @@ export const pageQueryHandlers = {
   "flow.export": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     try {
+      await ensureFlowRecorderHydrated();
       let diagRes = null;
       if (tabId) {
         try {
@@ -127,13 +131,11 @@ export const pageQueryHandlers = {
       }
       const targetKey = tabId || params.tabId || null;
       const state = getFlowState(targetKey);
-      const batch = exportFlowAsBatch(targetKey, diagRes?.diagnostics?.environment?.url || "", "", params.steps || null);
-      const playwright = exportFlowAsPlaywright(targetKey, diagRes?.diagnostics?.environment?.url || "", params.steps || null);
+      const formats = exportFlowFormats(targetKey, diagRes?.diagnostics?.environment?.url || "", params.title || params.name || "", params.steps || null);
       respond({
         tabId: targetKey,
         ...state,
-        batch,
-        playwright,
+        ...formats,
         diagnostics: diagRes?.diagnostics || null
       });
     } catch (err) {
@@ -143,6 +145,7 @@ export const pageQueryHandlers = {
 
   "flow.replay": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
+    await ensureFlowRecorderHydrated();
     const runReplay = () => replayRecordedFlow(tabId || params.tabId || null, params.steps || null);
     const promise = tabId
       ? client.runWithTabLock(tabId, "flow.replay", runReplay)
@@ -160,10 +163,38 @@ export const pageQueryHandlers = {
   "flow.clear": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     try {
+      await ensureFlowRecorderHydrated();
       if (tabId) {
         await client.sendTabMessageWithRetry(tabId, { action: "get_page_diagnostics", clear: true }).catch(() => {});
       }
       respond(clearFlowSteps(tabId || params.tabId || null));
+    } catch (err) {
+      respond(null, err);
+    }
+  },
+
+  "flow.state": async (client, params, respond) => {
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
+    await ensureFlowRecorderHydrated();
+    respond({ tabId: tabId || params.tabId || null, ...getFlowState(tabId || params.tabId || null) });
+  },
+
+  "flow.import": async (client, params, respond) => {
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
+    try {
+      await ensureFlowRecorderHydrated();
+      const flow = params.flow || params.recording || (Array.isArray(params.steps) ? { steps: params.steps } : null);
+      respond(importFlow(tabId || params.tabId || null, flow, params.title || params.name || ""));
+    } catch (err) {
+      respond(null, err);
+    }
+  },
+
+  "flow.edit": async (client, params, respond) => {
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
+    try {
+      await ensureFlowRecorderHydrated();
+      respond(editFlowStep(tabId || params.tabId || null, params.operation || "replace", params.stepId, params.step || params.value, params.index));
     } catch (err) {
       respond(null, err);
     }

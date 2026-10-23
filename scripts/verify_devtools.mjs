@@ -9,6 +9,7 @@ import { spawn } from "node:child_process";
 import { WebSocketServer } from "ws";
 import { launchExtensionBrowser, waitForServiceWorker } from "./lib/harness.mjs";
 import { applyEmulation } from "../extensions/background/cdp-emulation.js";
+import { pageCommand } from "../devtools/pages.mjs";
 import { ROOT_DIR } from "./lib/config.mjs";
 
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "agent-pilot-devtools-test-"));
@@ -157,6 +158,7 @@ try {
     const captured = await extension("network.listRequests", { tabId, method: "POST", resourceType: "Fetch", limit: 20 });
     const request = captured.requests.find(item => item.url.endsWith("/echo"));
     assert(request, JSON.stringify(captured));
+    assert.equal(request.postData, undefined, "network list should not retain or relay request bodies");
     const detail = await host("network.getResponseBody", {
       tabId,
       requestId: request.id,
@@ -216,6 +218,18 @@ try {
   const b = await host("contexts.create", { name: "B", headless: true });
   const ta = await host("tabs.create", { contextId: a.contextId, url });
   const tb = await host("tabs.create", { contextId: b.contextId, url });
+  await test("embedded runtime lists requests without bodies and loads them only on detail", async () => {
+    await host("page.evaluate", { tabId: ta.tabId, expression: "fetch('/echo',{method:'POST',headers:{'Content-Type':'text/plain'},body:'isolated-body'}).then(r=>r.text())" });
+    const captured = await host("network.listRequests", { tabId: ta.tabId, method: "POST", resourceType: "Fetch", limit: 20 });
+    const request = captured.requests.find(item => item.url.endsWith("/echo"));
+    assert(request, JSON.stringify(captured));
+    assert.equal(request.postData, undefined, "isolated network listing should not retain request bodies");
+    const detail = await host("network.getResponseBody", { tabId: ta.tabId, requestId: request.id, includeResponseBody: false });
+    assert.equal(detail.postData, "isolated-body");
+    assert.equal(detail.responseBody, undefined);
+    const metadataOnly = await host("network.getResponseBody", { tabId: ta.tabId, requestId: request.id, includeRequestBody: false, includeResponseBody: false });
+    assert.equal(metadataOnly.postData, undefined, "includeRequestBody=false must avoid the CDP body request");
+  });
   await test("contexts truly isolate cookies, localStorage and IndexedDB", async () => {
     await host("page.evaluate", { tabId: ta.tabId, expression: "document.cookie='login=alice';localStorage.setItem('login','alice');new Promise(r=>{const q=indexedDB.open('alice-db',1);q.onsuccess=()=>{q.result.close();r(true)}})" });
     const result = await host("page.evaluate", { tabId: tb.tabId, expression: "indexedDB.databases().then(dbs=>({cookie:document.cookie,storage:localStorage.getItem('login'),databases:dbs.map(d=>d.name)}))" });
@@ -229,6 +243,41 @@ try {
     await host("page.click", { tabId: ta.tabId, selector: button.ref });
     assert.equal(await host("page.evaluate", { tabId: ta.tabId, expression: "document.querySelector('#target').textContent" }), "Clicked");
     await assert.rejects(host("page.evaluate", { tabId: ta.tabId, agentId: "other-agent", expression: "document.cookie" }), /not found/);
+  });
+  await test("isolated heap capability is probed and real snapshots support baseline, diff and analysis", async () => {
+    const capability = await host("memory.heapCapability", { tabId: ta.tabId });
+    assert.equal(capability.supported, true, JSON.stringify(capability));
+    assert.equal(capability.target, "isolated-devtools");
+    const baselinePath = path.join(temporary, "heap-baseline.heapsnapshot");
+    const currentPath = path.join(temporary, "heap-current.heapsnapshot");
+    const baseline = await host("memory.heapSnapshot", { tabId: ta.tabId, action: "baseline", filePath: baselinePath });
+    assert.equal(baseline.baselineRecorded, true, JSON.stringify(baseline));
+    await host("page.evaluate", { tabId: ta.tabId, expression: "window.__heapRegression = Array.from({length:1200},(_,i)=>({index:i,payload:'retained-'+i}))" });
+    const current = await host("memory.heapSnapshot", { tabId: ta.tabId, action: "diff", filePath: currentPath });
+    assert.equal(current.leakAnalysis.baseline, baselinePath, JSON.stringify(current));
+    assert(current.bytes > 0 && current.leakAnalysis.constructors.length > 0);
+    const summary = await host("memory.analyzeSnapshot", { action: "summary", filePath: currentPath });
+    assert(summary.nodeCount > 0, JSON.stringify(summary));
+    const comparison = await host("memory.analyzeSnapshot", { action: "compare", baseFilePath: baselinePath, currentFilePath: currentPath });
+    assert(comparison.totalChanged > 0, JSON.stringify(comparison));
+  });
+  await test("unsupported HeapProfiler targets report false and remove incomplete snapshot files", async () => {
+    const client = {
+      send: async method => { throw new Error(`Protocol error (${method}): -32601 Method not found`); },
+      on() {},
+      off() {}
+    };
+    const fakeTab = { page: {}, client, tabId: -999, contextId: "unsupported-heap-test" };
+    const capability = await pageCommand(fakeTab, "memory.heapCapability", {});
+    assert.equal(capability.supported, false);
+    assert.equal(capability.code, "HEAPPROFILER_UNAVAILABLE");
+    const incompletePath = path.join(temporary, "unsupported.heapsnapshot");
+    await assert.rejects(pageCommand(fakeTab, "memory.heapSnapshot", { filePath: incompletePath }), /HEAPPROFILER_UNAVAILABLE/);
+    await assert.rejects(fs.stat(incompletePath), { code: "ENOENT" });
+  });
+  await test("data URLs can be inspected through isolated DevTools page evaluation", async () => {
+    const dataTab = await host("tabs.create", { contextId: a.contextId, url: "data:text/html,%3Ctitle%3EData%20target%3C%2Ftitle%3E%3Cmain%3EReady%3C%2Fmain%3E" });
+    assert.deepEqual(await host("page.evaluate", { tabId: dataTab.tabId, expression: "({title:document.title,text:document.querySelector('main').textContent})" }), { title: "Data target", text: "Ready" });
   });
   await host("contexts.close", { contextId: a.contextId }); await host("contexts.close", { contextId: b.contextId });
   console.log(`${checks} DevTools integration checks passed`);

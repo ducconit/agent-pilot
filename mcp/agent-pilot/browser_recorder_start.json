@@ -1,0 +1,38 @@
+{
+  "description": "Start recording a Chrome DevTools Recorder-compatible user flow on a tab. Captures navigation, clicks, input changes and Enter key actions with selectors; recording state survives page navigations.",
+  "inputSchema": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID; a usable Agent Pilot tab is created when omitted or unavailable",
+        "type": "integer"
+      },
+      "title": {
+        "description": "Recording title",
+        "type": "string"
+      },
+      "url": {
+        "description": "Initial URL when a new tab must be created",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_recorder_start",
+  "parameters": {
+    "properties": {
+      "tabId": {
+        "description": "Target tab ID; a usable Agent Pilot tab is created when omitted or unavailable",
+        "type": "integer"
+      },
+      "title": {
+        "description": "Recording title",
+        "type": "string"
+      },
+      "url": {
+        "description": "Initial URL when a new tab must be created",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}

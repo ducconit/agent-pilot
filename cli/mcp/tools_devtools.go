@@ -132,7 +132,7 @@ func init() {
 			properties["autoStop"] = field("boolean", "Automatically stop and analyze")
 			properties["durationMs"] = field("integer", "Auto-stop recording window, default 5000, max 30000")
 		case "browser_take_heapsnapshot":
-			properties["filePath"] = field("string", "Raw .heapsnapshot output for isolated context tabs; required there. Native tabs keep their constructor/baseline summaries.")
+			properties["filePath"] = field("string", "Required for isolated DevTools tabs; saves a real .heapsnapshot and enables baseline/diff comparison. Ordinary extension-debugger tabs do not support snapshots.")
 		}
 	}
 }

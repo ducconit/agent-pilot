@@ -26,7 +26,7 @@
         "type": "string"
       },
       "filePath": {
-        "description": "Raw .heapsnapshot output for isolated context tabs; required there. Native tabs keep their constructor/baseline summaries.",
+        "description": "Required for isolated DevTools tabs; saves a real .heapsnapshot and enables baseline/diff comparison. Ordinary extension-debugger tabs do not support snapshots.",
         "type": "string"
       },
       "forceGC": {
@@ -75,7 +75,7 @@
         "type": "string"
       },
       "filePath": {
-        "description": "Raw .heapsnapshot output for isolated context tabs; required there. Native tabs keep their constructor/baseline summaries.",
+        "description": "Required for isolated DevTools tabs; saves a real .heapsnapshot and enables baseline/diff comparison. Ordinary extension-debugger tabs do not support snapshots.",
         "type": "string"
       },
       "forceGC": {

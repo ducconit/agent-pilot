@@ -169,7 +169,10 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 		if requested, ok := getIntOrFloat(params, "timeoutMs"); ok && requested > 0 {
 			return requested
 		}
-		budget := 60000
+		// Lighthouse navigation audits can spend well over a minute waiting for
+		// page lifecycle and report generation. Keep this aligned with the
+		// embedded runtime's 120s extension request deadline.
+		budget := 120000
 		if defaultTimeoutMs > budget {
 			budget = defaultTimeoutMs
 		}

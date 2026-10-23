@@ -9,6 +9,7 @@ export class FeedbackPanel {
   constructor(options = {}) {
     this.ui = options.showToast ? { showToast: options.showToast } : options;
     this.getTabIdCallback = typeof options.getActiveTabId === "function" ? options.getActiveTabId : null;
+    this.feedbackTabId = null;
     this.isActive = false;
     this.currentMode = "element";
     this.items = [];
@@ -113,10 +114,16 @@ export class FeedbackPanel {
     }
 
     // Listen to messages from content script and background flow recorder
-    chrome.runtime.onMessage.addListener((msg) => {
+    chrome.runtime.onMessage.addListener((msg, sender) => {
       if (msg.action === "FEEDBACK_MODE_CHANGED") {
+        if (sender?.tab?.id && sender.tab.url && /^(https?|file):/i.test(sender.tab.url)) {
+          this.feedbackTabId = sender.tab.id;
+        }
         this.updateActiveState(msg.active);
       } else if (msg.action === "FEEDBACK_ITEMS_UPDATED") {
+        if (sender?.tab?.id && sender.tab.url && /^(https?|file):/i.test(sender.tab.url)) {
+          this.feedbackTabId = sender.tab.id;
+        }
         this.items = msg.items || [];
         this.renderItemsList();
         this.refreshDiagnostics({ silent: true });
@@ -132,6 +139,19 @@ export class FeedbackPanel {
 
   async getActiveTabId() {
     const isWeb = (t) => t && t.url && (t.url.startsWith("http://") || t.url.startsWith("https://") || t.url.startsWith("file://"));
+
+    // Prefer the page that supplied the visible Feedback Studio state. Focus can
+    // move to another Chrome window while the Side Panel remains open; resolving
+    // the active tab again for each edit/delete can otherwise mutate a different
+    // page from the one represented by these cards.
+    if (this.feedbackTabId) {
+      try {
+        const tab = await chrome.tabs.get(this.feedbackTabId);
+        if (isWeb(tab)) return tab.id;
+      } catch (_) {
+        this.feedbackTabId = null;
+      }
+    }
 
     if (this.getTabIdCallback) {
       try {
@@ -623,11 +643,11 @@ export class FeedbackPanel {
 
   async deleteItem(id) {
     const res = await this.sendTabMessage({ action: "delete_feedback_item", id });
-    if (res && res.success) {
-      this.items = res.items || [];
-    } else {
-      this.items = this.items.filter(it => it.id !== id);
+    if (!res?.success || !Array.isArray(res.items) || res.items.some(item => item.id === id)) {
+      this.ui.showToast("Không thể xác nhận xóa vị trí trên trang hiện tại.", "warning");
+      return;
     }
+    this.items = res.items;
     this.renderItemsList();
     this.ui.showToast("🗑️ Đã xóa vị trí này.");
   }
