@@ -56,11 +56,16 @@
 
   function showLockOverlay(action = "") {
     if (!lockOverlayEl || !lockOverlayEl.isConnected) {
-      if (!lockOverlayEl) {
-        lockOverlayEl = document.createElement("div");
-        lockOverlayEl.id = "agent-pilot-lock-overlay";
+      const existingOverlay = document.getElementById("agent-pilot-lock-overlay");
+      if (existingOverlay) {
+        lockOverlayEl = existingOverlay;
+      } else {
+        if (!lockOverlayEl) {
+          lockOverlayEl = document.createElement("div");
+          lockOverlayEl.id = "agent-pilot-lock-overlay";
+        }
+        (document.body || document.documentElement).appendChild(lockOverlayEl);
       }
-      (document.body || document.documentElement).appendChild(lockOverlayEl);
     }
 
     lockOverlayEl.dataset.action = getActionDescription(action);

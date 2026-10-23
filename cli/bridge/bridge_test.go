@@ -303,3 +303,19 @@ func TestHTTPAPIRejectsEmptyMethodAndMalformedFeedbackJSON(t *testing.T) {
 		t.Fatalf("expected 400 Bad Request for malformed JSON in /api/feedback/wait, got %d", badWaitRec.Code)
 	}
 }
+
+func TestDeriveCommandTimeout_PerformanceAndExplicitTimeoutMs(t *testing.T) {
+	for _, method := range []string{"performance.metrics", "memory.heapSnapshot", "page.screenshot"} {
+		if got := DeriveCommandTimeout(method, nil, 15000); got != 30000 {
+			t.Fatalf("DeriveCommandTimeout(%q, nil, 15000) = %d, want 30000", method, got)
+		}
+	}
+
+	if got := DeriveCommandTimeout("performance.metrics", map[string]interface{}{"timeoutMs": 45000}, 15000); got != 50000 {
+		t.Fatalf("DeriveCommandTimeout(performance.metrics, timeoutMs=45000) = %d, want 50000", got)
+	}
+
+	if got := DeriveCommandTimeout("page.evaluate", map[string]interface{}{"timeoutMs": 40000}, 15000); got != 45000 {
+		t.Fatalf("DeriveCommandTimeout(page.evaluate, timeoutMs=40000) = %d, want 45000", got)
+	}
+}

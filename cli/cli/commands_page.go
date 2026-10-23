@@ -36,6 +36,7 @@ func newOpenCommand() *cobra.Command {
 			FlagDef{Name: "password", Aliases: []string{"pass"}},
 			FlagDef{Name: "init-script"},
 			FlagDef{Name: "beforeunload", Aliases: []string{"handle-beforeunload"}},
+			FlagDef{Name: "timeout", Aliases: []string{"load-timeout"}},
 			FlagDef{Name: "format"},
 		))
 		if err != nil {
@@ -43,7 +44,12 @@ func newOpenCommand() *cobra.Command {
 			return errUsage
 		}
 		if len(cmdArgs.Positional) < 1 {
-			fmt.Println("Sử dụng: agent-pilot open <url> [--active] [--format json] [--user <username>] [--password <password>] [--init-script <js>] [--beforeunload accept|decline] [--include-snapshot] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			fmt.Println("Sử dụng: agent-pilot open <url> [--active] [--format json] [--timeout <ms>] [--user <username>] [--password <password>] [--init-script <js>] [--beforeunload accept|decline] [--include-snapshot] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			return errUsage
+		}
+		timeoutMs, err := cmdArgs.Int("timeout", 0)
+		if err != nil || timeoutMs < 0 {
+			fmt.Fprintf(os.Stderr, "❌ Error: giá trị timeout không hợp lệ: %v\n", cmdArgs.Flags["timeout"])
 			return errUsage
 		}
 		extra := map[string]interface{}{}
@@ -58,6 +64,10 @@ func newOpenCommand() *cobra.Command {
 		}
 		if bu := cmdArgs.String("beforeunload", ""); bu != "" {
 			extra["handleBeforeUnload"] = bu
+		}
+		if timeoutMs > 0 {
+			extra["loadTimeout"] = timeoutMs
+			extra["timeoutMs"] = timeoutMs
 		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -75,6 +85,7 @@ func newOpenCommand() *cobra.Command {
 	f.String("password", "", "Optional HTTP Basic Auth password")
 	f.String("init-script", "", "JavaScript to evaluate on new document")
 	f.String("beforeunload", "", "Auto-handle beforeunload dialog: accept or decline")
+	f.Int("timeout", 0, "Page load timeout in milliseconds")
 	f.String("format", "text", "Output format: text or json")
 	registerInlineWaitPflags(cmd)
 	return cmd
@@ -90,6 +101,7 @@ func newNavigateCommand() *cobra.Command {
 			FlagDef{Name: "beforeunload", Aliases: []string{"handle-beforeunload"}},
 			FlagDef{Name: "username", Aliases: []string{"user", "u"}},
 			FlagDef{Name: "password", Aliases: []string{"pass"}},
+			FlagDef{Name: "timeout", Aliases: []string{"load-timeout"}},
 			FlagDef{Name: "format"},
 		))
 		if err != nil {
@@ -112,7 +124,12 @@ func newNavigateCommand() *cobra.Command {
 			}
 		}
 		if targetURL == "" && navAction != "back" && navAction != "forward" && navAction != "reload" {
-			fmt.Println("Sử dụng: agent-pilot navigate <url|back|forward|reload> [--tab <id>] [--action url|back|forward|reload] [--ignore-cache] [--init-script <js>] [--beforeunload accept|decline] [--user <username>] [--password <password>] [--include-snapshot] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			fmt.Println("Sử dụng: agent-pilot navigate <url|back|forward|reload> [--tab <id>] [--action url|back|forward|reload] [--ignore-cache] [--init-script <js>] [--beforeunload accept|decline] [--timeout <ms>] [--user <username>] [--password <password>] [--include-snapshot] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			return errUsage
+		}
+		timeoutMs, err := cmdArgs.Int("timeout", 0)
+		if err != nil || timeoutMs < 0 {
+			fmt.Fprintf(os.Stderr, "❌ Error: giá trị timeout không hợp lệ: %v\n", cmdArgs.Flags["timeout"])
 			return errUsage
 		}
 		extra := map[string]interface{}{}
@@ -134,6 +151,10 @@ func newNavigateCommand() *cobra.Command {
 		if p := cmdArgs.String("password", ""); p != "" {
 			extra["password"] = p
 		}
+		if timeoutMs > 0 {
+			extra["loadTimeout"] = timeoutMs
+			extra["timeoutMs"] = timeoutMs
+		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -152,6 +173,7 @@ func newNavigateCommand() *cobra.Command {
 	f.String("beforeunload", "", "Auto-handle beforeunload dialog: accept or decline")
 	f.StringP("user", "u", "", "Optional HTTP Basic Auth username")
 	f.String("password", "", "Optional HTTP Basic Auth password")
+	f.Int("timeout", 0, "Page load timeout in milliseconds")
 	f.String("format", "text", "Output format: text or json")
 	registerInlineWaitPflags(cmd)
 	return cmd
@@ -647,7 +669,7 @@ func newEvaluateCommand() *cobra.Command {
 		script, targetTab, extra, err := parseEvalArgsWithOptions(args)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			fmt.Println("Sử dụng: agent-pilot evaluate <script> [-f <file>] [--arg <refOrVal>] [--args <jsonArray>] [-o <output.json>] [--tab <id>] (Alias: eval)")
+			fmt.Println("Sử dụng: agent-pilot evaluate <script> [-f <file>] [--arg <refOrVal>] [--args <jsonArray>] [-o <output.json>] [--timeout <ms>] [--tab <id>] (Alias: eval)")
 			return errUsage
 		}
 		if err := ExecEvaluate(script, targetTab, extra); err != nil {
@@ -661,6 +683,7 @@ func newEvaluateCommand() *cobra.Command {
 	f.StringP("output", "o", "", "Save evaluation result to file path")
 	f.String("arg", "", "Argument (@ref, selector, or value) passed to evaluated function")
 	f.String("args", "", "JSON array of arguments passed to evaluated function")
+	f.Int("timeout", 0, "Execution timeout in milliseconds")
 	f.IntP("tab", "t", 0, "Target tab ID")
 	return cmd
 }
@@ -781,6 +804,7 @@ func newScreenshotCommand() *cobra.Command {
 			FlagDef{Name: "step"},
 			FlagDef{Name: "caption-pos", Aliases: []string{"caption-position"}},
 			FlagDef{Name: "highlight", Aliases: []string{"highlight-selector"}},
+			FlagDef{Name: "timeout"},
 		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -789,6 +813,11 @@ func newScreenshotCommand() *cobra.Command {
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		timeoutMs, err := cmdArgs.Int("timeout", 0)
+		if err != nil || timeoutMs < 0 {
+			fmt.Fprintf(os.Stderr, "❌ Error: giá trị timeout không hợp lệ: %v\n", cmdArgs.Flags["timeout"])
 			return errUsage
 		}
 		mode := cmdArgs.String("mode", "visible")
@@ -809,6 +838,9 @@ func newScreenshotCommand() *cobra.Command {
 				return errUsage
 			}
 			extra["quality"] = q
+		}
+		if timeoutMs > 0 {
+			extra["timeoutMs"] = timeoutMs
 		}
 		if v := cmdArgs.String("caption", ""); v != "" {
 			extra["caption"] = v
@@ -851,6 +883,7 @@ func newScreenshotCommand() *cobra.Command {
 	f.String("step", "", "Annotation banner step badge (e.g. 1 or 1/7)")
 	f.String("caption-pos", "bottom", "Annotation banner position: bottom|top")
 	f.String("highlight", "", "CSS selector or @ref to highlight on screenshot")
+	f.Int("timeout", 0, "Screenshot timeout in milliseconds")
 	registerInlineWaitPflags(cmd)
 	return cmd
 }

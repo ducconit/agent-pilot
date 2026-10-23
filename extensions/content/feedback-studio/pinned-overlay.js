@@ -10,7 +10,9 @@
   if (window.__AP_INTERNAL__.__guards.fsPinned) return;
   window.__AP_INTERNAL__.__guards.fsPinned = true;
 
-  // Setup DOM Elements
+  // Setup DOM Elements (remove any stale layer from prior extension reload)
+  const existingPinnedLayer = document.getElementById("agent-pilot-feedback-pinned-layer");
+  if (existingPinnedLayer) existingPinnedLayer.remove();
   const pinnedLayer = document.createElement("div");
   pinnedLayer.id = "agent-pilot-feedback-pinned-layer";
   pinnedLayer.className = "agent-pilot-feedback-pinned-layer hidden";

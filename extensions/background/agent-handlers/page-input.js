@@ -24,11 +24,37 @@ import {
 import { sendTabMessageWithRetry } from "../tab-manager.js";
 import { getPositiveNumber } from "../batch-validation.js";
 
+const DEFAULT_EVAL_SCRIPTING_TIMEOUT_MS = 3500;
+const DEFAULT_EVAL_CDP_TIMEOUT_MS = 5000;
+
 /**
  * Shared page evaluation helper (MAIN world scripting first, CDP Runtime.evaluate fallback).
- * Supports optional `evalArgs` array containing `@ref` / CSS selector strings or JSON values.
+ * Supports optional `evalArgs` array (or `{ args, timeoutMs, timeout }` options object)
+ * containing `@ref` / CSS selector strings or JSON values, and bounds both MAIN-world
+ * executeScript and CDP Runtime.evaluate with timeouts so a wedged main thread fails fast.
  */
-export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgs = null) {
+export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgsOrOptions = null) {
+  const evalArgs = Array.isArray(evalArgsOrOptions)
+    ? evalArgsOrOptions
+    : Array.isArray(evalArgsOrOptions?.args)
+      ? evalArgsOrOptions.args
+      : null;
+  const options =
+    !Array.isArray(evalArgsOrOptions) && evalArgsOrOptions && typeof evalArgsOrOptions === "object"
+      ? evalArgsOrOptions
+      : {};
+
+  const requestedTimeout = Number(options?.timeoutMs || options?.timeout);
+  const scriptingTimeoutMs =
+    Number.isFinite(requestedTimeout) && requestedTimeout > 0
+      ? Math.max(100, Math.min(requestedTimeout, 4000))
+      : DEFAULT_EVAL_SCRIPTING_TIMEOUT_MS;
+  const cdpTimeoutMs =
+    Number.isFinite(requestedTimeout) && requestedTimeout > 0
+      ? Math.max(100, Math.min(requestedTimeout, 10000))
+      : DEFAULT_EVAL_CDP_TIMEOUT_MS;
+  let scriptingTimedOut = false;
+
   const hasArgs = Array.isArray(evalArgs) && evalArgs.length > 0;
   let argDescriptors = null;
   let markerPrefix = null;
@@ -54,8 +80,9 @@ export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgs 
     if (typeof chrome !== "undefined" && chrome.scripting && chrome.scripting.executeScript) {
       let mainWorldRan = false;
       let userEvalError = null;
+      let timerId = null;
       try {
-        const results = await chrome.scripting.executeScript({
+        const execPromise = chrome.scripting.executeScript({
           target: { tabId },
           world: "MAIN",
           func: async (code, descriptors) => {
@@ -87,9 +114,18 @@ export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgs 
           },
           args: [script, argDescriptors]
         });
+        const timeoutPromise = new Promise((resolve) => {
+          timerId = setTimeout(() => {
+            resolve([{ result: { __eval_timeout: true, timeoutMs: scriptingTimeoutMs } }]);
+          }, scriptingTimeoutMs);
+        });
+        const results = await Promise.race([execPromise, timeoutPromise]);
         if (results && results[0] && results[0].result) {
           const resObj = results[0].result;
-          if (resObj.__eval_err) {
+          if (resObj.__eval_timeout) {
+            scriptingTimedOut = true;
+            logDebug(`evaluateInTab MAIN world timed out after ${scriptingTimeoutMs}ms, falling back to CDP`);
+          } else if (resObj.__eval_err) {
             const isCspEvalError =
               resObj.name === "EvalError" ||
               (typeof resObj.message === "string" && resObj.message.includes("unsafe-eval"));
@@ -103,6 +139,8 @@ export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgs 
         }
       } catch (scriptingErr) {
         logDebug("evaluate in MAIN world fallback to CDP", scriptingErr);
+      } finally {
+        if (timerId !== null) clearTimeout(timerId);
       }
 
       if (mainWorldRan && userEvalError) {
@@ -110,7 +148,7 @@ export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgs 
       }
     }
 
-    // Attempt 2: Fallback to CDP Runtime.evaluate
+    // Attempt 2: Fallback to CDP Runtime.evaluate with V8 execution timeout
     if (!attachedTabs.has(tabId)) {
       await attachDebugger(tabId, broadcastFn).catch((err) => logDebug("evaluate attachDebugger", err));
     }
@@ -129,11 +167,27 @@ export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgs 
           return typeof rawVal === "function" ? rawVal(...resolvedArgs) : rawVal;
         })()`
       : script;
-    const evalRes = await sendCdpCommand(tabId, "Runtime.evaluate", {
-      expression: cdpExpression,
-      returnByValue: true,
-      awaitPromise: true
-    });
+    let evalRes;
+    try {
+      evalRes = await sendCdpCommand(
+        tabId,
+        "Runtime.evaluate",
+        {
+          expression: cdpExpression,
+          returnByValue: true,
+          awaitPromise: true,
+          timeout: cdpTimeoutMs
+        },
+        cdpTimeoutMs + 1000
+      );
+    } catch (cdpErr) {
+      if (scriptingTimedOut) {
+        throw new Error(
+          `MAIN_THREAD_BLOCKED: Page main thread did not respond to page.evaluate within ${scriptingTimeoutMs}ms (${cdpErr?.message || String(cdpErr)})`
+        );
+      }
+      throw cdpErr;
+    }
     if (evalRes?.exceptionDetails) {
       throw new Error(evalRes.exceptionDetails.exception?.description || evalRes.exceptionDetails.text);
     }
@@ -245,7 +299,10 @@ export const pageInputHandlers = {
     const evalArgs = Array.isArray(params.args) ? params.args : null;
 
     client.runWithTabLock(tabId, "page.evaluate", async () => {
-      const evalRes = await evaluateInTab(tabId, script, client.broadcastFn, evalArgs);
+      const evalRes = await evaluateInTab(tabId, script, client.broadcastFn, {
+        ...params,
+        args: evalArgs
+      });
       await runInlineWait(client, tabId, params);
       return evalRes;
     })

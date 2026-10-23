@@ -8,12 +8,41 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
 	"github.com/ducconit/agent-pilot-extension/cli/bridge"
 	"github.com/ducconit/agent-pilot-extension/cli/config"
 )
+
+func normalizeJSONNumbersForDisplay(v interface{}) interface{} {
+	switch val := v.(type) {
+	case float64:
+		if !math.IsNaN(val) && !math.IsInf(val, 0) && math.Trunc(val) == val && val >= -9007199254740991 && val <= 9007199254740991 {
+			return int64(val)
+		}
+		return val
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(val))
+		for k, item := range val {
+			out[k] = normalizeJSONNumbersForDisplay(item)
+		}
+		return out
+	case []interface{}:
+		out := make([]interface{}, len(val))
+		for i, item := range val {
+			out[i] = normalizeJSONNumbersForDisplay(item)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
+func formatDisplayValue(v interface{}) interface{} {
+	return normalizeJSONNumbersForDisplay(v)
+}
 
 func mergeExtraParams(params map[string]interface{}, extra ...map[string]interface{}) {
 	for _, m := range extra {
@@ -48,7 +77,7 @@ func printCommandResult(format, text string, result interface{}) error {
 		fmt.Println(string(payload))
 		return nil
 	}
-	fmt.Printf(text, result)
+	fmt.Printf(text, normalizeJSONNumbersForDisplay(result))
 	return nil
 }
 
@@ -85,7 +114,7 @@ func ExecType(selector, text string, clear, enter bool, tabID interface{}, extra
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Typed text '%s' into '%s': %v\n", text, selector, res)
+	fmt.Printf("✅ Typed text '%s' into '%s': %v\n", text, selector, normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 
@@ -103,7 +132,7 @@ func ExecScroll(deltaX, deltaY float64, tabID interface{}, extra ...map[string]i
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Scrolled (dx=%v, dy=%v): %v\n", deltaX, deltaY, res)
+	fmt.Printf("✅ Scrolled (dx=%v, dy=%v): %v\n", deltaX, deltaY, normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 
@@ -142,7 +171,7 @@ func ExecNavigate(url string, tabID interface{}, extra ...map[string]interface{}
 			targetDesc = act
 		}
 	}
-	fmt.Printf("✅ Navigated to '%s': %v\n", targetDesc, res)
+	fmt.Printf("✅ Navigated to '%s': %v\n", targetDesc, normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 
@@ -245,7 +274,7 @@ func ExecInspect(selector string, tabID interface{}, extra ...map[string]interfa
 	resMap, _ := res.(map[string]interface{})
 	fmt.Printf("🎯 Element details for '%s':\n", selector)
 	for k, v := range resMap {
-		fmt.Printf("  - %s: %v\n", k, v)
+		fmt.Printf("  - %s: %v\n", k, normalizeJSONNumbersForDisplay(v))
 	}
 	return nil
 }
@@ -306,7 +335,7 @@ func ExecBusy(busy bool, action string, tabID interface{}) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Agent busy indicator set to %v (%s): %v\n", busy, action, res)
+	fmt.Printf("✅ Agent busy indicator set to %v (%s): %v\n", busy, action, normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 
@@ -461,7 +490,7 @@ func ExecHover(selector string, tabID interface{}, extra ...map[string]interface
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Hovered on %s: %v\n", selector, res)
+	fmt.Printf("✅ Hovered on %s: %v\n", selector, normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 
@@ -473,7 +502,7 @@ func ExecDrag(params map[string]interface{}, tabID interface{}) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Drag dispatched: %v\n", res)
+	fmt.Printf("✅ Drag dispatched: %v\n", normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 
@@ -492,7 +521,7 @@ func ExecPressKey(key, selector string, tabID interface{}, extra ...map[string]i
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Key dispatched (%s): %v\n", key, res)
+	fmt.Printf("✅ Key dispatched (%s): %v\n", key, normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 
@@ -529,7 +558,7 @@ func ExecWaitFor(selector, text, state string, timeoutMs int, tabID interface{})
 			return fmt.Errorf("%v", resMap["error"])
 		}
 	}
-	fmt.Printf("✅ Wait successful: %v\n", res)
+	fmt.Printf("✅ Wait successful: %v\n", normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 
@@ -554,6 +583,6 @@ func ExecUploadFile(selector string, files []string, tabID interface{}, extra ..
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Files uploaded to %s: %v\n", selector, res)
+	fmt.Printf("✅ Files uploaded to %s: %v\n", selector, normalizeJSONNumbersForDisplay(res))
 	return nil
 }

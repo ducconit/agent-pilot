@@ -35,6 +35,35 @@ function serializeConsoleArgs(rawArgs) {
   });
 }
 
+function getHeaderCaseInsensitive(headers, name) {
+  if (!headers || typeof headers !== "object") return undefined;
+  const target = name.toLowerCase();
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === target && v !== undefined && v !== "") {
+      return String(v);
+    }
+  }
+  return undefined;
+}
+
+export function extractPerformanceHeaders(headers) {
+  if (!headers || typeof headers !== "object") return {};
+  const cacheStatus =
+    getHeaderCaseInsensitive(headers, "cf-cache-status") ||
+    getHeaderCaseInsensitive(headers, "x-nextjs-cache") ||
+    getHeaderCaseInsensitive(headers, "x-vercel-cache") ||
+    getHeaderCaseInsensitive(headers, "x-cache");
+  const contentEncoding = getHeaderCaseInsensitive(headers, "content-encoding");
+  const cacheControl = getHeaderCaseInsensitive(headers, "cache-control");
+  const serverTiming = getHeaderCaseInsensitive(headers, "server-timing");
+  const out = {};
+  if (cacheStatus) out.cacheStatus = cacheStatus;
+  if (contentEncoding) out.contentEncoding = contentEncoding;
+  if (cacheControl) out.cacheControl = cacheControl;
+  if (serverTiming) out.serverTiming = serverTiming;
+  return out;
+}
+
 /**
  * Initialize CDP event listeners for DevTools Console, Network, and Runtime events
  */
@@ -161,6 +190,7 @@ export function initCdpEventListeners(broadcastFn) {
         buffer.network.delete(oldestKey);
       }
 
+      const startTimeMs = typeof params.timestamp === "number" ? params.timestamp * 1000 : Date.now();
       const req = {
         id: params.requestId,
         navigationId: buffer.navigationId || 1,
@@ -174,8 +204,10 @@ export function initCdpEventListeners(broadcastFn) {
         initiator: params.initiator,
         type: params.type || "Other",
         wallTime: params.wallTime ? params.wallTime * 1000 : Date.now(),
+        startTimeMs,
         status: "pending",
-        responseSize: 0
+        responseSize: 0,
+        transferKB: 0
       };
       buffer.network.set(params.requestId, req);
       if (typeof broadcastFn === "function") {
@@ -188,11 +220,27 @@ export function initCdpEventListeners(broadcastFn) {
     } else if (method === "Network.responseReceived") {
       const existing = buffer.network.get(params.requestId);
       if (existing) {
-        existing.status = params.response.status;
-        existing.statusText = params.response.statusText;
-        existing.mimeType = params.response.mimeType;
-        existing.headers = params.response.headers;
-        existing.encodedDataLength = params.response.encodedDataLength;
+        const resp = params.response || {};
+        existing.status = resp.status;
+        existing.statusText = resp.statusText;
+        existing.mimeType = resp.mimeType;
+        if (resp.protocol) existing.protocol = resp.protocol;
+        if (resp.fromDiskCache) existing.fromDiskCache = true;
+        if (resp.fromServiceWorker) existing.fromServiceWorker = true;
+        existing.headers = resp.headers;
+        const encodedLen =
+          typeof resp.encodedDataLength === "number" && resp.encodedDataLength > 0
+            ? resp.encodedDataLength
+            : existing.encodedDataLength || 0;
+        existing.encodedDataLength = encodedLen;
+        existing.responseSize = encodedLen;
+        existing.transferKB = Math.round((encodedLen / 1024) * 10) / 10;
+        if (typeof params.timestamp === "number" && typeof existing.startTimeMs === "number") {
+          existing.durationMs = Math.max(0, Math.round(params.timestamp * 1000 - existing.startTimeMs));
+        } else if (resp.timing && typeof resp.timing.receiveHeadersEnd === "number") {
+          existing.durationMs = Math.max(0, Math.round(resp.timing.receiveHeadersEnd));
+        }
+        Object.assign(existing, extractPerformanceHeaders(resp.headers));
         if (typeof broadcastFn === "function") {
           broadcastFn({
             type: "DEVTOOLS_NETWORK_EVENT",
@@ -204,7 +252,14 @@ export function initCdpEventListeners(broadcastFn) {
     } else if (method === "Network.loadingFinished") {
       const existing = buffer.network.get(params.requestId);
       if (existing) {
-        existing.encodedDataLength = params.encodedDataLength;
+        if (typeof params.encodedDataLength === "number") {
+          existing.encodedDataLength = params.encodedDataLength;
+          existing.responseSize = params.encodedDataLength;
+          existing.transferKB = Math.round((params.encodedDataLength / 1024) * 10) / 10;
+        }
+        if (typeof params.timestamp === "number" && typeof existing.startTimeMs === "number") {
+          existing.durationMs = Math.max(0, Math.round(params.timestamp * 1000 - existing.startTimeMs));
+        }
         existing.finished = true;
         if (typeof broadcastFn === "function") {
           broadcastFn({
@@ -219,6 +274,9 @@ export function initCdpEventListeners(broadcastFn) {
       if (existing) {
         existing.status = "failed";
         existing.errorText = params.errorText;
+        if (typeof params.timestamp === "number" && typeof existing.startTimeMs === "number") {
+          existing.durationMs = Math.max(0, Math.round(params.timestamp * 1000 - existing.startTimeMs));
+        }
         if (typeof broadcastFn === "function") {
           broadcastFn({
             type: "DEVTOOLS_NETWORK_EVENT",

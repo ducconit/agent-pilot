@@ -569,7 +569,7 @@ const mockInlineClient = {
 };
 const inlineMeta = await runInlineWait(mockInlineClient, 501, {
   waitForSelector: ".loaded-panel",
-  waitMs: 15
+  waitMs: 20
 });
 const mergedClick = mergeWaitMeta({ success: true }, inlineMeta);
 
@@ -1207,32 +1207,685 @@ record(
   "timeout=false, methodNotFound=true"
 );
 
-// 29. dispatchCdpMouseClick with dblClick: true dispatches clickCount 1 then 2
+// 29. getPerformanceMetrics distinguishes liveDomElements vs blinkRetainedNodes, supports pre-metrics GC, includes runtimeErrors, and flags INP / DetachedOrUncollectedNodes / RetainedDocuments / ConsoleErrors
 attachedTabs.add(929);
-const clickEvents29 = [];
-globalThis.chrome.debugger.sendCommand = (_target, method, params, cb) => {
-  if (method === "Input.dispatchMouseEvent") {
-    clickEvents29.push({ type: params.type, clickCount: params.clickCount });
+let gcCalled929 = false;
+devtoolsBuffers.set(929, {
+  console: [{ type: "error", text: "RangeError: Maximum call stack size exceeded", timestamp: Date.now() }],
+  errors: [{ text: "Uncaught ReferenceError: chartInstance is not defined", timestamp: Date.now() }],
+  issues: [],
+  network: new Map()
+});
+globalThis.chrome.debugger.sendCommand = (_target, method, _params, cb) => {
+  if (method === "HeapProfiler.collectGarbage") {
+    gcCalled929 = true;
+    cb({});
+    return;
+  }
+  if (method === "Performance.getMetrics") {
+    cb({
+      metrics: [
+        { name: "JSHeapUsedSize", value: 42 * 1024 * 1024 },
+        { name: "JSHeapTotalSize", value: 64 * 1024 * 1024 },
+        { name: "Nodes", value: 1950 },
+        { name: "Documents", value: 7 },
+        { name: "JSEventListeners", value: 840 }
+      ]
+    });
+    return;
   }
   cb({});
 };
-await cdpManager.dispatchCdpMouseClick(929, 200, 150, { dblClick: true });
+globalThis.chrome.scripting = {
+  executeScript: async () => [
+    {
+      result: {
+        webVitals: {
+          ttfbMs: 120,
+          fcpMs: 450,
+          lcpMs: 1100,
+          lcpElement: "main.dashboard",
+          cls: 0.02,
+          clsCulprits: [],
+          inpMs: 640,
+          slowestInteraction: { name: "click", durationMs: 640, target: "button#stress-btn" },
+          totalBlockingTimeMs: 420,
+          longTasksCount: 3,
+          domContentLoadedMs: 500,
+          loadEventMs: 900
+        },
+        resources: {
+          totalCount: 10,
+          totalTransferKB: 420,
+          renderBlockingCount: 0,
+          renderBlockingUrls: [],
+          slowestResources: []
+        },
+        domHealth: {
+          totalElements: 450,
+          maxDepth: 14,
+          maxChildrenCount: 25,
+          maxChildrenSelector: "div.grid",
+          iframeCount: 0,
+          duplicateIds: [],
+          imagesMissingAlt: 0,
+          unlabelledInputs: 0
+        }
+      }
+    }
+  ]
+};
+const perf929 = await cdpManager.getPerformanceMetrics(929, { collectGarbage: true });
+const diag929 = (perf929.diagnostics || []).map((d) => d.metric);
 record(
-  "29. dispatchCdpMouseClick with dblClick: true dispatches clickCount 1 then 2",
-  clickEvents29.filter((e) => e.type === "mousePressed").map((e) => e.clickCount).join(",") === "1,2" &&
-    clickEvents29.filter((e) => e.type === "mouseReleased").map((e) => e.clickCount).join(",") === "1,2",
-  `events=${JSON.stringify(clickEvents29.filter((e) => e.type !== "mouseMoved"))}`
+  "29. getPerformanceMetrics separates liveDomElements vs blinkRetainedNodes, runs optional GC, surfaces runtimeErrors, and flags INP/DetachedDOM/RetainedDocuments",
+  gcCalled929 === true &&
+    perf929.garbageCollected === true &&
+    perf929.memory?.liveDomElements === 450 &&
+    perf929.memory?.blinkRetainedNodes === 1950 &&
+    perf929.memory?.detachedOrUncollectedNodes === 1500 &&
+    perf929.webVitals?.inpMs === 640 &&
+    perf929.webVitals?.ratings?.inp === "poor" &&
+    perf929.runtimeErrors?.consoleErrorCount === 1 &&
+    perf929.runtimeErrors?.pageErrorCount === 1 &&
+    diag929.includes("INP") &&
+    diag929.includes("DetachedOrUncollectedNodes") &&
+    diag929.includes("RetainedDocuments") &&
+    diag929.includes("ConsoleErrors"),
+  `live=${perf929.memory?.liveDomElements}, retained=${perf929.memory?.blinkRetainedNodes}, detached=${perf929.memory?.detachedOrUncollectedNodes}, diag=${diag929.join(",")}`
 );
 
-// 30. evaluateInTab resolves @ref/selector args, cleans up marker attributes, and invokes user function in MAIN world
-let markedArgs30 = null;
-let unmarkedPrefix30 = null;
-let mainWorldExec30 = null;
+// 30. getPerformanceMetrics survives a frozen main thread when executeScript times out and emits MainThreadBlocked diagnostic
+attachedTabs.add(930);
+globalThis.chrome.scripting = {
+  executeScript: () => new Promise(() => {})
+};
+const perf930 = await cdpManager.getPerformanceMetrics(930, { probeTimeoutMs: 60 });
+const diag930 = (perf930.diagnostics || []).map((d) => d.metric);
+record(
+  "30. getPerformanceMetrics bounds executeScript probe on a frozen main thread and returns MainThreadBlocked diagnostic",
+  perf930.success === true &&
+    perf930.mainThreadBlocked === true &&
+    perf930.domProbeTimedOut === true &&
+    perf930.memory?.blinkRetainedNodes === 1950 &&
+    diag930.includes("MainThreadBlocked"),
+  `mainThreadBlocked=${perf930.mainThreadBlocked}, diag=${diag930.join(",")}`
+);
+
+// 31. takeHeapSnapshot falls back to runtime-counters-fallback on extension tabs when HeapProfiler is unavailable but Performance.getMetrics is present
+attachedTabs.add(931);
+let step931 = 0;
+globalThis.chrome.debugger.sendCommand = (_target, method, _params, cb) => {
+  if (method === "HeapProfiler.collectGarbage" || method === "HeapProfiler.takeHeapSnapshot") {
+    globalThis.chrome.runtime.lastError = { message: "-32601 Method not found" };
+    cb({});
+    globalThis.chrome.runtime.lastError = null;
+    return;
+  }
+  if (method === "Performance.getMetrics") {
+    step931++;
+    if (step931 === 1) {
+      cb({
+        metrics: [
+          { name: "JSHeapUsedSize", value: 12 * 1024 * 1024 },
+          { name: "JSHeapTotalSize", value: 24 * 1024 * 1024 },
+          { name: "Nodes", value: 500 },
+          { name: "Documents", value: 2 },
+          { name: "JSEventListeners", value: 120 }
+        ]
+      });
+    } else {
+      cb({
+        metrics: [
+          { name: "JSHeapUsedSize", value: 22 * 1024 * 1024 },
+          { name: "JSHeapTotalSize", value: 32 * 1024 * 1024 },
+          { name: "Nodes", value: 1400 },
+          { name: "Documents", value: 5 },
+          { name: "JSEventListeners", value: 340 }
+        ]
+      });
+    }
+    return;
+  }
+  cb({});
+};
+globalThis.chrome.scripting = {
+  executeScript: async () => [
+    {
+      result: {
+        domHealth: {
+          totalElements: 420,
+          maxDepth: 10,
+          maxChildrenCount: 15,
+          maxChildrenSelector: "div.app",
+          iframeCount: 0,
+          duplicateIds: [],
+          imagesMissingAlt: 0,
+          unlabelledInputs: 0
+        }
+      }
+    }
+  ]
+};
+const fallbackBaseline = await cdpManager.takeHeapSnapshot(931, { action: "baseline" });
+const fallbackDiff = await cdpManager.takeHeapSnapshot(931, { action: "diff" });
+record(
+  "31. takeHeapSnapshot falls back to runtime-counters-fallback for baseline and diff when HeapProfiler is blocked on extension tabs",
+  fallbackBaseline.success === true &&
+    fallbackBaseline.snapshotMode === "runtime-counters-fallback" &&
+    fallbackBaseline.baselineRecorded === true &&
+    fallbackDiff.success === true &&
+    fallbackDiff.snapshotMode === "runtime-counters-fallback" &&
+    fallbackDiff.leakAnalysis?.hasBaseline === true &&
+    fallbackDiff.leakAnalysis?.leakSuspected === true &&
+    fallbackDiff.leakAnalysis?.deltas?.domNodes === 900 &&
+    fallbackDiff.leakAnalysis?.deltas?.documents === 3 &&
+    fallbackDiff.leakAnalysis?.deltas?.jsEventListeners === 220 &&
+    fallbackDiff.leakAnalysis?.deltas?.detachedOrUncollectedNodes === 900 &&
+    fallbackDiff.runtimeCounters?.detachedOrUncollectedNodes === 980,
+  `mode=${fallbackDiff.snapshotMode}, leakSuspected=${fallbackDiff.leakAnalysis?.leakSuspected}, deltaDom=${fallbackDiff.leakAnalysis?.deltas?.domNodes}, detachedDelta=${fallbackDiff.leakAnalysis?.deltas?.detachedOrUncollectedNodes}`
+);
+
+// 32. collectPageWebVitalsAndDomProbe in-page function filters out #agent-pilot-* / .agent-pilot-* / .ap-* elements and collects buffered PerformanceObserver Web Vitals
+let capturedPageProbeFunc = null;
+attachedTabs.add(932);
+globalThis.chrome.scripting = {
+  executeScript: async ({ func }) => {
+    capturedPageProbeFunc = func;
+    return [{ result: null }];
+  }
+};
+await cdpManager.getPerformanceMetrics(932, {});
+let inPageProbeResult = null;
+if (typeof capturedPageProbeFunc === "function") {
+  const prevWindow = globalThis.window;
+  const prevDocument = globalThis.document;
+  const prevPerformance = globalThis.performance;
+  const prevPerformanceObserver = globalThis.PerformanceObserver;
+  try {
+    const dupBtn1 = { id: "dup-btn", tagName: "BUTTON", className: "btn", children: [], getAttribute: () => null };
+    const dupBtn2 = { id: "dup-btn", tagName: "BUTTON", className: "btn", children: [], getAttribute: () => null };
+    const appMain = {
+      id: "app-main",
+      tagName: "MAIN",
+      className: "dashboard-shell",
+      children: [dupBtn1, dupBtn2],
+      getAttribute: () => null
+    };
+    const injectedRing = { id: "agent-pilot-cursor-ring", tagName: "DIV", className: "", children: [], getAttribute: () => null };
+    const injectedCursor1 = {
+      id: "agent-pilot-cursor-layer",
+      tagName: "DIV",
+      className: "",
+      children: [injectedRing],
+      getAttribute: () => null
+    };
+    const injectedCursor2 = {
+      id: "agent-pilot-cursor-layer",
+      tagName: "DIV",
+      className: "",
+      children: [],
+      getAttribute: () => null
+    };
+    const injectedBadge = {
+      id: "",
+      tagName: "SPAN",
+      className: "ap-badge",
+      children: [],
+      getAttribute: () => null
+    };
+    const bodyEl = {
+      id: "",
+      tagName: "BODY",
+      className: "",
+      children: [appMain, injectedCursor1, injectedCursor2, injectedBadge],
+      getAttribute: () => null
+    };
+    const htmlEl = {
+      id: "",
+      tagName: "HTML",
+      className: "",
+      children: [bodyEl],
+      getAttribute: () => null
+    };
+    const allSyntheticElements = [htmlEl, bodyEl, appMain, dupBtn1, dupBtn2, injectedCursor1, injectedRing, injectedCursor2, injectedBadge];
+    globalThis.window = {};
+    globalThis.document = {
+      documentElement: htmlEl,
+      body: bodyEl,
+      title: "Synthetic Dashboard",
+      readyState: "complete",
+      querySelectorAll: (sel) => (sel === "*" ? allSyntheticElements : []),
+      getElementById: () => null
+    };
+    globalThis.performance = {
+      getEntriesByType: (type) => {
+        if (type === "navigation") {
+          return [{ responseStart: 90, requestStart: 10, domInteractive: 210, domContentLoadedEventEnd: 320, loadEventEnd: 610, transferSize: 12345, encodedBodySize: 12000, decodedBodySize: 28000 }];
+        }
+        if (type === "paint") {
+          return [{ name: "first-paint", startTime: 180 }, { name: "first-contentful-paint", startTime: 240 }];
+        }
+        if (type === "resource") {
+          return [];
+        }
+        return [];
+      }
+    };
+    globalThis.PerformanceObserver = class {
+      constructor(cb) {
+        this.cb = cb;
+      }
+      observe({ type }) {
+        if (type === "largest-contentful-paint") {
+          this.cb({
+            getEntries: () => [{ startTime: 820, size: 48000, element: { tagName: "MAIN", id: "app-main", className: "dashboard-shell" } }]
+          });
+        } else if (type === "layout-shift") {
+          this.cb({
+            getEntries: () => [{ value: 0.04, hadRecentInput: false, sources: [{ node: { tagName: "DIV", id: "banner", className: "" } }] }]
+          });
+        } else if (type === "longtask") {
+          this.cb({
+            getEntries: () => [{ startTime: 300, duration: 130 }]
+          });
+        } else if (type === "event") {
+          this.cb({
+            getEntries: () => [{ name: "click", duration: 280, startTime: 400, interactionId: 7, target: { tagName: "BUTTON", id: "dup-btn", className: "btn" } }]
+          });
+        }
+      }
+      disconnect() {}
+    };
+    inPageProbeResult = await capturedPageProbeFunc();
+  } finally {
+    globalThis.window = prevWindow;
+    globalThis.document = prevDocument;
+    globalThis.performance = prevPerformance;
+    globalThis.PerformanceObserver = prevPerformanceObserver;
+  }
+}
+record(
+  "32. in-page probe excludes #agent-pilot-* / .ap-* overlays from domHealth and collects buffered PerformanceObserver LCP/CLS/INP/LongTasks",
+  inPageProbeResult?.domHealth?.totalElements === 5 &&
+    inPageProbeResult?.domHealth?.duplicateIds?.length === 1 &&
+    inPageProbeResult?.domHealth?.duplicateIds?.[0]?.id === "dup-btn" &&
+    inPageProbeResult?.webVitals?.lcpMs === 820 &&
+    inPageProbeResult?.webVitals?.lcpElement === "main#app-main.dashboard-shell" &&
+    inPageProbeResult?.webVitals?.cls === 0.04 &&
+    inPageProbeResult?.webVitals?.inpMs === 280 &&
+    inPageProbeResult?.webVitals?.slowestInteraction?.target === "button#dup-btn.btn" &&
+    inPageProbeResult?.webVitals?.longTasksCount === 1 &&
+    inPageProbeResult?.webVitals?.totalBlockingTimeMs === 80,
+  `totalElements=${inPageProbeResult?.domHealth?.totalElements}, dupIds=${JSON.stringify(inPageProbeResult?.domHealth?.duplicateIds)}, lcp=${inPageProbeResult?.webVitals?.lcpMs}, inp=${inPageProbeResult?.webVitals?.inpMs}, tbt=${inPageProbeResult?.webVitals?.totalBlockingTimeMs}`
+);
+
+// 33. Background tab paint starvation (visibilityState='hidden') & late-foreground LCP inflation detection + bringToFront support
+attachedTabs.add(933);
+let bringToFrontCdpCalls = 0;
+let bringToFrontTabUpdates = 0;
+globalThis.chrome.tabs = {
+  update: async (_tid, props) => {
+    if (props?.active === true) bringToFrontTabUpdates++;
+    return { id: 933, active: true };
+  }
+};
+globalThis.chrome.debugger.sendCommand = (_target, method, _params, cb) => {
+  globalThis.chrome.runtime.lastError = null;
+  if (method === "Page.bringToFront") {
+    bringToFrontCdpCalls++;
+    cb({});
+    return;
+  }
+  if (method === "Performance.getMetrics") {
+    cb({
+      metrics: [
+        { name: "JSHeapUsedSize", value: 18 * 1024 * 1024 },
+        { name: "JSHeapTotalSize", value: 32 * 1024 * 1024 },
+        { name: "Nodes", value: 380 },
+        { name: "Documents", value: 1 }
+      ]
+    });
+    return;
+  }
+  cb({});
+};
+let probeMode933 = "hidden";
+globalThis.chrome.scripting = {
+  executeScript: async () => {
+    if (probeMode933 === "hidden") {
+      return [
+        {
+          result: {
+            webVitals: {
+              ttfbMs: 12,
+              fcpMs: undefined,
+              lcpMs: undefined,
+              cls: 0,
+              clsCulprits: [],
+              domInteractiveMs: 85,
+              domContentLoadedMs: 120,
+              loadEventMs: 368,
+              visibilityState: "hidden",
+              wasHiddenBeforePaint: true,
+              backgroundTabPaintDeferred: true,
+              longTasksCount: 0,
+              totalBlockingTimeMs: 0,
+              maxLongTaskMs: 0,
+              topLongTasks: []
+            },
+            domHealth: { totalElements: 376, maxDepth: 11, maxChildrenCount: 8, iframeCount: 0, duplicateIds: [] }
+          }
+        }
+      ];
+    }
+    return [
+      {
+        result: {
+          webVitals: {
+            ttfbMs: 12,
+            fcpMs: 34008,
+            lcpMs: 34008,
+            lcpElement: "h1.hero-title",
+            cls: 0,
+            clsCulprits: [],
+            domInteractiveMs: 85,
+            domContentLoadedMs: 120,
+            loadEventMs: 368,
+            visibilityState: "visible",
+            wasHiddenBeforePaint: true,
+            lateForegroundPaint: true,
+            backgroundDwellEstimateMs: 33640,
+            longTasksCount: 0,
+            totalBlockingTimeMs: 0,
+            maxLongTaskMs: 0,
+            topLongTasks: []
+          },
+          domHealth: { totalElements: 376, maxDepth: 11, maxChildrenCount: 8, iframeCount: 0, duplicateIds: [] }
+        }
+      }
+    ];
+  }
+};
+const hiddenMetrics = await cdpManager.getPerformanceMetrics(933, {});
+probeMode933 = "late-foreground";
+const lateForegroundMetrics = await cdpManager.getPerformanceMetrics(933, { bringToFront: true });
+record(
+  "33. getPerformanceMetrics flags BackgroundTabPaintDeferred & LateForegroundPaintInflation without false-positive Slow LCP and supports bringToFront",
+  hiddenMetrics.webVitals?.ratings?.fcp === "deferred-background-tab" &&
+    hiddenMetrics.webVitals?.ratings?.lcp === "deferred-background-tab" &&
+    hiddenMetrics.diagnostics.some((d) => d.metric === "BackgroundTabPaintDeferred") &&
+    !hiddenMetrics.diagnostics.some((d) => d.metric === "LCP") &&
+    lateForegroundMetrics.broughtToFront === true &&
+    bringToFrontCdpCalls === 1 &&
+    bringToFrontTabUpdates === 1 &&
+    lateForegroundMetrics.webVitals?.ratings?.lcp === "deferred-background-tab" &&
+    lateForegroundMetrics.diagnostics.some((d) => d.metric === "LateForegroundPaintInflation" && d.backgroundDwellEstimateMs === 33640) &&
+    !lateForegroundMetrics.diagnostics.some((d) => d.metric === "LCP"),
+  `hiddenDiag=${JSON.stringify(hiddenMetrics.diagnostics.map((d) => d.metric))}, lateDiag=${JSON.stringify(lateForegroundMetrics.diagnostics.map((d) => d.metric))}, broughtToFront=${lateForegroundMetrics.broughtToFront}`
+);
+
+// 34. evaluateInTab bounds wedged MAIN-world executeScript with fast timeout and passes timeout to CDP Runtime.evaluate (or throws MAIN_THREAD_BLOCKED)
+attachedTabs.add(934);
+let cdpRuntimeEvalParams = null;
+let cdpEvalShouldFail = false;
+globalThis.chrome.scripting = {
+  executeScript: () => new Promise(() => {}) // Simulate infinite loop on main thread
+};
+globalThis.chrome.debugger.sendCommand = (_target, method, params, cb) => {
+  globalThis.chrome.runtime.lastError = null;
+  if (method === "Runtime.evaluate") {
+    cdpRuntimeEvalParams = params;
+    if (cdpEvalShouldFail) {
+      globalThis.chrome.runtime.lastError = { message: "Execution was terminated" };
+      cb({});
+      return;
+    }
+    cb({ result: { type: "string", value: "fallback-ok" } });
+    return;
+  }
+  cb({});
+};
+const evalFallbackVal = await evaluateInTab(934, "document.title", null, { timeoutMs: 150 });
+cdpEvalShouldFail = true;
+let evalBlockedErr = null;
+try {
+  await evaluateInTab(934, "while(true){}", null, { timeoutMs: 120 });
+} catch (err) {
+  evalBlockedErr = err;
+}
+record(
+  "34. evaluateInTab times out wedged executeScript quickly, passes V8 timeout to CDP Runtime.evaluate, and reports MAIN_THREAD_BLOCKED when wedged",
+  evalFallbackVal === "fallback-ok" &&
+    cdpRuntimeEvalParams?.timeout === 120 &&
+    Boolean(evalBlockedErr && String(evalBlockedErr.message).includes("MAIN_THREAD_BLOCKED")),
+  `evalFallbackVal=${evalFallbackVal}, cdpTimeout=${cdpRuntimeEvalParams?.timeout}, blockedErr=${evalBlockedErr?.message}`
+);
+
+// 35. collectDevtoolsData infers requestedType='console' when console=true & network=false, and network.listRequests strips bulky headers while enriching cacheStatus/contentEncoding/transferKB/summary
+const { systemHandlers } = await import("../extensions/background/agent-handlers/system.js");
+attachedTabs.add(935);
+devtoolsBuffers.set(935, {
+  console: [
+    { id: "c1", type: "log", text: "boot ok", timestamp: 1000 },
+    { id: "c2", type: "error", text: "failed chunk load", timestamp: 1005 }
+  ],
+  network: new Map([
+    [
+      "n1",
+      {
+        id: "n1",
+        url: "https://lagom.sphoton.com/vi",
+        method: "GET",
+        type: "Document",
+        status: 200,
+        encodedDataLength: 31800,
+        durationMs: 16268,
+        requestHeaders: { "user-agent": "Mozilla/5.0", cookie: "sid=123" },
+        headers: {
+          "cf-cache-status": "DYNAMIC",
+          "x-nextjs-cache": "MISS",
+          "content-encoding": "zstd",
+          "cache-control": "private, no-cache, no-store"
+        }
+      }
+    ],
+    [
+      "n2",
+      {
+        id: "n2",
+        url: "https://lagom.sphoton.com/_next/static/chunks/main.js",
+        method: "GET",
+        type: "Script",
+        status: 200,
+        encodedDataLength: 102400,
+        durationMs: 85,
+        requestHeaders: { "user-agent": "Mozilla/5.0" },
+        headers: {
+          "cf-cache-status": "HIT",
+          "content-encoding": "br"
+        }
+      }
+    ]
+  ])
+});
+const consoleOnlyPayload = await collectDevtoolsData(935, { console: true, network: false });
+const netListCompact = await new Promise((resolve, reject) => {
+  systemHandlers["network.listRequests"](
+    { getTargetTabId: async () => 935 },
+    { tabId: 935 },
+    (res, err) => (err ? reject(err) : resolve(res))
+  );
+});
+const netListWithHeaders = await new Promise((resolve, reject) => {
+  systemHandlers["network.listRequests"](
+    { getTargetTabId: async () => 935 },
+    { tabId: 935, includeHeaders: true },
+    (res, err) => (err ? reject(err) : resolve(res))
+  );
+});
+cleanupTabResources(935);
+record(
+  "35. collectDevtoolsData isolates console-only requests & network.listRequests strips raw headers while enriching cacheStatus/contentEncoding/summary",
+  Array.isArray(consoleOnlyPayload.console) &&
+    consoleOnlyPayload.console.length === 2 &&
+    consoleOnlyPayload.network === undefined &&
+    consoleOnlyPayload.performance === undefined &&
+    netListCompact.summary?.returnedCount === 2 &&
+    netListCompact.summary?.totalTransferKB === 131.1 &&
+    netListCompact.summary?.byType?.Document?.count === 1 &&
+    netListCompact.summary?.byType?.Script?.count === 1 &&
+    netListCompact.requests[0].headers === undefined &&
+    netListCompact.requests[0].requestHeaders === undefined &&
+    netListCompact.requests[0].cacheStatus === "DYNAMIC" &&
+    netListCompact.requests[0].contentEncoding === "zstd" &&
+    netListCompact.requests[0].transferKB === 31.1 &&
+    netListWithHeaders.requests[0].headers?.["cf-cache-status"] === "DYNAMIC" &&
+    netListWithHeaders.requests[0].requestHeaders?.["user-agent"] === "Mozilla/5.0",
+  `consoleOnlyHasPerf=${consoleOnlyPayload.performance !== undefined}, compactHeaders=${netListCompact.requests[0]?.headers}, cacheStatus=${netListCompact.requests[0]?.cacheStatus}, totalKB=${netListCompact.summary?.totalTransferKB}`
+);
+
+// 36. getPerformanceMetrics exposes navigationTiming breakdown, resources.byType, and emits PageLoadIncomplete diagnostic when readyState !== 'complete'
+attachedTabs.add(936);
+globalThis.chrome.scripting = {
+  executeScript: async () => [
+    {
+      result: {
+        webVitals: {
+          ttfbMs: 16188,
+          fcpMs: 16472,
+          lcpMs: 16472,
+          cls: 0,
+          clsCulprits: [],
+          domInteractiveMs: 16349,
+          domContentLoadedMs: 16418,
+          loadEventMs: undefined,
+          readyState: "interactive",
+          visibilityState: "visible",
+          navigationTiming: {
+            type: "navigate",
+            protocol: "h2",
+            responseStatus: 200,
+            redirectCount: 1,
+            dnsMs: 15,
+            tcpMs: 28,
+            tlsMs: 19,
+            ttfbMs: 16188,
+            responseDownloadMs: 80,
+            domInteractiveMs: 16349,
+            domContentLoadedMs: 16418,
+            loadEventMs: undefined,
+            transferKB: 31.1,
+            encodedBodyKB: 30.8,
+            decodedBodyKB: 183.7
+          },
+          longTasksCount: 1,
+          totalBlockingTimeMs: 42,
+          maxLongTaskMs: 92,
+          topLongTasks: []
+        },
+        resources: {
+          totalCount: 3,
+          totalTransferKB: 145.5,
+          byType: {
+            script: { count: 2, transferKB: 120.5, maxDurationMs: 140 },
+            img: { count: 1, transferKB: 25, maxDurationMs: 65 }
+          },
+          renderBlockingCount: 0,
+          renderBlockingUrls: [],
+          slowestResources: []
+        },
+        domHealth: { totalElements: 520, maxDepth: 12, maxChildrenCount: 10, iframeCount: 0, duplicateIds: [] }
+      }
+    }
+  ]
+};
+const perf936 = await cdpManager.getPerformanceMetrics(936, {});
+const diag936 = (perf936.diagnostics || []).map((d) => d.metric);
+cleanupTabResources(936);
+record(
+  "36. getPerformanceMetrics includes navigationTiming, resources.byType, and emits PageLoadIncomplete when readyState !== 'complete'",
+  perf936.navigationTiming?.protocol === "h2" &&
+    perf936.navigationTiming?.ttfbMs === 16188 &&
+    perf936.navigationTiming?.decodedBodyKB === 183.7 &&
+    perf936.resources?.byType?.script?.count === 2 &&
+    perf936.resources?.byType?.img?.transferKB === 25 &&
+    diag936.includes("PageLoadIncomplete") &&
+    inPageProbeResult?.webVitals?.navigationTiming?.ttfbMs === 80 &&
+    inPageProbeResult?.webVitals?.readyState === "complete",
+  `protocol=${perf936.navigationTiming?.protocol}, ttfb=${perf936.navigationTiming?.ttfbMs}, byType=${JSON.stringify(perf936.resources?.byType)}, diag=${diag936.join(",")}`
+);
+
+// 37. waitForTabComplete & tabs.create surface loadTimedOut=true when initial page load exceeds loadTimeout while status is still 'loading'
+const { waitForTabComplete } = await import("../extensions/background/tab-manager.js");
+const { tabsHandlers } = await import("../extensions/background/agent-handlers/tabs.js");
+globalThis.chrome = {
+  runtime: { lastError: null },
+  tabs: {
+    create: (opts, cb) => cb({ id: 937, url: opts.url, status: "loading", active: true, windowId: 1 }),
+    get: async (id) => ({ id, url: "https://lagom.sphoton.com/vi", status: "loading", active: true, windowId: 1 }),
+    onUpdated: {
+      addListener: () => {},
+      removeListener: () => {}
+    }
+  },
+  debugger: {
+    getTargets: (cb) => cb([]),
+    attach: (_t, _v, cb) => cb(),
+    sendCommand: (_t, _m, _p, cb) => cb({})
+  }
+};
+const rawWaitTimeout = await waitForTabComplete(937, 25);
+const createdSlowTab = await new Promise((resolve, reject) => {
+  tabsHandlers["tabs.create"](
+    {
+      getActiveTabId: async () => 937,
+      recordAgentTab: () => {},
+      assignTabToAgentGroup: async () => {},
+      broadcastFn: null
+    },
+    { url: "https://lagom.sphoton.com/vi", active: true, timeoutMs: 25 },
+    (res, err) => (err ? reject(err) : resolve(res))
+  );
+});
+cleanupTabResources(937);
+record(
+  "37. waitForTabComplete & tabs.create surface loadTimedOut=true when page load exceeds timeout while still loading",
+  rawWaitTimeout?.completed === false &&
+    rawWaitTimeout?.timedOut === true &&
+    createdSlowTab?.status === "loading" &&
+    createdSlowTab?.loadTimedOut === true &&
+    createdSlowTab?.loadTimeoutMs === 25,
+  `waitResult=${JSON.stringify(rawWaitTimeout)}, tabStatus=${createdSlowTab?.status}, loadTimedOut=${createdSlowTab?.loadTimedOut}`
+);
+
+// 38. dispatchCdpMouseClick with dblClick: true dispatches clickCount 1 then 2
+attachedTabs.add(938);
+const clickEvents38 = [];
+globalThis.chrome.debugger.sendCommand = (_target, method, params, cb) => {
+  if (method === "Input.dispatchMouseEvent") {
+    clickEvents38.push({ type: params.type, clickCount: params.clickCount });
+  }
+  cb({});
+};
+await cdpManager.dispatchCdpMouseClick(938, 200, 150, { dblClick: true });
+cleanupTabResources(938);
+record(
+  "38. dispatchCdpMouseClick with dblClick: true dispatches clickCount 1 then 2",
+  clickEvents38.filter((e) => e.type === "mousePressed").map((e) => e.clickCount).join(",") === "1,2" &&
+    clickEvents38.filter((e) => e.type === "mouseReleased").map((e) => e.clickCount).join(",") === "1,2",
+  `events=${JSON.stringify(clickEvents38.filter((e) => e.type !== "mouseMoved"))}`
+);
+
+// 39. evaluateInTab resolves @ref/selector args, cleans up marker attributes, and invokes user function in MAIN world
+let markedArgs39 = null;
+let unmarkedPrefix39 = null;
+let mainWorldExec39 = null;
 globalThis.chrome.tabs = {
   get: async (id) => ({ id, url: "https://example.test", status: "complete" }),
   sendMessage: (_tabId, msg, cb) => {
     if (msg.action === "mark_eval_targets") {
-      markedArgs30 = msg.args;
+      markedArgs39 = msg.args;
       cb({
         success: true,
         prefix: "eval_1_0",
@@ -1244,7 +1897,7 @@ globalThis.chrome.tabs = {
       return;
     }
     if (msg.action === "unmark_eval_targets") {
-      unmarkedPrefix30 = msg.prefix;
+      unmarkedPrefix39 = msg.prefix;
       cb({ success: true });
       return;
     }
@@ -1254,31 +1907,32 @@ globalThis.chrome.tabs = {
 globalThis.chrome.scripting = {
   executeScript: async (opts) => {
     if (opts.world === "MAIN" && Array.isArray(opts.args)) {
-      mainWorldExec30 = opts;
+      mainWorldExec39 = opts;
     }
     return [{ result: { ok: true, value: "btn-1:extra-val" } }];
   }
 };
-const evalRes30 = await evaluateInTab(
-  930,
+const evalRes39 = await evaluateInTab(
+  939,
   "(el, label) => el.id + ':' + label",
   () => {},
   ["@1", "extra-val"]
 );
+cleanupTabResources(939);
 record(
-  "30. evaluateInTab resolves @ref/selector args, passes descriptors to MAIN world, and cleans up markers",
-  evalRes30 === "btn-1:extra-val" &&
-    Array.isArray(markedArgs30) &&
-    markedArgs30.length === 2 &&
-    markedArgs30[0] === "@1" &&
-    unmarkedPrefix30 === "eval_1_0" &&
-    mainWorldExec30?.world === "MAIN" &&
-    Array.isArray(mainWorldExec30?.args?.[1]) &&
-    mainWorldExec30.args[1].length === 2,
-  `result=${evalRes30}, marked=${JSON.stringify(markedArgs30)}, unmarked=${unmarkedPrefix30}`
+  "39. evaluateInTab resolves @ref/selector args, passes descriptors to MAIN world, and cleans up markers",
+  evalRes39 === "btn-1:extra-val" &&
+    Array.isArray(markedArgs39) &&
+    markedArgs39.length === 2 &&
+    markedArgs39[0] === "@1" &&
+    unmarkedPrefix39 === "eval_1_0" &&
+    mainWorldExec39?.world === "MAIN" &&
+    Array.isArray(mainWorldExec39?.args?.[1]) &&
+    mainWorldExec39.args[1].length === 2,
+  `result=${evalRes39}, marked=${JSON.stringify(markedArgs39)}, unmarked=${unmarkedPrefix39}`
 );
 
-// 31. tabs.update supports action="reload", ignoreCache=true, initScript, handleBeforeUnload="accept", and includeSnapshot=true
+// 40. tabs.update supports action="reload", ignoreCache=true, initScript, handleBeforeUnload="accept", and includeSnapshot=true
 const invokeHandler = (method, client, params) =>
   new Promise((resolve, reject) => {
     AGENT_COMMAND_HANDLERS[method](client, params, (res, err) => {
@@ -1287,10 +1941,10 @@ const invokeHandler = (method, client, params) =>
     });
   });
 
-attachedTabs.add(931);
-const cdpCalls31 = [];
+attachedTabs.add(940);
+const cdpCalls40 = [];
 globalThis.chrome.debugger.sendCommand = (_target, method, params, cb) => {
-  cdpCalls31.push({ method, params });
+  cdpCalls40.push({ method, params });
   if (method === "Page.addScriptToEvaluateOnNewDocument") {
     cb({ identifier: "script-1" });
     return;
@@ -1312,10 +1966,10 @@ globalThis.chrome.tabs = {
   },
   onUpdated: { addListener: () => {}, removeListener: () => {} }
 };
-const navRes31 = await invokeHandler(
+const navRes40 = await invokeHandler(
   "tabs.update",
   {
-    getTargetTabId: async () => 931,
+    getTargetTabId: async () => 940,
     assignTabToAgentGroup: async () => {},
     sendTabMessageWithRetry: async (_tabId, msg) => {
       if (msg.action === "get_snapshot" || msg.action === "get_interactive_snapshot") {
@@ -1326,7 +1980,7 @@ const navRes31 = await invokeHandler(
     broadcastFn: () => {}
   },
   {
-    tabId: 931,
+    tabId: 940,
     action: "reload",
     ignoreCache: true,
     initScript: "window.__TEST_INIT__ = 1;",
@@ -1334,23 +1988,24 @@ const navRes31 = await invokeHandler(
     includeSnapshot: true
   }
 );
+cleanupTabResources(940);
 record(
-  "31. tabs.update supports action='reload', ignoreCache, initScript, handleBeforeUnload, and includeSnapshot",
-  navRes31.navigationAction === "reload" &&
-    navRes31.initScriptIdentifier === "script-1" &&
-    navRes31.snapshot?.count === 1 &&
-    cdpCalls31.some((c) => c.method === "Page.reload" && c.params?.ignoreCache === true) &&
-    cdpCalls31.some((c) => c.method === "Page.addScriptToEvaluateOnNewDocument"),
-  `action=${navRes31.navigationAction}, initScriptId=${navRes31.initScriptIdentifier}, snapshotCount=${navRes31.snapshot?.count}`
+  "40. tabs.update supports action='reload', ignoreCache, initScript, handleBeforeUnload, and includeSnapshot",
+  navRes40.navigationAction === "reload" &&
+    navRes40.initScriptIdentifier === "script-1" &&
+    navRes40.snapshot?.count === 1 &&
+    cdpCalls40.some((c) => c.method === "Page.reload" && c.params?.ignoreCache === true) &&
+    cdpCalls40.some((c) => c.method === "Page.addScriptToEvaluateOnNewDocument"),
+  `action=${navRes40.navigationAction}, initScriptId=${navRes40.initScriptIdentifier}, snapshotCount=${navRes40.snapshot?.count}`
 );
 
-// 32. captureTabScreenshot supports format="webp" and quality=80
+// 41. captureTabScreenshot supports format="webp" and quality=80
 const { captureTabScreenshot } = await import("../extensions/background/screenshot-service.js");
-let convertedMime32 = null;
-let convertedQuality32 = null;
-const prevOffscreen32 = globalThis.OffscreenCanvas;
-const prevCreateBitmap32 = globalThis.createImageBitmap;
-const prevFetch32 = globalThis.fetch;
+let convertedMime41 = null;
+let convertedQuality41 = null;
+const prevOffscreen41 = globalThis.OffscreenCanvas;
+const prevCreateBitmap41 = globalThis.createImageBitmap;
+const prevFetch41 = globalThis.fetch;
 globalThis.fetch = async () => ({
   blob: async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" })
 });
@@ -1368,8 +2023,8 @@ globalThis.OffscreenCanvas = class MockWebpCanvas {
     return { drawImage: () => {} };
   }
   async convertToBlob(opts) {
-    convertedMime32 = opts?.type;
-    convertedQuality32 = opts?.quality;
+    convertedMime41 = opts?.type;
+    convertedQuality41 = opts?.quality;
     return new Blob([new Uint8Array([82, 73, 70, 70])], { type: opts?.type || "image/webp" });
   }
 };
@@ -1377,59 +2032,61 @@ globalThis.chrome.tabs = {
   get: async (id) => ({ id, active: true, width: 800, height: 600, windowId: 1 }),
   captureVisibleTab: (_winId, _opts, cb) => cb("data:image/png;base64,iVBORw0KGgo=")
 };
-const shotWebp32 = await captureTabScreenshot(932, { format: "webp", quality: 80 });
-globalThis.OffscreenCanvas = prevOffscreen32;
-globalThis.createImageBitmap = prevCreateBitmap32;
-globalThis.fetch = prevFetch32;
+const shotWebp41 = await captureTabScreenshot(941, { format: "webp", quality: 80 });
+globalThis.OffscreenCanvas = prevOffscreen41;
+globalThis.createImageBitmap = prevCreateBitmap41;
+globalThis.fetch = prevFetch41;
+cleanupTabResources(941);
 record(
-  "32. captureTabScreenshot supports format='webp' and quality=80",
-  shotWebp32.format === "webp" &&
-    convertedMime32 === "image/webp" &&
-    Math.abs(convertedQuality32 - 0.8) < 0.001 &&
-    typeof shotWebp32.dataUrl === "string" &&
-    shotWebp32.dataUrl.startsWith("data:image/webp;base64,"),
-  `format=${shotWebp32.format}, mime=${convertedMime32}, quality=${convertedQuality32}`
+  "41. captureTabScreenshot supports format='webp' and quality=80",
+  shotWebp41.format === "webp" &&
+    convertedMime41 === "image/webp" &&
+    Math.abs(convertedQuality41 - 0.8) < 0.001 &&
+    typeof shotWebp41.dataUrl === "string" &&
+    shotWebp41.dataUrl.startsWith("data:image/webp;base64,"),
+  `format=${shotWebp41.format}, mime=${convertedMime41}, quality=${convertedQuality41}`
 );
 
-// 33. Navigation-aware Console/Network buffers & msgid single-message lookup
+// 42. Navigation-aware Console/Network buffers & msgid single-message lookup
 const { getBuffer } = await import("../extensions/background/constants.js");
-devtoolsBuffers.delete(933);
-const buf33 = getBuffer(933);
-buf33.console.push(
+devtoolsBuffers.delete(942);
+const buf42 = getBuffer(942);
+buf42.console.push(
   { msgid: 1, navigationId: 1, type: "log", text: "old nav log", args: ["old nav log"], timestamp: 1000 },
   { msgid: 2, navigationId: 2, type: "error", text: "current nav error", args: ["current nav error", { code: 500 }], timestamp: 2000 }
 );
-buf33.navigationId = 2;
-buf33.nextConsoleMsgId = 3;
-buf33.network.set("r1", { requestId: "r1", navigationId: 1, url: "https://example.test/old", method: "GET", status: 200 });
-buf33.network.set("r2", { requestId: "r2", navigationId: 2, url: "https://example.test/new", method: "POST", status: 201 });
+buf42.navigationId = 2;
+buf42.nextConsoleMsgId = 3;
+buf42.network.set("r1", { requestId: "r1", navigationId: 1, url: "https://example.test/old", method: "GET", status: 200 });
+buf42.network.set("r2", { requestId: "r2", navigationId: 2, url: "https://example.test/new", method: "POST", status: 201 });
 
-const currentNavDevtools = await collectDevtoolsData(933, { type: "console", includePreserved: false });
-const allNavDevtools = await collectDevtoolsData(933, { type: "console", includePreserved: true });
-const msgLookup33 = await collectDevtoolsData(933, { msgid: 2 });
-const netCurrentNav33 = await invokeHandler(
+const currentNavDevtools = await collectDevtoolsData(942, { type: "console", includePreserved: false });
+const allNavDevtools = await collectDevtoolsData(942, { type: "console", includePreserved: true });
+const msgLookup42 = await collectDevtoolsData(942, { msgid: 2 });
+const netCurrentNav42 = await invokeHandler(
   "network.listRequests",
-  { getTargetTabId: async () => 933 },
-  { tabId: 933, includePreserved: false }
+  { getTargetTabId: async () => 942 },
+  { tabId: 942, includePreserved: false }
 );
+cleanupTabResources(942);
 record(
-  "33. Navigation-aware Console/Network buffers filter by includePreserved/navigationId and inspect by msgid",
+  "42. Navigation-aware Console/Network buffers filter by includePreserved/navigationId and inspect by msgid",
   currentNavDevtools.console?.length === 1 &&
     currentNavDevtools.console[0].msgid === 2 &&
     allNavDevtools.console?.length === 2 &&
-    msgLookup33.message?.msgid === 2 &&
-    msgLookup33.message?.args?.[1]?.code === 500 &&
-    netCurrentNav33.matchingCount === 1 &&
-    netCurrentNav33.navigationId === 2 &&
-    netCurrentNav33.requests?.[0]?.requestId === "r2",
-  `currentConsole=${currentNavDevtools.console?.length}, allConsole=${allNavDevtools.console?.length}, msgId=${msgLookup33.message?.msgid}, netCurrent=${netCurrentNav33.matchingCount}`
+    msgLookup42.message?.msgid === 2 &&
+    msgLookup42.message?.args?.[1]?.code === 500 &&
+    netCurrentNav42.matchingCount === 1 &&
+    netCurrentNav42.navigationId === 2 &&
+    netCurrentNav42.requests?.[0]?.requestId === "r2",
+  `currentConsole=${currentNavDevtools.console?.length}, allConsole=${allNavDevtools.console?.length}, msgId=${msgLookup42.message?.msgid}, netCurrent=${netCurrentNav42.matchingCount}`
 );
 
-// 34. webauthn.manage supports virtual authenticator lifecycle over tab-scoped CDP
-attachedTabs.add(934);
-const webauthnCdp34 = [];
+// 43. webauthn.manage supports virtual authenticator lifecycle over tab-scoped CDP
+attachedTabs.add(943);
+const webauthnCdp43 = [];
 globalThis.chrome.debugger.sendCommand = (_target, method, params, cb) => {
-  webauthnCdp34.push({ method, params });
+  webauthnCdp43.push({ method, params });
   if (method === "WebAuthn.addVirtualAuthenticator") {
     cb({ authenticatorId: "auth-virtual-1" });
     return;
@@ -1440,52 +2097,53 @@ globalThis.chrome.debugger.sendCommand = (_target, method, params, cb) => {
   }
   cb({});
 };
-const webauthnClient34 = {
-  getTargetTabId: async () => 934,
+const webauthnClient43 = {
+  getTargetTabId: async () => 943,
   runWithTabLock: async (_tabId, _op, fn) => fn(),
   broadcastFn: () => {}
 };
-const addAuthRes34 = await invokeHandler("webauthn.manage", webauthnClient34, {
-  tabId: 934,
+const addAuthRes43 = await invokeHandler("webauthn.manage", webauthnClient43, {
+  tabId: 943,
   action: "addAuthenticator",
   protocol: "ctap2",
   transport: "internal"
 });
-const getCredsRes34 = await invokeHandler("webauthn.manage", webauthnClient34, {
-  tabId: 934,
+const getCredsRes43 = await invokeHandler("webauthn.manage", webauthnClient43, {
+  tabId: 943,
   action: "credentials",
   authenticatorId: "auth-virtual-1"
 });
-const verifyRes34 = await invokeHandler("webauthn.manage", webauthnClient34, {
-  tabId: 934,
+const verifyRes43 = await invokeHandler("webauthn.manage", webauthnClient43, {
+  tabId: 943,
   action: "verify",
   authenticatorId: "auth-virtual-1",
   isUserVerified: true
 });
-const clearRes34 = await invokeHandler("webauthn.manage", webauthnClient34, {
-  tabId: 934,
+const clearRes43 = await invokeHandler("webauthn.manage", webauthnClient43, {
+  tabId: 943,
   action: "clear",
   authenticatorId: "auth-virtual-1"
 });
-const disableAuthRes34 = await invokeHandler("webauthn.manage", webauthnClient34, {
-  tabId: 934,
+const disableAuthRes43 = await invokeHandler("webauthn.manage", webauthnClient43, {
+  tabId: 943,
   action: "disable"
 });
+cleanupTabResources(943);
 record(
-  "34. webauthn.manage manages virtual authenticators and credentials via WebAuthn CDP domain",
-  addAuthRes34.authenticatorId === "auth-virtual-1" &&
-    getCredsRes34.credentials?.length === 1 &&
-    getCredsRes34.credentials?.[0]?.credentialId === "cred-1" &&
-    verifyRes34.action === "setUserVerified" &&
-    clearRes34.action === "clearCredentials" &&
-    disableAuthRes34.success === true &&
-    webauthnCdp34.some((c) => c.method === "WebAuthn.enable") &&
-    webauthnCdp34.some((c) => c.method === "WebAuthn.addVirtualAuthenticator") &&
-    webauthnCdp34.some((c) => c.method === "WebAuthn.getCredentials") &&
-    webauthnCdp34.some((c) => c.method === "WebAuthn.setUserVerified") &&
-    webauthnCdp34.some((c) => c.method === "WebAuthn.clearCredentials") &&
-    webauthnCdp34.some((c) => c.method === "WebAuthn.disable"),
-  `authId=${addAuthRes34.authenticatorId}, creds=${getCredsRes34.credentials?.length}, cdpCalls=${webauthnCdp34.map((c) => c.method).join(",")}`
+  "43. webauthn.manage manages virtual authenticators and credentials via WebAuthn CDP domain",
+  addAuthRes43.authenticatorId === "auth-virtual-1" &&
+    getCredsRes43.credentials?.length === 1 &&
+    getCredsRes43.credentials?.[0]?.credentialId === "cred-1" &&
+    verifyRes43.action === "setUserVerified" &&
+    clearRes43.action === "clearCredentials" &&
+    disableAuthRes43.success === true &&
+    webauthnCdp43.some((c) => c.method === "WebAuthn.enable") &&
+    webauthnCdp43.some((c) => c.method === "WebAuthn.addVirtualAuthenticator") &&
+    webauthnCdp43.some((c) => c.method === "WebAuthn.getCredentials") &&
+    webauthnCdp43.some((c) => c.method === "WebAuthn.setUserVerified") &&
+    webauthnCdp43.some((c) => c.method === "WebAuthn.clearCredentials") &&
+    webauthnCdp43.some((c) => c.method === "WebAuthn.disable"),
+  `authId=${addAuthRes43.authenticatorId}, creds=${getCredsRes43.credentials?.length}, cdpCalls=${webauthnCdp43.map((c) => c.method).join(",")}`
 );
 
 recorder.summarize();

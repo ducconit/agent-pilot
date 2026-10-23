@@ -120,11 +120,21 @@ func parseEvalArgs(args []string) (string, interface{}, error) {
 	return script, tabID, err
 }
 
+func parseEvalArgsWithTimeout(args []string) (string, interface{}, int, error) {
+	script, tabID, extra, err := parseEvalArgsWithOptions(args)
+	if err != nil {
+		return "", nil, 0, err
+	}
+	timeoutMs, _ := extra["timeoutMs"].(int)
+	return script, tabID, timeoutMs, nil
+}
+
 func parseEvalArgsWithOptions(args []string) (string, interface{}, map[string]interface{}, error) {
 	var fileArg string
 	var outFileArg string
 	var evalArgs []interface{}
 	var tabID int
+	var timeoutMs int
 	var positional []string
 
 	for i := 0; i < len(args); i++ {
@@ -169,22 +179,38 @@ func parseEvalArgsWithOptions(args []string) (string, interface{}, map[string]in
 				return "", nil, nil, fmt.Errorf("--args phải là mảng JSON hợp lệ: %w", err)
 			}
 			evalArgs = append(evalArgs, parsed...)
-		} else if arg == "-tab" || arg == "--tab" {
+		} else if arg == "-tab" || arg == "--tab" || arg == "-t" {
 			if i+1 < len(args) {
 				id, err := strconv.Atoi(args[i+1])
-				if err != nil || id <= 0 {
+				if err != nil || id == 0 {
 					return "", nil, nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", args[i+1])
 				}
 				tabID = id
 				i++
 			}
-		} else if strings.HasPrefix(arg, "-tab=") || strings.HasPrefix(arg, "--tab=") {
+		} else if strings.HasPrefix(arg, "-tab=") || strings.HasPrefix(arg, "--tab=") || strings.HasPrefix(arg, "-t=") {
 			parts := strings.SplitN(arg, "=", 2)
 			id, err := strconv.Atoi(parts[1])
-			if err != nil || id <= 0 {
+			if err != nil || id == 0 {
 				return "", nil, nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", parts[1])
 			}
 			tabID = id
+		} else if arg == "-timeout" || arg == "--timeout" {
+			if i+1 < len(args) {
+				ms, err := strconv.Atoi(args[i+1])
+				if err != nil || ms <= 0 {
+					return "", nil, nil, fmt.Errorf("giá trị timeout không hợp lệ: %s", args[i+1])
+				}
+				timeoutMs = ms
+				i++
+			}
+		} else if strings.HasPrefix(arg, "-timeout=") || strings.HasPrefix(arg, "--timeout=") {
+			parts := strings.SplitN(arg, "=", 2)
+			ms, err := strconv.Atoi(parts[1])
+			if err != nil || ms <= 0 {
+				return "", nil, nil, fmt.Errorf("giá trị timeout không hợp lệ: %s", parts[1])
+			}
+			timeoutMs = ms
 		} else {
 			positional = append(positional, arg)
 		}
@@ -222,9 +248,12 @@ func parseEvalArgsWithOptions(args []string) (string, interface{}, map[string]in
 	if strings.TrimSpace(outFileArg) != "" {
 		extra["filePath"] = strings.TrimSpace(outFileArg)
 	}
+	if timeoutMs > 0 {
+		extra["timeoutMs"] = timeoutMs
+	}
 
 	var t interface{}
-	if tabID > 0 {
+	if tabID != 0 {
 		t = tabID
 	}
 	return script, t, extra, nil

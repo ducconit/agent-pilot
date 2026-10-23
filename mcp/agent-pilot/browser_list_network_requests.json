@@ -1,5 +1,5 @@
 {
-  "description": "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType, and navigation history (includePreserved/navigationId).",
+  "description": "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType, navigation history (includePreserved/navigationId), and compact summary statistics.",
   "inputSchema": {
     "properties": {
       "contextId": {
@@ -9,6 +9,10 @@
       "filterUrl": {
         "description": "Filter requests matching URL substring",
         "type": "string"
+      },
+      "includeHeaders": {
+        "description": "Include full HTTP request and response headers (default: false to save tokens)",
+        "type": "boolean"
       },
       "includePreserved": {
         "description": "Include network requests preserved across earlier navigations (default: true; set false for current navigation only)",
@@ -47,6 +51,10 @@
       "filterUrl": {
         "description": "Filter requests matching URL substring",
         "type": "string"
+      },
+      "includeHeaders": {
+        "description": "Include full HTTP request and response headers (default: false to save tokens)",
+        "type": "boolean"
       },
       "includePreserved": {
         "description": "Include network requests preserved across earlier navigations (default: true; set false for current navigation only)",

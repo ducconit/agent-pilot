@@ -29,7 +29,9 @@
   let isSessionActive = false;
   let virtualTypeQueue = Promise.resolve();
 
-  // Create Cursor Layer
+  // Create Cursor Layer (remove any stale layer from prior extension reload)
+  const existingCursorLayer = document.getElementById("agent-pilot-cursor-layer");
+  if (existingCursorLayer) existingCursorLayer.remove();
   const cursorLayer = document.createElement("div");
   cursorLayer.id = "agent-pilot-cursor-layer";
   document.documentElement.appendChild(cursorLayer);

@@ -546,7 +546,7 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_list_network_requests",
-		Description: "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType, and navigation history (includePreserved/navigationId).",
+		Description: "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType, navigation history (includePreserved/navigationId), and compact summary statistics.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -555,6 +555,7 @@ var mcpTools = []ToolInfo{
 				"resourceType":     map[string]interface{}{"type": "string", "description": "Filter by resource type (Fetch, XHR, Document, Script...)"},
 				"includePreserved": map[string]interface{}{"type": "boolean", "description": "Include network requests preserved across earlier navigations (default: true; set false for current navigation only)"},
 				"navigationId":     map[string]interface{}{"type": "integer", "description": "Optional navigationId to filter network requests to a specific navigation"},
+				"includeHeaders":   map[string]interface{}{"type": "boolean", "description": "Include full HTTP request and response headers (default: false to save tokens)"},
 				"limit":            map[string]interface{}{"type": "integer", "description": "Max requests to return (default: 100)"},
 				"tabId":            map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
@@ -590,13 +591,17 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_performance_metrics",
-		Description: "Retrieve comprehensive runtime & debugging metrics: CDP counters (JSHeapUsedMB, Nodes, JSEventListeners, LayoutCount, ScriptDuration), Core Web Vitals (TTFB, FCP, LCP + target element, CLS + shifting elements, TBT + long tasks), Resource bottlenecks (slowest & render-blocking URLs), DOM/A11y health (max depth, duplicate IDs, missing alt/labels), and automated diagnostic warnings.",
+		Description: "Retrieve comprehensive runtime & debugging metrics: CDP counters (JSHeapUsedMB, Nodes, JSEventListeners, LayoutCount, ScriptDuration), Core Web Vitals (TTFB, FCP, LCP + target element, CLS + shifting elements, INP, TBT + long tasks), Resource bottlenecks (slowest & render-blocking URLs), DOM/A11y health (liveDomElements vs blinkRetainedNodes, detachedOrUncollectedNodes, max depth, duplicate IDs, missing alt/labels), runtime console errors, and automated diagnostic warnings.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"includeWebVitals": map[string]interface{}{"type": "boolean", "description": "Collect Core Web Vitals (TTFB, FCP, LCP, CLS, TBT) (default: true)"},
+				"includeWebVitals": map[string]interface{}{"type": "boolean", "description": "Collect Core Web Vitals (TTFB, FCP, LCP, CLS, INP, TBT) (default: true)"},
 				"includeResources": map[string]interface{}{"type": "boolean", "description": "Collect resource bottleneck metrics (slowest & render-blocking URLs) (default: true)"},
 				"includeDomHealth": map[string]interface{}{"type": "boolean", "description": "Collect DOM depth, duplicate IDs, and accessibility health metrics (default: true)"},
+				"collectGarbage":   map[string]interface{}{"type": "boolean", "description": "Attempt V8 garbage collection before reading metrics to distinguish true detached DOM leaks from uncollected garbage (default: false)"},
+				"forceGC":          map[string]interface{}{"type": "boolean", "description": "Alias for collectGarbage: trigger V8 garbage collection before reading metrics (default: false)"},
+				"bringToFront":     map[string]interface{}{"type": "boolean", "description": "Activate and bring the tab to front before probing Web Vitals so Chromium paints FCP/LCP on background-opened tabs (default: false)"},
+				"timeoutMs":        map[string]interface{}{"type": "integer", "description": "Optional timeout in milliseconds for the metrics probe"},
 				"tabId":            map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
 		},
