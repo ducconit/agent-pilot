@@ -210,6 +210,22 @@ export const systemHandlers = {
       .catch(err => respond(null, err));
   },
 
+  "memory.heapCapability": async (client, params, respond) => {
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
+    respond({
+      supported: false,
+      target: "extension-debugger",
+      snapshot: false,
+      baseline: false,
+      diff: false,
+      collectGarbage: false,
+      code: "HEAPPROFILER_UNAVAILABLE",
+      tabId,
+      message: "Chrome's extension debugger does not expose HeapProfiler for this tab. Create an isolated DevTools context and pass its negative tabId for real heap snapshot/baseline/diff support."
+    });
+  },
+
   "memory.collectGarbage": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));

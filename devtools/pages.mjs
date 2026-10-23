@@ -2,8 +2,11 @@ import fs from "node:fs/promises";
 import { applyEmulation } from "../extensions/background/cdp-emulation.js";
 import { collectCssStyles } from "../extensions/background/cdp-css.js";
 import { outputPath, writeArtifact } from "./artifacts.mjs";
+import { analyzeHeapSnapshot } from "./heap-analysis.mjs";
 import { normalizeUrl } from "../extensions/background/constants.js";
 import { executeWebMcpTool, listWebMcpTools } from "./webmcp.mjs";
+
+const isolatedHeapBaselines = new Map();
 
 export async function element(tab, selector) {
   if (!selector) throw new Error("selector is required");
@@ -227,8 +230,22 @@ export async function pageCommand(tab, method, p) {
     case "devtools.getData": return { tabId: tab.tabId, console: tab.console.slice(-(p.limit || 100)), network: [...tab.requests.values()].slice(-(p.limit || 100)) };
     case "performance.metrics": await client.send("Performance.enable"); return { metrics: Object.fromEntries((await client.send("Performance.getMetrics")).metrics.map(m => [m.name, m.value])) };
     case "memory.collectGarbage": await client.send("HeapProfiler.collectGarbage"); break;
+    case "memory.heapCapability": return {
+      supported: true,
+      target: "isolated-devtools",
+      snapshot: true,
+      baseline: true,
+      diff: true,
+      collectGarbage: true,
+      requiresFilePath: true,
+      message: "Heap snapshot, baseline and diff use the isolated DevTools HeapProfiler and save real .heapsnapshot files."
+    };
     case "memory.heapSnapshot": {
+      if (Number(tab.tabId) >= 0) {
+        throw new Error("HEAPPROFILER_UNAVAILABLE: real .heapsnapshot files require an isolated DevTools context and a negative tabId");
+      }
       if (!p.filePath) throw new Error("Provide filePath to save an isolated tab's .heapsnapshot");
+      const action = String(p.action || "snapshot").toLowerCase().replace(/-/g, "_");
       const filePath = await outputPath(p.filePath, ".heapsnapshot", "heap");
       const file = await fs.open(filePath, "wx", 0o600); let writes = Promise.resolve();
       const listener = e => { writes = writes.then(() => file.write(e.chunk)); };
@@ -255,7 +272,40 @@ export async function pageCommand(tab, method, p) {
         await writes;
       }
       finally { client.off("HeapProfiler.addHeapSnapshotChunk", listener); await file.close(); }
-      return { path: filePath, bytes: (await fs.stat(filePath)).size, garbageCollected, ...(garbageCollectionWarning ? { garbageCollectionWarning } : {}) };
+      const baselineKey = `${tab.contextId}:${tab.tabId}`;
+      const previousBaseline = isolatedHeapBaselines.get(baselineKey) || null;
+      const wantsDiff = ["diff", "check_leak", "leak"].includes(action) || Boolean(p.compareWithBaseline);
+      const firstDiffNeedsBaseline = !previousBaseline && wantsDiff;
+      const wantsBaseline = action === "baseline" || Boolean(p.recordBaseline) || (!previousBaseline && !wantsDiff) || firstDiffNeedsBaseline;
+      let leakAnalysis;
+      if (previousBaseline && wantsDiff) {
+        leakAnalysis = await analyzeHeapSnapshot({
+          action: "compare",
+          baseFilePath: previousBaseline,
+          currentFilePath: filePath,
+          maxItems: p.maxConstructors
+        });
+      } else if (firstDiffNeedsBaseline) {
+        leakAnalysis = {
+          hasBaseline: false,
+          leakSuspected: false,
+          severity: "none",
+          message: "No isolated heap baseline existed; saved this snapshot as the baseline for the next diff."
+        };
+      }
+      if (wantsBaseline) isolatedHeapBaselines.set(baselineKey, filePath);
+      return {
+        success: true,
+        target: "isolated-devtools",
+        action,
+        path: filePath,
+        bytes: (await fs.stat(filePath)).size,
+        garbageCollected,
+        baselineRecorded: wantsBaseline,
+        ...(wantsBaseline ? { baselinePath: filePath } : previousBaseline ? { baselinePath: previousBaseline } : {}),
+        ...(leakAnalysis ? { leakAnalysis } : {}),
+        ...(garbageCollectionWarning ? { garbageCollectionWarning } : {})
+      };
     }
     case "session.start": case "page.setBusy": return { success: true, tabId: tab.tabId };
     case "session.end": if (p.closeTab) await page.close(); return { success: true, tabId: tab.tabId };

@@ -5,6 +5,7 @@
 
 import { LIMITS, NO_TARGET_TAB_ERROR } from "../constants.js";
 import { waitForTabComplete } from "../tab-manager.js";
+import { assertContentReceiverAvailable } from "../page-receiver.js";
 import { runInlineWait, mergeWaitMeta } from "./page-input.js";
 import {
   getFlowState,
@@ -36,6 +37,7 @@ export const pageQueryHandlers = {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.snapshot", async () => {
+      await assertContentReceiverAvailable(tabId, "page.snapshot");
       if (params.waitUntil !== false) {
         await waitForTabComplete(tabId, 5000);
       }
@@ -81,6 +83,7 @@ export const pageQueryHandlers = {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.screenshot", async () => {
+      await assertContentReceiverAvailable(tabId, "page.screenshot");
       await runInlineWait(client, tabId, params);
       return await client.captureTabScreenshot(tabId, params);
     })

@@ -211,6 +211,7 @@ func newHeapCommand() *cobra.Command {
 			{Name: "gc", IsBool: true},
 			{Name: "no-gc", IsBool: true},
 			{Name: "max-constructors"},
+			{Name: "file", Aliases: []string{"path", "file-path"}},
 			{Name: "tab", Aliases: []string{"t"}},
 		})
 		if err != nil {
@@ -227,9 +228,13 @@ func newHeapCommand() *cobra.Command {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
+		filePath := cmdArgs.String("file", "")
 		action := strings.ToLower(strings.TrimSpace(cmdArgs.String("action", "")))
 		if action == "" && len(cmdArgs.Positional) > 0 {
 			action = strings.ToLower(strings.TrimSpace(cmdArgs.Positional[0]))
+		}
+		if action == "capability" {
+			return ExecHeapCapability(tabID)
 		}
 		if action == "" {
 			if cmdArgs.Bool("baseline") {
@@ -243,7 +248,7 @@ func newHeapCommand() *cobra.Command {
 			}
 		}
 		collectGarbage := !cmdArgs.Bool("no-gc")
-		if err := ExecTakeHeapSnapshotWithOptions(action, collectGarbage, maxConstructors, tabID); err != nil {
+		if err := ExecTakeHeapSnapshotWithOptionsAndPath(action, collectGarbage, maxConstructors, filePath, tabID); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
@@ -256,6 +261,7 @@ func newHeapCommand() *cobra.Command {
 	f.Bool("gc", false, "Trigger V8 garbage collection only")
 	f.Bool("no-gc", false, "Skip automatic V8 garbage collection before snapshot")
 	f.Int("max-constructors", 15, "Maximum number of top object constructors to return")
+	f.String("file", "", "Save an isolated-context snapshot to this .heapsnapshot path")
 	f.IntP("tab", "t", 0, "Target tab ID")
 	return cmd
 }

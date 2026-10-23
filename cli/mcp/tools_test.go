@@ -9,7 +9,7 @@ import (
 )
 
 func TestMCPToolsRegistry(t *testing.T) {
-	expectedCount := 57
+	expectedCount := 58
 	if len(mcpTools) != expectedCount {
 		t.Fatalf("expected %d tools, got %d", expectedCount, len(mcpTools))
 	}
@@ -30,7 +30,7 @@ func TestMCPToolsRegistry(t *testing.T) {
 		"browser_upload_file", "browser_handle_dialog", "browser_hover", "browser_drag",
 		"browser_press_key", "browser_wait_for", "browser_emulate", "browser_resize_page",
 		"browser_list_network_requests", "browser_get_network_request", "browser_performance_trace",
-		"browser_performance_metrics", "browser_take_heapsnapshot", "browser_manage_extensions",
+		"browser_performance_metrics", "browser_heap_capability", "browser_take_heapsnapshot", "browser_manage_extensions",
 	}
 
 	toolMap := make(map[string]ToolInfo)

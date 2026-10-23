@@ -9,14 +9,22 @@ import (
 // A JSON payload preserves the complete MCP surface without a second schema
 // implementation in the CLI. Frequently used operations have readable aliases.
 func newDevtoolsCommand() *cobra.Command {
-	methods := map[string]string{"status": "devtools.runtime", "css": "css.getStyles", "audit": "lighthouse.audit", "audit-details": "lighthouse.analyze", "trace-insight": "performance.analyzeInsight", "video-start": "screencast.record", "video-stop": "screencast.record", "context-create": "contexts.create", "contexts": "contexts.list", "context-close": "contexts.close", "workers": "workers.debug", "ax": "accessibility.snapshot", "emulate": "emulation.set"}
+	methods := map[string]string{
+		"status": "devtools.runtime", "css": "css.getStyles", "audit": "lighthouse.audit", "audit-details": "lighthouse.analyze",
+		"trace-insight": "performance.analyzeInsight", "video-start": "screencast.record", "video-stop": "screencast.record",
+		"context-create": "contexts.create", "contexts": "contexts.list", "context-close": "contexts.close", "workers": "workers.debug",
+		"ax": "accessibility.snapshot", "emulate": "emulation.set", "heap-capability": "memory.heapCapability",
+		"heap-analyze": "memory.analyzeSnapshot", "3p-list": "developerTools.list", "3p-execute": "developerTools.execute",
+		"webmcp-list": "webmcp.list", "webmcp-execute": "webmcp.execute", "pwa-probe": "pwa.probe",
+		"pwa-state": "pwa.getOsAppState", "pwa-install": "pwa.install", "pwa-launch": "pwa.launch", "pwa-uninstall": "pwa.uninstall",
+	}
 	cmd := newLeafCommand("devtools", nil, func(args []string) error {
 		parsed, err := parseCmdArgs(args, []FlagDef{{Name: "params"}, {Name: "tab", Aliases: []string{"t"}}})
 		if err != nil {
 			return err
 		}
 		if len(parsed.Positional) != 1 {
-			return fmt.Errorf("usage: agent-pilot devtools <status|css|audit|audit-details|trace-insight|video-start|video-stop|context-create|contexts|context-close|workers|ax|emulate> [--params '{...}'] [--tab ID]")
+			return fmt.Errorf("usage: agent-pilot devtools <status|css|audit|audit-details|trace-insight|video-start|video-stop|context-create|contexts|context-close|workers|ax|emulate|heap-capability|heap-analyze|3p-list|3p-execute|webmcp-list|webmcp-execute|pwa-probe|pwa-state|pwa-install|pwa-launch|pwa-uninstall> [--params '{...}'] [--tab ID]")
 		}
 		operation := parsed.Positional[0]
 		method, ok := methods[operation]

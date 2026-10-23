@@ -39,6 +39,17 @@ const tab = (tabs.result || []).find(item => item.isAgentTab) || tabs.result?.[0
 assert(tab?.tabId || tab?.id, "No tab available for live batch smoke test");
 const tabId = tab.tabId || tab.id;
 
+const heapCapability = await json(`${base}/api`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ method: "memory.heapCapability", params: { tabId } })
+});
+assert.equal(heapCapability.success, true, JSON.stringify(heapCapability));
+assert.equal(typeof heapCapability.result?.supported, "boolean", JSON.stringify(heapCapability));
+if (!heapCapability.result.supported) {
+  assert.equal(heapCapability.result.code, "HEAPPROFILER_UNAVAILABLE", JSON.stringify(heapCapability));
+}
+
 const batch = await json(`${base}/api`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -77,6 +88,7 @@ console.log(JSON.stringify({
   extensionVersion: client.extensionVersion,
   extensionBuildId: client.extensionBuildId,
   tabId,
+  heapCapability: heapCapability.result,
   batchActions: results.map(step => step.type),
   heapResult: heapStep.success ? "supported" : "HEAPPROFILER_UNAVAILABLE"
 }, null, 2));

@@ -84,13 +84,39 @@ agent-pilot devtools status --tab 123
 agent-pilot metrics --tab 123
 agent-pilot trace start --tab 123
 agent-pilot trace stop --tab 123
-agent-pilot heap baseline --tab 123
-agent-pilot heap diff --tab 123
+agent-pilot heap capability --tab 123       # probe before doing heap work
+agent-pilot heap baseline --tab -123 --file /tmp/base.heapsnapshot
+agent-pilot heap diff --tab -123 --file /tmp/current.heapsnapshot
+agent-pilot devtools heap-analyze --params '{"action":"summary","filePath":"/tmp/base.heapsnapshot"}'
+agent-pilot devtools heap-analyze --params '{"action":"compare","baseFilePath":"/tmp/base.heapsnapshot","currentFilePath":"/tmp/current.heapsnapshot"}'
 ```
 
-HeapProfiler support depends on Chrome. Ordinary extension-debugger tabs return `HEAPPROFILER_UNAVAILABLE` and do not create a metrics fallback baseline. Use an isolated DevTools context for a real heap snapshot.
+Heap support is explicit: call `heap capability` first. Ordinary extension-debugger tabs return `supported:false` with `HEAPPROFILER_UNAVAILABLE`; they never create a fake metrics baseline. Create an isolated context (`agent-pilot devtools context-create`), open its negative tab, and pass `--file` to capture a real `.heapsnapshot`; isolated tabs support baseline/diff and the saved file can be analyzed with `devtools heap-analyze`.
 
-Snapshot operations on `data:` URLs can fail because there is no normal content receiver. Use an HTTP/localhost page for live smoke tests.
+The `devtools` command also exposes the MCP-only operations that do not have a
+separate top-level CLI command: `3p-list`, `3p-execute`, `webmcp-list`,
+`webmcp-execute`, `pwa-probe`, `pwa-state`, `pwa-install`, `pwa-launch`, and
+`pwa-uninstall`. Pass their MCP-shaped arguments through `--params`.
+
+Extension-backed snapshot/screenshot operations on `data:` URLs return `DATA_URL_UNSUPPORTED` because Chrome does not inject the Agent Pilot content receiver into a `data:` document. Use an HTTP/localhost page for those operations. The isolated DevTools runtime can still inspect `data:` URLs for CDP/AX/CSS/video/heap operations.
+
+The full DevTools bridge is available through CLI aliases as well as MCP:
+
+```bash
+agent-pilot devtools 3p-list --tab 123
+agent-pilot devtools 3p-execute --tab 123 --params '{"toolName":"name","input":{}}'
+agent-pilot devtools webmcp-list --tab 123
+agent-pilot devtools webmcp-execute --tab 123 --params '{"toolName":"name","input":{}}'
+agent-pilot devtools pwa-probe
+agent-pilot devtools pwa-state --params '{"manifestId":"https://example.test/manifest.webmanifest"}'
+agent-pilot devtools pwa-install --params '{"manifestId":"https://example.test/manifest.webmanifest"}'
+agent-pilot devtools pwa-launch --params '{"manifestId":"https://example.test/manifest.webmanifest"}'
+agent-pilot devtools pwa-uninstall --params '{"manifestId":"https://example.test/manifest.webmanifest"}'
+agent-pilot devtools video-start --tab -123 --params '{"filePath":"/tmp/test.mp4","fps":10}'
+agent-pilot devtools video-stop --tab -123
+```
+
+These operations use Chrome's native/private DevTools runtime. PWA commands still depend on a Chrome build exposing the browser-scoped PWA CDP domain; WebMCP and third-party tools depend on the page exposing those APIs.
 
 CSS inspection is progressive to keep responses close to Chrome MCP's compact default:
 

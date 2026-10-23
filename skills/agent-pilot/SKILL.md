@@ -74,10 +74,12 @@ If an MCP client reports an old tool list, old version, or a different port, tre
 ## Capability notes
 
 - HeapProfiler is unavailable on ordinary extension-debugger tabs in the current Chrome path. Heap actions fail with `HEAPPROFILER_UNAVAILABLE` instead of fabricating a metrics baseline; use an isolated DevTools context when a real `.heapsnapshot` is required.
+- Probe heap support with `agent-pilot heap capability --tab <id>` or MCP `browser_heap_capability` before starting a memory task. For a real snapshot/baseline/diff, create an isolated DevTools context, use its negative tab ID, and provide a `.heapsnapshot` `filePath`; analyze saved files with `devtools heap-analyze` or `browser_analyze_heapsnapshot`.
 - CDP can be temporarily unavailable when another debugger is attached. Prefer synthetic actions where possible and inspect `cdp.status`/`browser_devtools_status` only when a CDP operation is actually needed.
 - The generated MCP schemas under `mcp/agent-pilot/` are the source of truth for current tool names and parameters; do not rely on an old provider schema or a stale tool-count claim.
 - Batch `actions` are objects, not strings. For example: `{"actions":[{"type":"performance_metrics"},{"type":"performance_trace","action":"start"},{"type":"performance_trace","action":"stop"}]}`. A `heap_snapshot` action is exposed consistently, but ordinary extension-debugger tabs may return `HEAPPROFILER_UNAVAILABLE`.
-- Snapshot/capture actions on `data:` URLs can fail because the page has no normal extension content receiver. Use an HTTP/localhost page or an isolated DevTools context when testing snapshots, heap, or other page-context features.
+- Extension page snapshot/screenshot and batch capture on `data:` URLs fail early with `DATA_URL_UNSUPPORTED`: Chrome does not inject Agent Pilot's content receiver into a `data:` document. Use an HTTP/localhost page for extension-backed DOM capture, or an isolated DevTools context for CDP/AX/CSS/video/heap operations; the private Puppeteer path can inspect `data:` URLs.
+- Native MP4 screencast, PWA install/launch/uninstall, WebMCP, and page developer-tool discovery are available from both MCP and the CLI. The CLI aliases are `devtools video-start/video-stop`, `pwa-probe/pwa-state/pwa-install/pwa-launch/pwa-uninstall`, `webmcp-list/webmcp-execute`, and `3p-list/3p-execute`; pass MCP-shaped JSON through `--params`.
 
 ## References
 

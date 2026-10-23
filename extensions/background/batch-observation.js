@@ -25,6 +25,7 @@ import {
   sendTabMessageWithRetry
 } from "./tab-manager.js";
 import { captureTabScreenshot } from "./screenshot-service.js";
+import { assertContentReceiverAvailable } from "./page-receiver.js";
 import { getPositiveNumber } from "./batch-validation.js";
 import { collectDevtoolsData } from "./agent-handlers/devtools.js";
 import { evaluateInTab } from "./agent-handlers/page-input.js";
@@ -155,6 +156,7 @@ async function sleepAction(ctx, act) {
 async function screenshotAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for screenshot");
+  await assertContentReceiverAvailable(targetTabId, "batch.screenshot");
   const shotRes = await captureTabScreenshot(targetTabId, act);
   ctx.stepResult.success = true;
   if (shotRes.annotated) {
@@ -180,6 +182,7 @@ async function screenshotAction(ctx, act) {
 async function snapshotAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for snapshot");
+  await assertContentReceiverAvailable(targetTabId, "batch.snapshot");
   const res = await sendTabMessageWithRetry(targetTabId, {
     action: "get_snapshot",
     maxElements: act.maxElements || LIMITS.SNAPSHOT_MAX_ELEMENTS_DEFAULT,

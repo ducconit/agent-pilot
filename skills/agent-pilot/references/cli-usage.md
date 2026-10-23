@@ -257,18 +257,26 @@ agent-pilot trace start [--tab 12345]
 agent-pilot click "#heavy-filter-btn" --tab 12345
 agent-pilot trace stop [--tab 12345]
 
-# Memory Leak Detection workflow: record baseline -> interact -> diff against baseline
-agent-pilot heap baseline --tab 12345
+# Probe first. Ordinary extension-debugger tabs report HEAPPROFILER_UNAVAILABLE;
+# use a negative tab ID from an isolated DevTools context for a real snapshot.
+agent-pilot heap capability --tab 12345
+
+# Memory Leak Detection workflow on an isolated context:
+agent-pilot heap baseline --tab -12345 --file /tmp/base.heapsnapshot
 agent-pilot click "#open-modal" --tab 12345
 agent-pilot click "#close-modal" --tab 12345
-agent-pilot heap diff --tab 12345
+agent-pilot heap diff --tab -12345 --file /tmp/current.heapsnapshot
+
+# Analyze saved snapshots without returning the full heap graph to the agent.
+agent-pilot devtools heap-analyze --params '{"action":"summary","filePath":"/tmp/base.heapsnapshot"}'
+agent-pilot devtools heap-analyze --params '{"action":"compare","baseFilePath":"/tmp/base.heapsnapshot","currentFilePath":"/tmp/current.heapsnapshot"}'
 
 # One-shot V8 heap snapshot (top constructors + Detached DOM nodes) or forced Garbage Collection
 agent-pilot heap snapshot [--max-constructors 25] [--tab 12345]
 agent-pilot heap gc [--tab 12345]
 
-# Native extension-debugger tabs return HEAPPROFILER_UNAVAILABLE; no metrics fallback baseline is created.
-# Use an isolated DevTools context when a real .heapsnapshot is required.
+# Native extension-debugger tabs return HEAPPROFILER_UNAVAILABLE; no metrics
+# fallback baseline is created. Isolated tabs support real baseline/diff files.
 
 # All-in-one DevTools snapshot (Console errors, failed Network requests, Web Vitals, DOM health, diagnostics)
 agent-pilot devtools [--tab 12345]

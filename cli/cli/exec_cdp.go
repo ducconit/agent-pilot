@@ -160,10 +160,18 @@ func ExecTakeHeapSnapshot(gc bool, tabID interface{}) error {
 	if gc {
 		action = "gc"
 	}
-	return ExecTakeHeapSnapshotWithOptions(action, true, 0, tabID)
+	return ExecTakeHeapSnapshotWithOptionsAndPath(action, true, 0, "", tabID)
 }
 
 func ExecTakeHeapSnapshotWithOptions(action string, collectGarbage bool, maxConstructors int, tabID interface{}) error {
+	return ExecTakeHeapSnapshotWithOptionsAndPath(action, collectGarbage, maxConstructors, "", tabID)
+}
+
+func ExecHeapCapability(tabID interface{}) error {
+	return dispatchAndPrintJSON("memory.heapCapability", nil, tabID)
+}
+
+func ExecTakeHeapSnapshotWithOptionsAndPath(action string, collectGarbage bool, maxConstructors int, filePath string, tabID interface{}) error {
 	normalized := strings.ToLower(strings.TrimSpace(action))
 	if normalized == "gc" {
 		return dispatchAndPrintJSON("memory.collectGarbage", nil, tabID)
@@ -177,6 +185,9 @@ func ExecTakeHeapSnapshotWithOptions(action string, collectGarbage bool, maxCons
 	}
 	if maxConstructors > 0 {
 		params["maxConstructors"] = maxConstructors
+	}
+	if filePath != "" {
+		params["filePath"] = filePath
 	}
 	return dispatchAndPrintJSON("memory.heapSnapshot", params, tabID)
 }

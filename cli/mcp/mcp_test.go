@@ -558,10 +558,17 @@ func TestPerformanceAndHeapSnapshotSchemas(t *testing.T) {
 	if !ok {
 		t.Fatalf("browser_take_heapsnapshot missing properties")
 	}
-	for _, key := range []string{"action", "forceGC", "recordBaseline", "compareWithBaseline", "maxConstructors", "tabId"} {
+	for _, key := range []string{"action", "forceGC", "recordBaseline", "compareWithBaseline", "maxConstructors", "filePath", "tabId"} {
 		if _, exists := heapProps[key]; !exists {
 			t.Errorf("browser_take_heapsnapshot schema missing %q property", key)
 		}
+	}
+	capabilityProps, ok := toolMap["browser_heap_capability"].InputSchema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("browser_heap_capability missing properties")
+	}
+	if _, exists := capabilityProps["tabId"]; !exists {
+		t.Errorf("browser_heap_capability schema missing %q property", "tabId")
 	}
 }
 

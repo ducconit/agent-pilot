@@ -570,6 +570,16 @@ var mcpTools = []ToolInfo{
 		},
 	},
 	{
+		Name:        "browser_heap_capability",
+		Description: "Probe real heap support before taking a snapshot. Ordinary extension-debugger tabs return supported=false with HEAPPROFILER_UNAVAILABLE; isolated DevTools context tabs support snapshot, baseline and diff when a filePath is provided.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"tabId": map[string]interface{}{"type": "integer", "description": "Target tab ID; negative IDs identify an isolated DevTools tab"},
+			},
+		},
+	},
+	{
 		Name:        "browser_take_heapsnapshot",
 		Description: "Capture a real V8 heap memory snapshot, parse top object constructors & Detached DOM nodes, and detect memory leaks via baseline/diff comparison. Ordinary extension-debugger tabs return HEAPPROFILER_UNAVAILABLE instead of a metrics fallback; use an isolated DevTools context for native heap snapshots. Garbage collection is attempted before snapshot unless collectGarbage: false.",
 		InputSchema: map[string]interface{}{
@@ -581,6 +591,7 @@ var mcpTools = []ToolInfo{
 				"recordBaseline":      map[string]interface{}{"type": "boolean", "description": "Explicitly save this snapshot as the new per-tab memory baseline"},
 				"compareWithBaseline": map[string]interface{}{"type": "boolean", "description": "Compare this snapshot against the stored per-tab baseline to detect memory leaks"},
 				"maxConstructors":     map[string]interface{}{"type": "integer", "description": "Maximum number of top object constructors to return (default: 20)"},
+				"filePath":            map[string]interface{}{"type": "string", "description": "Required for isolated DevTools tabs; saves the real .heapsnapshot and enables baseline/diff comparison"},
 				"tabId":               map[string]interface{}{"type": "integer", "description": "Target tab ID"},
 			},
 		},

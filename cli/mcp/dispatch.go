@@ -143,6 +143,7 @@ var mcpToolBridgeMap = map[string]string{
 	"browser_service_workers":             "workers.debug",
 	"browser_accessibility_snapshot":      "accessibility.snapshot",
 	"browser_devtools_status":             "devtools.runtime",
+	"browser_heap_capability":             "memory.heapCapability",
 	"browser_analyze_heapsnapshot":        "memory.analyzeSnapshot",
 	"browser_list_3p_developer_tools":     "developerTools.list",
 	"browser_execute_3p_developer_tool":   "developerTools.execute",

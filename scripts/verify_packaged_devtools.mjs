@@ -47,7 +47,7 @@ async function tool(name, args = {}) {
 }
 try {
   await rpc("initialize", { protocolVersion: "2024-11-05", clientInfo: { name: "packaged-test", version: "1" }, capabilities: {} });
-	const list = await rpc("tools/list"); assert.equal(list.tools.length, 57);
+	const list = await rpc("tools/list"); assert.equal(list.tools.length, 58);
   const status = await tool("browser_devtools_status");
   assert(status.embedded); assert.equal(status.systemNodeRequired, false); assert.equal(status.ffmpegRequired, false);
   console.log("PASS packaged MCP starts its embedded runtime with Node/npm absent from PATH");
@@ -65,6 +65,22 @@ try {
   assert.equal(typeof audit.scores.accessibility, "number");
   const details = await tool("browser_lighthouse_analyze_audit", { filePath: audit.jsonPath }); assert(details.audits.length);
   console.log("PASS real Lighthouse and audit drill-down need no external runtime or install");
+  const heapCapability = await tool("browser_heap_capability", { tabId: tab.tabId });
+  assert.equal(heapCapability.supported, true);
+  const baselinePath = path.join(temporary, "baseline.heapsnapshot");
+  const currentPath = path.join(temporary, "current.heapsnapshot");
+  const baseline = await tool("browser_take_heapsnapshot", { tabId: tab.tabId, action: "baseline", filePath: baselinePath });
+  assert.equal(baseline.success, true); assert.equal(baseline.baselineRecorded, true);
+  assert((await fs.stat(baseline.path)).size > 0);
+  await tool("browser_evaluate", { tabId: tab.tabId, expression: "globalThis.__agentPilotLeakProbe = Array.from({length: 2000}, (_, i) => ({i, value: 'probe'})); true" });
+  const current = await tool("browser_take_heapsnapshot", { tabId: tab.tabId, action: "diff", filePath: currentPath });
+  assert.equal(current.success, true); assert(current.leakAnalysis); assert.equal(current.baselineRecorded, false);
+  assert((await fs.stat(current.path)).size > 0);
+  const heapSummary = await tool("browser_analyze_heapsnapshot", { action: "summary", filePath: current.path });
+  assert(heapSummary.nodeCount > 0);
+  const heapDiff = await tool("browser_analyze_heapsnapshot", { action: "compare", baseFilePath: baseline.path, currentFilePath: current.path });
+  assert(heapDiff); assert(Array.isArray(heapDiff.constructors));
+  console.log("PASS real isolated HeapProfiler snapshots, baseline/diff and saved-file analysis");
   await tool("browser_screencast_start", { fps: 5 });
   await tool("browser_evaluate", { expression: "new Promise(r=>setTimeout(()=>{document.body.style.background='red';r(true)},500))" });
   const video = await tool("browser_screencast_stop"); assert(video.bytes > 0);
