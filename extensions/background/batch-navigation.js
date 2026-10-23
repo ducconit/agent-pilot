@@ -10,6 +10,7 @@ import {
   attachedTabs,
   normalizeUrl,
   DEFAULT_LOAD_TIMEOUT_MS,
+  LIMITS,
   agentControlledTabs,
   logDebug
 } from "./constants.js";
@@ -20,11 +21,29 @@ import {
   assignTabToAgentGroup,
   createTabWithWindowFallback,
   waitForTabComplete,
-  navigateTabAndWait
+  navigateTabAndWait,
+  sendTabMessageWithRetry,
+  normalizeNavigationAction,
+  applyPreNavigationOptions,
+  executeTabNavigationAction
 } from "./tab-manager.js";
 import { getPositiveNumber } from "./batch-validation.js";
 
 export const navigationHandlers = { open: openAction, navigate: navigateAction, close: closeAction };
+
+async function attachStepSnapshotIfRequested(ctx, tabId, act) {
+  if (!act?.includeSnapshot || !tabId) return;
+  try {
+    const snapRes = await sendTabMessageWithRetry(tabId, {
+      action: "get_snapshot",
+      maxElements: act.snapshotMaxElements || act.maxElements || LIMITS.SNAPSHOT_MAX_ELEMENTS_DEFAULT,
+      format: act.snapshotFormat || "text"
+    });
+    ctx.stepResult.snapshot = snapRes?.result !== undefined ? snapRes.result : snapRes;
+  } catch (err) {
+    logDebug("batch step includeSnapshot", err);
+  }
+}
 
 async function resolveBatchTargetTab(bridgeClient, requestedTabId, agentId, options = {}) {
   if (bridgeClient && typeof bridgeClient.getTargetTabId === "function") {
@@ -69,6 +88,7 @@ async function openAction(ctx, act) {
   }
 
   await attachDebugger(tab.id).catch((err) => logDebug("batch attachDebugger", err));
+  await applyPreNavigationOptions(tab.id, act, bridgeClient?.broadcastFn).catch((err) => logDebug("batch open applyPreNavigationOptions", err));
 
   // Wait for tab load completion if requested (default true)
   if (act.waitUntil !== false) {
@@ -79,14 +99,16 @@ async function openAction(ctx, act) {
     }
   }
 
+  await attachStepSnapshotIfRequested(ctx, tab.id, act);
+
   ctx.stepResult.success = true;
   ctx.stepResult.tabId = tab.id;
   ctx.stepResult.url = tab.url || tab.pendingUrl || url;
 }
 
 /**
- * navigate / tabs.update — navigate an explicit or current tab, optionally
- * waiting for load completion.
+ * navigate / tabs.update / back / forward / reload — navigate an explicit or current tab,
+ * optionally waiting for load completion.
  */
 async function navigateAction(ctx, act) {
   const { bridgeClient } = ctx;
@@ -95,6 +117,26 @@ async function navigateAction(ctx, act) {
     ? await resolveBatchTargetTab(bridgeClient, act.tabId, agentId)
     : ctx.currentTabId;
   if (!targetTabId) throw new Error("No active tab for navigate");
+
+  const navAction = normalizeNavigationAction(act);
+  await applyPreNavigationOptions(targetTabId, act, bridgeClient?.broadcastFn).catch((err) => logDebug("batch navigate applyPreNavigationOptions", err));
+
+  if (navAction === "back" || navAction === "forward" || navAction === "reload") {
+    await executeTabNavigationAction(targetTabId, navAction, act, bridgeClient?.broadcastFn);
+    if (act.waitUntil !== false) {
+      const loadTimeout = getPositiveNumber(act.loadTimeout, act.timeoutMs, act.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
+      await waitForTabComplete(targetTabId, loadTimeout);
+      if (!attachedTabs.has(targetTabId)) {
+        await attachDebugger(targetTabId).catch((err) => logDebug("batch navigate action attachDebugger", err));
+      }
+    }
+    await attachStepSnapshotIfRequested(ctx, targetTabId, act);
+    ctx.stepResult.success = true;
+    ctx.stepResult.tabId = targetTabId;
+    ctx.stepResult.navigationAction = navAction;
+    return;
+  }
+
   const url = normalizeUrl(act.url, act);
 
   if (act.waitUntil !== false) {
@@ -111,6 +153,8 @@ async function navigateAction(ctx, act) {
       });
     });
   }
+
+  await attachStepSnapshotIfRequested(ctx, targetTabId, act);
 
   ctx.stepResult.success = true;
   ctx.stepResult.tabId = targetTabId;

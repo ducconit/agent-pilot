@@ -35,6 +35,10 @@
         },
         "type": "array"
       },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after filling form (default: false)",
+        "type": "boolean"
+      },
       "pressEnter": {
         "description": "Press enter on the last input after filling (default: false)",
         "type": "boolean"
@@ -104,6 +108,10 @@
           "type": "object"
         },
         "type": "array"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after filling form (default: false)",
+        "type": "boolean"
       },
       "pressEnter": {
         "description": "Press enter on the last input after filling (default: false)",

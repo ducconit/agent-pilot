@@ -1,13 +1,30 @@
 {
-  "description": "Evaluate a JavaScript expression or script in the context of the page (MAIN world first, with CDP Runtime.evaluate fallback) and return the serialized result. Accepts either 'expression' or 'script', plus optional post-eval waitMs/waitForSelector/waitForText.",
+  "description": "Evaluate a JavaScript expression, function, or script file in the context of the page (MAIN world first, with CDP Runtime.evaluate fallback) and return or save the serialized result. Supports resolving @ref/CSS selector arguments (args) into live DOM Elements, loading scripts from sourcePath, and saving large outputs to filePath.",
   "inputSchema": {
     "properties": {
+      "args": {
+        "description": "Optional arguments passed to the evaluated function; @ref or CSS selector strings (e.g. '@1', '#modal') are resolved to live DOM Element arguments in MAIN world",
+        "items": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "object",
+            "null"
+          ]
+        },
+        "type": "array"
+      },
       "contextId": {
         "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
       },
       "expression": {
-        "description": "JavaScript expression or script to evaluate",
+        "description": "JavaScript expression or function to evaluate (e.g. '(el) =\u003e el.textContent')",
+        "type": "string"
+      },
+      "filePath": {
+        "description": "Optional local file path to save the JSON-serialized evaluation result to disk",
         "type": "string"
       },
       "script": {
@@ -17,6 +34,10 @@
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep after evaluating",
         "type": "integer"
+      },
+      "sourcePath": {
+        "description": "Optional local file path to load JavaScript source from instead of inline expression",
+        "type": "string"
       },
       "tabId": {
         "description": "Target tab ID",
@@ -40,12 +61,29 @@
   "name": "browser_evaluate",
   "parameters": {
     "properties": {
+      "args": {
+        "description": "Optional arguments passed to the evaluated function; @ref or CSS selector strings (e.g. '@1', '#modal') are resolved to live DOM Element arguments in MAIN world",
+        "items": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "object",
+            "null"
+          ]
+        },
+        "type": "array"
+      },
       "contextId": {
         "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
       },
       "expression": {
-        "description": "JavaScript expression or script to evaluate",
+        "description": "JavaScript expression or function to evaluate (e.g. '(el) =\u003e el.textContent')",
+        "type": "string"
+      },
+      "filePath": {
+        "description": "Optional local file path to save the JSON-serialized evaluation result to disk",
         "type": "string"
       },
       "script": {
@@ -55,6 +93,10 @@
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep after evaluating",
         "type": "integer"
+      },
+      "sourcePath": {
+        "description": "Optional local file path to load JavaScript source from instead of inline expression",
+        "type": "string"
       },
       "tabId": {
         "description": "Target tab ID",

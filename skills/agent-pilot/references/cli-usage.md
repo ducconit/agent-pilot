@@ -116,6 +116,12 @@ agent-pilot open https://example.com --active
 agent-pilot open https://staging.example.com --user admin --password "p@ss&&word!"
 agent-pilot navigate https://staging.example.com/checkout --user admin --password "p@ss&&word!" --tab 12345
 
+# Rich navigation: history back/forward, cache-bypassing reload, initScript, beforeunload auto-handling, and inline snapshot
+agent-pilot navigate --action reload --ignore-cache --tab 12345
+agent-pilot navigate --action back --tab 12345
+agent-pilot navigate --action forward --tab 12345
+agent-pilot navigate https://example.com/app --init-script "window.__E2E__ = true;" --beforeunload accept --include-snapshot --tab 12345
+
 # Close the current or specified Agent tab when testing is done to free RAM
 agent-pilot close [--tab <id>]
 
@@ -137,6 +143,10 @@ agent-pilot close --tab 12345 --format json
 ```bash
 # Click an element by CSS selector (auto-calculates center & plays neon ripple)
 agent-pilot click "#submit-button"
+
+# Double-click an element or include an interactive snapshot in the same round-trip
+agent-pilot click "#file-row" --dblclick --tab 12345
+agent-pilot click "#submit-button" --include-snapshot --tab 12345
 
 # Click at specific viewport coordinates
 agent-pilot click -x 350 -y 220
@@ -210,6 +220,10 @@ agent-pilot eval "({ url: location.href, readyState: document.readyState })"
 
 # Evaluate script on a specific tab
 agent-pilot evaluate "document.querySelector('h1').innerText" --tab 12345
+
+# Evaluate a function with @ref / CSS selector arguments resolved to live DOM Elements, or read/save via disk
+agent-pilot evaluate "(btn, label) => ({ text: btn.innerText, label })" --arg "@1" --arg "primary" --tab 12345
+agent-pilot evaluate -f ./scripts/extract-table.js -o /tmp/table-data.json --tab 12345
 ```
 
 ---
@@ -237,8 +251,9 @@ agent-pilot screenshot -o /tmp/step-01.png \
 # Capture specific element
 agent-pilot screenshot --mode element --selector ".hero-banner" -o ./banner.png
 
-# Capture specific screen region
+# Capture specific screen region or save as compressed WebP/JPEG
 agent-pilot screenshot --mode region -o ./region.png
+agent-pilot screenshot --format webp --quality 80 -o /tmp/viewport.webp --tab 12345
 ```
 
 ---
@@ -280,6 +295,19 @@ agent-pilot heap gc [--tab 12345]
 
 # All-in-one DevTools snapshot (Console errors, failed Network requests, Web Vitals, DOM health, diagnostics)
 agent-pilot devtools [--tab 12345]
+
+# Filter network requests to the current navigation only (or a specific navigationId)
+agent-pilot network list --current-nav --tab 12345
+agent-pilot network list --nav-id 2 --tab 12345
+
+# Virtual WebAuthn / Passkey authenticator management (tab-scoped CDP WebAuthn domain)
+agent-pilot webauthn enable --tab 12345
+agent-pilot webauthn add --protocol ctap2 --transport internal --tab 12345
+agent-pilot webauthn credentials --id <authenticatorId> --tab 12345
+agent-pilot webauthn verify --id <authenticatorId> --verified=true --tab 12345
+agent-pilot webauthn clear --id <authenticatorId> --tab 12345
+agent-pilot webauthn remove --id <authenticatorId> --tab 12345
+agent-pilot webauthn disable --tab 12345
 ```
 
 CSS inspection defaults to a compact summary. Use `agent-pilot devtools css --params '{"selector":"#app","detail":"computed","groups":["layout","typography"]}'` for targeted values, `detail:"rules"` with `includeInherited:true` for paginated cascade declarations, or `detail:"full"` only for the complete payload.

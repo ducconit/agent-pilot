@@ -96,6 +96,8 @@ func newNetworkCommand() *cobra.Command {
 			{Name: "method"},
 			{Name: "type"},
 			{Name: "limit"},
+			{Name: "current-nav", Aliases: []string{"no-preserved"}, IsBool: true},
+			{Name: "nav-id", Aliases: []string{"navigation-id"}},
 			{Name: "tab", Aliases: []string{"t"}},
 		})
 		if err != nil {
@@ -114,13 +116,24 @@ func newNetworkCommand() *cobra.Command {
 		if err != nil || limit <= 0 {
 			return fmt.Errorf("❌ Error: Giới hạn (limit) phải là số nguyên dương: %v", cmdArgs.Flags["limit"])
 		}
+		extra := map[string]interface{}{}
+		if cmdArgs.Bool("current-nav") {
+			extra["includePreserved"] = false
+		}
+		if _, hasNav := cmdArgs.Flags["nav-id"]; hasNav {
+			navID, navErr := cmdArgs.Int("nav-id", 0)
+			if navErr != nil || navID <= 0 {
+				return fmt.Errorf("❌ Error: nav-id phải là số nguyên dương: %v", cmdArgs.Flags["nav-id"])
+			}
+			extra["navigationId"] = navID
+		}
 		if len(cmdArgs.Positional) > 1 && (cmdArgs.Positional[0] == "get" || cmdArgs.Positional[0] == "body") {
 			if err := ExecGetNetworkResponseBody(cmdArgs.Positional[1], tabID); err != nil {
 				fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 				return errUsage
 			}
 		} else {
-			if err := ExecListNetworkRequests(filterUrl, method, resType, limit, tabID); err != nil {
+			if err := ExecListNetworkRequests(filterUrl, method, resType, limit, tabID, extra); err != nil {
 				fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 				return errUsage
 			}
@@ -132,6 +145,8 @@ func newNetworkCommand() *cobra.Command {
 	f.String("method", "", "Filter by HTTP method")
 	f.String("type", "", "Filter by resource type")
 	f.Int("limit", 50, "Maximum number of requests")
+	f.Bool("current-nav", false, "Only show requests from the current navigation")
+	f.Int("nav-id", 0, "Filter requests by navigationId")
 	f.IntP("tab", "t", 0, "Target tab ID")
 	return cmd
 }
@@ -398,6 +413,72 @@ func newExtensionsCommand() *cobra.Command {
 	f.StringP("path", "p", "", "Absolute path to an unpacked extension directory for install")
 	f.Bool("enable-incognito", false, "Enable an installed unpacked extension in incognito windows")
 	f.Bool("confirm-self", false, "Allow uninstalling Agent Pilot itself")
+	f.IntP("tab", "t", 0, "Target tab ID")
+	return cmd
+}
+
+func newWebAuthnCommand() *cobra.Command {
+	cmd := newLeafCommand("webauthn", nil, func(args []string) error {
+		cmdArgs, err := parseCmdArgs(args, []FlagDef{
+			{Name: "action", Aliases: []string{"a"}},
+			{Name: "authenticator-id", Aliases: []string{"id", "auth-id"}},
+			{Name: "protocol"},
+			{Name: "transport"},
+			{Name: "enable-ui", IsBool: true},
+			{Name: "user-verified", Aliases: []string{"verified"}},
+			{Name: "tab", Aliases: []string{"t"}},
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		action := cmdArgs.String("action", "")
+		if action == "" && len(cmdArgs.Positional) > 0 {
+			action = cmdArgs.Positional[0]
+		}
+		if action == "" {
+			action = "enable"
+		}
+		authID := cmdArgs.String("authenticator-id", "")
+		if authID == "" && len(cmdArgs.Positional) > 1 {
+			authID = cmdArgs.Positional[1]
+		}
+		params := map[string]interface{}{
+			"action": action,
+		}
+		if authID != "" {
+			params["authenticatorId"] = authID
+		}
+		if p := cmdArgs.String("protocol", ""); p != "" {
+			params["protocol"] = p
+		}
+		if tr := cmdArgs.String("transport", ""); tr != "" {
+			params["transport"] = tr
+		}
+		if cmdArgs.Bool("enable-ui") {
+			params["enableUI"] = true
+		}
+		if uv, hasUV := cmdArgs.Flags["user-verified"]; hasUV {
+			params["isUserVerified"] = strings.EqualFold(uv, "true") || uv == "1"
+		}
+		if err := ExecWebAuthn(params, tabID); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+			return errUsage
+		}
+		return nil
+	})
+	f := cmd.Flags()
+	f.StringP("action", "a", "enable", "WebAuthn action: enable|disable|addAuthenticator|removeAuthenticator|getCredentials|clearCredentials|setUserVerified")
+	f.String("authenticator-id", "", "Virtual authenticator ID")
+	f.String("protocol", "ctap2", "Protocol for addAuthenticator: ctap2|u2f")
+	f.String("transport", "internal", "Transport for addAuthenticator: internal|usb|nfc|ble|cable")
+	f.Bool("enable-ui", false, "Enable WebAuthn UI in DevTools")
+	f.String("user-verified", "true", "Simulated user verification state (true|false)")
 	f.IntP("tab", "t", 0, "Target tab ID")
 	return cmd
 }

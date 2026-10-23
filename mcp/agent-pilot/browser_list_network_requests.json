@@ -1,5 +1,5 @@
 {
-  "description": "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType.",
+  "description": "List recent HTTP/HTTPS network requests captured on the tab with optional filters by URL, method, resourceType, and navigation history (includePreserved/navigationId).",
   "inputSchema": {
     "properties": {
       "contextId": {
@@ -10,6 +10,10 @@
         "description": "Filter requests matching URL substring",
         "type": "string"
       },
+      "includePreserved": {
+        "description": "Include network requests preserved across earlier navigations (default: true; set false for current navigation only)",
+        "type": "boolean"
+      },
       "limit": {
         "description": "Max requests to return (default: 100)",
         "type": "integer"
@@ -17,6 +21,10 @@
       "method": {
         "description": "Filter by HTTP method (GET, POST, PUT, DELETE...)",
         "type": "string"
+      },
+      "navigationId": {
+        "description": "Optional navigationId to filter network requests to a specific navigation",
+        "type": "integer"
       },
       "resourceType": {
         "description": "Filter by resource type (Fetch, XHR, Document, Script...)",
@@ -40,6 +48,10 @@
         "description": "Filter requests matching URL substring",
         "type": "string"
       },
+      "includePreserved": {
+        "description": "Include network requests preserved across earlier navigations (default: true; set false for current navigation only)",
+        "type": "boolean"
+      },
       "limit": {
         "description": "Max requests to return (default: 100)",
         "type": "integer"
@@ -47,6 +59,10 @@
       "method": {
         "description": "Filter by HTTP method (GET, POST, PUT, DELETE...)",
         "type": "string"
+      },
+      "navigationId": {
+        "description": "Optional navigationId to filter network requests to a specific navigation",
+        "type": "integer"
       },
       "resourceType": {
         "description": "Filter by resource type (Fetch, XHR, Document, Script...)",

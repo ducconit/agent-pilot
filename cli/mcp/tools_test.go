@@ -9,7 +9,7 @@ import (
 )
 
 func TestMCPToolsRegistry(t *testing.T) {
-	expectedCount := 67
+	expectedCount := 68
 	if len(mcpTools) != expectedCount {
 		t.Fatalf("expected %d tools, got %d", expectedCount, len(mcpTools))
 	}
@@ -22,6 +22,7 @@ func TestMCPToolsRegistry(t *testing.T) {
 		"browser_list_3p_developer_tools", "browser_execute_3p_developer_tool",
 		"browser_list_webmcp_tools", "browser_execute_webmcp_tool",
 		"browser_get_os_app_state", "browser_install_pwa", "browser_launch_pwa", "browser_uninstall_pwa",
+		"browser_webauthn",
 		"browser_run_actions", "browser_open_tab", "browser_close_tab", "browser_list_tabs", "browser_navigate",
 		"browser_click", "browser_type", "browser_scroll", "browser_snapshot", "browser_fill_form",
 		"browser_get_element", "browser_screenshot", "browser_get_devtools_data", "browser_pick_color",

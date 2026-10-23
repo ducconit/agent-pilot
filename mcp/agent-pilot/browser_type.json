@@ -1,5 +1,5 @@
 {
-  "description": "Type text into an input or textarea with realistic human keystroke intervals. Supports inline post-type waitMs/waitForSelector/waitForText.",
+  "description": "Type text into an input or textarea with realistic human keystroke intervals. Supports inline post-type waitMs/waitForSelector/waitForText and includeSnapshot.",
   "inputSchema": {
     "properties": {
       "clear": {
@@ -9,6 +9,10 @@
       "contextId": {
         "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after typing (default: false)",
+        "type": "boolean"
       },
       "pressEnter": {
         "description": "Press Enter after typing",
@@ -58,6 +62,10 @@
       "contextId": {
         "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after typing (default: false)",
+        "type": "boolean"
       },
       "pressEnter": {
         "description": "Press Enter after typing",

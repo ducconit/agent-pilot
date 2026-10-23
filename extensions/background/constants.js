@@ -12,6 +12,7 @@ export const tabLockStates = new Map(); // tabId -> { manualLock: boolean, autoC
 export const activeDialogs = new Map(); // tabId -> { type, message, defaultPrompt, url, timestamp }
 export const activeTracingSessions = new Map(); // tabId -> { buffer: [], categories: string, startTime: number }
 export const memoryBaselines = new Map(); // tabId -> { timestamp, metrics, heapSummary, domSummary }
+export const beforeUnloadPolicies = new Map(); // tabId -> "accept" | "decline"
 
 // Chrome Native Tab Group styling constants
 export const AGENT_GROUP_TITLE = "🤖 Agent Pilot";
@@ -126,6 +127,7 @@ export function cleanupDebuggerState(tabId) {
   activeTracingSessions.delete(tabId);
   activeDialogs.delete(tabId);
   memoryBaselines.delete(tabId);
+  beforeUnloadPolicies.delete(tabId);
 }
 
 /**
@@ -248,10 +250,15 @@ export function getBuffer(tabId) {
     devtoolsBuffers.set(tabId, {
       console: [],
       network: new Map(),
-      performance: { metrics: {}, timestamp: Date.now() }
+      performance: { metrics: {}, timestamp: Date.now() },
+      navigationId: 1,
+      nextConsoleMsgId: 1
     });
   }
-  return devtoolsBuffers.get(tabId);
+  const buf = devtoolsBuffers.get(tabId);
+  if (!buf.navigationId) buf.navigationId = 1;
+  if (!buf.nextConsoleMsgId) buf.nextConsoleMsgId = 1;
+  return buf;
 }
 
 // Secret & Private Key Masking Configuration (Default: true)

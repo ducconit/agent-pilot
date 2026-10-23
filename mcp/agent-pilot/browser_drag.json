@@ -1,5 +1,5 @@
 {
-  "description": "Drag from a source to a target element, or between coordinates (fromX/fromY/toX/toY) for canvas/game aiming. Set via:'cdp' for trusted CDP input; via:'auto' falls back to synthetic. Supports inline post-drag waitMs/waitForSelector/waitForText.",
+  "description": "Drag from a source to a target element, or between coordinates (fromX/fromY/toX/toY) for canvas/game aiming. Set via:'cdp' for trusted CDP input; via:'auto' falls back to synthetic. Supports inline post-drag waitMs/waitForSelector/waitForText and includeSnapshot.",
   "inputSchema": {
     "properties": {
       "contextId": {
@@ -21,6 +21,10 @@
       "holdMs": {
         "description": "Hold at destination before release in ms (slingshot pull)",
         "type": "integer"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after dragging (default: false)",
+        "type": "boolean"
       },
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep after dragging",
@@ -87,6 +91,10 @@
       "holdMs": {
         "description": "Hold at destination before release in ms (slingshot pull)",
         "type": "integer"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after dragging (default: false)",
+        "type": "boolean"
       },
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep after dragging",

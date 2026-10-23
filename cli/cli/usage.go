@@ -43,10 +43,11 @@ THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT / A
   devtools <operation>          CSS, Lighthouse, audit drill-down, video, context riêng, worker, AX
   metrics                       Lấy chỉ số chuyên sâu (Core Web Vitals: LCP/CLS/FCP/TTFB/TBT, DOM Health, Heap)
   heap [baseline|diff|snapshot] Chụp V8 Heap Snapshot, phân tích Detached DOM & phát hiện Memory Leak
+  webauthn <action>             Quản lý Virtual WebAuthn Authenticator & Passkeys qua CDP
   extensions [list|toggle]      Quản lý, xem danh sách và bật/tắt các Extension đã cài đặt
   open <url>                    Mở tab mới với URL chỉ định
-  navigate <url>                Điều hướng tab hiện tại đến URL
-  screenshot [tùy chọn]         Chụp ảnh màn hình (Lưu ra file PNG)
+  navigate <url|back|forward|reload> Điều hướng tab hiện tại đến URL hoặc back/forward/reload
+  screenshot [tùy chọn]         Chụp ảnh màn hình (Lưu ra file PNG/JPEG/WebP)
   inspect <selector>            Soi và trích xuất thông số phần tử DOM
   cdp status                    Kiểm tra CDP/debugger đã attach (dùng cho --via cdp)
   session [start|end|status]    Bắt đầu/kết thúc phiên làm việc (Giữ chuột ảo và viền neon liên tục)

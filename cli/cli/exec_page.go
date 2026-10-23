@@ -121,8 +121,9 @@ func ExecOpen(url string, active bool, extra ...map[string]interface{}) error {
 }
 
 func ExecNavigate(url string, tabID interface{}, extra ...map[string]interface{}) error {
-	params := map[string]interface{}{
-		"url": url,
+	params := map[string]interface{}{}
+	if url != "" {
+		params["url"] = url
 	}
 	if tabID != nil {
 		params["tabId"] = tabID
@@ -135,7 +136,13 @@ func ExecNavigate(url string, tabID interface{}, extra ...map[string]interface{}
 	if strings.EqualFold(commandOutputFormat(extra...), "json") {
 		return printCommandResult("json", "", res)
 	}
-	fmt.Printf("✅ Navigated to '%s': %v\n", url, res)
+	targetDesc := url
+	if targetDesc == "" {
+		if act, ok := params["action"].(string); ok && act != "" {
+			targetDesc = act
+		}
+	}
+	fmt.Printf("✅ Navigated to '%s': %v\n", targetDesc, res)
 	return nil
 }
 
@@ -197,6 +204,10 @@ func ExecScreenshotWithOptions(mode, selector, clipStr, outputPath string, tabID
 		params["tabId"] = tabID
 	}
 	mergeExtraParams(params, extra...)
+	if imgFmt, ok := params["imgFormat"].(string); ok && imgFmt != "" {
+		params["format"] = imgFmt
+		delete(params, "imgFormat")
+	}
 
 	res, err := bridge.DispatchCommand("page.screenshot", params, config.DefaultBridgePort())
 	if err != nil {
@@ -347,7 +358,14 @@ func ExecEvaluate(expression string, tabID interface{}, extra ...map[string]inte
 		params["tabId"] = tabID
 	}
 	mergeExtraParams(params, extra...)
+	if err := bridge.EnrichEvaluateArgs(params); err != nil {
+		return err
+	}
 	res, err := bridge.DispatchCommand("page.evaluate", params, config.DefaultBridgePort())
+	if err != nil {
+		return err
+	}
+	res, err = bridge.ProcessEvaluateResult(res, params)
 	if err != nil {
 		return err
 	}

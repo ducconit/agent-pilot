@@ -212,3 +212,73 @@ func TestProcessBatchScreenshots(t *testing.T) {
 		t.Errorf("expected path %q, got %v", outPathNested, stepRes["path"])
 	}
 }
+
+func TestEnrichEvaluateArgsAndProcessResult(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcFile := filepath.Join(tmpDir, "probe.js")
+	if err := os.WriteFile(srcFile, []byte("() => ({ ok: true, count: 42 })"), 0644); err != nil {
+		t.Fatalf("failed to write source js: %v", err)
+	}
+	outFile := filepath.Join(tmpDir, "eval_out.json")
+
+	args := map[string]interface{}{
+		"sourcePath": srcFile,
+		"filePath":   outFile,
+	}
+	if err := EnrichEvaluateArgs(args); err != nil {
+		t.Fatalf("EnrichEvaluateArgs failed: %v", err)
+	}
+	if args["script"] != "() => ({ ok: true, count: 42 })" {
+		t.Errorf("expected script populated from sourcePath, got %v", args["script"])
+	}
+
+	// Reject sensitive sourcePath or filePath (including symlink to /etc)
+	badSource := map[string]interface{}{"sourcePath": "/etc/passwd"}
+	if err := EnrichEvaluateArgs(badSource); err == nil {
+		t.Error("expected sensitive sourcePath /etc/passwd to be rejected")
+	}
+	badOut := map[string]interface{}{"script": "1+1", "filePath": "/etc/evil.json"}
+	if err := EnrichEvaluateArgs(badOut); err == nil {
+		t.Error("expected sensitive filePath /etc/evil.json to be rejected")
+	}
+	badDotfile := map[string]interface{}{"script": "1+1", "filePath": "/home/user/.bashrc"}
+	if err := EnrichEvaluateArgs(badDotfile); err == nil {
+		t.Error("expected sensitive dotfile /home/user/.bashrc to be rejected")
+	}
+	etcSymlink := filepath.Join(tmpDir, "etc_link")
+	if err := os.Symlink("/etc", etcSymlink); err == nil {
+		badSymlinkOut := map[string]interface{}{"script": "1+1", "filePath": filepath.Join(etcSymlink, "evil.json")}
+		if err := EnrichEvaluateArgs(badSymlinkOut); err == nil {
+			t.Error("expected symlinked /etc output path to be rejected")
+		}
+	}
+
+	// Also verify "file" alias for sourcePath
+	fileAliasArgs := map[string]interface{}{"file": srcFile}
+	if err := EnrichEvaluateArgs(fileAliasArgs); err != nil {
+		t.Fatalf("EnrichEvaluateArgs with file alias failed: %v", err)
+	}
+	if fileAliasArgs["script"] != "() => ({ ok: true, count: 42 })" {
+		t.Errorf("expected script populated from file alias, got %v", fileAliasArgs["script"])
+	}
+	if _, hasFile := fileAliasArgs["file"]; hasFile {
+		t.Error("expected 'file' key to be cleaned up after enrichment")
+	}
+
+	// ProcessEvaluateResult writes JSON to disk and returns metadata
+	savedMeta, err := ProcessEvaluateResult(map[string]interface{}{"ok": true, "count": 42}, args)
+	if err != nil {
+		t.Fatalf("ProcessEvaluateResult failed: %v", err)
+	}
+	metaMap, ok := savedMeta.(map[string]interface{})
+	if !ok || metaMap["saved"] != true {
+		t.Fatalf("expected saved=true metadata, got %#v", savedMeta)
+	}
+	rawSaved, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatalf("failed to read saved eval output: %v", err)
+	}
+	if !strings.Contains(string(rawSaved), `"count": 42`) {
+		t.Errorf("unexpected saved eval output: %s", string(rawSaved))
+	}
+}

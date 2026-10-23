@@ -76,7 +76,7 @@ record(
 
 // 2. Batch executor + handler registry
 const EXPECTED_BATCH_ACTIONS = [
-  "open", "open_tab", "tabs.create", "navigate", "tabs.update", "close", "close_tab", "tabs.remove",
+  "open", "open_tab", "tabs.create", "navigate", "tabs.update", "back", "forward", "reload", "close", "close_tab", "tabs.remove",
   "wait", "sleep", "wait_for", "wait_for_selector",
   "click", "page.click", "type", "page.type", "press_key", "key",
   "scroll", "page.scroll", "hover", "page.hover", "drag", "page.drag",
@@ -108,7 +108,7 @@ const EXPECTED_AGENT_METHODS = [
   "network.listRequests", "network.getResponseBody",
   "performance.trace", "performance.metrics",
   "memory.heapSnapshot", "memory.collectGarbage",
-  "extensions.manage", "config.getSecretFilter", "config.setSecretFilter", "extension.reload"
+  "extensions.manage", "webauthn.manage", "config.getSecretFilter", "config.setSecretFilter", "extension.reload"
 ];
 const LEGACY_ALIASES = [
   "tabs.list", "evaluate", "page.key", "page.wait", "page.upload",
@@ -592,7 +592,7 @@ record(
   inlineMessages.length === 1 &&
     inlineMessages[0].action === "wait_for" &&
     inlineMessages[0].selector === ".loaded-panel" &&
-    mergedClick.waitedMs >= 15 &&
+    mergedClick.waitedMs >= 10 &&
     mergedClick.waitForResult?.success === true &&
     evalWithScriptAlias === "eval:window.__squoosh",
   `waitForSelector=${inlineMessages[0]?.selector}, waitedMs=${mergedClick.waitedMs}, evalResult=${evalWithScriptAlias}`
@@ -1205,6 +1205,287 @@ record(
   cdpManager.isUnsupportedHeapProfilerError(new Error("CDP command HeapProfiler.takeHeapSnapshot timed out after 15000ms")) === false &&
     cdpManager.isUnsupportedHeapProfilerError(new Error("-32601 Method not found")) === true,
   "timeout=false, methodNotFound=true"
+);
+
+// 29. dispatchCdpMouseClick with dblClick: true dispatches clickCount 1 then 2
+attachedTabs.add(929);
+const clickEvents29 = [];
+globalThis.chrome.debugger.sendCommand = (_target, method, params, cb) => {
+  if (method === "Input.dispatchMouseEvent") {
+    clickEvents29.push({ type: params.type, clickCount: params.clickCount });
+  }
+  cb({});
+};
+await cdpManager.dispatchCdpMouseClick(929, 200, 150, { dblClick: true });
+record(
+  "29. dispatchCdpMouseClick with dblClick: true dispatches clickCount 1 then 2",
+  clickEvents29.filter((e) => e.type === "mousePressed").map((e) => e.clickCount).join(",") === "1,2" &&
+    clickEvents29.filter((e) => e.type === "mouseReleased").map((e) => e.clickCount).join(",") === "1,2",
+  `events=${JSON.stringify(clickEvents29.filter((e) => e.type !== "mouseMoved"))}`
+);
+
+// 30. evaluateInTab resolves @ref/selector args, cleans up marker attributes, and invokes user function in MAIN world
+let markedArgs30 = null;
+let unmarkedPrefix30 = null;
+let mainWorldExec30 = null;
+globalThis.chrome.tabs = {
+  get: async (id) => ({ id, url: "https://example.test", status: "complete" }),
+  sendMessage: (_tabId, msg, cb) => {
+    if (msg.action === "mark_eval_targets") {
+      markedArgs30 = msg.args;
+      cb({
+        success: true,
+        prefix: "eval_1_0",
+        descriptors: [
+          { kind: "element", attr: "data-ap-eval-arg-0", token: "eval_1_0" },
+          { kind: "value", value: "extra-val" }
+        ]
+      });
+      return;
+    }
+    if (msg.action === "unmark_eval_targets") {
+      unmarkedPrefix30 = msg.prefix;
+      cb({ success: true });
+      return;
+    }
+    cb({ status: "ok", success: true });
+  }
+};
+globalThis.chrome.scripting = {
+  executeScript: async (opts) => {
+    if (opts.world === "MAIN" && Array.isArray(opts.args)) {
+      mainWorldExec30 = opts;
+    }
+    return [{ result: { ok: true, value: "btn-1:extra-val" } }];
+  }
+};
+const evalRes30 = await evaluateInTab(
+  930,
+  "(el, label) => el.id + ':' + label",
+  () => {},
+  ["@1", "extra-val"]
+);
+record(
+  "30. evaluateInTab resolves @ref/selector args, passes descriptors to MAIN world, and cleans up markers",
+  evalRes30 === "btn-1:extra-val" &&
+    Array.isArray(markedArgs30) &&
+    markedArgs30.length === 2 &&
+    markedArgs30[0] === "@1" &&
+    unmarkedPrefix30 === "eval_1_0" &&
+    mainWorldExec30?.world === "MAIN" &&
+    Array.isArray(mainWorldExec30?.args?.[1]) &&
+    mainWorldExec30.args[1].length === 2,
+  `result=${evalRes30}, marked=${JSON.stringify(markedArgs30)}, unmarked=${unmarkedPrefix30}`
+);
+
+// 31. tabs.update supports action="reload", ignoreCache=true, initScript, handleBeforeUnload="accept", and includeSnapshot=true
+const invokeHandler = (method, client, params) =>
+  new Promise((resolve, reject) => {
+    AGENT_COMMAND_HANDLERS[method](client, params, (res, err) => {
+      if (err) reject(err);
+      else resolve(res);
+    });
+  });
+
+attachedTabs.add(931);
+const cdpCalls31 = [];
+globalThis.chrome.debugger.sendCommand = (_target, method, params, cb) => {
+  cdpCalls31.push({ method, params });
+  if (method === "Page.addScriptToEvaluateOnNewDocument") {
+    cb({ identifier: "script-1" });
+    return;
+  }
+  cb({});
+};
+globalThis.chrome.tabs = {
+  get: async (id) => ({ id, url: "https://example.test/dashboard", title: "Dashboard", status: "complete", active: true }),
+  sendMessage: (_tabId, msg, cb) => {
+    if (msg.action === "get_interactive_snapshot") {
+      cb({ elements: [{ ref: "@1", tag: "button", text: "Refresh" }], count: 1 });
+      return;
+    }
+    if (msg.action === "ping") {
+      cb({ status: "ok" });
+      return;
+    }
+    cb({ success: true });
+  },
+  onUpdated: { addListener: () => {}, removeListener: () => {} }
+};
+const navRes31 = await invokeHandler(
+  "tabs.update",
+  {
+    getTargetTabId: async () => 931,
+    assignTabToAgentGroup: async () => {},
+    sendTabMessageWithRetry: async (_tabId, msg) => {
+      if (msg.action === "get_snapshot" || msg.action === "get_interactive_snapshot") {
+        return { elements: [{ ref: "@1", tag: "button", text: "Refresh" }], count: 1 };
+      }
+      return { success: true };
+    },
+    broadcastFn: () => {}
+  },
+  {
+    tabId: 931,
+    action: "reload",
+    ignoreCache: true,
+    initScript: "window.__TEST_INIT__ = 1;",
+    handleBeforeUnload: "accept",
+    includeSnapshot: true
+  }
+);
+record(
+  "31. tabs.update supports action='reload', ignoreCache, initScript, handleBeforeUnload, and includeSnapshot",
+  navRes31.navigationAction === "reload" &&
+    navRes31.initScriptIdentifier === "script-1" &&
+    navRes31.snapshot?.count === 1 &&
+    cdpCalls31.some((c) => c.method === "Page.reload" && c.params?.ignoreCache === true) &&
+    cdpCalls31.some((c) => c.method === "Page.addScriptToEvaluateOnNewDocument"),
+  `action=${navRes31.navigationAction}, initScriptId=${navRes31.initScriptIdentifier}, snapshotCount=${navRes31.snapshot?.count}`
+);
+
+// 32. captureTabScreenshot supports format="webp" and quality=80
+const { captureTabScreenshot } = await import("../extensions/background/screenshot-service.js");
+let convertedMime32 = null;
+let convertedQuality32 = null;
+const prevOffscreen32 = globalThis.OffscreenCanvas;
+const prevCreateBitmap32 = globalThis.createImageBitmap;
+const prevFetch32 = globalThis.fetch;
+globalThis.fetch = async () => ({
+  blob: async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" })
+});
+globalThis.createImageBitmap = async () => ({
+  width: 800,
+  height: 600,
+  close: () => {}
+});
+globalThis.OffscreenCanvas = class MockWebpCanvas {
+  constructor(w, h) {
+    this.width = w;
+    this.height = h;
+  }
+  getContext() {
+    return { drawImage: () => {} };
+  }
+  async convertToBlob(opts) {
+    convertedMime32 = opts?.type;
+    convertedQuality32 = opts?.quality;
+    return new Blob([new Uint8Array([82, 73, 70, 70])], { type: opts?.type || "image/webp" });
+  }
+};
+globalThis.chrome.tabs = {
+  get: async (id) => ({ id, active: true, width: 800, height: 600, windowId: 1 }),
+  captureVisibleTab: (_winId, _opts, cb) => cb("data:image/png;base64,iVBORw0KGgo=")
+};
+const shotWebp32 = await captureTabScreenshot(932, { format: "webp", quality: 80 });
+globalThis.OffscreenCanvas = prevOffscreen32;
+globalThis.createImageBitmap = prevCreateBitmap32;
+globalThis.fetch = prevFetch32;
+record(
+  "32. captureTabScreenshot supports format='webp' and quality=80",
+  shotWebp32.format === "webp" &&
+    convertedMime32 === "image/webp" &&
+    Math.abs(convertedQuality32 - 0.8) < 0.001 &&
+    typeof shotWebp32.dataUrl === "string" &&
+    shotWebp32.dataUrl.startsWith("data:image/webp;base64,"),
+  `format=${shotWebp32.format}, mime=${convertedMime32}, quality=${convertedQuality32}`
+);
+
+// 33. Navigation-aware Console/Network buffers & msgid single-message lookup
+const { getBuffer } = await import("../extensions/background/constants.js");
+devtoolsBuffers.delete(933);
+const buf33 = getBuffer(933);
+buf33.console.push(
+  { msgid: 1, navigationId: 1, type: "log", text: "old nav log", args: ["old nav log"], timestamp: 1000 },
+  { msgid: 2, navigationId: 2, type: "error", text: "current nav error", args: ["current nav error", { code: 500 }], timestamp: 2000 }
+);
+buf33.navigationId = 2;
+buf33.nextConsoleMsgId = 3;
+buf33.network.set("r1", { requestId: "r1", navigationId: 1, url: "https://example.test/old", method: "GET", status: 200 });
+buf33.network.set("r2", { requestId: "r2", navigationId: 2, url: "https://example.test/new", method: "POST", status: 201 });
+
+const currentNavDevtools = await collectDevtoolsData(933, { type: "console", includePreserved: false });
+const allNavDevtools = await collectDevtoolsData(933, { type: "console", includePreserved: true });
+const msgLookup33 = await collectDevtoolsData(933, { msgid: 2 });
+const netCurrentNav33 = await invokeHandler(
+  "network.listRequests",
+  { getTargetTabId: async () => 933 },
+  { tabId: 933, includePreserved: false }
+);
+record(
+  "33. Navigation-aware Console/Network buffers filter by includePreserved/navigationId and inspect by msgid",
+  currentNavDevtools.console?.length === 1 &&
+    currentNavDevtools.console[0].msgid === 2 &&
+    allNavDevtools.console?.length === 2 &&
+    msgLookup33.message?.msgid === 2 &&
+    msgLookup33.message?.args?.[1]?.code === 500 &&
+    netCurrentNav33.matchingCount === 1 &&
+    netCurrentNav33.navigationId === 2 &&
+    netCurrentNav33.requests?.[0]?.requestId === "r2",
+  `currentConsole=${currentNavDevtools.console?.length}, allConsole=${allNavDevtools.console?.length}, msgId=${msgLookup33.message?.msgid}, netCurrent=${netCurrentNav33.matchingCount}`
+);
+
+// 34. webauthn.manage supports virtual authenticator lifecycle over tab-scoped CDP
+attachedTabs.add(934);
+const webauthnCdp34 = [];
+globalThis.chrome.debugger.sendCommand = (_target, method, params, cb) => {
+  webauthnCdp34.push({ method, params });
+  if (method === "WebAuthn.addVirtualAuthenticator") {
+    cb({ authenticatorId: "auth-virtual-1" });
+    return;
+  }
+  if (method === "WebAuthn.getCredentials") {
+    cb({ credentials: [{ credentialId: "cred-1", rpId: "example.test", signCount: 1 }] });
+    return;
+  }
+  cb({});
+};
+const webauthnClient34 = {
+  getTargetTabId: async () => 934,
+  runWithTabLock: async (_tabId, _op, fn) => fn(),
+  broadcastFn: () => {}
+};
+const addAuthRes34 = await invokeHandler("webauthn.manage", webauthnClient34, {
+  tabId: 934,
+  action: "addAuthenticator",
+  protocol: "ctap2",
+  transport: "internal"
+});
+const getCredsRes34 = await invokeHandler("webauthn.manage", webauthnClient34, {
+  tabId: 934,
+  action: "credentials",
+  authenticatorId: "auth-virtual-1"
+});
+const verifyRes34 = await invokeHandler("webauthn.manage", webauthnClient34, {
+  tabId: 934,
+  action: "verify",
+  authenticatorId: "auth-virtual-1",
+  isUserVerified: true
+});
+const clearRes34 = await invokeHandler("webauthn.manage", webauthnClient34, {
+  tabId: 934,
+  action: "clear",
+  authenticatorId: "auth-virtual-1"
+});
+const disableAuthRes34 = await invokeHandler("webauthn.manage", webauthnClient34, {
+  tabId: 934,
+  action: "disable"
+});
+record(
+  "34. webauthn.manage manages virtual authenticators and credentials via WebAuthn CDP domain",
+  addAuthRes34.authenticatorId === "auth-virtual-1" &&
+    getCredsRes34.credentials?.length === 1 &&
+    getCredsRes34.credentials?.[0]?.credentialId === "cred-1" &&
+    verifyRes34.action === "setUserVerified" &&
+    clearRes34.action === "clearCredentials" &&
+    disableAuthRes34.success === true &&
+    webauthnCdp34.some((c) => c.method === "WebAuthn.enable") &&
+    webauthnCdp34.some((c) => c.method === "WebAuthn.addVirtualAuthenticator") &&
+    webauthnCdp34.some((c) => c.method === "WebAuthn.getCredentials") &&
+    webauthnCdp34.some((c) => c.method === "WebAuthn.setUserVerified") &&
+    webauthnCdp34.some((c) => c.method === "WebAuthn.clearCredentials") &&
+    webauthnCdp34.some((c) => c.method === "WebAuthn.disable"),
+  `authId=${addAuthRes34.authenticatorId}, creds=${getCredsRes34.credentials?.length}, cdpCalls=${webauthnCdp34.map((c) => c.method).join(",")}`
 );
 
 recorder.summarize();

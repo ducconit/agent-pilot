@@ -21,9 +21,12 @@ agent-pilot service status
 # Always create a controlled tab first; capture the returned tab id
 agent-pilot open http://127.0.0.1:3000
 
-# Machine-readable interaction output
-agent-pilot open http://127.0.0.1:3000 --format json
-agent-pilot click '#submit' --tab 123 --format json
+# Machine-readable interaction output (add --include-snapshot to get a snapshot in the same round-trip)
+agent-pilot open http://127.0.0.1:3000 --include-snapshot --format json
+agent-pilot click '#submit' --tab 123 --include-snapshot --format json
+agent-pilot click '#row-1' --dblclick --tab 123 --format json
+agent-pilot navigate --action reload --ignore-cache --tab 123 --format json
+agent-pilot evaluate "(el, v) => el.dataset.id + ':' + v" --arg "@1" --arg "ok" -o /tmp/eval.json --tab 123
 agent-pilot close --tab 123 --format json
 agent-pilot emulate --theme dark --format json
 
@@ -98,12 +101,15 @@ agent-pilot batch flow.json --format json
 
 Batch `actions` must contain objects. For DevTools use `{ "type": "performance_metrics" }`, `{ "type": "performance_trace", "action": "start" }`, `{ "type": "performance_trace", "action": "stop" }`, or `{ "type": "heap_snapshot" }`; unsupported heap capture reports `HEAPPROFILER_UNAVAILABLE` rather than a fake fallback.
 
-Use inline `waitMs`, `waitForSelector`, or `waitForText` on navigation and interaction commands instead of a separate sleep/wait command. Batch screenshots are written to disk and should not be returned as base64 unless explicitly needed.
+Use inline `waitMs`, `waitForSelector`, `waitForText`, or `includeSnapshot` (`--include-snapshot`) on navigation and interaction commands instead of a separate sleep/wait/snapshot command. Batch screenshots (`format: "png" | "jpeg" | "webp"`, `quality: 1..100`) and batch `evaluate` steps with `filePath` are written to disk and return file paths rather than raw payloads unless explicitly requested.
 
-## Compact DevTools workflow
+## Compact DevTools & Virtual WebAuthn workflow
 
 ```bash
 agent-pilot devtools status --tab 123
+agent-pilot network list --current-nav --tab 123
+agent-pilot webauthn add --protocol ctap2 --transport internal --tab 123
+agent-pilot webauthn credentials --id <authenticatorId> --tab 123
 agent-pilot metrics --tab 123
 agent-pilot trace start --tab 123
 agent-pilot trace stop --tab 123

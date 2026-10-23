@@ -204,6 +204,32 @@ func TestParseEvalArgs(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected error for empty args, got nil")
 	}
+
+	// 5. parseEvalArgsWithOptions with --arg, --args, and -o
+	outPath := t.TempDir() + "/eval_out.json"
+	script, tab, extra, err := parseEvalArgsWithOptions([]string{
+		"(el, label) => el.id + ':' + label",
+		"--arg", "@1",
+		"--args", `["primary"]`,
+		"-o", outPath,
+		"--tab", "55",
+	})
+	if err != nil {
+		t.Fatalf("parseEvalArgsWithOptions failed: %v", err)
+	}
+	if script != "(el, label) => el.id + ':' + label" {
+		t.Errorf("unexpected script: %s", script)
+	}
+	if tab != 55 {
+		t.Errorf("expected tab=55, got %v", tab)
+	}
+	if extra["filePath"] != outPath {
+		t.Errorf("expected filePath=%s, got %v", outPath, extra["filePath"])
+	}
+	evalArgs, ok := extra["args"].([]interface{})
+	if !ok || len(evalArgs) != 2 || evalArgs[0] != "@1" || evalArgs[1] != "primary" {
+		t.Errorf("unexpected extra[args]: %#v", extra["args"])
+	}
 }
 
 func TestParseFillArgs(t *testing.T) {
@@ -531,5 +557,22 @@ func TestApplyInlineWaitAndNegativePositionalArgs(t *testing.T) {
 	}
 	if len(scrollArgs.Positional) != 1 || scrollArgs.Positional[0] != "-300" {
 		t.Fatalf("expected positional '-300', got: %v", scrollArgs.Positional)
+	}
+
+	// 3. WebAuthn --verified alias for --user-verified
+	webauthnArgs, err := parseCmdArgs(
+		[]string{"verify", "--id", "auth-1", "--verified=true", "--tab", "123"},
+		[]FlagDef{
+			{Name: "action", Aliases: []string{"a"}},
+			{Name: "authenticator-id", Aliases: []string{"id", "auth-id"}},
+			{Name: "user-verified", Aliases: []string{"verified"}},
+			{Name: "tab", Aliases: []string{"t"}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("unexpected parseCmdArgs error for webauthn --verified: %v", err)
+	}
+	if webauthnArgs.Flags["user-verified"] != "true" || webauthnArgs.Flags["authenticator-id"] != "auth-1" {
+		t.Fatalf("unexpected webauthn flags: %#v", webauthnArgs.Flags)
 	}
 }

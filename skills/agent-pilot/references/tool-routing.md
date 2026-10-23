@@ -34,12 +34,14 @@ remain on the same tab.
 
 | Task | CLI | MCP | Path and required conditions |
 | --- | --- | --- | --- |
-| Open, navigate, click, type, fill, scroll, wait | `open`, `navigate`, `click`, `type`, `fill`, `scroll`, `wait` | `browser_open_tab`, `browser_navigate`, `browser_click`, `browser_type`, `browser_fill_form`, `browser_scroll`, `browser_wait_for` | Extension relay; use synthetic input by default |
+| Open, navigate (`url`/`back`/`forward`/`reload`), click (`dblClick`), type, fill, scroll, wait | `open`, `navigate`, `click`, `type`, `fill`, `scroll`, `wait` | `browser_open_tab`, `browser_navigate`, `browser_click`, `browser_type`, `browser_fill_form`, `browser_scroll`, `browser_wait_for` | Extension relay; use synthetic input by default; add `includeSnapshot: true` (`--include-snapshot`) to get a snapshot in the same round-trip |
+| Evaluate JS with `@ref`/selector `args` or file I/O | `evaluate` (`--arg`, `--args`, `-f`, `-o`) | `browser_evaluate` (`args`, `sourcePath`, `filePath`) | Extension relay (`MAIN` world first, CDP fallback); `@ref` and CSS selectors in `args` resolve to live DOM `Element` nodes |
 | Interactive page snapshot | `snapshot` | `browser_snapshot` | Extension relay; bounded `maxElements` keeps output small |
 | Trusted input, canvas, WebGL, cross-origin iframe | `--via cdp` on `click`/`drag`/upload where supported | `via: "cdp"` | Extension CDP; fails with `CDP_UNAVAILABLE` if another debugger is attached |
-| Screenshot | `screenshot` | `browser_screenshot` | Extension relay for normal tabs; background capture requires CDP; save to `path` |
+| Screenshot (`png`/`jpeg`/`webp`) | `screenshot` (`--format`, `--quality`) | `browser_screenshot` (`format`, `quality`) | Extension relay for normal tabs; background capture requires CDP; save to `path` |
 | CSS | `devtools css --tab <positive-id>` | `browser_get_css_styles` | Compact `summary` by default; use `computed`, `rules`, then `full` progressively |
-| Console/network summary | `network list` | `browser_get_devtools_data`, `browser_list_network_requests` | Extension relay; request bodies and full headers are fetched only on detail |
+| Console/network summary & `msgid` lookup | `network list` (`--current-nav`, `--nav-id`) | `browser_get_devtools_data` (`msgid`, `includePreserved`, `navigationId`), `browser_list_network_requests` | Extension relay; filter to latest navigation with `includePreserved: false`; inspect single console message with `msgid` |
+| Virtual WebAuthn / Passkey testing | `webauthn` (`enable`, `add`, `credentials`, `verify`, `clear`, `remove`, `disable`) | `browser_webauthn` | Extension CDP (`WebAuthn` domain) on positive Chrome `tabId` |
 | Network body/artifact | `network get` / DevTools detail | `browser_get_network_request` | CDP; pass file paths when an artifact is required |
 | Runtime metrics | `metrics` | `browser_performance_metrics` | Extension CDP on ordinary tabs; no heap snapshot is implied |
 | Performance trace and insights | `trace`, `devtools trace-insight` | `browser_performance_trace`, `browser_performance_analyze_insight` | Isolated DevTools for the full trace/insight runtime; stop the trace before reading insights |

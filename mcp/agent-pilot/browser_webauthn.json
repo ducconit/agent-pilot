@@ -1,0 +1,160 @@
+{
+  "description": "Manage tab-level virtual WebAuthn authenticators and passkey credentials via Chrome DevTools Protocol (WebAuthn domain).",
+  "inputSchema": {
+    "properties": {
+      "action": {
+        "description": "WebAuthn operation; default enable",
+        "enum": [
+          "enable",
+          "disable",
+          "addAuthenticator",
+          "add",
+          "removeAuthenticator",
+          "remove",
+          "getCredentials",
+          "credentials",
+          "clearCredentials",
+          "clear",
+          "setUserVerified",
+          "verify"
+        ],
+        "type": "string"
+      },
+      "authenticatorId": {
+        "description": "Virtual authenticator ID (required for removeAuthenticator, getCredentials, clearCredentials, setUserVerified)",
+        "type": "string"
+      },
+      "automaticPresenceSimulation": {
+        "description": "Automatically simulate user presence on auth requests (default: true)",
+        "type": "boolean"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "enableUI": {
+        "description": "Whether to enable the DevTools WebAuthn UI when enabling the domain (default: false)",
+        "type": "boolean"
+      },
+      "hasResidentKey": {
+        "description": "Support resident keys / passkeys (default: true)",
+        "type": "boolean"
+      },
+      "hasUserVerification": {
+        "description": "Support user verification (default: true)",
+        "type": "boolean"
+      },
+      "isUserVerified": {
+        "description": "Simulated user verification state (default: true)",
+        "type": "boolean"
+      },
+      "options": {
+        "description": "Optional raw CDP VirtualAuthenticatorOptions override for addAuthenticator",
+        "type": "object"
+      },
+      "protocol": {
+        "description": "Authenticator protocol for addAuthenticator (default: ctap2)",
+        "enum": [
+          "ctap2",
+          "u2f"
+        ],
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "transport": {
+        "description": "Authenticator transport for addAuthenticator (default: internal)",
+        "enum": [
+          "internal",
+          "usb",
+          "nfc",
+          "ble",
+          "cable"
+        ],
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "name": "browser_webauthn",
+  "parameters": {
+    "properties": {
+      "action": {
+        "description": "WebAuthn operation; default enable",
+        "enum": [
+          "enable",
+          "disable",
+          "addAuthenticator",
+          "add",
+          "removeAuthenticator",
+          "remove",
+          "getCredentials",
+          "credentials",
+          "clearCredentials",
+          "clear",
+          "setUserVerified",
+          "verify"
+        ],
+        "type": "string"
+      },
+      "authenticatorId": {
+        "description": "Virtual authenticator ID (required for removeAuthenticator, getCredentials, clearCredentials, setUserVerified)",
+        "type": "string"
+      },
+      "automaticPresenceSimulation": {
+        "description": "Automatically simulate user presence on auth requests (default: true)",
+        "type": "boolean"
+      },
+      "contextId": {
+        "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "enableUI": {
+        "description": "Whether to enable the DevTools WebAuthn UI when enabling the domain (default: false)",
+        "type": "boolean"
+      },
+      "hasResidentKey": {
+        "description": "Support resident keys / passkeys (default: true)",
+        "type": "boolean"
+      },
+      "hasUserVerification": {
+        "description": "Support user verification (default: true)",
+        "type": "boolean"
+      },
+      "isUserVerified": {
+        "description": "Simulated user verification state (default: true)",
+        "type": "boolean"
+      },
+      "options": {
+        "description": "Optional raw CDP VirtualAuthenticatorOptions override for addAuthenticator",
+        "type": "object"
+      },
+      "protocol": {
+        "description": "Authenticator protocol for addAuthenticator (default: ctap2)",
+        "enum": [
+          "ctap2",
+          "u2f"
+        ],
+        "type": "string"
+      },
+      "tabId": {
+        "description": "Target tab ID",
+        "type": "integer"
+      },
+      "transport": {
+        "description": "Authenticator transport for addAuthenticator (default: internal)",
+        "enum": [
+          "internal",
+          "usb",
+          "nfc",
+          "ble",
+          "cable"
+        ],
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}

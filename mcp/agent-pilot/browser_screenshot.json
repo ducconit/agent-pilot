@@ -54,6 +54,15 @@
         "description": "Optional multi-line subtitle/description drawn below the title on the screenshot annotation banner",
         "type": "string"
       },
+      "format": {
+        "description": "Screenshot image format: 'png' (default), 'jpeg', or 'webp'",
+        "enum": [
+          "png",
+          "jpeg",
+          "webp"
+        ],
+        "type": "string"
+      },
       "height": {
         "description": "Height in pixels for region mode (alternative to clip object)",
         "type": "number"
@@ -67,11 +76,15 @@
         "type": "string"
       },
       "path": {
-        "description": "Output file path to save PNG image (default: OS temp directory screenshot_\u003cts\u003e.png)",
+        "description": "Output file path to save screenshot image (default: OS temp directory screenshot_\u003cts\u003e.\u003cext\u003e)",
         "type": "string"
       },
+      "quality": {
+        "description": "Compression quality (1..100) for jpeg/webp formats (default: 85)",
+        "type": "integer"
+      },
       "savePath": {
-        "description": "Alias for path: output file path to save PNG image",
+        "description": "Alias for path: output file path to save screenshot image",
         "type": "string"
       },
       "selector": {
@@ -179,6 +192,15 @@
         "description": "Optional multi-line subtitle/description drawn below the title on the screenshot annotation banner",
         "type": "string"
       },
+      "format": {
+        "description": "Screenshot image format: 'png' (default), 'jpeg', or 'webp'",
+        "enum": [
+          "png",
+          "jpeg",
+          "webp"
+        ],
+        "type": "string"
+      },
       "height": {
         "description": "Height in pixels for region mode (alternative to clip object)",
         "type": "number"
@@ -192,11 +214,15 @@
         "type": "string"
       },
       "path": {
-        "description": "Output file path to save PNG image (default: OS temp directory screenshot_\u003cts\u003e.png)",
+        "description": "Output file path to save screenshot image (default: OS temp directory screenshot_\u003cts\u003e.\u003cext\u003e)",
         "type": "string"
       },
+      "quality": {
+        "description": "Compression quality (1..100) for jpeg/webp formats (default: 85)",
+        "type": "integer"
+      },
       "savePath": {
-        "description": "Alias for path: output file path to save PNG image",
+        "description": "Alias for path: output file path to save screenshot image",
         "type": "string"
       },
       "selector": {

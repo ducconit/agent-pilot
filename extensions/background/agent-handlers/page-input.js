@@ -7,6 +7,7 @@
 import {
   attachedTabs,
   DEFAULTS,
+  LIMITS,
   NO_TARGET_TAB_ERROR,
   logDebug
 } from "../constants.js";
@@ -20,87 +21,149 @@ import {
   dispatchCdpKeyEvent,
   uploadFileInput
 } from "../cdp-manager.js";
+import { sendTabMessageWithRetry } from "../tab-manager.js";
 import { getPositiveNumber } from "../batch-validation.js";
 
 /**
  * Shared page evaluation helper (MAIN world scripting first, CDP Runtime.evaluate fallback).
+ * Supports optional `evalArgs` array containing `@ref` / CSS selector strings or JSON values.
  */
-export async function evaluateInTab(tabId, script, broadcastFn = null) {
-  // Attempt 1: Execute in MAIN world for direct window/DOM framework access
-  if (typeof chrome !== "undefined" && chrome.scripting && chrome.scripting.executeScript) {
-    let mainWorldRan = false;
-    let userEvalError = null;
-    try {
-      const results = await chrome.scripting.executeScript({
-        target: { tabId },
-        world: "MAIN",
-        func: async (code) => {
-          try {
-            const rawVal = window.eval(code);
-            const value = await Promise.resolve(rawVal);
-            return { __eval_ok: true, value };
-          } catch (e) {
-            return {
-              __eval_err: true,
-              name: e?.name || "",
-              message: e?.message || String(e),
-              stack: e?.stack
-            };
+export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgs = null) {
+  const hasArgs = Array.isArray(evalArgs) && evalArgs.length > 0;
+  let argDescriptors = null;
+  let markerPrefix = null;
+
+  if (hasArgs) {
+    const markRes = await sendTabMessageWithRetry(tabId, {
+      action: "mark_eval_targets",
+      args: evalArgs
+    });
+    if (markRes && markRes.success === false) {
+      throw new Error(markRes.error || "Failed to resolve evaluate arguments");
+    }
+    if (markRes && Array.isArray(markRes.descriptors)) {
+      argDescriptors = markRes.descriptors;
+      markerPrefix = markRes.prefix || null;
+    } else {
+      argDescriptors = evalArgs.map((value) => ({ kind: "value", value }));
+    }
+  }
+
+  try {
+    // Attempt 1: Execute in MAIN world for direct window/DOM framework access
+    if (typeof chrome !== "undefined" && chrome.scripting && chrome.scripting.executeScript) {
+      let mainWorldRan = false;
+      let userEvalError = null;
+      try {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId },
+          world: "MAIN",
+          func: async (code, descriptors) => {
+            try {
+              const resolvedArgs = [];
+              if (Array.isArray(descriptors)) {
+                for (const desc of descriptors) {
+                  if (desc && desc.kind === "element" && desc.attr && desc.prefix) {
+                    const el = document.querySelector(`[${desc.attr}="${desc.prefix}"]`);
+                    if (el) el.removeAttribute(desc.attr);
+                    resolvedArgs.push(el);
+                  } else {
+                    resolvedArgs.push(desc ? desc.value : undefined);
+                  }
+                }
+              }
+              const rawVal = window.eval(code);
+              const invoked = typeof rawVal === "function" ? rawVal(...resolvedArgs) : rawVal;
+              const value = await Promise.resolve(invoked);
+              return { __eval_ok: true, value };
+            } catch (e) {
+              return {
+                __eval_err: true,
+                name: e?.name || "",
+                message: e?.message || String(e),
+                stack: e?.stack
+              };
+            }
+          },
+          args: [script, argDescriptors]
+        });
+        if (results && results[0] && results[0].result) {
+          const resObj = results[0].result;
+          if (resObj.__eval_err) {
+            const isCspEvalError =
+              resObj.name === "EvalError" ||
+              (typeof resObj.message === "string" && resObj.message.includes("unsafe-eval"));
+            if (!isCspEvalError) {
+              mainWorldRan = true;
+              userEvalError = new Error(resObj.message);
+            }
+          } else {
+            return resObj.value;
           }
-        },
-        args: [script]
-      });
-      if (results && results[0] && results[0].result) {
-        const resObj = results[0].result;
-        if (resObj.__eval_err) {
-          const isCspEvalError =
-            resObj.name === "EvalError" ||
-            (typeof resObj.message === "string" && resObj.message.includes("unsafe-eval"));
-          if (!isCspEvalError) {
-            mainWorldRan = true;
-            userEvalError = new Error(resObj.message);
-          }
-        } else {
-          return resObj.value;
         }
+      } catch (scriptingErr) {
+        logDebug("evaluate in MAIN world fallback to CDP", scriptingErr);
       }
-    } catch (scriptingErr) {
-      logDebug("evaluate in MAIN world fallback to CDP", scriptingErr);
+
+      if (mainWorldRan && userEvalError) {
+        throw userEvalError;
+      }
     }
 
-    if (mainWorldRan && userEvalError) {
-      throw userEvalError;
+    // Attempt 2: Fallback to CDP Runtime.evaluate
+    if (!attachedTabs.has(tabId)) {
+      await attachDebugger(tabId, broadcastFn).catch((err) => logDebug("evaluate attachDebugger", err));
+    }
+    const cdpExpression = argDescriptors
+      ? `(() => {
+          const descriptors = ${JSON.stringify(argDescriptors)};
+          const resolvedArgs = descriptors.map((desc) => {
+            if (desc && desc.kind === "element" && desc.attr && desc.prefix) {
+              const el = document.querySelector(\`[\${desc.attr}="\${desc.prefix}"]\`);
+              if (el) el.removeAttribute(desc.attr);
+              return el;
+            }
+            return desc ? desc.value : undefined;
+          });
+          const rawVal = eval(${JSON.stringify(script)});
+          return typeof rawVal === "function" ? rawVal(...resolvedArgs) : rawVal;
+        })()`
+      : script;
+    const evalRes = await sendCdpCommand(tabId, "Runtime.evaluate", {
+      expression: cdpExpression,
+      returnByValue: true,
+      awaitPromise: true
+    });
+    if (evalRes?.exceptionDetails) {
+      throw new Error(evalRes.exceptionDetails.exception?.description || evalRes.exceptionDetails.text);
+    }
+    return evalRes && evalRes.result ? evalRes.result.value : evalRes;
+  } finally {
+    if (markerPrefix) {
+      await sendTabMessageWithRetry(tabId, {
+        action: "unmark_eval_targets",
+        prefix: markerPrefix,
+        count: evalArgs.length
+      }).catch(() => {});
     }
   }
-
-  // Attempt 2: Fallback to CDP Runtime.evaluate
-  if (!attachedTabs.has(tabId)) {
-    await attachDebugger(tabId, broadcastFn).catch((err) => logDebug("evaluate attachDebugger", err));
-  }
-  const evalRes = await sendCdpCommand(tabId, "Runtime.evaluate", {
-    expression: script,
-    returnByValue: true,
-    awaitPromise: true
-  });
-  if (evalRes?.exceptionDetails) {
-    throw new Error(evalRes.exceptionDetails.exception?.description || evalRes.exceptionDetails.text);
-  }
-  return evalRes && evalRes.result ? evalRes.result.value : evalRes;
 }
 
 /**
- * Executes optional inline wait on a target tab:
+ * Executes optional inline wait (and optional post-action `includeSnapshot`) on a target tab:
  * 1. If params.waitForSelector or params.waitForText is non-empty, sends a `wait_for`
  *    command to the content script on `tabId` (throwing if the wait times out).
  * 2. If a positive sleep duration is specified via `waitMs`, `sleepMs`, `sleep`, or
  *    numeric `wait`, sleeps for that many milliseconds.
- * Returns metadata `{ waitedMs, waitForResult }` when any wait was executed, or `null` otherwise.
+ * 3. If params.includeSnapshot is true, captures an interactive snapshot after waiting.
+ * Returns metadata `{ waitedMs, waitForResult, snapshot }` when any wait or snapshot was executed, or `null` otherwise.
  */
 export async function runInlineWait(client, tabId, params = {}) {
   if (!params || typeof params !== "object") return null;
 
   const waitForSelector = typeof params.waitForSelector === "string" ? params.waitForSelector.trim() : "";
   const waitForText = typeof params.waitForText === "string" ? params.waitForText.trim() : "";
+  const includeSnapshot = Boolean(params.includeSnapshot);
   let sleepMs = 0;
   try {
     sleepMs = getPositiveNumber(params.waitMs, params.sleepMs, params.sleep, params.wait) || 0;
@@ -108,12 +171,13 @@ export async function runInlineWait(client, tabId, params = {}) {
     sleepMs = 0;
   }
 
-  if (!waitForSelector && !waitForText && sleepMs <= 0) {
+  if (!waitForSelector && !waitForText && sleepMs <= 0 && !includeSnapshot) {
     return null;
   }
 
   const startTime = Date.now();
   let waitForResult = undefined;
+  const hasWait = Boolean(waitForSelector || waitForText || sleepMs > 0);
 
   if ((waitForSelector || waitForText) && client && typeof client.sendTabMessageWithRetry === "function") {
     let timeoutMs = DEFAULTS.WAIT_FOR_TIMEOUT_MS;
@@ -137,9 +201,25 @@ export async function runInlineWait(client, tabId, params = {}) {
     await new Promise((r) => setTimeout(r, sleepMs));
   }
 
+  const waitedMs = hasWait ? (Date.now() - startTime) : undefined;
+  let snapshot = undefined;
+  if (includeSnapshot && client && typeof client.sendTabMessageWithRetry === "function") {
+    try {
+      const snapRes = await client.sendTabMessageWithRetry(tabId, {
+        action: "get_snapshot",
+        maxElements: params.snapshotMaxElements || params.maxElements || LIMITS.SNAPSHOT_MAX_ELEMENTS_DEFAULT,
+        format: params.snapshotFormat || "text"
+      });
+      snapshot = snapRes?.result !== undefined ? snapRes.result : snapRes;
+    } catch (err) {
+      logDebug("runInlineWait includeSnapshot error", err);
+    }
+  }
+
   return {
-    waitedMs: Date.now() - startTime,
-    ...(waitForResult ? { waitForResult } : {})
+    ...(waitedMs !== undefined ? { waitedMs } : {}),
+    ...(waitForResult ? { waitForResult } : {}),
+    ...(snapshot !== undefined ? { snapshot } : {})
   };
 }
 
@@ -148,8 +228,9 @@ export function mergeWaitMeta(res, waitMeta) {
   if (res && typeof res === "object" && !Array.isArray(res)) {
     return {
       ...res,
-      waitedMs: (Number(res.waitedMs) || 0) + waitMeta.waitedMs,
-      ...(waitMeta.waitForResult ? { waitForResult: waitMeta.waitForResult } : {})
+      ...(waitMeta.waitedMs !== undefined ? { waitedMs: (Number(res.waitedMs) || 0) + waitMeta.waitedMs } : {}),
+      ...(waitMeta.waitForResult ? { waitForResult: waitMeta.waitForResult } : {}),
+      ...(waitMeta.snapshot !== undefined ? { snapshot: waitMeta.snapshot } : {})
     };
   }
   return res;
@@ -161,9 +242,10 @@ export const pageInputHandlers = {
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const script = params.script || params.expression || params.code || "";
     if (!script) return respond(null, new Error("Missing script or expression to evaluate"));
+    const evalArgs = Array.isArray(params.args) ? params.args : null;
 
     client.runWithTabLock(tabId, "page.evaluate", async () => {
-      const evalRes = await evaluateInTab(tabId, script, client.broadcastFn);
+      const evalRes = await evaluateInTab(tabId, script, client.broadcastFn, evalArgs);
       await runInlineWait(client, tabId, params);
       return evalRes;
     })
@@ -192,13 +274,15 @@ export const pageInputHandlers = {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const via = client.normalizeVia(params);
+    const clickCount = (params.dblClick || params.doubleClick) ? 2 : (Number(params.clickCount) || 1);
     if (via === "synthetic") {
       client.runWithTabLock(tabId, "page.click", async () => {
         const res = await client.sendTabMessageWithRetry(tabId, {
           action: "click_cursor",
           x: params.x,
           y: params.y,
-          selector: params.selector
+          selector: params.selector,
+          clickCount
         });
         const waitMeta = await runInlineWait(client, tabId, params);
         return mergeWaitMeta(res || { success: true }, waitMeta);
@@ -219,7 +303,8 @@ export const pageInputHandlers = {
         await ensureCdpAttached(tabId, client.broadcastFn);
         clickRes = await dispatchCdpMouseClick(tabId, point.x, point.y, {
           button: params.button || "left",
-          clickCount: params.clickCount || 1
+          clickCount,
+          dblClick: Boolean(params.dblClick || params.doubleClick)
         });
       } catch (err) {
         // via=auto: CDP can be unavailable (DevTools open, no debugger permission) → synthetic
@@ -229,7 +314,8 @@ export const pageInputHandlers = {
             action: "click_cursor",
             x: params.x,
             y: params.y,
-            selector: params.selector
+            selector: params.selector,
+            clickCount
           });
           clickRes = Object.assign({}, res || {}, {
             via: "synthetic",

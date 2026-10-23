@@ -9,6 +9,7 @@
 import {
   attachedTabs,
   DEFAULTS,
+  LIMITS,
   logDebug
 } from "./constants.js";
 import {
@@ -50,6 +51,20 @@ async function resolveStepTabId(ctx, act) {
   });
 }
 
+async function attachStepSnapshotIfRequested(ctx, tabId, act) {
+  if (!act?.includeSnapshot || !tabId) return;
+  try {
+    const snapRes = await sendTabMessageWithRetry(tabId, {
+      action: "get_snapshot",
+      maxElements: act.snapshotMaxElements || act.maxElements || LIMITS.SNAPSHOT_MAX_ELEMENTS_DEFAULT,
+      format: act.snapshotFormat || "text"
+    });
+    ctx.stepResult.snapshot = snapRes?.result !== undefined ? snapRes.result : snapRes;
+  } catch (err) {
+    logDebug("batch interaction includeSnapshot", err);
+  }
+}
+
 /** scroll_into_view — ask the content script to scroll an element into view. */
 async function scrollIntoViewAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
@@ -60,6 +75,7 @@ async function scrollIntoViewAction(ctx, act) {
     behavior: act.behavior || "auto"
   });
   if (!res || !res.success) throw new Error(res?.error || `Failed to scroll into view: ${act.selector}`);
+  await attachStepSnapshotIfRequested(ctx, targetTabId, act);
   ctx.stepResult.success = true;
   ctx.stepResult.rect = res.rect;
 }
@@ -73,6 +89,7 @@ async function clickAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for click");
   const via = normalizeVia(act);
+  const clickCount = (act.dblClick || act.doubleClick) ? 2 : (Number(act.clickCount) || 1);
   if (via !== "synthetic") {
     try {
       const point = await resolvePoint(targetTabId, act.x, act.y, act.selector, "click");
@@ -84,8 +101,10 @@ async function clickAction(ctx, act) {
       await ensureCdpAttached(targetTabId);
       ctx.stepResult.result = await dispatchCdpMouseClick(targetTabId, point.x, point.y, {
         button: act.button || "left",
-        clickCount: act.clickCount || 1
+        clickCount,
+        dblClick: Boolean(act.dblClick || act.doubleClick)
       });
+      await attachStepSnapshotIfRequested(ctx, targetTabId, act);
       ctx.stepResult.success = true;
       ctx.stepResult.via = "cdp";
       return;
@@ -98,9 +117,11 @@ async function clickAction(ctx, act) {
     action: "click_cursor",
     selector: act.selector,
     x: act.x,
-    y: act.y
+    y: act.y,
+    clickCount
   });
   if (!res || !res.success) throw new Error(res?.error || "Click failed");
+  await attachStepSnapshotIfRequested(ctx, targetTabId, act);
   ctx.stepResult.success = true;
   ctx.stepResult.element = res.element;
 }
@@ -117,6 +138,7 @@ async function typeAction(ctx, act) {
     pressEnter: Boolean(act.pressEnter)
   });
   if (!res || !res.success) throw new Error(res?.error || "Type failed");
+  await attachStepSnapshotIfRequested(ctx, targetTabId, act);
   ctx.stepResult.success = true;
   ctx.stepResult.textEntered = res.textEntered;
 }
@@ -130,6 +152,7 @@ async function pressKeyAction(ctx, act) {
     key: act.key || "Enter",
     selector: act.selector
   });
+  await attachStepSnapshotIfRequested(ctx, targetTabId, act);
   ctx.stepResult.success = true;
   ctx.stepResult.key = act.key || "Enter";
 }
@@ -143,6 +166,7 @@ async function scrollAction(ctx, act) {
     deltaX: act.deltaX || 0,
     deltaY: act.deltaY || 0
   });
+  await attachStepSnapshotIfRequested(ctx, targetTabId, act);
   ctx.stepResult.success = true;
   ctx.stepResult.scroll = res;
 }
@@ -156,6 +180,7 @@ async function hoverAction(ctx, act) {
     selector: act.selector
   });
   if (!res || !res.success) throw new Error(res?.error || "Hover failed");
+  await attachStepSnapshotIfRequested(ctx, targetTabId, act);
   ctx.stepResult.success = true;
   ctx.stepResult.hover = res;
 }
@@ -183,6 +208,7 @@ async function dragAction(ctx, act) {
         toPoint.y,
         { steps: act.steps || DEFAULTS.DRAG_STEPS_CDP, holdMs: act.holdMs || act.hold || 0 }
       );
+      await attachStepSnapshotIfRequested(ctx, targetTabId, act);
       ctx.stepResult.success = true;
       ctx.stepResult.via = "cdp";
       return;
@@ -198,6 +224,7 @@ async function dragAction(ctx, act) {
     steps: act.steps || DEFAULTS.DRAG_STEPS
   });
   if (!res || !res.success) throw new Error(res?.error || "Drag failed");
+  await attachStepSnapshotIfRequested(ctx, targetTabId, act);
   ctx.stepResult.success = true;
   ctx.stepResult.drag = res;
 }
@@ -212,6 +239,7 @@ async function uploadAction(ctx, act) {
     filePayloads: act.filePayloads,
     broadcastFn: ctx.bridgeClient?.broadcastFn
   });
+  await attachStepSnapshotIfRequested(ctx, targetTabId, act);
   ctx.stepResult.success = true;
   ctx.stepResult.upload = res;
 }
@@ -224,6 +252,7 @@ async function dialogAction(ctx, act) {
     await attachDebugger(targetTabId);
   }
   const res = await handleJavaScriptDialog(targetTabId, act.accept !== false, act.promptText || "");
+  await attachStepSnapshotIfRequested(ctx, targetTabId, act);
   ctx.stepResult.success = true;
   ctx.stepResult.dialog = res;
 }
@@ -239,6 +268,7 @@ async function fillFormAction(ctx, act) {
     pressEnter: Boolean(act.pressEnter)
   });
   if (!res || !res.success) throw new Error(res?.error || "Fill form failed");
+  await attachStepSnapshotIfRequested(ctx, targetTabId, act);
   ctx.stepResult.success = true;
   ctx.stepResult.filledCount = res.filledCount;
   ctx.stepResult.submitted = res.submitted;

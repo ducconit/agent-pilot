@@ -95,7 +95,7 @@ func deriveBatchTimeout(params map[string]interface{}, defaultTimeoutMs int) int
 						actsSum += config.BatchWaitForSelDefaultMs
 					}
 
-				case "open", "open_tab", "tabs.create", "navigate", "tabs.update", "load":
+				case "open", "open_tab", "tabs.create", "navigate", "tabs.update", "load", "back", "forward", "reload":
 					loadTo := config.BatchNavigateLoadDefaultMs
 					if lt, ok := getIntOrFloat(act, "loadTimeout"); ok && lt > 0 {
 						loadTo = lt
@@ -253,6 +253,11 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 		if method == "tabs.update" && params != nil {
 			if u, ok := params["url"].(string); ok && strings.TrimSpace(u) != "" {
 				hasNav = true
+			} else if navAct, ok := params["action"].(string); ok {
+				switch strings.ToLower(strings.TrimSpace(navAct)) {
+				case "back", "forward", "reload", "url":
+					hasNav = true
+				}
 			}
 		}
 		if waitUntil && hasNav {

@@ -24,6 +24,9 @@ export const BATCH_ACTION_HANDLERS = {
   open_tab: navigationHandlers.open,
   "tabs.create": navigationHandlers.open,
   "tabs.update": navigationHandlers.navigate,
+  back: navigationHandlers.navigate,
+  forward: navigationHandlers.navigate,
+  reload: navigationHandlers.navigate,
   close_tab: navigationHandlers.close,
   "tabs.remove": navigationHandlers.close,
 

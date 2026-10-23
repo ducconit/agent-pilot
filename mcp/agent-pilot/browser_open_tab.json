@@ -10,9 +10,25 @@
         "description": "Isolated login context returned by browser_create_context",
         "type": "string"
       },
+      "handleBeforeUnload": {
+        "description": "Automatically accept or decline beforeunload confirmation dialogs on this tab",
+        "enum": [
+          "accept",
+          "decline"
+        ],
+        "type": "string"
+      },
       "headless": {
         "description": "First managed context can launch headlessly",
         "type": "boolean"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after opening the tab (default: false)",
+        "type": "boolean"
+      },
+      "initScript": {
+        "description": "Optional JavaScript registered via Page.addScriptToEvaluateOnNewDocument for navigations in this tab",
+        "type": "string"
       },
       "isolatedContext": {
         "description": "Named isolated session; automatically creates it if missing",
@@ -67,9 +83,25 @@
         "description": "Isolated login context returned by browser_create_context",
         "type": "string"
       },
+      "handleBeforeUnload": {
+        "description": "Automatically accept or decline beforeunload confirmation dialogs on this tab",
+        "enum": [
+          "accept",
+          "decline"
+        ],
+        "type": "string"
+      },
       "headless": {
         "description": "First managed context can launch headlessly",
         "type": "boolean"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after opening the tab (default: false)",
+        "type": "boolean"
+      },
+      "initScript": {
+        "description": "Optional JavaScript registered via Page.addScriptToEvaluateOnNewDocument for navigations in this tab",
+        "type": "string"
       },
       "isolatedContext": {
         "description": "Named isolated session; automatically creates it if missing",

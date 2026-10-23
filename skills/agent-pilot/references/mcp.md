@@ -2,7 +2,7 @@
 
 Use the MCP interface for conversational agents and IDEs. The MCP server runs over stdio (`agent-pilot mcp`) while the Go bridge and Chrome extension remain shared local services.
 
-The generated schemas in `mcp/agent-pilot/` are authoritative. This repository currently exports 67 schema files; clients that show an older count or omit newer actions are using a stale provider cache. `browser_run_actions.actions` is an array of action objects (`{"type":"click",...}`), not an array of strings.
+The generated schemas in `mcp/agent-pilot/` are authoritative. This repository currently exports 68 schema files; clients that show an older count or omit newer actions are using a stale provider cache. `browser_run_actions.actions` is an array of action objects (`{"type":"click",...}`), not an array of strings.
 
 Before testing, query `http://127.0.0.1:<port>/health` and confirm the MCP/bridge port plus `clients[].instanceId`, `clients[].bridgePort`, `clients[].extensionVersion`, and `clients[].extensionBuildId`. If the MCP connector reports a different port or build than `/health`, it is stale or attached to another bridge; select the port explicitly with `agent-pilot mcp --bridge-port <port>` and refresh the connector schema. Every MCP response includes compact `_meta` provenance (`bridgePort`, bridge version, instance, extension version/build when available).
 
@@ -44,14 +44,16 @@ For a compact DevTools batch, use action objects:
 
 | Need | MCP tool |
 | --- | --- |
-| Open/navigate/close | `browser_open_tab`, `browser_navigate`, `browser_close_tab` |
-| Find interactive controls | `browser_snapshot` |
+| Open/navigate/back/forward/reload/close | `browser_open_tab`, `browser_navigate` (`action: "url"\|"back"\|"forward"\|"reload"`, `ignoreCache`, `initScript`, `handleBeforeUnload`), `browser_close_tab` |
+| Find interactive controls | `browser_snapshot` (or `includeSnapshot: true` on interaction/navigation tools) |
 | Inspect one element | `browser_get_element` |
+| Evaluate JS with `@ref`/selector args or disk I/O | `browser_evaluate` (`script` or `sourcePath`, `args: ["@1", ...]`, `filePath`) |
 | Fill several fields | `browser_fill_form` |
-| Click/type/scroll | `browser_click`, `browser_type`, `browser_scroll` |
+| Click/double-click/type/scroll | `browser_click` (`dblClick: true`), `browser_type`, `browser_scroll` |
 | Upload files | `browser_upload_file` (`via: "auto"` by default) |
-| Screenshot | `browser_screenshot` |
-| Console/network/metrics | `browser_get_devtools_data` |
+| Screenshot (`png`/`jpeg`/`webp`) | `browser_screenshot` (`format`, `quality`, `path`, annotations) |
+| Console/network/metrics & `msgid` lookup | `browser_get_devtools_data` (`msgid`, `includePreserved`, `navigationId`), `browser_list_network_requests` |
+| Virtual WebAuthn / Passkey testing | `browser_webauthn` (`enable`, `addAuthenticator`, `getCredentials`, `setUserVerified`, `clearCredentials`, `removeAuthenticator`, `disable`) |
 | Trace / Web Vitals / heap | `browser_performance_trace`, `browser_performance_metrics`, `browser_heap_capability`, `browser_take_heapsnapshot`, `browser_analyze_heapsnapshot` |
 | Advanced DevTools | `browser_lighthouse_audit`, `browser_lighthouse_analyze_audit`, `browser_performance_analyze_insight`, `browser_accessibility_snapshot`, `browser_service_workers` |
 | Extension lifecycle | `browser_manage_extensions` |
@@ -68,13 +70,14 @@ Start with the smallest response that answers the question:
   "detail": "summary",
   "errorsOnly": true,
   "excludeStatic": true,
+  "includePreserved": false,
   "limit": 20
 }
 ```
 
-`browser_get_devtools_data` supports `detail: "summary" | "standard" | "full"`, `errorsOnly`, `excludeStatic`, `filterOrigin`, `includeHeaders`, `limit`, and `clear`. Use `full` or `includeHeaders` only when drilling into a known failure.
+`browser_get_devtools_data` supports `detail: "summary" | "standard" | "full"`, `errorsOnly`, `excludeStatic`, `filterOrigin`, `includeHeaders`, `includePreserved`, `navigationId`, `msgid`, `limit`, and `clear`. Pass `includePreserved: false` to restrict Console/Network entries to the latest navigation (`navigationId`), or pass `msgid` to inspect a specific Console message's full `args` and stack trace. Use `full` or `includeHeaders` only when drilling into a known failure.
 
-Prefer `browser_snapshot` with a bounded `maxElements` and `waitForSelector` over raw HTML. Prefer `browser_get_element` with `includeStyles: false`; enable styles only for UI or contrast inspection. Screenshots should use a filesystem `path`; request `base64: true` only when the image must remain inline.
+Prefer `browser_snapshot` with a bounded `maxElements` and `waitForSelector` over raw HTML, or pass `includeSnapshot: true` directly on `browser_open_tab`, `browser_navigate`, `browser_click`, `browser_type`, `browser_fill_form`, `browser_upload_file`, `browser_scroll`, `browser_hover`, `browser_drag`, or `browser_press_key` to save a round-trip. Prefer `browser_get_element` with `includeStyles: false`; enable styles only for UI or contrast inspection. Screenshots should use a filesystem `path` (supports `format: "png" | "jpeg" | "webp"` and `quality: 1..100`); request `base64: true` only when the image must remain inline. For large `browser_evaluate` outputs, pass `filePath` so the Go bridge writes the JSON result to disk and returns compact metadata (`savedPath`, `bytes`).
 
 ## CDP and capability boundaries
 

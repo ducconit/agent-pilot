@@ -1,10 +1,14 @@
 {
-  "description": "Dispatch keyboard key event or combination (Enter, Tab, Escape, Control+A, Control+Shift+R...) to active element or selector. Supports inline post-key waitMs/waitForSelector/waitForText.",
+  "description": "Dispatch keyboard key event or combination (Enter, Tab, Escape, Control+A, Control+Shift+R...) to active element or selector. Supports inline post-key waitMs/waitForSelector/waitForText and includeSnapshot.",
   "inputSchema": {
     "properties": {
       "contextId": {
         "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after pressing key (default: false)",
+        "type": "boolean"
       },
       "key": {
         "description": "Key name or combination (e.g., 'Enter', 'Tab', 'Escape', 'Control+A')",
@@ -46,6 +50,10 @@
       "contextId": {
         "description": "Optional isolated context; context tab IDs are negative",
         "type": "string"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after pressing key (default: false)",
+        "type": "boolean"
       },
       "key": {
         "description": "Key name or combination (e.g., 'Enter', 'Tab', 'Escape', 'Control+A')",

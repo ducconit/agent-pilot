@@ -116,25 +116,64 @@ func ParseSessionArgs(args []string) (string, string, interface{}, error) {
 }
 
 func parseEvalArgs(args []string) (string, interface{}, error) {
+	script, tabID, _, err := parseEvalArgsWithOptions(args)
+	return script, tabID, err
+}
+
+func parseEvalArgsWithOptions(args []string) (string, interface{}, map[string]interface{}, error) {
 	var fileArg string
+	var outFileArg string
+	var evalArgs []interface{}
 	var tabID int
 	var positional []string
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		if arg == "-f" || arg == "--file" {
+		if arg == "-f" || arg == "--file" || arg == "--source-path" {
 			if i+1 < len(args) {
 				fileArg = args[i+1]
 				i++
 			}
-		} else if strings.HasPrefix(arg, "-f=") || strings.HasPrefix(arg, "--file=") {
+		} else if strings.HasPrefix(arg, "-f=") || strings.HasPrefix(arg, "--file=") || strings.HasPrefix(arg, "--source-path=") {
 			parts := strings.SplitN(arg, "=", 2)
 			fileArg = parts[1]
+		} else if arg == "-o" || arg == "--output" || arg == "--out" || arg == "--file-path" {
+			if i+1 < len(args) {
+				outFileArg = args[i+1]
+				i++
+			}
+		} else if strings.HasPrefix(arg, "-o=") || strings.HasPrefix(arg, "--output=") || strings.HasPrefix(arg, "--out=") || strings.HasPrefix(arg, "--file-path=") {
+			parts := strings.SplitN(arg, "=", 2)
+			outFileArg = parts[1]
+		} else if arg == "--arg" {
+			if i+1 < len(args) {
+				evalArgs = append(evalArgs, args[i+1])
+				i++
+			}
+		} else if strings.HasPrefix(arg, "--arg=") {
+			parts := strings.SplitN(arg, "=", 2)
+			evalArgs = append(evalArgs, parts[1])
+		} else if arg == "--args" {
+			if i+1 < len(args) {
+				var parsed []interface{}
+				if err := json.Unmarshal([]byte(args[i+1]), &parsed); err != nil {
+					return "", nil, nil, fmt.Errorf("--args phải là mảng JSON hợp lệ: %w", err)
+				}
+				evalArgs = append(evalArgs, parsed...)
+				i++
+			}
+		} else if strings.HasPrefix(arg, "--args=") {
+			parts := strings.SplitN(arg, "=", 2)
+			var parsed []interface{}
+			if err := json.Unmarshal([]byte(parts[1]), &parsed); err != nil {
+				return "", nil, nil, fmt.Errorf("--args phải là mảng JSON hợp lệ: %w", err)
+			}
+			evalArgs = append(evalArgs, parsed...)
 		} else if arg == "-tab" || arg == "--tab" {
 			if i+1 < len(args) {
 				id, err := strconv.Atoi(args[i+1])
 				if err != nil || id <= 0 {
-					return "", nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", args[i+1])
+					return "", nil, nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", args[i+1])
 				}
 				tabID = id
 				i++
@@ -143,7 +182,7 @@ func parseEvalArgs(args []string) (string, interface{}, error) {
 			parts := strings.SplitN(arg, "=", 2)
 			id, err := strconv.Atoi(parts[1])
 			if err != nil || id <= 0 {
-				return "", nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", parts[1])
+				return "", nil, nil, fmt.Errorf("giá trị tab ID không hợp lệ: %s", parts[1])
 			}
 			tabID = id
 		} else {
@@ -155,7 +194,7 @@ func parseEvalArgs(args []string) (string, interface{}, error) {
 	if fileArg != "" {
 		data, err := os.ReadFile(fileArg)
 		if err != nil {
-			return "", nil, fmt.Errorf("không thể đọc file %s: %w", fileArg, err)
+			return "", nil, nil, fmt.Errorf("không thể đọc file %s: %w", fileArg, err)
 		}
 		script = string(data)
 	} else if len(positional) > 0 {
@@ -166,21 +205,29 @@ func parseEvalArgs(args []string) (string, interface{}, error) {
 		if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
 			data, err := io.ReadAll(io.LimitReader(os.Stdin, config.MaxAPIBodyBytes))
 			if err != nil {
-				return "", nil, fmt.Errorf("lỗi đọc stdin: %w", err)
+				return "", nil, nil, fmt.Errorf("lỗi đọc stdin: %w", err)
 			}
 			script = string(data)
 		}
 	}
 
 	if strings.TrimSpace(script) == "" {
-		return "", nil, fmt.Errorf("vui lòng cung cấp mã script, file (-f <path>) hoặc pipe qua stdin")
+		return "", nil, nil, fmt.Errorf("vui lòng cung cấp mã script, file (-f <path>) hoặc pipe qua stdin")
+	}
+
+	extra := map[string]interface{}{}
+	if len(evalArgs) > 0 {
+		extra["args"] = evalArgs
+	}
+	if strings.TrimSpace(outFileArg) != "" {
+		extra["filePath"] = strings.TrimSpace(outFileArg)
 	}
 
 	var t interface{}
 	if tabID > 0 {
 		t = tabID
 	}
-	return script, t, nil
+	return script, t, extra, nil
 }
 
 func parseFillArgs(args []string) ([]map[string]interface{}, string, bool, interface{}, error) {
@@ -327,12 +374,13 @@ func parseCmdArgs(args []string, allowedFlags []FlagDef) (FlexibleCmdArgs, error
 }
 
 // InlineWaitFlagDefs returns the shared flag definitions for inline wait options
-// (--wait/--sleep/--wait-ms/--sleep-ms, --wait-for/--wait-selector, --wait-text).
+// (--wait/--sleep/--wait-ms/--sleep-ms, --wait-for/--wait-selector, --wait-text, --include-snapshot).
 func InlineWaitFlagDefs() []FlagDef {
 	return []FlagDef{
 		{Name: "wait", Aliases: []string{"sleep", "wait-ms", "sleep-ms"}},
 		{Name: "wait-for", Aliases: []string{"wait-selector"}},
 		{Name: "wait-text"},
+		{Name: "include-snapshot", Aliases: []string{"snapshot"}, IsBool: true},
 	}
 }
 
@@ -341,8 +389,8 @@ func withInlineWaitFlags(defs ...FlagDef) []FlagDef {
 	return append(defs, InlineWaitFlagDefs()...)
 }
 
-// ApplyInlineWait populates waitMs, waitForSelector, and waitForText on params
-// when any of the inline wait flags are present.
+// ApplyInlineWait populates waitMs, waitForSelector, waitForText, and includeSnapshot on params
+// when any of the inline wait/snapshot flags are present.
 func (a FlexibleCmdArgs) ApplyInlineWait(params map[string]interface{}) error {
 	if rawWait, ok := a.Flags["wait"]; ok && strings.TrimSpace(rawWait) != "" {
 		trimmed := strings.TrimSpace(rawWait)
@@ -362,6 +410,9 @@ func (a FlexibleCmdArgs) ApplyInlineWait(params map[string]interface{}) error {
 	}
 	if txt := strings.TrimSpace(a.String("wait-text", "")); txt != "" {
 		params["waitForText"] = txt
+	}
+	if a.Bool("include-snapshot") {
+		params["includeSnapshot"] = true
 	}
 	return nil
 }

@@ -140,7 +140,17 @@ export const systemHandlers = {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     const buffer = getBuffer(tabId);
+    const currentNavId = buffer.navigationId || 1;
+    const targetNavId =
+      params.navigationId !== undefined && params.navigationId !== null && params.navigationId !== ""
+        ? Number(params.navigationId)
+        : params.includePreserved === false || params.currentNavigationOnly === true
+          ? currentNavId
+          : null;
     let requests = Array.from(buffer.network.values());
+    if (targetNavId !== null && !Number.isNaN(targetNavId)) {
+      requests = requests.filter(r => (r.navigationId || 1) === targetNavId);
+    }
     if (params.filterUrl) {
       requests = requests.filter(r => r.url && r.url.includes(params.filterUrl));
     }
@@ -156,6 +166,7 @@ export const systemHandlers = {
       : NETWORK_LIST_LIMIT_DEFAULT;
     respond({
       tabId,
+      navigationId: currentNavId,
       totalCaptured: buffer.network.size,
       matchingCount: requests.length,
       requests: requests.slice(-limit)
@@ -363,5 +374,89 @@ export const systemHandlers = {
     setTimeout(() => {
       chrome.runtime.reload();
     }, RELOAD_RESPONSE_DELAY_MS);
+  },
+
+  "webauthn.manage": async (client, params, respond) => {
+    const tabId = await client.getTargetTabId(params.tabId, params.agentId);
+    if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
+    const rawAction = String(params.action || "enable").trim();
+    const lower = rawAction.toLowerCase();
+
+    client.runWithTabLock(tabId, `webauthn.${rawAction}`, async () => {
+      if (!attachedTabs.has(tabId)) {
+        await attachDebugger(tabId, client.broadcastFn);
+      }
+
+      if (lower === "enable") {
+        const enableUI = Boolean(params.enableUI);
+        await sendCdpCommand(tabId, "WebAuthn.enable", { enableUI });
+        return { success: true, tabId, action: "enable", enableUI };
+      }
+
+      if (lower === "disable") {
+        await sendCdpCommand(tabId, "WebAuthn.disable", {});
+        return { success: true, tabId, action: "disable" };
+      }
+
+      if (lower === "addauthenticator" || lower === "addvirtualauthenticator" || lower === "add_authenticator" || lower === "add") {
+        await sendCdpCommand(tabId, "WebAuthn.enable", { enableUI: Boolean(params.enableUI) }).catch(() => {});
+        const options =
+          params.options && typeof params.options === "object" && !Array.isArray(params.options)
+            ? params.options
+            : {
+                protocol: params.protocol || "ctap2",
+                transport: params.transport || "internal",
+                hasResidentKey: params.hasResidentKey !== undefined ? Boolean(params.hasResidentKey) : true,
+                hasUserVerification: params.hasUserVerification !== undefined ? Boolean(params.hasUserVerification) : true,
+                isUserVerified: params.isUserVerified !== undefined ? Boolean(params.isUserVerified) : true,
+                automaticPresenceSimulation:
+                  params.automaticPresenceSimulation !== undefined ? Boolean(params.automaticPresenceSimulation) : true
+              };
+        const res = await sendCdpCommand(tabId, "WebAuthn.addVirtualAuthenticator", { options });
+        return {
+          success: true,
+          tabId,
+          action: "addAuthenticator",
+          authenticatorId: res?.authenticatorId || null,
+          options
+        };
+      }
+
+      const authenticatorId = typeof params.authenticatorId === "string" ? params.authenticatorId.trim() : "";
+      if (!authenticatorId) {
+        throw new Error(`authenticatorId is required for WebAuthn action '${rawAction}'`);
+      }
+
+      if (lower === "removeauthenticator" || lower === "removevirtualauthenticator" || lower === "remove_authenticator" || lower === "remove") {
+        await sendCdpCommand(tabId, "WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+        return { success: true, tabId, action: "removeAuthenticator", authenticatorId };
+      }
+
+      if (lower === "getcredentials" || lower === "get_credentials" || lower === "listcredentials" || lower === "credentials") {
+        const res = await sendCdpCommand(tabId, "WebAuthn.getCredentials", { authenticatorId });
+        return {
+          success: true,
+          tabId,
+          action: "getCredentials",
+          authenticatorId,
+          credentials: res?.credentials || []
+        };
+      }
+
+      if (lower === "clearcredentials" || lower === "clear_credentials" || lower === "clear") {
+        await sendCdpCommand(tabId, "WebAuthn.clearCredentials", { authenticatorId });
+        return { success: true, tabId, action: "clearCredentials", authenticatorId };
+      }
+
+      if (lower === "setuserverified" || lower === "set_user_verified" || lower === "verify") {
+        const isUserVerified = params.isUserVerified !== false;
+        await sendCdpCommand(tabId, "WebAuthn.setUserVerified", { authenticatorId, isUserVerified });
+        return { success: true, tabId, action: "setUserVerified", authenticatorId, isUserVerified };
+      }
+
+      throw new Error(`Unsupported WebAuthn action: ${rawAction}`);
+    })
+      .then((res) => respond(res))
+      .catch((err) => respond(null, err));
   }
 };

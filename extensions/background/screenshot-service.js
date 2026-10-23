@@ -8,9 +8,29 @@ import { attachDebugger, sendCdpCommand } from "./cdp-manager.js";
 import { sendTabMessageWithRetry } from "./tab-manager.js";
 
 /**
+ * Normalize screenshot format ("png" | "jpeg" | "webp") and quality (1..100).
+ */
+export function normalizeScreenshotFormat(rawFormat, rawQuality) {
+  const lower = String(rawFormat || "png").toLowerCase().trim();
+  const format = lower === "jpg" || lower === "jpeg" ? "jpeg" : lower === "webp" ? "webp" : "png";
+  const mimeType = format === "jpeg" ? "image/jpeg" : format === "webp" ? "image/webp" : "image/png";
+  let quality = undefined;
+  if (format === "jpeg" || format === "webp") {
+    const parsed = Number(rawQuality);
+    quality = Number.isFinite(parsed) && parsed > 0 ? Math.max(1, Math.min(100, Math.round(parsed))) : 85;
+  }
+  return {
+    format,
+    mimeType,
+    quality,
+    canvasQuality: quality !== undefined ? quality / 100 : undefined
+  };
+}
+
+/**
  * OffscreenCanvas-based image cropping utility for Service Workers
  */
-export async function cropDataUrlInWorker(dataUrl, clip) {
+export async function cropDataUrlInWorker(dataUrl, clip, formatOpts = {}) {
   if (!clip || !clip.width || !clip.height || typeof OffscreenCanvas === "undefined") {
     return dataUrl;
   }
@@ -41,10 +61,40 @@ export async function cropDataUrlInWorker(dataUrl, clip) {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh);
 
-    const croppedBlob = await canvas.convertToBlob({ type: "image/png" });
+    const croppedBlob = await canvas.convertToBlob({
+      type: formatOpts.mimeType || "image/png",
+      ...(formatOpts.canvasQuality !== undefined ? { quality: formatOpts.canvasQuality } : {})
+    });
     return await blobToDataUrl(croppedBlob);
   } catch (err) {
     logDebug("OffscreenCanvas crop", err);
+    return dataUrl;
+  } finally {
+    if (bitmap && typeof bitmap.close === "function") {
+      bitmap.close();
+    }
+  }
+}
+
+async function convertDataUrlFormatInWorker(dataUrl, formatOpts = {}) {
+  if (!dataUrl || typeof OffscreenCanvas === "undefined" || typeof createImageBitmap === "undefined") {
+    return dataUrl;
+  }
+  let bitmap = null;
+  try {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    bitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(bitmap, 0, 0, bitmap.width, bitmap.height);
+    const convertedBlob = await canvas.convertToBlob({
+      type: formatOpts.mimeType || "image/png",
+      ...(formatOpts.canvasQuality !== undefined ? { quality: formatOpts.canvasQuality } : {})
+    });
+    return await blobToDataUrl(convertedBlob);
+  } catch (err) {
+    logDebug("OffscreenCanvas format convert", err);
     return dataUrl;
   } finally {
     if (bitmap && typeof bitmap.close === "function") {
@@ -113,7 +163,7 @@ function wrapCanvasText(ctx, text, maxWidth, maxLines = 3) {
  * Draws an optional highlight box and/or a non-intrusive step/title/description
  * banner directly onto the PNG image without mutating the page DOM.
  */
-export async function annotateDataUrlInWorker(dataUrl, annotation = {}) {
+export async function annotateDataUrlInWorker(dataUrl, annotation = {}, formatOpts = {}) {
   if (!dataUrl || !annotation || typeof annotation !== "object") {
     return { dataUrl, annotated: false };
   }
@@ -251,7 +301,10 @@ export async function annotateDataUrlInWorker(dataUrl, annotation = {}) {
       ctx.restore();
     }
 
-    const outBlob = await canvas.convertToBlob({ type: "image/png" });
+    const outBlob = await canvas.convertToBlob({
+      type: formatOpts.mimeType || "image/png",
+      ...(formatOpts.canvasQuality !== undefined ? { quality: formatOpts.canvasQuality } : {})
+    });
     const annotatedUrl = await blobToDataUrl(outBlob);
     return { dataUrl: annotatedUrl, annotated: true };
   } catch (err) {
@@ -391,6 +444,7 @@ export async function captureTabScreenshot(tabId, params = {}) {
   }
 
   const annotationOpts = await resolveAnnotationOptions(tabId, params, targetTab, clip, mode);
+  const formatOpts = normalizeScreenshotFormat(params.format, params.quality);
 
   // If targetTab is running in background or CDP is attached or full page requested, capture via CDP
   if (!isTabActive || attachedTabs.has(tabId) || isFullPage) {
@@ -400,7 +454,8 @@ export async function captureTabScreenshot(tabId, params = {}) {
 
     if (attachedTabs.has(tabId)) {
       const cdpParams = {
-        format: "png",
+        format: formatOpts.format,
+        ...(formatOpts.quality !== undefined ? { quality: formatOpts.quality } : {}),
         captureBeyondViewport: isFullPage
       };
       if (isTabActive) {
@@ -422,18 +477,26 @@ export async function captureTabScreenshot(tabId, params = {}) {
           res = await sendCdpCommand(tabId, "Page.captureScreenshot", cdpParams, CDP_SCREENSHOT_TIMEOUT_MS);
         } catch (firstErr) {
           logDebug("CDP screenshot initial attempt note", firstErr);
-          res = await sendCdpCommand(tabId, "Page.captureScreenshot", { format: "png" }, CDP_SCREENSHOT_TIMEOUT_MS);
+          res = await sendCdpCommand(
+            tabId,
+            "Page.captureScreenshot",
+            {
+              format: formatOpts.format,
+              ...(formatOpts.quality !== undefined ? { quality: formatOpts.quality } : {})
+            },
+            CDP_SCREENSHOT_TIMEOUT_MS
+          );
           requiresCrop = Boolean((mode === "element" || mode === "region") && clip);
         }
 
-        let resultUrl = "data:image/png;base64," + res.data;
+        let resultUrl = `data:${formatOpts.mimeType};base64,` + res.data;
         if (requiresCrop && clip) {
-          resultUrl = await cropDataUrlInWorker(resultUrl, clip);
+          resultUrl = await cropDataUrlInWorker(resultUrl, clip, formatOpts);
           requiresCrop = false;
         }
         let annotated = false;
         if (annotationOpts) {
-          const annRes = await annotateDataUrlInWorker(resultUrl, annotationOpts);
+          const annRes = await annotateDataUrlInWorker(resultUrl, annotationOpts, formatOpts);
           resultUrl = annRes.dataUrl;
           annotated = annRes.annotated;
         }
@@ -441,6 +504,7 @@ export async function captureTabScreenshot(tabId, params = {}) {
         return {
           success: true,
           tabId,
+          format: formatOpts.format,
           isBackgroundTab: !isTabActive,
           dataUrl: resultUrl,
           clip: clip,
@@ -464,23 +528,32 @@ export async function captureTabScreenshot(tabId, params = {}) {
 
   // Fallback to captureVisibleTab (captures active tab in the window)
   const winId = targetTab?.windowId || null;
+  const visibleFormat = formatOpts.format === "jpeg" ? "jpeg" : "png";
+  const visibleOpts = {
+    format: visibleFormat,
+    ...(visibleFormat === "jpeg" && formatOpts.quality !== undefined ? { quality: formatOpts.quality } : {})
+  };
   return new Promise((resolve, reject) => {
-    chrome.tabs.captureVisibleTab(winId, { format: "png" }, async (rawUrl) => {
+    chrome.tabs.captureVisibleTab(winId, visibleOpts, async (rawUrl) => {
       if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
       const needsCrop = Boolean((mode === "element" || mode === "region") && clip);
       let finalUrl = rawUrl;
       if (needsCrop) {
-        finalUrl = await cropDataUrlInWorker(rawUrl, clip);
+        finalUrl = await cropDataUrlInWorker(rawUrl, clip, formatOpts);
       }
       let annotated = false;
       if (annotationOpts) {
-        const annRes = await annotateDataUrlInWorker(finalUrl, annotationOpts);
+        const annRes = await annotateDataUrlInWorker(finalUrl, annotationOpts, formatOpts);
         finalUrl = annRes.dataUrl;
         annotated = annRes.annotated;
+      }
+      if (!needsCrop && !annotated && visibleFormat !== formatOpts.format) {
+        finalUrl = await convertDataUrlFormatInWorker(finalUrl, formatOpts);
       }
       resolve({
         success: true,
         tabId,
+        format: formatOpts.format,
         isBackgroundTab: false,
         dataUrl: finalUrl,
         clip: clip,

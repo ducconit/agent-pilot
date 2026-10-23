@@ -213,9 +213,13 @@ async function evaluateAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for evaluate");
   const script = act.expression || act.script || act.code || "";
-  const val = await evaluateInTab(targetTabId, script, ctx.bridgeClient?.broadcastFn);
+  const evalArgs = Array.isArray(act.args) ? act.args : null;
+  const val = await evaluateInTab(targetTabId, script, ctx.bridgeClient?.broadcastFn, evalArgs);
   ctx.stepResult.success = true;
   ctx.stepResult.value = val;
+  if (typeof act.filePath === "string" && act.filePath.trim()) {
+    ctx.stepResult.requestedEvalFilePath = act.filePath.trim();
+  }
 }
 
 /** cdp — escape hatch to send an arbitrary CDP method on the target tab. */
@@ -245,7 +249,10 @@ async function devtoolsAction(ctx, act) {
       clear: act.clear,
       filterOrigin: act.filterOrigin,
       errorsOnly: act.errorsOnly,
-      excludeStatic: act.excludeStatic
+      excludeStatic: act.excludeStatic,
+      msgid: act.msgid,
+      includePreserved: act.includePreserved,
+      navigationId: act.navigationId
     },
     ctx.bridgeClient?.broadcastFn
   );

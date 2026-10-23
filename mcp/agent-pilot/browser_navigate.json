@@ -1,9 +1,39 @@
 {
-  "description": "Navigate the active or specified tab to a new URL (waits for page load completion by default).",
+  "description": "Navigate the active or specified tab to a new URL, or perform history/reload actions ('back', 'forward', 'reload'). Supports initScript, ignoreCache, handleBeforeUnload, and includeSnapshot.",
   "inputSchema": {
     "properties": {
+      "action": {
+        "description": "Navigation operation: 'url' (default), 'back', 'forward', or 'reload'",
+        "enum": [
+          "url",
+          "back",
+          "forward",
+          "reload"
+        ],
+        "type": "string"
+      },
       "contextId": {
         "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "handleBeforeUnload": {
+        "description": "Automatically accept or decline beforeunload confirmation dialogs during navigation",
+        "enum": [
+          "accept",
+          "decline"
+        ],
+        "type": "string"
+      },
+      "ignoreCache": {
+        "description": "Bypass browser cache when action is 'reload' (default: false)",
+        "type": "boolean"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after navigation completes (default: false)",
+        "type": "boolean"
+      },
+      "initScript": {
+        "description": "Optional JavaScript registered via Page.addScriptToEvaluateOnNewDocument before navigating",
         "type": "string"
       },
       "password": {
@@ -19,7 +49,7 @@
         "type": "integer"
       },
       "url": {
-        "description": "Destination URL",
+        "description": "Destination URL (required when action is 'url' or omitted)",
         "type": "string"
       },
       "username": {
@@ -43,16 +73,43 @@
         "type": "boolean"
       }
     },
-    "required": [
-      "url"
-    ],
     "type": "object"
   },
   "name": "browser_navigate",
   "parameters": {
     "properties": {
+      "action": {
+        "description": "Navigation operation: 'url' (default), 'back', 'forward', or 'reload'",
+        "enum": [
+          "url",
+          "back",
+          "forward",
+          "reload"
+        ],
+        "type": "string"
+      },
       "contextId": {
         "description": "Optional isolated context; context tab IDs are negative",
+        "type": "string"
+      },
+      "handleBeforeUnload": {
+        "description": "Automatically accept or decline beforeunload confirmation dialogs during navigation",
+        "enum": [
+          "accept",
+          "decline"
+        ],
+        "type": "string"
+      },
+      "ignoreCache": {
+        "description": "Bypass browser cache when action is 'reload' (default: false)",
+        "type": "boolean"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after navigation completes (default: false)",
+        "type": "boolean"
+      },
+      "initScript": {
+        "description": "Optional JavaScript registered via Page.addScriptToEvaluateOnNewDocument before navigating",
         "type": "string"
       },
       "password": {
@@ -68,7 +125,7 @@
         "type": "integer"
       },
       "url": {
-        "description": "Destination URL",
+        "description": "Destination URL (required when action is 'url' or omitted)",
         "type": "string"
       },
       "username": {
@@ -92,9 +149,6 @@
         "type": "boolean"
       }
     },
-    "required": [
-      "url"
-    ],
     "type": "object"
   }
 }

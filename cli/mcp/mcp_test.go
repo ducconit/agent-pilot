@@ -611,3 +611,60 @@ func TestMCPSessionStateTracking(t *testing.T) {
 		t.Fatalf("expected agentLastTabId to be cleared after closing tab 410, got %v", preparedAfterClose["agentLastTabId"])
 	}
 }
+
+func TestRichNavigationEvaluateWebAuthnAndDevtoolsSchemas(t *testing.T) {
+	toolMap := make(map[string]ToolInfo, len(mcpTools))
+	for _, tool := range mcpTools {
+		toolMap[tool.Name] = tool
+	}
+
+	navProps, ok := toolMap["browser_navigate"].InputSchema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("browser_navigate missing properties")
+	}
+	for _, key := range []string{"url", "action", "ignoreCache", "initScript", "handleBeforeUnload", "includeSnapshot"} {
+		if _, exists := navProps[key]; !exists {
+			t.Errorf("browser_navigate schema missing %q property", key)
+		}
+	}
+
+	evalProps, ok := toolMap["browser_evaluate"].InputSchema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("browser_evaluate missing properties")
+	}
+	for _, key := range []string{"script", "sourcePath", "args", "filePath", "tabId"} {
+		if _, exists := evalProps[key]; !exists {
+			t.Errorf("browser_evaluate schema missing %q property", key)
+		}
+	}
+
+	devtoolsProps, ok := toolMap["browser_get_devtools_data"].InputSchema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("browser_get_devtools_data missing properties")
+	}
+	for _, key := range []string{"type", "msgid", "includePreserved", "navigationId", "clear", "tabId"} {
+		if _, exists := devtoolsProps[key]; !exists {
+			t.Errorf("browser_get_devtools_data schema missing %q property", key)
+		}
+	}
+
+	webauthnTool, exists := toolMap["browser_webauthn"]
+	if !exists {
+		t.Fatalf("browser_webauthn tool missing from mcpTools")
+	}
+	webauthnProps, ok := webauthnTool.InputSchema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("browser_webauthn missing properties")
+	}
+	for _, key := range []string{"action", "protocol", "transport", "authenticatorId", "isUserVerified", "tabId"} {
+		if _, exists := webauthnProps[key]; !exists {
+			t.Errorf("browser_webauthn schema missing %q property", key)
+		}
+	}
+
+	// Verify browser_navigate validation: action="url" without url fails before bridge call
+	out, isErr := executeToolCall("browser_navigate", map[string]interface{}{"action": "url"})
+	if !isErr || !strings.Contains(out, `missing required parameter "url"`) {
+		t.Fatalf("expected missing url error for browser_navigate with action=url, got: isErr=%v, out=%s", isErr, out)
+	}
+}

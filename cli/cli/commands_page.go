@@ -25,6 +25,7 @@ func registerInlineWaitPflags(cmd *cobra.Command) {
 	f.Int("sleep", 0, "Milliseconds to sleep after action")
 	f.String("wait-for", "", "CSS selector or @ref to wait for after action")
 	f.String("wait-text", "", "Text to wait for on the page after action")
+	f.Bool("include-snapshot", false, "Capture and return interactive snapshot after action")
 }
 
 func newOpenCommand() *cobra.Command {
@@ -33,6 +34,8 @@ func newOpenCommand() *cobra.Command {
 			FlagDef{Name: "active", IsBool: true},
 			FlagDef{Name: "username", Aliases: []string{"user", "u"}},
 			FlagDef{Name: "password", Aliases: []string{"pass"}},
+			FlagDef{Name: "init-script"},
+			FlagDef{Name: "beforeunload", Aliases: []string{"handle-beforeunload"}},
 			FlagDef{Name: "format"},
 		))
 		if err != nil {
@@ -40,7 +43,7 @@ func newOpenCommand() *cobra.Command {
 			return errUsage
 		}
 		if len(cmdArgs.Positional) < 1 {
-			fmt.Println("Sử dụng: agent-pilot open <url> [--active] [--format json] [--user <username>] [--password <password>] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			fmt.Println("Sử dụng: agent-pilot open <url> [--active] [--format json] [--user <username>] [--password <password>] [--init-script <js>] [--beforeunload accept|decline] [--include-snapshot] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
 			return errUsage
 		}
 		extra := map[string]interface{}{}
@@ -49,6 +52,12 @@ func newOpenCommand() *cobra.Command {
 		}
 		if p := cmdArgs.String("password", ""); p != "" {
 			extra["password"] = p
+		}
+		if initJS := cmdArgs.String("init-script", ""); initJS != "" {
+			extra["initScript"] = initJS
+		}
+		if bu := cmdArgs.String("beforeunload", ""); bu != "" {
+			extra["handleBeforeUnload"] = bu
 		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -64,6 +73,8 @@ func newOpenCommand() *cobra.Command {
 	f.Bool("active", false, "Make tab active")
 	f.StringP("user", "u", "", "Optional HTTP Basic Auth username")
 	f.String("password", "", "Optional HTTP Basic Auth password")
+	f.String("init-script", "", "JavaScript to evaluate on new document")
+	f.String("beforeunload", "", "Auto-handle beforeunload dialog: accept or decline")
 	f.String("format", "text", "Output format: text or json")
 	registerInlineWaitPflags(cmd)
 	return cmd
@@ -73,6 +84,10 @@ func newNavigateCommand() *cobra.Command {
 	cmd := newLeafCommand("navigate", nil, func(args []string) error {
 		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
 			FlagDef{Name: "tab", Aliases: []string{"t"}},
+			FlagDef{Name: "action"},
+			FlagDef{Name: "ignore-cache", IsBool: true},
+			FlagDef{Name: "init-script"},
+			FlagDef{Name: "beforeunload", Aliases: []string{"handle-beforeunload"}},
 			FlagDef{Name: "username", Aliases: []string{"user", "u"}},
 			FlagDef{Name: "password", Aliases: []string{"pass"}},
 			FlagDef{Name: "format"},
@@ -86,11 +101,33 @@ func newNavigateCommand() *cobra.Command {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-		if len(cmdArgs.Positional) < 1 {
-			fmt.Println("Sử dụng: agent-pilot navigate <url> [--tab <id>] [--user <username>] [--password <password>] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+		navAction := strings.ToLower(strings.TrimSpace(cmdArgs.String("action", "")))
+		targetURL := ""
+		if len(cmdArgs.Positional) > 0 {
+			firstLower := strings.ToLower(strings.TrimSpace(cmdArgs.Positional[0]))
+			if navAction == "" && (firstLower == "back" || firstLower == "forward" || firstLower == "reload") {
+				navAction = firstLower
+			} else {
+				targetURL = cmdArgs.Positional[0]
+			}
+		}
+		if targetURL == "" && navAction != "back" && navAction != "forward" && navAction != "reload" {
+			fmt.Println("Sử dụng: agent-pilot navigate <url|back|forward|reload> [--tab <id>] [--action url|back|forward|reload] [--ignore-cache] [--init-script <js>] [--beforeunload accept|decline] [--user <username>] [--password <password>] [--include-snapshot] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
 			return errUsage
 		}
 		extra := map[string]interface{}{}
+		if navAction != "" {
+			extra["action"] = navAction
+		}
+		if cmdArgs.Bool("ignore-cache") {
+			extra["ignoreCache"] = true
+		}
+		if initJS := cmdArgs.String("init-script", ""); initJS != "" {
+			extra["initScript"] = initJS
+		}
+		if bu := cmdArgs.String("beforeunload", ""); bu != "" {
+			extra["handleBeforeUnload"] = bu
+		}
 		if u := cmdArgs.String("username", ""); u != "" {
 			extra["username"] = u
 		}
@@ -102,13 +139,17 @@ func newNavigateCommand() *cobra.Command {
 			return errUsage
 		}
 		extra["format"] = cmdArgs.String("format", "text")
-		if err := ExecNavigate(cmdArgs.Positional[0], tabID, extra); err != nil {
+		if err := ExecNavigate(targetURL, tabID, extra); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
 		return nil
 	})
 	f := cmd.Flags()
 	f.IntP("tab", "t", 0, "Target tab ID")
+	f.String("action", "url", "Navigation action: url|back|forward|reload")
+	f.Bool("ignore-cache", false, "Bypass cache when reloading")
+	f.String("init-script", "", "JavaScript to evaluate on new document")
+	f.String("beforeunload", "", "Auto-handle beforeunload dialog: accept or decline")
 	f.StringP("user", "u", "", "Optional HTTP Basic Auth username")
 	f.String("password", "", "Optional HTTP Basic Auth password")
 	f.String("format", "text", "Output format: text or json")
@@ -156,6 +197,8 @@ func newClickCommand() *cobra.Command {
 			FlagDef{Name: "x"},
 			FlagDef{Name: "y"},
 			FlagDef{Name: "via"},
+			FlagDef{Name: "dblclick", Aliases: []string{"double-click", "double"}, IsBool: true},
+			FlagDef{Name: "button"},
 			FlagDef{Name: "format"},
 		))
 		if err != nil {
@@ -182,6 +225,13 @@ func newClickCommand() *cobra.Command {
 			selector = cmdArgs.Positional[0]
 		}
 		extra := map[string]interface{}{}
+		if cmdArgs.Bool("dblclick") {
+			extra["dblClick"] = true
+			extra["clickCount"] = 2
+		}
+		if btn := cmdArgs.String("button", ""); btn != "" {
+			extra["button"] = btn
+		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -198,6 +248,8 @@ func newClickCommand() *cobra.Command {
 	f.Float64("x", 0, "X coordinate (with --y)")
 	f.Float64("y", 0, "Y coordinate (with --x)")
 	f.String("via", "synthetic", "Input backend: synthetic|cdp|auto")
+	f.Bool("dblclick", false, "Perform double-click")
+	f.String("button", "left", "Mouse button: left|right|middle")
 	f.String("format", "text", "Output format: text or json")
 	registerInlineWaitPflags(cmd)
 	return cmd
@@ -592,13 +644,13 @@ func newDialogCommand() *cobra.Command {
 
 func newEvaluateCommand() *cobra.Command {
 	cmd := newLeafCommand("evaluate", []string{"eval"}, func(args []string) error {
-		script, targetTab, err := parseEvalArgs(args)
+		script, targetTab, extra, err := parseEvalArgsWithOptions(args)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			fmt.Println("Sử dụng: agent-pilot evaluate <script> [-f <file>] [--tab <id>] (Alias: eval)")
+			fmt.Println("Sử dụng: agent-pilot evaluate <script> [-f <file>] [--arg <refOrVal>] [--args <jsonArray>] [-o <output.json>] [--tab <id>] (Alias: eval)")
 			return errUsage
 		}
-		if err := ExecEvaluate(script, targetTab); err != nil {
+		if err := ExecEvaluate(script, targetTab, extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
@@ -606,6 +658,9 @@ func newEvaluateCommand() *cobra.Command {
 	})
 	f := cmd.Flags()
 	f.StringP("file", "f", "", "Path to a JS script file")
+	f.StringP("output", "o", "", "Save evaluation result to file path")
+	f.String("arg", "", "Argument (@ref, selector, or value) passed to evaluated function")
+	f.String("args", "", "JSON array of arguments passed to evaluated function")
 	f.IntP("tab", "t", 0, "Target tab ID")
 	return cmd
 }
@@ -715,6 +770,8 @@ func newScreenshotCommand() *cobra.Command {
 		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
 			FlagDef{Name: "tab", Aliases: []string{"t"}},
 			FlagDef{Name: "mode"},
+			FlagDef{Name: "format", Aliases: []string{"fmt"}},
+			FlagDef{Name: "quality", Aliases: []string{"q"}},
 			FlagDef{Name: "o", Aliases: []string{"output", "out", "path", "save-path"}},
 			FlagDef{Name: "selector", Aliases: []string{"sel", "s"}},
 			FlagDef{Name: "clip"},
@@ -742,6 +799,17 @@ func newScreenshotCommand() *cobra.Command {
 			out = cmdArgs.Positional[0]
 		}
 		extra := map[string]interface{}{}
+		if imgFmt := cmdArgs.String("format", ""); imgFmt != "" {
+			extra["imgFormat"] = imgFmt
+		}
+		if _, hasQ := cmdArgs.Flags["quality"]; hasQ {
+			q, qErr := cmdArgs.Int("quality", 85)
+			if qErr != nil || q < 1 || q > 100 {
+				fmt.Fprintf(os.Stderr, "❌ Error: invalid --quality value (must be 1..100)\n")
+				return errUsage
+			}
+			extra["quality"] = q
+		}
 		if v := cmdArgs.String("caption", ""); v != "" {
 			extra["caption"] = v
 		}
@@ -772,7 +840,9 @@ func newScreenshotCommand() *cobra.Command {
 	f := cmd.Flags()
 	f.IntP("tab", "t", 0, "Target tab ID")
 	f.String("mode", "visible", "Capture mode: visible, region, element, full")
-	f.StringP("output", "o", "", "Output PNG path")
+	f.String("format", "png", "Image format: png|jpeg|webp")
+	f.IntP("quality", "q", 85, "Compression quality (1..100) for jpeg/webp")
+	f.StringP("output", "o", "", "Output image path")
 	f.StringP("selector", "s", "", "CSS selector or snapshot ref for element mode")
 	f.String("clip", "", "Clip bounding box 'x,y,width,height' for region mode")
 	f.StringP("caption", "c", "", "Annotation banner caption/title")

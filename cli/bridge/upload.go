@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"mime"
 	"net/http"
@@ -177,9 +178,176 @@ func isBatchUploadAction(stepMap map[string]interface{}) bool {
 	}
 }
 
-// EnrichBatchUploadArgs walks batch actions and enriches any upload/upload_file step.
+func isBatchEvaluateAction(stepMap map[string]interface{}) bool {
+	actType, _ := stepMap["action"].(string)
+	if actType == "" {
+		actType, _ = stepMap["type"].(string)
+	}
+	switch strings.ToLower(strings.TrimSpace(actType)) {
+	case "evaluate", "eval", "page.evaluate":
+		return true
+	default:
+		return false
+	}
+}
+
+// ValidateEvalOutputPath validates a user/agent-supplied filePath for saving
+// evaluation results against path traversal and sensitive system/user files.
+func ValidateEvalOutputPath(outputPath string) (string, error) {
+	trimmed := strings.TrimSpace(outputPath)
+	if trimmed == "" {
+		return "", fmt.Errorf("evaluation output filePath cannot be empty")
+	}
+	cleanPath := filepath.Clean(trimmed)
+	if cleanPath == ".." || strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) || strings.HasPrefix(cleanPath, "../") {
+		return "", fmt.Errorf("path traversal outside working directory %q is not permitted", cleanPath)
+	}
+
+	checkTargets := []string{cleanPath}
+	if absPath, err := filepath.Abs(cleanPath); err == nil {
+		checkTargets = append(checkTargets, absPath)
+	}
+	if evalPath, err := filepath.EvalSymlinks(cleanPath); err == nil {
+		checkTargets = append(checkTargets, evalPath)
+	} else if evalParent, pErr := filepath.EvalSymlinks(filepath.Dir(cleanPath)); pErr == nil {
+		checkTargets = append(checkTargets, filepath.Join(evalParent, filepath.Base(cleanPath)))
+	}
+	for _, target := range checkTargets {
+		isTempPath := strings.HasPrefix(target, "/var/folders/") || strings.HasPrefix(target, "/var/tmp/")
+		for _, forbidden := range forbiddenSystemPrefixes {
+			if forbidden == "/var" && isTempPath {
+				continue
+			}
+			if target == forbidden || strings.HasPrefix(target, forbidden+"/") {
+				return "", fmt.Errorf("writing to sensitive system path %q is not permitted", cleanPath)
+			}
+		}
+		if strings.Contains(target, ".ssh") || strings.Contains(target, "authorized_keys") ||
+			strings.Contains(target, ".bashrc") || strings.Contains(target, ".zshrc") ||
+			strings.Contains(target, ".profile") || containsForbiddenUploadSegment(filepath.ToSlash(target)) {
+			return "", fmt.Errorf("writing to sensitive user configuration %q is not permitted", cleanPath)
+		}
+	}
+	return cleanPath, nil
+}
+
+// EnrichEvaluateArgs validates optional sourcePath (or file alias, reading JS source
+// from disk when expression/script/code is omitted) and validates optional filePath output path.
+func EnrichEvaluateArgs(args map[string]interface{}) error {
+	if args == nil {
+		return nil
+	}
+	sourcePath, _ := args["sourcePath"].(string)
+	if strings.TrimSpace(sourcePath) == "" {
+		sourcePath, _ = args["file"].(string)
+	}
+	if strings.TrimSpace(sourcePath) != "" {
+		cleanSource, err := ValidateUploadFilePath(sourcePath)
+		if err != nil {
+			return err
+		}
+		info, statErr := os.Stat(cleanSource)
+		if statErr != nil {
+			return fmt.Errorf("failed to stat evaluate sourcePath %q: %w", sourcePath, statErr)
+		}
+		if info.IsDir() {
+			return fmt.Errorf("refusing to read directory %q as evaluate sourcePath: expected a regular file", sourcePath)
+		}
+		if info.Size() > MaxSyntheticUploadBytes {
+			return fmt.Errorf("evaluate sourcePath %q (%d bytes) exceeds maximum script size (%d bytes)", sourcePath, info.Size(), MaxSyntheticUploadBytes)
+		}
+		data, readErr := os.ReadFile(cleanSource)
+		if readErr != nil {
+			return fmt.Errorf("failed to read evaluate sourcePath %q: %w", sourcePath, readErr)
+		}
+		expr, _ := args["expression"].(string)
+		script, _ := args["script"].(string)
+		code, _ := args["code"].(string)
+		if strings.TrimSpace(expr) == "" && strings.TrimSpace(script) == "" && strings.TrimSpace(code) == "" {
+			args["script"] = string(data)
+			args["expression"] = string(data)
+		}
+		args["sourcePath"] = cleanSource
+		delete(args, "file")
+	}
+
+	outPath, _ := args["filePath"].(string)
+	if strings.TrimSpace(outPath) == "" {
+		outPath, _ = args["savePath"].(string)
+	}
+	if strings.TrimSpace(outPath) != "" {
+		cleanOut, err := ValidateEvalOutputPath(outPath)
+		if err != nil {
+			return err
+		}
+		args["filePath"] = cleanOut
+	}
+	return nil
+}
+
+// ProcessEvaluateResult writes the evaluation result to disk when args["filePath"]
+// (or args["savePath"]) is non-empty, returning a compact metadata summary instead
+// of flooding the caller context with large payloads.
+func ProcessEvaluateResult(res interface{}, args map[string]interface{}) (interface{}, error) {
+	if args == nil {
+		return res, nil
+	}
+	outPath, _ := args["filePath"].(string)
+	if strings.TrimSpace(outPath) == "" {
+		outPath, _ = args["savePath"].(string)
+	}
+	if strings.TrimSpace(outPath) == "" {
+		return res, nil
+	}
+	cleanOut, err := ValidateEvalOutputPath(outPath)
+	if err != nil {
+		return res, err
+	}
+	absOut, absErr := filepath.Abs(cleanOut)
+	if absErr != nil {
+		absOut = cleanOut
+	}
+	if dir := filepath.Dir(absOut); dir != "" && dir != "." {
+		if mkErr := os.MkdirAll(dir, 0755); mkErr != nil {
+			return res, fmt.Errorf("failed to create directory %s: %v", dir, mkErr)
+		}
+	}
+
+	var payload []byte
+	switch v := res.(type) {
+	case string:
+		payload = []byte(v)
+	default:
+		encoded, mErr := json.MarshalIndent(res, "", "  ")
+		if mErr != nil {
+			payload = []byte(fmt.Sprintf("%v", res))
+		} else {
+			payload = encoded
+		}
+	}
+
+	if writeErr := os.WriteFile(absOut, payload, 0600); writeErr != nil {
+		return res, fmt.Errorf("failed to write evaluation output to %s: %v", absOut, writeErr)
+	}
+	return map[string]interface{}{
+		"saved":    true,
+		"filePath": absOut,
+		"bytes":    len(payload),
+	}, nil
+}
+
+// EnrichBatchUploadArgs walks batch actions and enriches any upload/upload_file or evaluate/eval step.
 func EnrichBatchUploadArgs(args map[string]interface{}) error {
 	if args == nil {
+		return nil
+	}
+	enrichStep := func(stepMap map[string]interface{}) error {
+		if isBatchUploadAction(stepMap) {
+			return EnrichUploadArgs(stepMap)
+		}
+		if isBatchEvaluateAction(stepMap) {
+			return EnrichEvaluateArgs(stepMap)
+		}
 		return nil
 	}
 	if actionsIface, ok := args["actions"].([]interface{}); ok {
@@ -188,18 +356,14 @@ func EnrichBatchUploadArgs(args map[string]interface{}) error {
 			if !ok {
 				continue
 			}
-			if isBatchUploadAction(stepMap) {
-				if err := EnrichUploadArgs(stepMap); err != nil {
-					return err
-				}
+			if err := enrichStep(stepMap); err != nil {
+				return err
 			}
 		}
 	} else if actionsSlice, ok := args["actions"].([]map[string]interface{}); ok {
 		for _, stepMap := range actionsSlice {
-			if isBatchUploadAction(stepMap) {
-				if err := EnrichUploadArgs(stepMap); err != nil {
-					return err
-				}
+			if err := enrichStep(stepMap); err != nil {
+				return err
 			}
 		}
 	}
@@ -208,7 +372,8 @@ func EnrichBatchUploadArgs(args map[string]interface{}) error {
 
 // ProcessBatchScreenshots inspects batch.run step results, saves any screenshot
 // dataUrl to disk (using the step's requestedPath or an auto-generated file path),
-// and strips the raw Base64 dataUrl unless includeBase64 was requested.
+// strips the raw Base64 dataUrl unless includeBase64 was requested, and persists
+// any evaluate step result that requested a filePath.
 func ProcessBatchScreenshots(res interface{}) (interface{}, error) {
 	resMap, ok := res.(map[string]interface{})
 	if !ok {
@@ -224,6 +389,20 @@ func ProcessBatchScreenshots(res interface{}) (interface{}, error) {
 		if !ok {
 			continue
 		}
+		if evalOutPath, _ := stepMap["requestedEvalFilePath"].(string); strings.TrimSpace(evalOutPath) != "" {
+			delete(stepMap, "requestedEvalFilePath")
+			savedMeta, evalErr := ProcessEvaluateResult(stepMap["value"], map[string]interface{}{"filePath": evalOutPath})
+			if evalErr != nil {
+				return res, evalErr
+			}
+			if metaMap, ok := savedMeta.(map[string]interface{}); ok {
+				stepMap["saved"] = metaMap["saved"]
+				stepMap["filePath"] = metaMap["filePath"]
+				stepMap["bytes"] = metaMap["bytes"]
+				delete(stepMap, "value")
+			}
+		}
+
 		targetMap := stepMap
 		dataURL, _ := targetMap["dataUrl"].(string)
 		if dataURL == "" {

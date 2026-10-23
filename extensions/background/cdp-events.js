@@ -14,11 +14,26 @@
 import {
   activeTracingSessions,
   activeDialogs,
+  beforeUnloadPolicies,
   LIMITS,
   getBuffer,
-  cleanupDebuggerState
+  cleanupDebuggerState,
+  logDebug
 } from "./constants.js";
+import { sendCdpCommand } from "./cdp-connection.js";
 import { clearEmulationState } from "./cdp-emulation.js";
+
+function serializeConsoleArgs(rawArgs) {
+  if (!Array.isArray(rawArgs) || rawArgs.length === 0) return undefined;
+  return rawArgs.slice(0, 10).map((arg) => {
+    if (!arg || typeof arg !== "object") return { value: arg };
+    const item = { type: arg.type };
+    if (arg.subtype) item.subtype = arg.subtype;
+    if (arg.value !== undefined) item.value = arg.value;
+    if (arg.description) item.description = String(arg.description).slice(0, 500);
+    return item;
+  });
+}
 
 /**
  * Initialize CDP event listeners for DevTools Console, Network, and Runtime events
@@ -46,6 +61,14 @@ export function initCdpEventListeners(broadcastFn) {
     if (!tabId) return;
     const buffer = getBuffer(tabId);
 
+    // 0. Top-level frame navigation tracking (preserve logs across navigations with navigationId)
+    if (method === "Page.frameNavigated") {
+      if (!params?.frame?.parentId) {
+        buffer.navigationId = (buffer.navigationId || 1) + 1;
+      }
+      return;
+    }
+
     // 1. Console Events
     if (method === "Runtime.consoleAPICalled") {
       const textArgs = (params.args || []).map((arg) => {
@@ -54,10 +77,14 @@ export function initCdpEventListeners(broadcastFn) {
         return JSON.stringify(arg);
       }).join(" ");
 
+      const msgid = buffer.nextConsoleMsgId++;
       const entry = {
         id: "console_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+        msgid,
+        navigationId: buffer.navigationId || 1,
         type: params.type || "log",
         text: textArgs || "(empty)",
+        args: serializeConsoleArgs(params.args),
         timestamp: params.timestamp || Date.now(),
         stackTrace: params.stackTrace
       };
@@ -74,8 +101,11 @@ export function initCdpEventListeners(broadcastFn) {
       }
     } else if (method === "Console.messageAdded") {
       const msg = params.message;
+      const msgid = buffer.nextConsoleMsgId++;
       const entry = {
         id: "console_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+        msgid,
+        navigationId: buffer.navigationId || 1,
         type: msg.level || "log",
         text: msg.text || "",
         url: msg.url,
@@ -99,8 +129,11 @@ export function initCdpEventListeners(broadcastFn) {
       const text = excDesc && ! String(excDesc).startsWith(baseText)
         ? `${baseText}: ${excDesc}`
         : (excDesc || baseText);
+      const msgid = buffer.nextConsoleMsgId++;
       const entry = {
         id: "console_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+        msgid,
+        navigationId: buffer.navigationId || 1,
         type: "error",
         text,
         url: details.url,
@@ -130,6 +163,7 @@ export function initCdpEventListeners(broadcastFn) {
 
       const req = {
         id: params.requestId,
+        navigationId: buffer.navigationId || 1,
         url: params.request.url,
         method: params.request.method,
         requestHeaders: params.request.headers,
@@ -197,9 +231,18 @@ export function initCdpEventListeners(broadcastFn) {
 
     // 3. JavaScript Dialog Events
     else if (method === "Page.javascriptDialogOpening") {
+      const dialogType = params.type || "alert";
+      if (dialogType === "beforeunload" && beforeUnloadPolicies.has(tabId)) {
+        const policy = beforeUnloadPolicies.get(tabId);
+        const accept = policy !== "decline" && policy !== false;
+        sendCdpCommand(tabId, "Page.handleJavaScriptDialog", { accept }).catch((err) =>
+          logDebug("auto handleBeforeUnload dialog", err)
+        );
+        return;
+      }
       activeDialogs.set(tabId, {
         message: params.message || "",
-        type: params.type || "alert",
+        type: dialogType,
         defaultPrompt: params.defaultPrompt || "",
         url: params.url || "",
         timestamp: Date.now()

@@ -1,5 +1,5 @@
 {
-  "description": "Upload local files into a file input element (\u003cinput type='file'\u003e) or an upload trigger button/menuitem using CDP DOM.setFileInputFiles with automatic MAIN-world DataTransfer synthetic fallback when CDP cannot attach. Supports inline post-upload waitMs/waitForSelector/waitForText.",
+  "description": "Upload local files into a file input element (\u003cinput type='file'\u003e) or an upload trigger button/menuitem using CDP DOM.setFileInputFiles with automatic MAIN-world DataTransfer synthetic fallback when CDP cannot attach. Supports inline post-upload waitMs/waitForSelector/waitForText and includeSnapshot.",
   "inputSchema": {
     "properties": {
       "contextId": {
@@ -12,6 +12,10 @@
           "type": "string"
         },
         "type": "array"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after uploading (default: false)",
+        "type": "boolean"
       },
       "selector": {
         "description": "CSS selector or @ref of the \u003cinput type='file'\u003e element or upload trigger button/menuitem",
@@ -66,6 +70,10 @@
           "type": "string"
         },
         "type": "array"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after uploading (default: false)",
+        "type": "boolean"
       },
       "selector": {
         "description": "CSS selector or @ref of the \u003cinput type='file'\u003e element or upload trigger button/menuitem",

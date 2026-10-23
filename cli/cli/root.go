@@ -222,6 +222,7 @@ func newRootCommand() *cobra.Command {
 		newHeapCommand(),
 		newCdpCommand(),
 		newExtensionsCommand(),
+		newWebAuthnCommand(),
 		newSkillCommand(),
 		newFeedbackCommand(),
 		newBatchCommand(),

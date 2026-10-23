@@ -153,6 +153,7 @@ var mcpToolBridgeMap = map[string]string{
 	"browser_install_pwa":                 "pwa.install",
 	"browser_launch_pwa":                  "pwa.launch",
 	"browser_uninstall_pwa":               "pwa.uninstall",
+	"browser_webauthn":                    "webauthn.manage",
 	"browser_list_tabs":                   "tabs.listAll",
 	"browser_click":                       "page.click",
 	"browser_type":                        "page.type",
@@ -212,6 +213,9 @@ func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool)
 
 	if bridgeMethod, ok := mcpToolBridgeMap[name]; ok {
 		if name == "browser_evaluate" {
+			if err := bridge.EnrichEvaluateArgs(args); err != nil {
+				return fmt.Sprintf("Error: %v", err), true
+			}
 			expr, _ := args["expression"].(string)
 			script, _ := args["script"].(string)
 			code, _ := args["code"].(string)
@@ -220,6 +224,9 @@ func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool)
 			}
 		}
 		res, err := bridge.DispatchCommand(bridgeMethod, args, port)
+		if name == "browser_evaluate" && err == nil {
+			res, err = bridge.ProcessEvaluateResult(res, args)
+		}
 		if strings.HasPrefix(name, "browser_recorder_") {
 			return formatRecorderToolResult(res, err)
 		}
@@ -253,6 +260,12 @@ func executeToolCall(name string, rawArgs map[string]interface{}) (string, bool)
 		return formatToolResult(res, err)
 
 	case "browser_navigate":
+		navAction, _ := args["action"].(string)
+		navAction = strings.ToLower(strings.TrimSpace(navAction))
+		urlStr, _ := args["url"].(string)
+		if (navAction == "" || navAction == "url") && strings.TrimSpace(urlStr) == "" {
+			return `Error: missing required parameter "url" for tool "browser_navigate" when action is "url"`, true
+		}
 		res, err := bridge.DispatchCommand("tabs.update", args, port)
 		if err == nil {
 			recordSessionOpenedTab(res)

@@ -20,6 +20,8 @@ function normalizeDetailLevel(value) {
 function compactConsoleEntry(entry) {
   return {
     id: entry.id,
+    msgid: entry.msgid,
+    navigationId: entry.navigationId,
     type: entry.type,
     text: entry.text,
     url: entry.stackTrace?.callFrames?.find((frame) => frame.url)?.url || entry.url,
@@ -30,6 +32,7 @@ function compactConsoleEntry(entry) {
 function compactNetworkEntry(entry) {
   return {
     id: entry.id,
+    navigationId: entry.navigationId,
     method: entry.method,
     status: entry.status,
     statusText: entry.statusText,
@@ -51,6 +54,34 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
   }
 
   const buffer = getBuffer(tabId);
+  const currentNavId = buffer.navigationId || 1;
+
+  if (params.msgid !== undefined && params.msgid !== null && params.msgid !== "") {
+    const targetMsgId = Number(params.msgid);
+    const found = buffer.console.find(
+      (item) =>
+        (!Number.isNaN(targetMsgId) && Number(item.msgid) === targetMsgId) ||
+        String(item.id) === String(params.msgid)
+    ) || null;
+    return {
+      tabId,
+      attached: attachedTabs.has(tabId),
+      navigationId: currentNavId,
+      timestamp: Date.now(),
+      found: Boolean(found),
+      message: found,
+      console: found ? [found] : []
+    };
+  }
+
+  const targetNavId =
+    params.navigationId !== undefined && params.navigationId !== null && params.navigationId !== ""
+      ? Number(params.navigationId)
+      : params.includePreserved === false || params.currentNavigationOnly === true
+        ? currentNavId
+        : null;
+  const hasNavFilter = targetNavId !== null && !Number.isNaN(targetNavId);
+
   const requestedType = params.type || "all";
   const limit = Math.min(Math.max(Number(params.limit) || LIMITS.DEVTOOLS_FETCH_DEFAULT, 1), LIMITS.DEVTOOLS_FETCH_MAX);
   const filterOrigin = params.filterOrigin !== false;
@@ -65,6 +96,9 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
 
   if (requestedType === "all" || requestedType === "console") {
     let logs = buffer.console;
+    if (hasNavFilter) {
+      logs = logs.filter((item) => (item.navigationId || 1) === targetNavId);
+    }
     if (filterOrigin) {
       // Hide our own logs: entries whose stack only references extension frames
       logs = logs.filter(item => {
@@ -96,6 +130,9 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
 
   if (requestedType === "all" || requestedType === "network") {
     let reqs = Array.from(buffer.network.values());
+    if (hasNavFilter) {
+      reqs = reqs.filter((item) => (item.navigationId || 1) === targetNavId);
+    }
     if (filterOrigin) {
       reqs = reqs.filter(item => {
         const url = item.url || "";
@@ -174,8 +211,10 @@ export async function collectDevtoolsData(tabId, params = {}, broadcastFn = null
   const responsePayload = {
     tabId,
     attached: attachedTabs.has(tabId),
+    navigationId: currentNavId,
     timestamp: Date.now(),
     summary: {
+      navigationId: currentNavId,
       consoleEntries: consoleData ? consoleData.length : 0,
       consoleErrors: consoleErrorCount,
       networkRequests: networkData ? networkData.length : 0,

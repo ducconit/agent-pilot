@@ -4,7 +4,9 @@
  */
 
 import {
+  attachedTabs,
   agentControlledTabs,
+  beforeUnloadPolicies,
   tabLockStates,
   getTabLockState,
   AGENT_GROUP_TITLE,
@@ -13,6 +15,7 @@ import {
   normalizeUrl,
   logDebug
 } from "./constants.js";
+import { attachDebugger, sendCdpCommand } from "./cdp-connection.js";
 
 /**
  * Get active tab ID in last focused window or any window
@@ -664,4 +667,127 @@ export function navigateTabAndWait(tabId, targetUrl, timeoutMs = DEFAULT_LOAD_TI
       }
     });
   });
+}
+
+/**
+ * Normalize navigation action ("url" | "back" | "forward" | "reload").
+ */
+export function normalizeNavigationAction(params = {}) {
+  const candidates = [params.navAction, params.navigationAction, params.action, params.type];
+  for (const cand of candidates) {
+    if (typeof cand !== "string") continue;
+    const lower = cand.toLowerCase().trim();
+    if (lower === "back" || lower === "goback") return "back";
+    if (lower === "forward" || lower === "goforward") return "forward";
+    if (lower === "reload" || lower === "refresh") return "reload";
+    if (lower === "url") return "url";
+  }
+  return "url";
+}
+
+/**
+ * Apply pre-navigation CDP/dialog options (`handleBeforeUnload` policy and `initScript`).
+ */
+export async function applyPreNavigationOptions(tabId, params = {}, broadcastFn = null) {
+  if (!tabId || !params || typeof params !== "object") return {};
+
+  let handleBeforeUnload = undefined;
+  if (params.handleBeforeUnload !== undefined && params.handleBeforeUnload !== null && params.handleBeforeUnload !== "") {
+    const policy = typeof params.handleBeforeUnload === "string"
+      ? params.handleBeforeUnload.toLowerCase().trim()
+      : (params.handleBeforeUnload ? "accept" : "decline");
+    beforeUnloadPolicies.set(tabId, policy);
+    handleBeforeUnload = policy;
+  }
+
+  let initScriptIdentifier = undefined;
+  const initScript = typeof params.initScript === "string" ? params.initScript.trim() : "";
+  if (initScript) {
+    if (!attachedTabs.has(tabId)) {
+      await attachDebugger(tabId, broadcastFn).catch((err) => logDebug("initScript attachDebugger", err));
+    }
+    if (attachedTabs.has(tabId)) {
+      const res = await sendCdpCommand(tabId, "Page.addScriptToEvaluateOnNewDocument", {
+        source: initScript
+      }).catch((err) => {
+        logDebug("addScriptToEvaluateOnNewDocument error", err);
+        return null;
+      });
+      if (res && res.identifier) {
+        initScriptIdentifier = res.identifier;
+      }
+    }
+  }
+  return {
+    ...(initScriptIdentifier ? { initScriptIdentifier } : {}),
+    ...(handleBeforeUnload ? { handleBeforeUnload } : {})
+  };
+}
+
+/**
+ * Execute a non-URL navigation action ("back" | "forward" | "reload") on a tab.
+ */
+export async function executeTabNavigationAction(tabId, navAction, params = {}, broadcastFn = null) {
+  const action = String(navAction || "").toLowerCase().trim();
+  const ignoreCache = Boolean(params.ignoreCache);
+
+  if (action === "reload") {
+    if (typeof chrome !== "undefined" && typeof chrome.tabs?.reload === "function") {
+      await new Promise((resolve, reject) => {
+        chrome.tabs.reload(tabId, { bypassCache: ignoreCache }, () => {
+          if (chrome.runtime?.lastError) return reject(new Error(chrome.runtime.lastError.message));
+          resolve();
+        });
+      });
+      return;
+    }
+    if (!attachedTabs.has(tabId)) {
+      await attachDebugger(tabId, broadcastFn).catch((err) => logDebug("reload attachDebugger", err));
+    }
+    await sendCdpCommand(tabId, "Page.reload", { ignoreCache });
+    return;
+  }
+
+  if (action === "back") {
+    if (typeof chrome !== "undefined" && typeof chrome.tabs?.goBack === "function") {
+      await new Promise((resolve, reject) => {
+        chrome.tabs.goBack(tabId, () => {
+          if (chrome.runtime?.lastError) return reject(new Error(chrome.runtime.lastError.message));
+          resolve();
+        });
+      });
+      return;
+    }
+    if (!attachedTabs.has(tabId)) {
+      await attachDebugger(tabId, broadcastFn).catch((err) => logDebug("goBack attachDebugger", err));
+    }
+    const hist = await sendCdpCommand(tabId, "Page.getNavigationHistory", {});
+    if (hist && Array.isArray(hist.entries) && typeof hist.currentIndex === "number" && hist.currentIndex > 0) {
+      await sendCdpCommand(tabId, "Page.navigateToHistoryEntry", { entryId: hist.entries[hist.currentIndex - 1].id });
+    } else {
+      await sendCdpCommand(tabId, "Runtime.evaluate", { expression: "window.history.back()", returnByValue: true });
+    }
+    return;
+  }
+
+  if (action === "forward") {
+    if (typeof chrome !== "undefined" && typeof chrome.tabs?.goForward === "function") {
+      await new Promise((resolve, reject) => {
+        chrome.tabs.goForward(tabId, () => {
+          if (chrome.runtime?.lastError) return reject(new Error(chrome.runtime.lastError.message));
+          resolve();
+        });
+      });
+      return;
+    }
+    if (!attachedTabs.has(tabId)) {
+      await attachDebugger(tabId, broadcastFn).catch((err) => logDebug("goForward attachDebugger", err));
+    }
+    const hist = await sendCdpCommand(tabId, "Page.getNavigationHistory", {});
+    if (hist && Array.isArray(hist.entries) && typeof hist.currentIndex === "number" && hist.currentIndex + 1 < hist.entries.length) {
+      await sendCdpCommand(tabId, "Page.navigateToHistoryEntry", { entryId: hist.entries[hist.currentIndex + 1].id });
+    } else {
+      await sendCdpCommand(tabId, "Runtime.evaluate", { expression: "window.history.forward()", returnByValue: true });
+    }
+  }
 }

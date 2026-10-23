@@ -162,25 +162,28 @@ export async function dispatchCdpMouseClick(tabId, x, y, options = {}) {
   const py = Math.round(y);
   const button = options.button || "left";
   const buttons = buttonToBitmask(button);
-  const clickCount = options.clickCount || 1;
+  const rawCount = (options.dblClick || options.doubleClick) ? 2 : (Number(options.clickCount) || 1);
+  const clickCount = Math.max(1, Math.min(3, Math.floor(rawCount)));
 
   await sendCdpCommand(tabId, "Input.dispatchMouseEvent", { type: "mouseMoved", x: px, y: py });
-  await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
-    type: "mousePressed",
-    x: px,
-    y: py,
-    button,
-    buttons,
-    clickCount
-  });
-  await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
-    type: "mouseReleased",
-    x: px,
-    y: py,
-    button,
-    buttons: 0,
-    clickCount
-  });
+  for (let currentCount = 1; currentCount <= clickCount; currentCount++) {
+    await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      x: px,
+      y: py,
+      button,
+      buttons,
+      clickCount: currentCount
+    });
+    await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      x: px,
+      y: py,
+      button,
+      buttons: 0,
+      clickCount: currentCount
+    });
+  }
 
   return { success: true, via: "cdp", trusted: true, x: px, y: py, button, clickCount };
 }

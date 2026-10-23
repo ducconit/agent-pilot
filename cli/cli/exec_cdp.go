@@ -108,7 +108,7 @@ func dispatchAndPrintJSON(method string, params map[string]interface{}, tabID in
 	return nil
 }
 
-func ExecListNetworkRequests(filterUrl, method, resType string, limit int, tabID interface{}) error {
+func ExecListNetworkRequests(filterUrl, method, resType string, limit int, tabID interface{}, extra ...map[string]interface{}) error {
 	params := map[string]interface{}{}
 	if filterUrl != "" {
 		params["filterUrl"] = filterUrl
@@ -122,6 +122,7 @@ func ExecListNetworkRequests(filterUrl, method, resType string, limit int, tabID
 	if limit > 0 {
 		params["limit"] = limit
 	}
+	mergeExtraParams(params, extra...)
 	return dispatchAndPrintJSON("network.listRequests", params, tabID)
 }
 
@@ -215,4 +216,8 @@ func ExecManageExtensions(action, extensionID, extensionPath string, enabled *bo
 		params["confirmSelf"] = true
 	}
 	return dispatchAndPrintJSON("extensions.manage", params, nil)
+}
+
+func ExecWebAuthn(params map[string]interface{}, tabID interface{}) error {
+	return dispatchAndPrintJSON("webauthn.manage", params, tabID)
 }

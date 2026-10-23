@@ -1,5 +1,5 @@
 {
-  "description": "Retrieve real-time DevTools logs (Console, Network requests, Performance metrics). Supports errorsOnly and excludeStatic for compact debugging.",
+  "description": "Retrieve real-time DevTools logs (Console with numeric msgid \u0026 args, Network requests, Performance metrics). Supports msgid lookup, includePreserved/navigationId filtering, errorsOnly, and excludeStatic.",
   "inputSchema": {
     "properties": {
       "clear": {
@@ -35,8 +35,20 @@
         "description": "Include full HTTP response headers on network requests (default: false to save tokens)",
         "type": "boolean"
       },
+      "includePreserved": {
+        "description": "Include console/network entries preserved across earlier navigations (default: true; set false for current navigation only)",
+        "type": "boolean"
+      },
       "limit": {
         "description": "Max entries to return",
+        "type": "integer"
+      },
+      "msgid": {
+        "description": "Optional numeric console message ID (msgid) to inspect a single console message in full detail",
+        "type": "integer"
+      },
+      "navigationId": {
+        "description": "Optional navigationId to filter console/network entries to a specific navigation",
         "type": "integer"
       },
       "tabId": {
@@ -86,8 +98,20 @@
         "description": "Include full HTTP response headers on network requests (default: false to save tokens)",
         "type": "boolean"
       },
+      "includePreserved": {
+        "description": "Include console/network entries preserved across earlier navigations (default: true; set false for current navigation only)",
+        "type": "boolean"
+      },
       "limit": {
         "description": "Max entries to return",
+        "type": "integer"
+      },
+      "msgid": {
+        "description": "Optional numeric console message ID (msgid) to inspect a single console message in full detail",
+        "type": "integer"
+      },
+      "navigationId": {
+        "description": "Optional navigationId to filter console/network entries to a specific navigation",
         "type": "integer"
       },
       "tabId": {

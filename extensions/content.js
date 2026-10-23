@@ -265,6 +265,69 @@
       }
       return { success: true };
     },
+    mark_eval_targets: (req) => {
+      const rawArgs = Array.isArray(req.args) ? req.args : [];
+      const prefix = "ap-eval-" + Math.random().toString(36).slice(2, UNIQUE_ID_SALT_LEN);
+      const cleanupPrefix = () => {
+        for (let j = 0; j < rawArgs.length; j++) {
+          const attr = `data-ap-eval-arg-${j}`;
+          for (const marked of document.querySelectorAll(`[${attr}="${prefix}"]`)) {
+            marked.removeAttribute(attr);
+          }
+        }
+      };
+      const descriptors = [];
+      for (let i = 0; i < rawArgs.length; i++) {
+        const item = rawArgs[i];
+        let selectorCandidate = null;
+        let requireElement = false;
+        if (typeof item === "string") {
+          const trimmed = item.trim();
+          if (/^@\d+$/.test(trimmed)) {
+            selectorCandidate = trimmed;
+            requireElement = true;
+          } else if (trimmed.length > 0) {
+            selectorCandidate = trimmed;
+          }
+        } else if (item && typeof item === "object" && !Array.isArray(item) && (typeof item.selector === "string" || typeof item.ref === "string")) {
+          selectorCandidate = String(item.selector || item.ref).trim();
+          requireElement = true;
+        }
+
+        if (selectorCandidate) {
+          let el = null;
+          try {
+            el = resolveTargetElement(selectorCandidate);
+          } catch (_) {
+            el = null;
+          }
+          if (el) {
+            const attr = `data-ap-eval-arg-${i}`;
+            el.setAttribute(attr, prefix);
+            descriptors.push({ kind: "element", attr, prefix, selector: selectorCandidate });
+            continue;
+          }
+          if (requireElement) {
+            cleanupPrefix();
+            return { success: false, error: `Element not found for evaluate argument: ${selectorCandidate}` };
+          }
+        }
+        descriptors.push({ kind: "value", value: item });
+      }
+      return { success: true, prefix, count: rawArgs.length, descriptors };
+    },
+    unmark_eval_targets: (req) => {
+      const count = Number(req.count) || 0;
+      const prefix = req.prefix || "";
+      for (let i = 0; i < count; i++) {
+        const attr = `data-ap-eval-arg-${i}`;
+        const sel = prefix ? `[${attr}="${prefix}"]` : `[${attr}]`;
+        for (const el of document.querySelectorAll(sel)) {
+          el.removeAttribute(attr);
+        }
+      }
+      return { success: true };
+    },
     scroll_into_view: (req) => {
       const el = resolveTargetElement(req.selector);
       if (!el) return { success: false, error: `Selector '${req.selector}' not found` };

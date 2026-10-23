@@ -193,4 +193,12 @@ func TestDeriveCommandTimeout(t *testing.T) {
 	if to != 23000 {
 		t.Errorf("expected 23000 (18000 + 5000), got %d", to)
 	}
+
+	// 17. tabs.update with action=back/forward/reload gets navigation loadTimeout + buffer
+	for _, navAct := range []string{"back", "forward", "reload"} {
+		to = DeriveCommandTimeout("tabs.update", map[string]interface{}{"action": navAct}, 0)
+		if to != 35000 {
+			t.Errorf("expected 35000 for tabs.update action=%s, got %d", navAct, to)
+		}
+	}
 }

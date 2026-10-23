@@ -1,5 +1,5 @@
 {
-  "description": "Scroll viewport or active element smoothly by deltaX and deltaY pixels. Supports inline post-scroll waitMs/waitForSelector/waitForText.",
+  "description": "Scroll viewport or active element smoothly by deltaX and deltaY pixels. Supports inline post-scroll waitMs/waitForSelector/waitForText and includeSnapshot.",
   "inputSchema": {
     "properties": {
       "contextId": {
@@ -13,6 +13,10 @@
       "deltaY": {
         "description": "Vertical scroll offset",
         "type": "number"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after scrolling (default: false)",
+        "type": "boolean"
       },
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep after scrolling",
@@ -51,6 +55,10 @@
       "deltaY": {
         "description": "Vertical scroll offset",
         "type": "number"
+      },
+      "includeSnapshot": {
+        "description": "Capture and return an interactive page snapshot after scrolling (default: false)",
+        "type": "boolean"
       },
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep after scrolling",

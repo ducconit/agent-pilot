@@ -17,6 +17,7 @@ func newDevtoolsCommand() *cobra.Command {
 		"heap-analyze": "memory.analyzeSnapshot", "3p-list": "developerTools.list", "3p-execute": "developerTools.execute",
 		"webmcp-list": "webmcp.list", "webmcp-execute": "webmcp.execute", "pwa-probe": "pwa.probe",
 		"pwa-state": "pwa.getOsAppState", "pwa-install": "pwa.install", "pwa-launch": "pwa.launch", "pwa-uninstall": "pwa.uninstall",
+		"webauthn": "webauthn.manage", "logs": "devtools.getData", "console": "devtools.getData",
 	}
 	cmd := newLeafCommand("devtools", nil, func(args []string) error {
 		parsed, err := parseCmdArgs(args, []FlagDef{{Name: "params"}, {Name: "tab", Aliases: []string{"t"}}})

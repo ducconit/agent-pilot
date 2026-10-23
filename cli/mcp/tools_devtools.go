@@ -97,6 +97,19 @@ func init() {
 		devtoolsTool("browser_uninstall_pwa", "Uninstall a PWA by manifest ID through the browser-scoped PWA CDP domain.", map[string]interface{}{
 			"manifestId": field("string", "PWA manifest ID"),
 		}, "manifestId"),
+		devtoolsTool("browser_webauthn", "Manage tab-level virtual WebAuthn authenticators and passkey credentials via Chrome DevTools Protocol (WebAuthn domain).", map[string]interface{}{
+			"action":                      choices("WebAuthn operation; default enable", "enable", "disable", "addAuthenticator", "add", "removeAuthenticator", "remove", "getCredentials", "credentials", "clearCredentials", "clear", "setUserVerified", "verify"),
+			"tabId":                       field("integer", "Target tab ID"),
+			"enableUI":                    field("boolean", "Whether to enable the DevTools WebAuthn UI when enabling the domain (default: false)"),
+			"authenticatorId":             field("string", "Virtual authenticator ID (required for removeAuthenticator, getCredentials, clearCredentials, setUserVerified)"),
+			"protocol":                    choices("Authenticator protocol for addAuthenticator (default: ctap2)", "ctap2", "u2f"),
+			"transport":                   choices("Authenticator transport for addAuthenticator (default: internal)", "internal", "usb", "nfc", "ble", "cable"),
+			"hasResidentKey":              field("boolean", "Support resident keys / passkeys (default: true)"),
+			"hasUserVerification":         field("boolean", "Support user verification (default: true)"),
+			"isUserVerified":              field("boolean", "Simulated user verification state (default: true)"),
+			"automaticPresenceSimulation": field("boolean", "Automatically simulate user presence on auth requests (default: true)"),
+			"options":                     map[string]interface{}{"type": "object", "description": "Optional raw CDP VirtualAuthenticatorOptions override for addAuthenticator"},
+		}),
 	)
 	for i := range mcpTools {
 		tool := &mcpTools[i]

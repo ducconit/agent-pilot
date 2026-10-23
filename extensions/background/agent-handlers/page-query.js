@@ -43,7 +43,7 @@ export const pageQueryHandlers = {
       if (params.waitUntil !== false) {
         await waitForTabComplete(tabId, 5000);
       }
-      await runInlineWait(client, tabId, params);
+      await runInlineWait(client, tabId, { ...params, includeSnapshot: false });
       return await client.sendTabMessageWithRetry(tabId, {
         action: "get_snapshot",
         maxElements: params.maxElements || LIMITS.SNAPSHOT_MAX_ELEMENTS_DEFAULT,

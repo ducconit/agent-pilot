@@ -14,7 +14,13 @@ import {
   logDebug
 } from "../constants.js";
 import { attachDebugger } from "../cdp-manager.js";
-import { createTabWithWindowFallback, waitForTabComplete } from "../tab-manager.js";
+import {
+  createTabWithWindowFallback,
+  waitForTabComplete,
+  normalizeNavigationAction,
+  applyPreNavigationOptions,
+  executeTabNavigationAction
+} from "../tab-manager.js";
 import { getPositiveNumber } from "../batch-validation.js";
 import { runInlineWait, mergeWaitMeta } from "./page-input.js";
 
@@ -114,6 +120,7 @@ export const tabsHandlers = {
         }
 
         await attachDebugger(tab.id, client.broadcastFn).catch((err) => logDebug("attachDebugger error", err));
+        const preNavMeta = await applyPreNavigationOptions(tab.id, params, client.broadcastFn);
 
         if (params.waitUntil !== false) {
           const loadTimeout = getPositiveNumber(params.loadTimeout, params.timeoutMs, params.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
@@ -131,6 +138,9 @@ export const tabsHandlers = {
             if (refreshed && refreshed.id) tab = refreshed;
           } catch (_) {}
         }
+        if (preNavMeta?.initScriptIdentifier) {
+          tab = { ...tab, initScriptIdentifier: preNavMeta.initScriptIdentifier };
+        }
       }
       respond(mergeWaitMeta(tab, waitMeta));
     } catch (err) {
@@ -146,6 +156,58 @@ export const tabsHandlers = {
       return respond(null, err);
     }
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
+
+    const navAction = normalizeNavigationAction(params);
+    let preNavMeta = null;
+    try {
+      preNavMeta = await applyPreNavigationOptions(tabId, params, client.broadcastFn);
+    } catch (err) {
+      logDebug("applyPreNavigationOptions note", err);
+    }
+
+    if (navAction === "back" || navAction === "forward" || navAction === "reload") {
+      try {
+        if (params.active !== undefined && typeof chrome.tabs?.update === "function") {
+          await new Promise((resolve) => {
+            chrome.tabs.update(tabId, { active: Boolean(params.active) }, () => resolve());
+          });
+        }
+        await executeTabNavigationAction(tabId, navAction, params, client.broadcastFn);
+        agentControlledTabs.add(tabId);
+        if (typeof client.recordAgentTab === "function") {
+          client.recordAgentTab(tabId, params.agentId);
+        } else {
+          client.lastAgentTabId = tabId;
+        }
+        await client.assignTabToAgentGroup(tabId).catch((err) => logDebug("assignTabToAgentGroup error", err));
+        await attachDebugger(tabId, client.broadcastFn).catch((err) => logDebug("attachDebugger error", err));
+
+        if (params.waitUntil !== false) {
+          const loadTimeout = getPositiveNumber(params.loadTimeout, params.timeoutMs, params.timeout) || DEFAULT_LOAD_TIMEOUT_MS;
+          await waitForTabComplete(tabId, loadTimeout);
+          if (!attachedTabs.has(tabId)) {
+            await attachDebugger(tabId, client.broadcastFn).catch((err) => logDebug("post-load attachDebugger error", err));
+          }
+        }
+
+        const waitMeta = await runInlineWait(client, tabId, params);
+        let tab = { id: tabId, action: navAction, navigationAction: navAction };
+        if (typeof chrome.tabs?.get === "function") {
+          try {
+            const refreshed = await chrome.tabs.get(tabId);
+            if (refreshed && refreshed.id) tab = { ...refreshed, action: navAction, navigationAction: navAction };
+          } catch (_) {}
+        }
+        if (preNavMeta?.initScriptIdentifier) {
+          tab = { ...tab, initScriptIdentifier: preNavMeta.initScriptIdentifier };
+        }
+        respond(mergeWaitMeta(tab, waitMeta));
+      } catch (err) {
+        respond(null, err);
+      }
+      return;
+    }
+
     const updateProps = {};
     if (params.url) updateProps.url = normalizeUrl(params.url, params);
     if (params.active !== undefined) updateProps.active = Boolean(params.active);
@@ -182,6 +244,9 @@ export const tabsHandlers = {
                 const refreshed = await chrome.tabs.get(tab.id);
                 if (refreshed && refreshed.id) tab = refreshed;
               } catch (_) {}
+            }
+            if (preNavMeta?.initScriptIdentifier) {
+              tab = { ...tab, initScriptIdentifier: preNavMeta.initScriptIdentifier };
             }
           }
           respond(mergeWaitMeta(tab, waitMeta));
