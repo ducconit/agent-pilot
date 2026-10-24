@@ -42,7 +42,7 @@
 
   const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
     ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
-    : "1.0.12-beta";
+    : "1.0.13-beta";
 
   window.__AGENT_PILOT__ = window.__AGENT_PILOT__ || {};
   const pageApi = {
