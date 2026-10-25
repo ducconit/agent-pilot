@@ -9,10 +9,11 @@ package agentpilot
 
 import "embed"
 
-// SkillFiles embeds the canonical skills tree (skills/agent-pilot/**).
+// SkillFiles embeds the canonical skills documentation tree (skills/agent-pilot/**),
+// excluding any locally built native binary inside skills/agent-pilot/scripts/.
 //
-// The CLI installs these files verbatim with `agent-pilot skill install`, so a
-// released binary always ships the exact files the repository publishes.
+// The CLI installs these files verbatim with `agent-pilot skill install` and
+// copies the running native binary into `<target>/scripts/agent-pilot(.exe)`.
 //
-//go:embed skills
+//go:embed skills/agent-pilot/SKILL.md skills/agent-pilot/references skills/agent-pilot/examples skills/agent-pilot/scripts/README.md
 var SkillFiles embed.FS

@@ -57,40 +57,42 @@ if (fs.existsSync(skillSourceDir)) {
   }
 }
 
+function atomicCopyExecutable(src, dest) {
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  const tmp = `${dest}.tmp.${Date.now()}`;
+  fs.copyFileSync(src, tmp);
+  if (process.platform !== "win32") {
+    fs.chmodSync(tmp, 0o755);
+  }
+  try {
+    fs.renameSync(tmp, dest);
+  } catch (_) {
+    try { fs.unlinkSync(tmp); } catch (_) {}
+  }
+}
+
 // Synchronize cli/agent-pilot binary if compiled
-const binarySource = path.join(ROOT_DIR, "cli", process.platform === "win32" ? "agent-pilot.exe" : "agent-pilot");
+const binaryName = process.platform === "win32" ? "agent-pilot.exe" : "agent-pilot";
+const binarySource = path.join(ROOT_DIR, "cli", binaryName);
 if (fs.existsSync(binarySource)) {
   try {
-    const agkBinDir = path.join(agkDir, "bin");
-    fs.mkdirSync(agkBinDir, { recursive: true });
-    const targetBin = path.join(agkBinDir, path.basename(binarySource));
-    const tmpBin = `${targetBin}.tmp.${Date.now()}`;
-    fs.copyFileSync(binarySource, tmpBin);
-    if (process.platform !== "win32") {
-      fs.chmodSync(tmpBin, 0o755);
-    }
-    try {
-      fs.renameSync(tmpBin, targetBin);
-    } catch (_) {
-      try { fs.unlinkSync(tmpBin); } catch (_) {}
-    }
+    const targetBin = path.join(agkDir, "bin", binaryName);
+    atomicCopyExecutable(binarySource, targetBin);
     console.log(`✓ Synchronized agent-pilot binary -> ${targetBin}`);
+
+    const agkSkillBin = path.join(targetSkillDir, "scripts", binaryName);
+    atomicCopyExecutable(binarySource, agkSkillBin);
+    console.log(`✓ Synchronized skill binary -> ${agkSkillBin}`);
 
     const geminiBinDir = path.join(homeDir, ".gemini", "config", "plugins", "agk", "bin");
     if (fs.existsSync(path.dirname(geminiBinDir))) {
-      fs.mkdirSync(geminiBinDir, { recursive: true });
-      const geminiBin = path.join(geminiBinDir, path.basename(binarySource));
-      const tmpGeminiBin = `${geminiBin}.tmp.${Date.now()}`;
-      fs.copyFileSync(binarySource, tmpGeminiBin);
-      if (process.platform !== "win32") {
-        fs.chmodSync(tmpGeminiBin, 0o755);
-      }
-      try {
-        fs.renameSync(tmpGeminiBin, geminiBin);
-      } catch (_) {
-        try { fs.unlinkSync(tmpGeminiBin); } catch (_) {}
-      }
+      const geminiBin = path.join(geminiBinDir, binaryName);
+      atomicCopyExecutable(binarySource, geminiBin);
       console.log(`✓ Synchronized agent-pilot binary -> ${geminiBin}`);
+
+      const geminiSkillBin = path.join(homeDir, ".gemini", "config", "plugins", "agk", "skills", "agent-pilot", "scripts", binaryName);
+      atomicCopyExecutable(binarySource, geminiSkillBin);
+      console.log(`✓ Synchronized skill binary -> ${geminiSkillBin}`);
     }
 
     // Export & synchronize MCP tool schemas

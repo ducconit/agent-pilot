@@ -46,6 +46,8 @@ states/
 /agent-pilot.exe
 cli/agent-pilot
 cli/agent-pilot.exe
+skills/agent-pilot/scripts/agent-pilot
+skills/agent-pilot/scripts/agent-pilot.exe
 *.test
 /cli/devtools/payload/runtime.zip
 

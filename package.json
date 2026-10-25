@@ -1,6 +1,6 @@
 {
   "name": "agent-pilot",
-  "version": "1.0.13-beta",
+  "version": "1.0.14-beta",
   "description": "Agent Pilot (Beta) - Universal AI Agent Browser Controller (Antigravity First)",
   "type": "module",
   "scripts": {

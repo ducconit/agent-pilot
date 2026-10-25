@@ -49,11 +49,18 @@ func TestEmbeddedSkillMatchesRepoSource(t *testing.T) {
 	}
 
 	repoCount := 0
-	walkErr := filepath.WalkDir(repoSkillsDir, func(_ string, d fs.DirEntry, err error) error {
+	walkErr := filepath.WalkDir(repoSkillsDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if !d.IsDir() {
+			rel, relErr := filepath.Rel(repoSkillsDir, p)
+			if relErr == nil {
+				slashRel := filepath.ToSlash(rel)
+				if slashRel == "scripts/agent-pilot" || slashRel == "scripts/agent-pilot.exe" {
+					return nil
+				}
+			}
 			repoCount++
 		}
 		return nil

@@ -56,4 +56,22 @@ if (result.error) {
   process.exit(1);
 }
 
+if (result.status === 0) {
+  const builtBinary = path.join(ROOT_DIR, OUTPUT_PATH);
+  const skillScriptsDir = path.join(ROOT_DIR, "skills", "agent-pilot", "scripts");
+  const skillBinary = path.join(skillScriptsDir, OUTPUT_NAME);
+  try {
+    fs.mkdirSync(skillScriptsDir, { recursive: true });
+    const tmpSkillBinary = `${skillBinary}.tmp.${Date.now()}`;
+    fs.copyFileSync(builtBinary, tmpSkillBinary);
+    if (process.platform !== "win32") {
+      fs.chmodSync(tmpSkillBinary, 0o755);
+    }
+    fs.renameSync(tmpSkillBinary, skillBinary);
+    console.log(`✓ Synced CLI binary to skills/agent-pilot/scripts/${OUTPUT_NAME}`);
+  } catch (err) {
+    console.warn(`⚠️ Could not copy CLI binary to skills/agent-pilot/scripts: ${err.message}`);
+  }
+}
+
 process.exit(result.status ?? 1);
