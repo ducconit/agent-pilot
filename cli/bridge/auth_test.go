@@ -3,6 +3,8 @@ package bridge
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/ducconit/agent-pilot-extension/cli/config"
@@ -113,5 +115,35 @@ func TestAuthErrorDoesNotEchoSecret(t *testing.T) {
 	}
 	if contains := rec.Body.String(); contains == "super-secret-value" || contains == "wrong" {
 		t.Fatalf("auth response leaked a key: %s", contains)
+	}
+}
+
+func TestKeysEqualConstantTimeHashAndRemoteHealthAuth(t *testing.T) {
+	if keysEqual("", "secret") || keysEqual("secret", "") || keysEqual("", "") {
+		t.Fatal("empty keys must never match")
+	}
+	if keysEqual("short", "much-longer-secret-key-value") {
+		t.Fatal("different-length keys must not match")
+	}
+	if !keysEqual("exact-secret-key-123", "exact-secret-key-123") {
+		t.Fatal("identical keys must match")
+	}
+
+	t.Setenv(config.APIKeyEnvVar, "bridge-health-key")
+	srv := httptest.NewServer(WithHTTPAuth(handleHealth))
+	defer srv.Close()
+
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatalf("parse srv url: %v", err)
+	}
+	port, err := strconv.Atoi(u.Port())
+	if err != nil {
+		t.Fatalf("parse port: %v", err)
+	}
+
+	meta := remoteBridgeMetadata(port, "")
+	if meta == nil {
+		t.Fatal("expected remoteBridgeMetadata to succeed when AGENT_PILOT_API_KEY is configured")
 	}
 }

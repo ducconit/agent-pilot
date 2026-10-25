@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
@@ -19,7 +20,9 @@ func keysEqual(candidate, expected string) bool {
 	if candidate == "" || expected == "" {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(candidate), []byte(expected)) == 1
+	candHash := sha256.Sum256([]byte(candidate))
+	expHash := sha256.Sum256([]byte(expected))
+	return subtle.ConstantTimeCompare(candHash[:], expHash[:]) == 1
 }
 
 func apiKeyFromRequest(r *http.Request) string {

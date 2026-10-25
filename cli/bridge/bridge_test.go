@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -319,7 +320,65 @@ func TestDeriveCommandTimeout_PerformanceAndExplicitTimeoutMs(t *testing.T) {
 		t.Fatalf("DeriveCommandTimeout(page.evaluate, nil, 15000) = %d, want 25000", got)
 	}
 
+	if got := DeriveCommandTimeout("page.evaluate", map[string]interface{}{"timeoutMs": 4000}, 15000); got != 9000 {
+		t.Fatalf("DeriveCommandTimeout(page.evaluate, timeoutMs=4000, default=15000) = %d, want 9000", got)
+	}
+
 	if got := DeriveCommandTimeout("page.evaluate", map[string]interface{}{"timeoutMs": 40000}, 15000); got != 45000 {
 		t.Fatalf("DeriveCommandTimeout(page.evaluate, timeoutMs=40000) = %d, want 45000", got)
+	}
+
+	if got := DeriveCommandTimeout("page.evaluate", map[string]interface{}{"timeoutMs": 999999}, 15000); got != 125000 {
+		t.Fatalf("DeriveCommandTimeout(page.evaluate, timeoutMs=999999) = %d, want 125000 (clamped ceiling)", got)
+	}
+}
+
+func TestWebSocketRejectsLocalhostWebOriginCSWSH(t *testing.T) {
+	if !IsWebSocketOriginAllowed("") {
+		t.Fatal("empty WebSocket origin must be allowed for local CLI/tests")
+	}
+	if !IsWebSocketOriginAllowed("chrome-extension://abcdefghijklmnop") {
+		t.Fatal("valid chrome-extension:// WebSocket origin must be allowed")
+	}
+	if IsWebSocketOriginAllowed("chrome-extension://") || IsWebSocketOriginAllowed("chrome-extension://../bad") {
+		t.Fatal("malformed chrome-extension:// origin must be rejected")
+	}
+	if IsWebSocketOriginAllowed("http://localhost:3000") || IsWebSocketOriginAllowed("http://127.0.0.1:8080") {
+		t.Fatal("web page origins on localhost must not be allowed to open control WebSockets (CSWSH)")
+	}
+
+	_, wsURL := startTestBridgeWS(t)
+	headers := http.Header{}
+	headers.Set("Origin", "http://localhost:3000")
+	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
+	if err == nil {
+		_ = conn.Close()
+		t.Fatal("expected WebSocket dial with Origin: http://localhost:3000 to be rejected")
+	}
+	if resp != nil && resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected status 403 Forbidden for CSWSH attempt, got %d", resp.StatusCode)
+	}
+}
+
+func TestSendCommandToExtensionWithContextCancellation(t *testing.T) {
+	_, wsURL := startTestBridgeWS(t)
+	conn := dialFakeExtension(t, wsURL, func(method string, id interface{}) (map[string]interface{}, bool) {
+		// Never reply to "slow.hang"
+		return nil, false
+	})
+	defer conn.Close()
+	waitForClientCount(t, 1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := SendCommandToExtensionWithContext(ctx, "slow.hang", map[string]interface{}{}, 10000)
+	elapsed := time.Since(start)
+	if err == nil || !strings.Contains(err.Error(), "context") {
+		t.Fatalf("expected context cancellation error, got: %v", err)
+	}
+	if elapsed > 2*time.Second {
+		t.Fatalf("expected fast cancellation (<2s), took %v", elapsed)
 	}
 }

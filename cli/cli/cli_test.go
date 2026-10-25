@@ -242,6 +242,10 @@ func TestOpenWithTabFlagCloseMultipleAndTabsAliases(t *testing.T) {
 			_, _ = w.Write([]byte(`{"success":true,"result":[{"tabId":1734693240,"title":"Tab A","url":"https://jenkins.sphoton.com/a","active":true},{"tabId":1734693246,"title":"Tab B","url":"https://jenkins.sphoton.com/b","active":false}]}`))
 		case "tabs.remove":
 			tid := params["tabId"]
+			if tid == float64(999999) {
+				_, _ = w.Write([]byte(`{"success":false,"error":"Tab #999999 not found"}`))
+				return
+			}
 			_, _ = fmt.Fprintf(w, `{"success":true,"result":{"success":true,"closedTabId":%v}}`, tid)
 		default:
 			_, _ = w.Write([]byte(`{"success":true,"result":{"id":1734693237,"title":"Jenkins","url":"https://jenkins.sphoton.com/job/Dulichso/configure"}}`))
@@ -321,5 +325,18 @@ func TestOpenWithTabFlagCloseMultipleAndTabsAliases(t *testing.T) {
 	}
 	if len(received) != 3 || received[0]["method"] != "tabs.listAll" || received[1]["method"] != "tabs.remove" || received[2]["method"] != "tabs.remove" {
 		t.Fatalf("expected tabs.listAll + 2 tabs.remove calls for close --all, got: %#v", received)
+	}
+
+	// 5. `close <id1> <missing_id> <id3>` continues past failing tab and aggregates error
+	received = nil
+	outPartial, partialErr := runCmd("close", "1734693240", "999999", "1734693246")
+	if partialErr == nil || !strings.Contains(partialErr.Error(), "Tab #999999 not found") {
+		t.Fatalf("expected aggregated error for missing tab 999999, got: %v", partialErr)
+	}
+	if len(received) != 3 {
+		t.Fatalf("expected all 3 tabs.remove calls to be attempted despite middle failure, got %d", len(received))
+	}
+	if !strings.Contains(outPartial, "[Tab #1734693240]") || !strings.Contains(outPartial, "[Tab #1734693246]") {
+		t.Fatalf("expected both valid tabs to be closed and printed, got: %s", outPartial)
 	}
 }

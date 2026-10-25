@@ -7,6 +7,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -137,16 +138,33 @@ func ExecScroll(deltaX, deltaY float64, tabID interface{}, extra ...map[string]i
 }
 
 func extractTabTag(v interface{}) string {
-	norm := normalizeJSONNumbersForDisplay(v)
-	m, ok := norm.(map[string]interface{})
+	m, ok := v.(map[string]interface{})
 	if !ok {
 		return ""
 	}
 	for _, key := range []string{"id", "tabId", "closedTabId"} {
 		if idVal, exists := m[key]; exists && idVal != nil {
-			s := strings.TrimSpace(fmt.Sprintf("%v", idVal))
-			if s != "" && s != "<nil>" && s != "0" {
-				return fmt.Sprintf("[Tab #%s] ", s)
+			var idStr string
+			switch n := idVal.(type) {
+			case float64:
+				if !math.IsNaN(n) && !math.IsInf(n, 0) && math.Trunc(n) == n && n > 0 {
+					idStr = strconv.FormatInt(int64(n), 10)
+				}
+			case int:
+				if n > 0 {
+					idStr = strconv.Itoa(n)
+				}
+			case int64:
+				if n > 0 {
+					idStr = strconv.FormatInt(n, 10)
+				}
+			case string:
+				if s := strings.TrimSpace(n); s != "" && s != "<nil>" && s != "0" {
+					idStr = s
+				}
+			}
+			if idStr != "" {
+				return "[Tab #" + idStr + "] "
 			}
 		}
 	}
@@ -236,10 +254,12 @@ func ExecClose(tabID interface{}, extra ...map[string]interface{}) error {
 
 func ExecCloseMultiple(tabIDs []int, format string) error {
 	results := make([]interface{}, 0, len(tabIDs))
+	var errs []error
 	for _, id := range tabIDs {
 		res, err := bridge.DispatchCommand("tabs.remove", map[string]interface{}{"tabId": id}, config.DefaultBridgePort())
 		if err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("tab #%d: %w", id, err))
+			continue
 		}
 		results = append(results, res)
 		if !strings.EqualFold(format, "json") {
@@ -247,9 +267,11 @@ func ExecCloseMultiple(tabIDs []int, format string) error {
 		}
 	}
 	if strings.EqualFold(format, "json") {
-		return printCommandResult("json", "", results)
+		if err := printCommandResult("json", "", results); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func ExecCloseAll(format string) error {
@@ -266,7 +288,7 @@ func ExecCloseAll(format string) error {
 		}
 	}
 	tabIDs := make([]int, 0, len(tabs))
-	seen := make(map[int]bool, len(tabs))
+	seen := make(map[int]struct{}, len(tabs))
 	for _, t := range tabs {
 		tm, ok := t.(map[string]interface{})
 		if !ok {
@@ -285,9 +307,11 @@ func ExecCloseAll(format string) error {
 		case int64:
 			id = int(v)
 		}
-		if id > 0 && !seen[id] {
-			seen[id] = true
-			tabIDs = append(tabIDs, id)
+		if id > 0 {
+			if _, exists := seen[id]; !exists {
+				seen[id] = struct{}{}
+				tabIDs = append(tabIDs, id)
+			}
 		}
 	}
 	if len(tabIDs) == 0 {

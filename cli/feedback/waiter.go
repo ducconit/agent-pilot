@@ -64,13 +64,15 @@ func WaitForFeedbackWithContext(ctx context.Context, timeoutSec int, tabID inter
 
 	removeWaiter := func() {
 		waitersLock.Lock()
-		var rem []*FeedbackWaiter
+		n := 0
 		for _, w := range pendingWaiters {
 			if w.ID != waiterID {
-				rem = append(rem, w)
+				pendingWaiters[n] = w
+				n++
 			}
 		}
-		pendingWaiters = rem
+		clear(pendingWaiters[n:])
+		pendingWaiters = pendingWaiters[:n]
 		waitersLock.Unlock()
 	}
 
@@ -126,10 +128,11 @@ func CheckAndNotifyFeedbackWaiters(data map[string]interface{}) {
 	defer waitersLock.Unlock()
 
 	payloadTabID := data["tabId"]
-	var remaining []*FeedbackWaiter
+	n := 0
 	for _, w := range pendingWaiters {
 		if !tabIDMatches(w.TabID, payloadTabID) {
-			remaining = append(remaining, w)
+			pendingWaiters[n] = w
+			n++
 			continue
 		}
 		w.Timer.Stop()
@@ -142,5 +145,6 @@ func CheckAndNotifyFeedbackWaiters(data map[string]interface{}) {
 		payload["channel"] = "reactive_channel_a"
 		w.Channel <- payload
 	}
-	pendingWaiters = remaining
+	clear(pendingWaiters[n:])
+	pendingWaiters = pendingWaiters[:n]
 }

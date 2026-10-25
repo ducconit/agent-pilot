@@ -192,67 +192,69 @@ func newNavigateCommand() *cobra.Command {
 	return cmd
 }
 
-func newCloseCommand() *cobra.Command {
-	cmd := newLeafCommand("close", []string{"close-tab"}, func(args []string) error {
-		cmdArgs, err := parseCmdArgs(args, []FlagDef{
-			{Name: "tab", Aliases: []string{"t"}},
-			{Name: "all", Aliases: []string{"a"}, IsBool: true},
-			{Name: "format"},
-		})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			return errUsage
-		}
-		format := cmdArgs.String("format", "text")
-		if cmdArgs.Bool("all") {
-			if err := ExecCloseAll(format); err != nil {
-				return fmt.Errorf("❌ Error: %v", err)
-			}
-			return nil
-		}
-		tabID, err := cmdArgs.TabID()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
-			return errUsage
-		}
-		var tabIDs []int
-		seen := make(map[int]bool)
-		if id, ok := tabID.(int); ok && id > 0 {
-			seen[id] = true
-			tabIDs = append(tabIDs, id)
-		}
-		for _, pos := range cmdArgs.Positional {
-			if strings.EqualFold(strings.TrimSpace(pos), "all") {
-				if err := ExecCloseAll(format); err != nil {
-					return fmt.Errorf("❌ Error: %v", err)
-				}
-				return nil
-			}
-			parsed, convErr := strconv.Atoi(strings.TrimSpace(pos))
-			if convErr != nil || parsed <= 0 {
-				fmt.Fprintf(os.Stderr, "❌ Error: invalid tab ID: %s\n", pos)
-				return errUsage
-			}
-			if !seen[parsed] {
-				seen[parsed] = true
-				tabIDs = append(tabIDs, parsed)
-			}
-		}
-		if len(tabIDs) > 1 {
-			if err := ExecCloseMultiple(tabIDs, format); err != nil {
-				return fmt.Errorf("❌ Error: %v", err)
-			}
-			return nil
-		}
-		var singleTab interface{}
-		if len(tabIDs) == 1 {
-			singleTab = tabIDs[0]
-		}
-		if err := ExecClose(singleTab, map[string]interface{}{"format": format}); err != nil {
-			return fmt.Errorf("❌ Error: %v", err)
+func runCloseCommand(args []string) error {
+	cmdArgs, err := parseCmdArgs(args, []FlagDef{
+		{Name: "tab", Aliases: []string{"t"}},
+		{Name: "all", Aliases: []string{"a"}, IsBool: true},
+		{Name: "format"},
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+		return errUsage
+	}
+	format := cmdArgs.String("format", "text")
+	if cmdArgs.Bool("all") {
+		if err := ExecCloseAll(format); err != nil {
+			return fmt.Errorf("❌ Error: %w", err)
 		}
 		return nil
-	})
+	}
+	tabID, err := cmdArgs.TabID()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
+		return errUsage
+	}
+	var tabIDs []int
+	seen := make(map[int]struct{})
+	if id, ok := tabID.(int); ok && id > 0 {
+		seen[id] = struct{}{}
+		tabIDs = append(tabIDs, id)
+	}
+	for _, pos := range cmdArgs.Positional {
+		if strings.EqualFold(strings.TrimSpace(pos), "all") {
+			if err := ExecCloseAll(format); err != nil {
+				return fmt.Errorf("❌ Error: %w", err)
+			}
+			return nil
+		}
+		parsed, convErr := strconv.Atoi(strings.TrimSpace(pos))
+		if convErr != nil || parsed <= 0 {
+			fmt.Fprintf(os.Stderr, "❌ Error: invalid tab ID: %s\n", pos)
+			return errUsage
+		}
+		if _, exists := seen[parsed]; !exists {
+			seen[parsed] = struct{}{}
+			tabIDs = append(tabIDs, parsed)
+		}
+	}
+	if len(tabIDs) > 1 {
+		if err := ExecCloseMultiple(tabIDs, format); err != nil {
+			return fmt.Errorf("❌ Error: %w", err)
+		}
+		return nil
+	}
+	var singleTab interface{}
+	if len(tabIDs) == 1 {
+		singleTab = tabIDs[0]
+	}
+	if err := ExecClose(singleTab, map[string]interface{}{"format": format}); err != nil {
+		return fmt.Errorf("❌ Error: %w", err)
+	}
+	return nil
+}
+
+func newCloseCommand() *cobra.Command {
+	cmd := newLeafCommand("close", []string{"close-tab"}, runCloseCommand)
 	cmd.Flags().IntP("tab", "t", 0, "Target tab ID in Agent Pilot group to close")
 	cmd.Flags().BoolP("all", "a", false, "Close all open tabs in the Agent Pilot group")
 	cmd.Flags().String("format", "text", "Output format: text or json")
@@ -974,8 +976,7 @@ func newTabsCommand() *cobra.Command {
 		if len(args) > 0 {
 			sub := strings.ToLower(strings.TrimSpace(args[0]))
 			if sub == "close" || sub == "close-tab" {
-				closeCmd := newCloseCommand()
-				return closeCmd.RunE(closeCmd, args[1:])
+				return runCloseCommand(args[1:])
 			}
 			if sub == "list" || sub == "ls" {
 				args = args[1:]

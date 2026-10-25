@@ -26,6 +26,7 @@ import { getPositiveNumber } from "../batch-validation.js";
 
 const DEFAULT_EVAL_SCRIPTING_TIMEOUT_MS = 10000;
 const DEFAULT_EVAL_CDP_TIMEOUT_MS = 10000;
+const MAX_EVAL_TIMEOUT_MS = 120000;
 
 /**
  * Shared page evaluation helper (MAIN world scripting first, CDP Runtime.evaluate fallback).
@@ -47,11 +48,11 @@ export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgsO
   const requestedTimeout = Number(options?.timeoutMs || options?.timeout);
   const scriptingTimeoutMs =
     Number.isFinite(requestedTimeout) && requestedTimeout > 0
-      ? Math.max(100, requestedTimeout)
+      ? Math.max(100, Math.min(requestedTimeout, MAX_EVAL_TIMEOUT_MS))
       : DEFAULT_EVAL_SCRIPTING_TIMEOUT_MS;
   const cdpTimeoutMs =
     Number.isFinite(requestedTimeout) && requestedTimeout > 0
-      ? Math.max(100, requestedTimeout)
+      ? Math.max(100, Math.min(requestedTimeout, MAX_EVAL_TIMEOUT_MS))
       : DEFAULT_EVAL_CDP_TIMEOUT_MS;
   let scriptingTimedOut = false;
 

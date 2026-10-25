@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -61,8 +62,12 @@ func useDevtoolsHost(method string, params map[string]interface{}) bool {
 }
 
 func dispatchLocalCommand(method string, params map[string]interface{}) (interface{}, error) {
+	return dispatchLocalCommandWithContext(context.Background(), method, params)
+}
+
+func dispatchLocalCommandWithContext(ctx context.Context, method string, params map[string]interface{}) (interface{}, error) {
 	if !useDevtoolsHost(method, params) {
-		return SendCommandToExtension(method, params, 0)
+		return SendCommandToExtensionWithContext(ctx, method, params, 0)
 	}
 	cloned := make(map[string]interface{}, len(params)+1)
 	for key, value := range params {

@@ -20,6 +20,10 @@ import (
 	"github.com/ducconit/agent-pilot-extension/cli/config"
 )
 
+// MaxEvaluateTimeoutMs caps user-supplied page.evaluate timeout parameters to
+// prevent a non-settling Promise from holding the per-tab mutex indefinitely.
+const MaxEvaluateTimeoutMs = 120000
+
 func deriveBatchTimeout(params map[string]interface{}, defaultTimeoutMs int) int {
 	minBatch := config.BatchBaseTimeoutMs // 5 minutes base timeout for batches
 	if defaultTimeoutMs > minBatch {
@@ -244,10 +248,8 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 	if (method == "performance.metrics" || method == "memory.heapSnapshot" || method == "page.screenshot") && baseTimeout < 30000 {
 		baseTimeout = 30000
 	}
-	if method == "page.evaluate" && baseTimeout < 25000 {
-		baseTimeout = 25000
-	}
 
+	explicitEvalTimeout := false
 	if method == "tabs.create" || method == "tabs.update" {
 		waitUntil := true
 		if params != nil {
@@ -291,18 +293,29 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 			hasWaitCondition = true
 		}
 		if !hasWaitCondition {
-			if requested, ok := getIntOrFloat(params, "timeoutMs"); ok && requested > 0 {
-				effective := requested + config.PageWaitBufferMs
-				if defaultTimeoutMs <= 0 || effective > baseTimeout {
-					baseTimeout = effective
-				}
-			} else if requested, ok := getIntOrFloat(params, "timeout"); ok && requested > 0 {
-				effective := requested + config.PageWaitBufferMs
-				if defaultTimeoutMs <= 0 || effective > baseTimeout {
-					baseTimeout = effective
+			requested, ok := getIntOrFloat(params, "timeoutMs")
+			if !ok || requested <= 0 {
+				requested, ok = getIntOrFloat(params, "timeout")
+			}
+			if ok && requested > 0 {
+				if method == "page.evaluate" {
+					if requested > MaxEvaluateTimeoutMs {
+						requested = MaxEvaluateTimeoutMs
+					}
+					baseTimeout = requested + config.PageWaitBufferMs
+					explicitEvalTimeout = true
+				} else {
+					effective := requested + config.PageWaitBufferMs
+					if defaultTimeoutMs <= 0 || effective > baseTimeout {
+						baseTimeout = effective
+					}
 				}
 			}
 		}
+	}
+
+	if method == "page.evaluate" && !explicitEvalTimeout && baseTimeout < 25000 {
+		baseTimeout = 25000
 	}
 
 	if method == "page.type" || method == "page.typeText" {

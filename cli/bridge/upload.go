@@ -19,8 +19,17 @@ import (
 const MaxSyntheticUploadBytes = 20 * 1024 * 1024
 
 var forbiddenUploadSubstrings = []string{
-	"/.ssh/", "/.aws/", "/.gnupg/", "/.kube/", "/.config/gcloud/",
+	"/.ssh/", "/.aws/", "/.gnupg/", "/.kube/", "/.config/",
+	"/.local/", "/.agk/", "/.git/", "/.docker/",
 	"/etc/shadow", "/etc/passwd", "/etc/gshadow", "/proc/", "/sys/",
+	".git-credentials", ".netrc", ".npmrc", ".pypirc",
+	"_history", "id_rsa", "id_ed25519", "id_ecdsa", "authorized_keys",
+}
+
+var forbiddenEvalOutputExts = map[string]struct{}{
+	".sh": {}, ".bash": {}, ".zsh": {}, ".exe": {}, ".bat": {},
+	".cmd": {}, ".ps1": {}, ".service": {}, ".plist": {},
+	".so": {}, ".dll": {}, ".dylib": {}, ".bin": {},
 }
 
 func containsForbiddenUploadSegment(slashPath string) bool {
@@ -29,6 +38,10 @@ func containsForbiddenUploadSegment(slashPath string) bool {
 		if strings.Contains(lower, sub) {
 			return true
 		}
+	}
+	base := strings.ToLower(filepath.Base(slashPath))
+	if base == ".env" || strings.HasPrefix(base, ".env.") {
+		return true
 	}
 	return false
 }
@@ -191,8 +204,40 @@ func isBatchEvaluateAction(stepMap map[string]interface{}) bool {
 	}
 }
 
+func isWithinAllowedEvalOutputRoot(targetAbs string) (bool, error) {
+	var roots []string
+	if cwd, err := os.Getwd(); err == nil && cwd != "" {
+		roots = append(roots, filepath.Clean(cwd))
+		if evalCwd, sErr := filepath.EvalSymlinks(cwd); sErr == nil && evalCwd != "" {
+			roots = append(roots, filepath.Clean(evalCwd))
+		}
+	}
+	for _, td := range []string{os.TempDir(), "/tmp", "/var/tmp", "/var/folders", "/private/tmp", "/private/var/folders"} {
+		if td != "" {
+			roots = append(roots, filepath.Clean(td))
+			if evalTd, sErr := filepath.EvalSymlinks(td); sErr == nil && evalTd != "" {
+				roots = append(roots, filepath.Clean(evalTd))
+			}
+		}
+	}
+
+	for _, root := range roots {
+		rel, err := filepath.Rel(root, targetAbs)
+		if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || strings.HasPrefix(rel, "../") {
+			continue
+		}
+		for _, seg := range strings.Split(filepath.ToSlash(rel), "/") {
+			if strings.HasPrefix(seg, ".") && seg != "." {
+				return false, fmt.Errorf("writing to hidden dotfile or dot-directory %q is not permitted", targetAbs)
+			}
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
 // ValidateEvalOutputPath validates a user/agent-supplied filePath for saving
-// evaluation results against path traversal and sensitive system/user files.
+// evaluation results against path traversal, executable files, and sensitive system/user files.
 func ValidateEvalOutputPath(outputPath string) (string, error) {
 	trimmed := strings.TrimSpace(outputPath)
 	if trimmed == "" {
@@ -202,9 +247,15 @@ func ValidateEvalOutputPath(outputPath string) (string, error) {
 	if cleanPath == ".." || strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) || strings.HasPrefix(cleanPath, "../") {
 		return "", fmt.Errorf("path traversal outside working directory %q is not permitted", cleanPath)
 	}
+	if ext := strings.ToLower(filepath.Ext(cleanPath)); ext != "" {
+		if _, forbiddenExt := forbiddenEvalOutputExts[ext]; forbiddenExt {
+			return "", fmt.Errorf("writing executable or system file extension %q is not permitted", ext)
+		}
+	}
 
 	checkTargets := []string{cleanPath}
-	if absPath, err := filepath.Abs(cleanPath); err == nil {
+	absPath, absErr := filepath.Abs(cleanPath)
+	if absErr == nil {
 		checkTargets = append(checkTargets, absPath)
 	}
 	if evalPath, err := filepath.EvalSymlinks(cleanPath); err == nil {
@@ -226,6 +277,15 @@ func ValidateEvalOutputPath(outputPath string) (string, error) {
 			strings.Contains(target, ".bashrc") || strings.Contains(target, ".zshrc") ||
 			strings.Contains(target, ".profile") || containsForbiddenUploadSegment(filepath.ToSlash(target)) {
 			return "", fmt.Errorf("writing to sensitive user configuration %q is not permitted", cleanPath)
+		}
+		if filepath.IsAbs(target) {
+			allowed, dotErr := isWithinAllowedEvalOutputRoot(target)
+			if dotErr != nil {
+				return "", dotErr
+			}
+			if !allowed {
+				return "", fmt.Errorf("writing outside working directory or temp directory %q is not permitted", cleanPath)
+			}
 		}
 	}
 	return cleanPath, nil

@@ -2173,6 +2173,8 @@ globalThis.chrome.debugger.sendCommand = (_target, method, _params, cb) => {
 };
 const evalLargeTimeoutVal44 = await evaluateInTab(944, "async_ok", null, { timeoutMs: 45000 });
 const savedBudget44 = passedBudget44;
+await evaluateInTab(944, "async_ok", null, { timeoutMs: 9999999 });
+const clampedBudget44 = passedBudget44;
 let asyncTimeoutErr44 = null;
 try {
   await evaluateInTab(944, "async_slow_never_resolves", null, { timeoutMs: 220 });
@@ -2181,12 +2183,13 @@ try {
 }
 cleanupTabResources(944);
 record(
-  "44. evaluateInTab honors timeoutMs > 4000ms and throws EVAL_ASYNC_TIMEOUT without re-running script via CDP when an async Promise times out",
+  "44. evaluateInTab honors timeoutMs > 4000ms, clamps ceiling at 120000ms, and throws EVAL_ASYNC_TIMEOUT without re-running script via CDP",
   evalLargeTimeoutVal44 === "async-ok-45000" &&
     savedBudget44 === 45000 &&
+    clampedBudget44 === 120000 &&
     cdpEvalCount44 === 0 &&
     Boolean(asyncTimeoutErr44 && String(asyncTimeoutErr44.message).includes("EVAL_ASYNC_TIMEOUT")),
-  `val=${evalLargeTimeoutVal44}, budget=${savedBudget44}, cdpEvalCount=${cdpEvalCount44}, err=${asyncTimeoutErr44?.message}`
+  `val=${evalLargeTimeoutVal44}, budget=${savedBudget44}, clamped=${clampedBudget44}, cdpEvalCount=${cdpEvalCount44}, err=${asyncTimeoutErr44?.message}`
 );
 
 recorder.summarize();

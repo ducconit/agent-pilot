@@ -22,7 +22,16 @@ import (
 	"github.com/ducconit/agent-pilot-extension/cli/version"
 )
 
-var forwardHTTPClient = &http.Client{}
+var defaultHTTPTransport = &http.Transport{
+	MaxIdleConns:        100,
+	MaxIdleConnsPerHost: 20,
+	IdleConnTimeout:     90 * time.Second,
+	DisableCompression:  true,
+}
+
+var forwardHTTPClient = &http.Client{
+	Transport: defaultHTTPTransport,
+}
 
 func writeJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -178,7 +187,7 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case "config.getSecretFilter":
-		res, err := SendCommandToExtension("config.getSecretFilter", params, config.ConfigRPCCommandTimeoutMs)
+		res, err := SendCommandToExtensionWithContext(r.Context(), "config.getSecretFilter", params, config.ConfigRPCCommandTimeoutMs)
 		if err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]interface{}{
 				"success": false,
@@ -198,7 +207,7 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 				atomic.StoreInt32(&secretFilterOn, 0)
 			}
 		}
-		res, err := SendCommandToExtension("config.setSecretFilter", params, config.ConfigRPCCommandTimeoutMs)
+		res, err := SendCommandToExtensionWithContext(r.Context(), "config.setSecretFilter", params, config.ConfigRPCCommandTimeoutMs)
 		if err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]interface{}{
 				"success": false,
@@ -236,7 +245,7 @@ func handleHTTPAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Dispatch to extension
-	res, err := dispatchLocalCommand(method, params)
+	res, err := dispatchLocalCommandWithContext(r.Context(), method, params)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 		return
@@ -394,7 +403,10 @@ func ForwardCommandToActiveServer(method string, params map[string]interface{}, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to contact Agent Pilot Bridge at %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, config.MaxForwardBody))
 	if err != nil {

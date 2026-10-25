@@ -9,13 +9,22 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ducconit/agent-pilot-extension/cli/config"
 	"github.com/ducconit/agent-pilot-extension/cli/feedback"
 )
 
+var embeddedStartMu sync.Mutex
+
 func ensureEmbeddedBridgeRunning(port int, addr string) {
+	embeddedStartMu.Lock()
+	defer embeddedStartMu.Unlock()
+
+	if BridgeReachable(port) {
+		return
+	}
 	go func() {
 		if err := StartBridgeServer(port); err != nil {
 			log.Printf("[AgentPilot Go] Embedded bridge server error: %v", err)

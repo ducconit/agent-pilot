@@ -14,6 +14,14 @@ func TestValidateUploadFilePath(t *testing.T) {
 		"/etc/gshadow",
 		"/home/user/.ssh/id_rsa",
 		"/home/user/.aws/credentials",
+		"/home/user/.git-credentials",
+		"/home/user/.netrc",
+		"/home/user/.npmrc",
+		"/home/user/.bash_history",
+		"/home/user/.config/gh/hosts.yml",
+		"/home/user/.local/bin/agent-pilot",
+		"/home/user/project/.env",
+		"/home/user/project/.env.production",
 		"/proc/self/environ",
 		"/tmp/../../etc/passwd",
 	}
@@ -280,5 +288,36 @@ func TestEnrichEvaluateArgsAndProcessResult(t *testing.T) {
 	}
 	if !strings.Contains(string(rawSaved), `"count": 42`) {
 		t.Errorf("unexpected saved eval output: %s", string(rawSaved))
+	}
+}
+
+func TestValidateEvalOutputPathBlocksDotDirsBinariesAndOutsideWorkspace(t *testing.T) {
+	blocked := []string{
+		"/home/ubuntu/.local/bin/agent-pilot",
+		"/home/ubuntu/.agk/bin/agent-pilot",
+		"/home/ubuntu/.config/systemd/user/agent-pilot.service",
+		"/home/ubuntu/other-project/output.json",
+		".git/hooks/pre-commit",
+		"./.env",
+		"sub/.hidden/out.json",
+		"out/malicious.sh",
+		"out/malicious.exe",
+		"out/malicious.service",
+	}
+	for _, p := range blocked {
+		if _, err := ValidateEvalOutputPath(p); err == nil {
+			t.Errorf("expected ValidateEvalOutputPath(%q) to be rejected, got nil", p)
+		}
+	}
+
+	allowed := []string{
+		"eval_result.json",
+		"artifacts/output.txt",
+		filepath.Join(t.TempDir(), "temp_eval.json"),
+	}
+	for _, p := range allowed {
+		if _, err := ValidateEvalOutputPath(p); err != nil {
+			t.Errorf("expected ValidateEvalOutputPath(%q) to succeed, got %v", p, err)
+		}
 	}
 }

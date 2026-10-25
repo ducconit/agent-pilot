@@ -6,11 +6,14 @@
 package bridge
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"runtime"
 	"sort"
 	"strings"
@@ -79,8 +82,38 @@ type metadataCacheEntry struct {
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
-		return IsOriginAllowed(origin)
+		return IsWebSocketOriginAllowed(origin)
 	},
+}
+
+func isValidExtensionOrigin(origin string) bool {
+	if !strings.HasPrefix(origin, "chrome-extension://") {
+		return false
+	}
+	rest := strings.TrimPrefix(origin, "chrome-extension://")
+	extID := strings.TrimSuffix(rest, "/")
+	if len(extID) < 8 || len(extID) > 64 {
+		return false
+	}
+	for _, ch := range extID {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '-') {
+			return false
+		}
+	}
+	if pinned := strings.TrimSpace(os.Getenv("AGENT_PILOT_EXTENSION_ID")); pinned != "" {
+		return extID == pinned
+	}
+	return true
+}
+
+// IsWebSocketOriginAllowed restricts control WebSocket upgrades strictly to
+// non-browser loopback dialers (empty Origin) or Chrome Extension origins,
+// blocking Cross-Site WebSocket Hijacking (CSWSH) from web pages on localhost.
+func IsWebSocketOriginAllowed(origin string) bool {
+	if origin == "" {
+		return true
+	}
+	return isValidExtensionOrigin(origin)
 }
 
 // IsOriginAllowed validates origin against extension and localhost
@@ -89,7 +122,7 @@ func IsOriginAllowed(origin string) bool {
 		return true
 	}
 	if strings.HasPrefix(origin, "chrome-extension://") {
-		return true
+		return isValidExtensionOrigin(origin)
 	}
 	u, err := url.Parse(origin)
 	if err != nil {
@@ -105,14 +138,38 @@ func getClientByID(instanceID string) *ClientConnection {
 	return selectClientLocked(instanceID)
 }
 
-// SendCommandToExtension dispatches a command to a connected extension and
-// blocks until the matching reply arrives or the (derived) timeout elapses.
+func parseExtensionReply(method string, res map[string]interface{}) (interface{}, error) {
+	filterEnabled := atomic.LoadInt32(&secretFilterOn) == 1
+	if errMsg, ok := res["error"].(string); ok && errMsg != "" {
+		if sanitizedErr, ok := SanitizeData(errMsg, filterEnabled).(string); ok && sanitizedErr != "" {
+			errMsg = sanitizedErr
+		}
+		return nil, fmt.Errorf("%s", errMsg)
+	}
+	resultData := res["result"]
+	if strings.HasPrefix(method, "devtools.protocol.") {
+		return resultData, nil
+	}
+	sanitized := SanitizeData(resultData, filterEnabled)
+	return sanitized, nil
+}
+
+// SendCommandToExtension dispatches a command to a connected extension using context.Background().
+func SendCommandToExtension(method string, params map[string]interface{}, timeoutMs int) (interface{}, error) {
+	return SendCommandToExtensionWithContext(context.Background(), method, params, timeoutMs)
+}
+
+// SendCommandToExtensionWithContext dispatches a command to a connected extension and
+// blocks until the matching reply arrives, ctx is canceled, or the (derived) timeout elapses.
 //
 // Correlation: a fresh id is allocated, a buffered channel is registered under
 // that id, then the message is written. The reader goroutine (handleWebSocket)
 // matches the reply id back to this channel, so concurrent callers never see
 // each other's responses.
-func SendCommandToExtension(method string, params map[string]interface{}, timeoutMs int) (interface{}, error) {
+func SendCommandToExtensionWithContext(ctx context.Context, method string, params map[string]interface{}, timeoutMs int) (interface{}, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	instanceID, _ := params["instanceId"].(string)
 	client := getClientByID(instanceID)
 	if client == nil {
@@ -135,6 +192,7 @@ func SendCommandToExtension(method string, params map[string]interface{}, timeou
 	pendingReqLock.Unlock()
 
 	client.WriteMu.Lock()
+	_ = client.WS.SetWriteDeadline(time.Now().Add(config.WSWriteControlTimeout))
 	err := client.WS.WriteJSON(msg)
 	client.WriteMu.Unlock()
 	if err != nil {
@@ -150,26 +208,26 @@ func SendCommandToExtension(method string, params map[string]interface{}, timeou
 
 	select {
 	case res := <-resChan:
-		filterEnabled := atomic.LoadInt32(&secretFilterOn) == 1
-		if errMsg, ok := res["error"].(string); ok && errMsg != "" {
-			if sanitizedErr, ok := SanitizeData(errMsg, filterEnabled).(string); ok && sanitizedErr != "" {
-				errMsg = sanitizedErr
-			}
-			return nil, fmt.Errorf("%s", errMsg)
-		}
-		resultData := res["result"]
-		if strings.HasPrefix(method, "devtools.protocol.") {
-			return resultData, nil
-		}
-		sanitized := SanitizeData(resultData, filterEnabled)
-		return sanitized, nil
+		return parseExtensionReply(method, res)
+
+	case <-ctx.Done():
+		pendingReqLock.Lock()
+		delete(pendingRequests, reqID)
+		pendingReqLock.Unlock()
+		return nil, fmt.Errorf("command '%s' canceled: %w", method, ctx.Err())
 
 	case <-timer.C:
 		// Remove the pending entry so a very late reply cannot leak a channel.
 		pendingReqLock.Lock()
 		delete(pendingRequests, reqID)
 		pendingReqLock.Unlock()
-		return nil, fmt.Errorf("command '%s' timed out after %dms", method, timeoutMs)
+		// Drain a reply delivered at the exact millisecond the timer fired.
+		select {
+		case res := <-resChan:
+			return parseExtensionReply(method, res)
+		default:
+			return nil, fmt.Errorf("command '%s' timed out after %dms", method, timeoutMs)
+		}
 	}
 }
 
@@ -385,6 +443,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 							result = map[string]interface{}{"success": false, "error": saveErr.Error()}
 						}
 						client.WriteMu.Lock()
+						_ = client.WS.SetWriteDeadline(time.Now().Add(config.WSWriteControlTimeout))
 						if err := client.WS.WriteJSON(map[string]interface{}{
 							"id":     idVal,
 							"result": result,
@@ -533,13 +592,27 @@ func cloneMetadata(metadata map[string]interface{}) map[string]interface{} {
 	return cloned
 }
 
+var healthProbeHTTPClient = &http.Client{
+	Timeout:   500 * time.Millisecond,
+	Transport: defaultHTTPTransport,
+}
+
 func remoteBridgeMetadata(port int, instanceID string) map[string]interface{} {
-	client := &http.Client{Timeout: 500 * time.Millisecond}
-	response, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/health", port))
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/health", port), nil)
 	if err != nil {
 		return nil
 	}
-	defer response.Body.Close()
+	if key := config.BridgeAPIKey(); key != "" {
+		req.Header.Set(config.APIKeyHeader, key)
+	}
+	response, err := healthProbeHTTPClient.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, response.Body)
+		_ = response.Body.Close()
+	}()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil
 	}
