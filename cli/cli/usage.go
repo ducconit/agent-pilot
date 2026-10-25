@@ -47,15 +47,16 @@ THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT / A
   heap [baseline|diff|snapshot] Chụp V8 Heap Snapshot, phân tích Detached DOM & phát hiện Memory Leak
   webauthn <action>             Quản lý Virtual WebAuthn Authenticator & Passkeys qua CDP
   extensions [list|toggle]      Quản lý, xem danh sách và bật/tắt các Extension đã cài đặt
-  open <url>                    Mở tab mới với URL chỉ định
+  open <url> [--tab <id>]       Mở tab mới với URL chỉ định (hoặc điều hướng tab <id> nếu truyền --tab)
   navigate <url|back|forward|reload> Điều hướng tab hiện tại đến URL hoặc back/forward/reload
+  close [id1 id2...|--all]      Đóng tab hiện tại, danh sách tab chỉ định hoặc toàn bộ tab (--all)
   screenshot [tùy chọn]         Chụp ảnh màn hình (Lưu ra file PNG/JPEG/WebP)
   inspect <selector>            Soi và trích xuất thông số phần tử DOM
   cdp status                    Kiểm tra CDP/debugger đã attach (dùng cho --via cdp)
   session [start|end|status]    Bắt đầu/kết thúc phiên làm việc (Giữ chuột ảo và viền neon liên tục)
   busy [on|off]                 Bật/tắt viền phát sáng và chỉ báo trạng thái AI Agent trên tab
   evaluate <script>             Thực thi mã JavaScript (-f <file>, stdin, hoặc string; Alias: eval)
-  tabs                          Liệt kê danh sách tất cả các tab đang mở
+  tabs                          Liệt kê danh sách tất cả các tab đang mở (Alias: list, ls)
   batch <script.json>           Thực thi chuỗi hành động automation từ file JSON
   feedback [list|wait]          Xem danh sách hoặc chờ phản hồi từ người dùng
 

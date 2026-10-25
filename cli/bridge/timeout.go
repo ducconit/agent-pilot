@@ -244,6 +244,9 @@ func DeriveCommandTimeout(method string, params map[string]interface{}, defaultT
 	if (method == "performance.metrics" || method == "memory.heapSnapshot" || method == "page.screenshot") && baseTimeout < 30000 {
 		baseTimeout = 30000
 	}
+	if method == "page.evaluate" && baseTimeout < 25000 {
+		baseTimeout = 25000
+	}
 
 	if method == "tabs.create" || method == "tabs.update" {
 		waitUntil := true

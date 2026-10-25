@@ -2146,5 +2146,48 @@ record(
   `authId=${addAuthRes43.authenticatorId}, creds=${getCredsRes43.credentials?.length}, cdpCalls=${webauthnCdp43.map((c) => c.method).join(",")}`
 );
 
+// 44. evaluateInTab honors large timeoutMs without 4000ms clamping and fails fast on async Promise timeout without double-executing via CDP
+attachedTabs.add(944);
+let cdpEvalCount44 = 0;
+let passedBudget44 = null;
+globalThis.window = {
+  eval: (code) => {
+    if (code === "async_slow_never_resolves") {
+      return new Promise(() => {});
+    }
+    return Promise.resolve("async-ok-45000");
+  }
+};
+globalThis.chrome.scripting = {
+  executeScript: async (opts) => {
+    passedBudget44 = opts.args?.[2];
+    const res = await opts.func(...opts.args);
+    return [{ result: res }];
+  }
+};
+globalThis.chrome.debugger.sendCommand = (_target, method, _params, cb) => {
+  if (method === "Runtime.evaluate") {
+    cdpEvalCount44++;
+  }
+  cb({ result: { type: "string", value: "should-not-run-cdp" } });
+};
+const evalLargeTimeoutVal44 = await evaluateInTab(944, "async_ok", null, { timeoutMs: 45000 });
+const savedBudget44 = passedBudget44;
+let asyncTimeoutErr44 = null;
+try {
+  await evaluateInTab(944, "async_slow_never_resolves", null, { timeoutMs: 220 });
+} catch (err) {
+  asyncTimeoutErr44 = err;
+}
+cleanupTabResources(944);
+record(
+  "44. evaluateInTab honors timeoutMs > 4000ms and throws EVAL_ASYNC_TIMEOUT without re-running script via CDP when an async Promise times out",
+  evalLargeTimeoutVal44 === "async-ok-45000" &&
+    savedBudget44 === 45000 &&
+    cdpEvalCount44 === 0 &&
+    Boolean(asyncTimeoutErr44 && String(asyncTimeoutErr44.message).includes("EVAL_ASYNC_TIMEOUT")),
+  `val=${evalLargeTimeoutVal44}, budget=${savedBudget44}, cdpEvalCount=${cdpEvalCount44}, err=${asyncTimeoutErr44?.message}`
+);
+
 recorder.summarize();
 recorder.exitIfFailed();

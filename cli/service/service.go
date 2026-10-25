@@ -139,8 +139,8 @@ func candidateBinaryPaths(goos, homeDir, localAppData string) []string {
 		if trimmedHome != "" {
 			paths = append(
 				paths,
-				filepath.Join(trimmedHome, ".local", "bin", "agent-pilot.exe"),
 				filepath.Join(trimmedHome, ".agk", "bin", "agent-pilot.exe"),
+				filepath.Join(trimmedHome, ".local", "bin", "agent-pilot.exe"),
 			)
 		}
 		return paths
@@ -149,8 +149,8 @@ func candidateBinaryPaths(goos, homeDir, localAppData string) []string {
 		if trimmedHome != "" {
 			paths = append(
 				paths,
-				filepath.Join(trimmedHome, ".local", "bin", "agent-pilot"),
 				filepath.Join(trimmedHome, ".agk", "bin", "agent-pilot"),
+				filepath.Join(trimmedHome, ".local", "bin", "agent-pilot"),
 			)
 		}
 		paths = append(paths, "/opt/homebrew/bin/agent-pilot", "/usr/local/bin/agent-pilot")
@@ -160,8 +160,8 @@ func candidateBinaryPaths(goos, homeDir, localAppData string) []string {
 		if trimmedHome != "" {
 			paths = append(
 				paths,
-				filepath.Join(trimmedHome, ".local", "bin", "agent-pilot"),
 				filepath.Join(trimmedHome, ".agk", "bin", "agent-pilot"),
+				filepath.Join(trimmedHome, ".local", "bin", "agent-pilot"),
 			)
 		}
 		paths = append(paths, "/usr/local/bin/agent-pilot")
@@ -300,6 +300,9 @@ WantedBy=default.target
 	if err != nil {
 		return fmt.Errorf("failed to enable systemd service: %s (%w)", out, err)
 	}
+
+	// Also restart in case the service was already active under a previous ExecStart binary path
+	_, _ = m.runCmd("systemctl", "--user", "restart", config.ServiceNameLinux)
 
 	fmt.Printf("✅ Đã cài đặt và kích hoạt thành công Agent Pilot Service (systemd --user)!\n")
 	fmt.Printf("📁 Tệp cấu hình: %s\n", serviceFilePath)

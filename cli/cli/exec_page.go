@@ -136,17 +136,60 @@ func ExecScroll(deltaX, deltaY float64, tabID interface{}, extra ...map[string]i
 	return nil
 }
 
+func extractTabTag(v interface{}) string {
+	norm := normalizeJSONNumbersForDisplay(v)
+	m, ok := norm.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	for _, key := range []string{"id", "tabId", "closedTabId"} {
+		if idVal, exists := m[key]; exists && idVal != nil {
+			s := strings.TrimSpace(fmt.Sprintf("%v", idVal))
+			if s != "" && s != "<nil>" && s != "0" {
+				return fmt.Sprintf("[Tab #%s] ", s)
+			}
+		}
+	}
+	return ""
+}
+
 func ExecOpen(url string, active bool, extra ...map[string]interface{}) error {
+	var targetTabID interface{}
+	explicitActive := false
+	for _, m := range extra {
+		if tid, ok := m["tabId"]; ok && tid != nil {
+			targetTabID = tid
+		}
+		if ea, ok := m["explicitActive"].(bool); ok && ea {
+			explicitActive = true
+		}
+	}
+
 	params := map[string]interface{}{
-		"url":    url,
-		"active": active,
+		"url": url,
+	}
+	method := "tabs.create"
+	if targetTabID != nil {
+		method = "tabs.update"
+		params["tabId"] = targetTabID
+		if active || explicitActive {
+			params["active"] = active
+		}
+	} else {
+		params["active"] = active
 	}
 	mergeExtraParams(params, extra...)
-	res, err := bridge.DispatchCommand("tabs.create", params, config.DefaultBridgePort())
+	delete(params, "explicitActive")
+
+	res, err := bridge.DispatchCommand(method, params, config.DefaultBridgePort())
 	if err != nil {
 		return err
 	}
-	return printCommandResult(commandOutputFormat(extra...), "✅ Opened tab: %v\n", res)
+	if strings.EqualFold(commandOutputFormat(extra...), "json") {
+		return printCommandResult("json", "", res)
+	}
+	fmt.Printf("✅ Opened tab: %s%v\n", extractTabTag(res), normalizeJSONNumbersForDisplay(res))
+	return nil
 }
 
 func ExecNavigate(url string, tabID interface{}, extra ...map[string]interface{}) error {
@@ -171,7 +214,7 @@ func ExecNavigate(url string, tabID interface{}, extra ...map[string]interface{}
 			targetDesc = act
 		}
 	}
-	fmt.Printf("✅ Navigated to '%s': %v\n", targetDesc, normalizeJSONNumbersForDisplay(res))
+	fmt.Printf("✅ Navigated to '%s': %s%v\n", targetDesc, extractTabTag(res), normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 
@@ -184,7 +227,77 @@ func ExecClose(tabID interface{}, extra ...map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	return printCommandResult(commandOutputFormat(extra...), "✅ Closed tab: %v\n", res)
+	if strings.EqualFold(commandOutputFormat(extra...), "json") {
+		return printCommandResult("json", "", res)
+	}
+	fmt.Printf("✅ Closed tab: %s%v\n", extractTabTag(res), normalizeJSONNumbersForDisplay(res))
+	return nil
+}
+
+func ExecCloseMultiple(tabIDs []int, format string) error {
+	results := make([]interface{}, 0, len(tabIDs))
+	for _, id := range tabIDs {
+		res, err := bridge.DispatchCommand("tabs.remove", map[string]interface{}{"tabId": id}, config.DefaultBridgePort())
+		if err != nil {
+			return err
+		}
+		results = append(results, res)
+		if !strings.EqualFold(format, "json") {
+			fmt.Printf("✅ Closed tab: %s%v\n", extractTabTag(res), normalizeJSONNumbersForDisplay(res))
+		}
+	}
+	if strings.EqualFold(format, "json") {
+		return printCommandResult("json", "", results)
+	}
+	return nil
+}
+
+func ExecCloseAll(format string) error {
+	res, err := bridge.DispatchCommand("tabs.listAll", map[string]interface{}{}, config.DefaultBridgePort())
+	if err != nil {
+		return err
+	}
+	var tabs []interface{}
+	if tSlice, ok := res.([]interface{}); ok {
+		tabs = tSlice
+	} else if resMap, ok := res.(map[string]interface{}); ok {
+		if tSlice, ok := resMap["value"].([]interface{}); ok {
+			tabs = tSlice
+		}
+	}
+	tabIDs := make([]int, 0, len(tabs))
+	seen := make(map[int]bool, len(tabs))
+	for _, t := range tabs {
+		tm, ok := t.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		rawID := tm["tabId"]
+		if rawID == nil {
+			rawID = tm["id"]
+		}
+		var id int
+		switch v := rawID.(type) {
+		case float64:
+			id = int(v)
+		case int:
+			id = v
+		case int64:
+			id = int(v)
+		}
+		if id > 0 && !seen[id] {
+			seen[id] = true
+			tabIDs = append(tabIDs, id)
+		}
+	}
+	if len(tabIDs) == 0 {
+		if strings.EqualFold(format, "json") {
+			return printCommandResult("json", "", []interface{}{})
+		}
+		fmt.Println("✅ Closed 0 tabs (no open tabs in Agent Pilot group)")
+		return nil
+	}
+	return ExecCloseMultiple(tabIDs, format)
 }
 
 func ExecScreenshot(mode, selector, outputPath string, tabID interface{}) error {

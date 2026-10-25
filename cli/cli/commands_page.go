@@ -31,6 +31,7 @@ func registerInlineWaitPflags(cmd *cobra.Command) {
 func newOpenCommand() *cobra.Command {
 	cmd := newLeafCommand("open", nil, func(args []string) error {
 		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
+			FlagDef{Name: "tab", Aliases: []string{"t"}},
 			FlagDef{Name: "active", IsBool: true},
 			FlagDef{Name: "username", Aliases: []string{"user", "u"}},
 			FlagDef{Name: "password", Aliases: []string{"pass"}},
@@ -44,7 +45,12 @@ func newOpenCommand() *cobra.Command {
 			return errUsage
 		}
 		if len(cmdArgs.Positional) < 1 {
-			fmt.Println("Sử dụng: agent-pilot open <url> [--active] [--format json] [--timeout <ms>] [--user <username>] [--password <password>] [--init-script <js>] [--beforeunload accept|decline] [--include-snapshot] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			fmt.Println("Sử dụng: agent-pilot open <url> [--tab <id>] [--active] [--format json] [--timeout <ms>] [--user <username>] [--password <password>] [--init-script <js>] [--beforeunload accept|decline] [--include-snapshot] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			return errUsage
+		}
+		tabID, err := cmdArgs.TabID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
 		timeoutMs, err := cmdArgs.Int("timeout", 0)
@@ -53,6 +59,12 @@ func newOpenCommand() *cobra.Command {
 			return errUsage
 		}
 		extra := map[string]interface{}{}
+		if tabID != nil {
+			extra["tabId"] = tabID
+		}
+		if _, hasActive := cmdArgs.Flags["active"]; hasActive {
+			extra["explicitActive"] = true
+		}
 		if u := cmdArgs.String("username", ""); u != "" {
 			extra["username"] = u
 		}
@@ -80,6 +92,7 @@ func newOpenCommand() *cobra.Command {
 		return nil
 	})
 	f := cmd.Flags()
+	f.IntP("tab", "t", 0, "Reuse and navigate existing tab ID instead of creating a new tab")
 	f.Bool("active", false, "Make tab active")
 	f.StringP("user", "u", "", "Optional HTTP Basic Auth username")
 	f.String("password", "", "Optional HTTP Basic Auth password")
@@ -183,31 +196,65 @@ func newCloseCommand() *cobra.Command {
 	cmd := newLeafCommand("close", []string{"close-tab"}, func(args []string) error {
 		cmdArgs, err := parseCmdArgs(args, []FlagDef{
 			{Name: "tab", Aliases: []string{"t"}},
+			{Name: "all", Aliases: []string{"a"}, IsBool: true},
 			{Name: "format"},
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
+		format := cmdArgs.String("format", "text")
+		if cmdArgs.Bool("all") {
+			if err := ExecCloseAll(format); err != nil {
+				return fmt.Errorf("❌ Error: %v", err)
+			}
+			return nil
+		}
 		tabID, err := cmdArgs.TabID()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-		if tabID == nil && len(cmdArgs.Positional) > 0 {
-			parsed, convErr := strconv.Atoi(cmdArgs.Positional[0])
+		var tabIDs []int
+		seen := make(map[int]bool)
+		if id, ok := tabID.(int); ok && id > 0 {
+			seen[id] = true
+			tabIDs = append(tabIDs, id)
+		}
+		for _, pos := range cmdArgs.Positional {
+			if strings.EqualFold(strings.TrimSpace(pos), "all") {
+				if err := ExecCloseAll(format); err != nil {
+					return fmt.Errorf("❌ Error: %v", err)
+				}
+				return nil
+			}
+			parsed, convErr := strconv.Atoi(strings.TrimSpace(pos))
 			if convErr != nil || parsed <= 0 {
-				fmt.Fprintf(os.Stderr, "❌ Error: invalid tab ID: %s\n", cmdArgs.Positional[0])
+				fmt.Fprintf(os.Stderr, "❌ Error: invalid tab ID: %s\n", pos)
 				return errUsage
 			}
-			tabID = parsed
+			if !seen[parsed] {
+				seen[parsed] = true
+				tabIDs = append(tabIDs, parsed)
+			}
 		}
-		if err := ExecClose(tabID, map[string]interface{}{"format": cmdArgs.String("format", "text")}); err != nil {
+		if len(tabIDs) > 1 {
+			if err := ExecCloseMultiple(tabIDs, format); err != nil {
+				return fmt.Errorf("❌ Error: %v", err)
+			}
+			return nil
+		}
+		var singleTab interface{}
+		if len(tabIDs) == 1 {
+			singleTab = tabIDs[0]
+		}
+		if err := ExecClose(singleTab, map[string]interface{}{"format": format}); err != nil {
 			return fmt.Errorf("❌ Error: %v", err)
 		}
 		return nil
 	})
 	cmd.Flags().IntP("tab", "t", 0, "Target tab ID in Agent Pilot group to close")
+	cmd.Flags().BoolP("all", "a", false, "Close all open tabs in the Agent Pilot group")
 	cmd.Flags().String("format", "text", "Output format: text or json")
 	return cmd
 }
@@ -923,7 +970,17 @@ func newInspectCommand() *cobra.Command {
 }
 
 func newTabsCommand() *cobra.Command {
-	return newLeafCommand("tabs", nil, func(args []string) error {
+	return newLeafCommand("tabs", []string{"list", "list-tabs", "ls"}, func(args []string) error {
+		if len(args) > 0 {
+			sub := strings.ToLower(strings.TrimSpace(args[0]))
+			if sub == "close" || sub == "close-tab" {
+				closeCmd := newCloseCommand()
+				return closeCmd.RunE(closeCmd, args[1:])
+			}
+			if sub == "list" || sub == "ls" {
+				args = args[1:]
+			}
+		}
 		cmdArgs, err := parseCmdArgs(args, []FlagDef{{Name: "format"}})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)

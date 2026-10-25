@@ -24,8 +24,8 @@ import {
 import { sendTabMessageWithRetry } from "../tab-manager.js";
 import { getPositiveNumber } from "../batch-validation.js";
 
-const DEFAULT_EVAL_SCRIPTING_TIMEOUT_MS = 3500;
-const DEFAULT_EVAL_CDP_TIMEOUT_MS = 5000;
+const DEFAULT_EVAL_SCRIPTING_TIMEOUT_MS = 10000;
+const DEFAULT_EVAL_CDP_TIMEOUT_MS = 10000;
 
 /**
  * Shared page evaluation helper (MAIN world scripting first, CDP Runtime.evaluate fallback).
@@ -47,11 +47,11 @@ export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgsO
   const requestedTimeout = Number(options?.timeoutMs || options?.timeout);
   const scriptingTimeoutMs =
     Number.isFinite(requestedTimeout) && requestedTimeout > 0
-      ? Math.max(100, Math.min(requestedTimeout, 4000))
+      ? Math.max(100, requestedTimeout)
       : DEFAULT_EVAL_SCRIPTING_TIMEOUT_MS;
   const cdpTimeoutMs =
     Number.isFinite(requestedTimeout) && requestedTimeout > 0
-      ? Math.max(100, Math.min(requestedTimeout, 10000))
+      ? Math.max(100, requestedTimeout)
       : DEFAULT_EVAL_CDP_TIMEOUT_MS;
   let scriptingTimedOut = false;
 
@@ -85,7 +85,7 @@ export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgsO
         const execPromise = chrome.scripting.executeScript({
           target: { tabId },
           world: "MAIN",
-          func: async (code, descriptors) => {
+          func: async (code, descriptors, budgetMs) => {
             try {
               const resolvedArgs = [];
               if (Array.isArray(descriptors)) {
@@ -101,8 +101,36 @@ export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgsO
               }
               const rawVal = window.eval(code);
               const invoked = typeof rawVal === "function" ? rawVal(...resolvedArgs) : rawVal;
-              const value = await Promise.resolve(invoked);
-              return { __eval_ok: true, value };
+              if (
+                invoked !== null &&
+                (typeof invoked === "object" || typeof invoked === "function") &&
+                typeof invoked.then === "function"
+              ) {
+                const asyncWaitMs =
+                  typeof budgetMs === "number" && budgetMs >= 200 ? budgetMs - 50 : Math.max(50, Number(budgetMs) || 10000);
+                let asyncTimer = null;
+                try {
+                  const timeoutSentinel = Symbol("eval_async_timeout");
+                  const raced = await Promise.race([
+                    Promise.resolve(invoked),
+                    new Promise((resolve) => {
+                      asyncTimer = setTimeout(() => resolve(timeoutSentinel), asyncWaitMs);
+                    })
+                  ]);
+                  if (raced === timeoutSentinel) {
+                    return {
+                      __eval_err: true,
+                      __eval_async_timeout: true,
+                      name: "TimeoutError",
+                      message: `EVAL_ASYNC_TIMEOUT: Async Promise in page.evaluate did not settle within ${budgetMs}ms`
+                    };
+                  }
+                  return { __eval_ok: true, value: raced };
+                } finally {
+                  if (asyncTimer !== null) clearTimeout(asyncTimer);
+                }
+              }
+              return { __eval_ok: true, value: invoked };
             } catch (e) {
               return {
                 __eval_err: true,
@@ -112,7 +140,7 @@ export async function evaluateInTab(tabId, script, broadcastFn = null, evalArgsO
               };
             }
           },
-          args: [script, argDescriptors]
+          args: [script, argDescriptors, scriptingTimeoutMs]
         });
         const timeoutPromise = new Promise((resolve) => {
           timerId = setTimeout(() => {

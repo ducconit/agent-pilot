@@ -251,7 +251,7 @@ var legacyLongFlags = []string{
 	"action", "name", "network", "cpu", "theme", "filter", "method", "type", "bridge-port", "instance-id",
 	"limit", "categories", "enabled", "path", "force", "agy", "antigravity",
 	"gc", "port", "step", "step-id", "operation", "index", "title", "url", "steps",
-	"level", "load-timeout", "version", "json", "short",
+	"level", "load-timeout", "version", "json", "short", "all",
 }
 
 // normalizeLegacyFlags rewrites any token that is exactly "-<name>" or starts

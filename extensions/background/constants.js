@@ -23,7 +23,7 @@ export const NO_TARGET_TAB_ERROR =
 // Timeout & Capacity constants
 export const CDP_PROTOCOL_VERSION = "1.3";
 export const CDP_SCREENSHOT_TIMEOUT_MS = 4000;
-export const DEFAULT_LOAD_TIMEOUT_MS = 15000;
+export const DEFAULT_LOAD_TIMEOUT_MS = 12000;
 export const DEFAULT_AGENT_PORT = 58765;
 export const MAX_DEVTOOLS_CONSOLE_ENTRIES = 500;
 export const MAX_DEVTOOLS_NETWORK_ENTRIES = 300;

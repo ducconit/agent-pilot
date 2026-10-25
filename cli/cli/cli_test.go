@@ -224,3 +224,102 @@ func TestVersionCommandAndFlags(t *testing.T) {
 		t.Fatalf("unexpected version --json payload: %#v", parsed)
 	}
 }
+
+func TestOpenWithTabFlagCloseMultipleAndTabsAliases(t *testing.T) {
+	var received []map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request: %v", err)
+			return
+		}
+		received = append(received, req)
+		w.Header().Set("Content-Type", "application/json")
+		method, _ := req["method"].(string)
+		params, _ := req["params"].(map[string]interface{})
+		switch method {
+		case "tabs.listAll":
+			_, _ = w.Write([]byte(`{"success":true,"result":[{"tabId":1734693240,"title":"Tab A","url":"https://jenkins.sphoton.com/a","active":true},{"tabId":1734693246,"title":"Tab B","url":"https://jenkins.sphoton.com/b","active":false}]}`))
+		case "tabs.remove":
+			tid := params["tabId"]
+			_, _ = fmt.Fprintf(w, `{"success":true,"result":{"success":true,"closedTabId":%v}}`, tid)
+		default:
+			_, _ = w.Write([]byte(`{"success":true,"result":{"id":1734693237,"title":"Jenkins","url":"https://jenkins.sphoton.com/job/Dulichso/configure"}}`))
+		}
+	}))
+	defer server.Close()
+
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parse server url: %v", err)
+	}
+	port, err := strconv.Atoi(u.Port())
+	if err != nil {
+		t.Fatalf("parse port: %v", err)
+	}
+	t.Cleanup(func() { _ = config.SetBridgePortOverride(0) })
+
+	runCmd := func(args ...string) (string, error) {
+		oldStdout := os.Stdout
+		rPipe, wPipe, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("os.Pipe: %v", err)
+		}
+		os.Stdout = wPipe
+		root := newRootCommand()
+		root.SetArgs(normalizeLegacyFlags(append(args, "--port", strconv.Itoa(port))))
+		execErr := root.Execute()
+		_ = wPipe.Close()
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, rPipe)
+		return buf.String(), execErr
+	}
+
+	// 1. `open <url> --tab <id>` dispatches `tabs.update` on that tab instead of leaking a new tab
+	outOpen, err := runCmd("open", "https://jenkins.sphoton.com/job/Dulichso/configure", "--tab", "1734693237")
+	if err != nil {
+		t.Fatalf("open --tab failed: %v", err)
+	}
+	if !strings.Contains(outOpen, "[Tab #1734693237]") {
+		t.Fatalf("expected [Tab #1734693237] tag in open output, got: %s", outOpen)
+	}
+	if len(received) != 1 || received[0]["method"] != "tabs.update" {
+		t.Fatalf("expected open --tab to dispatch tabs.update, got: %#v", received)
+	}
+	openParams, _ := received[0]["params"].(map[string]interface{})
+	if openParams["tabId"] != float64(1734693237) || openParams["url"] != "https://jenkins.sphoton.com/job/Dulichso/configure" {
+		t.Fatalf("unexpected open --tab params: %#v", openParams)
+	}
+
+	// 2. `list` and `ls` aliases work for `tabs`
+	outList, err := runCmd("list")
+	if err != nil {
+		t.Fatalf("agent-pilot list alias failed: %v", err)
+	}
+	if !strings.Contains(outList, "[Tab #1734693240]") || !strings.Contains(outList, "[Tab #1734693246]") {
+		t.Fatalf("unexpected list output: %s", outList)
+	}
+
+	// 3. `close <id1> <id2>` closes multiple tabs in order and deduplicates
+	received = nil
+	outCloseMulti, err := runCmd("close", "1734693240", "1734693246", "1734693240")
+	if err != nil {
+		t.Fatalf("close multiple tab IDs failed: %v", err)
+	}
+	if len(received) != 2 || received[0]["method"] != "tabs.remove" || received[1]["method"] != "tabs.remove" {
+		t.Fatalf("expected 2 deduplicated tabs.remove calls, got %d: %#v", len(received), received)
+	}
+	if !strings.Contains(outCloseMulti, "[Tab #1734693240]") || !strings.Contains(outCloseMulti, "[Tab #1734693246]") {
+		t.Fatalf("expected closed tab tags in output, got: %s", outCloseMulti)
+	}
+
+	// 4. `close --all` queries tabs.listAll and closes every open tab in the group
+	received = nil
+	if _, err := runCmd("close", "--all"); err != nil {
+		t.Fatalf("close --all failed: %v", err)
+	}
+	if len(received) != 3 || received[0]["method"] != "tabs.listAll" || received[1]["method"] != "tabs.remove" || received[2]["method"] != "tabs.remove" {
+		t.Fatalf("expected tabs.listAll + 2 tabs.remove calls for close --all, got: %#v", received)
+	}
+}

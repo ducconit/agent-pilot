@@ -315,6 +315,10 @@ func TestDeriveCommandTimeout_PerformanceAndExplicitTimeoutMs(t *testing.T) {
 		t.Fatalf("DeriveCommandTimeout(performance.metrics, timeoutMs=45000) = %d, want 50000", got)
 	}
 
+	if got := DeriveCommandTimeout("page.evaluate", nil, 15000); got != 25000 {
+		t.Fatalf("DeriveCommandTimeout(page.evaluate, nil, 15000) = %d, want 25000", got)
+	}
+
 	if got := DeriveCommandTimeout("page.evaluate", map[string]interface{}{"timeoutMs": 40000}, 15000); got != 45000 {
 		t.Fatalf("DeriveCommandTimeout(page.evaluate, timeoutMs=40000) = %d, want 45000", got)
 	}

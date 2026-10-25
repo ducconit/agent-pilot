@@ -39,8 +39,8 @@ func TestGetTargetBinaryPath(t *testing.T) {
 func TestCandidateBinaryPaths_ByOS(t *testing.T) {
 	linuxPaths := candidateBinaryPaths("linux", "/home/ubuntu", "")
 	expectedLinux := []string{
-		"/home/ubuntu/.local/bin/agent-pilot",
 		"/home/ubuntu/.agk/bin/agent-pilot",
+		"/home/ubuntu/.local/bin/agent-pilot",
 		"/usr/local/bin/agent-pilot",
 	}
 	if strings.Join(linuxPaths, "|") != strings.Join(expectedLinux, "|") {
@@ -49,8 +49,8 @@ func TestCandidateBinaryPaths_ByOS(t *testing.T) {
 
 	darwinPaths := candidateBinaryPaths("darwin", "/Users/dev", "")
 	expectedDarwin := []string{
-		"/Users/dev/.local/bin/agent-pilot",
 		"/Users/dev/.agk/bin/agent-pilot",
+		"/Users/dev/.local/bin/agent-pilot",
 		"/opt/homebrew/bin/agent-pilot",
 		"/usr/local/bin/agent-pilot",
 	}
