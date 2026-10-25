@@ -24,6 +24,7 @@ CÁC LỆNH HỖ TRỢ:
   server [--port 58765]         Khởi chạy Bridge Server nền lắng nghe kết nối từ Extension
   service <action>              Quản lý service chạy ngầm (install, uninstall, start, stop, restart, status)
   skill install [tùy chọn]      Cài skill agent-pilot vào thư mục skills (~/.agents/skills)
+  version [--json|--short]      Hiển thị thông tin phiên bản Agent Pilot CLI
 
 THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT / AGENT):
   snapshot [tùy chọn]           Trích xuất bản đồ phần tử tương tác (@1, @2...) cực nhẹ cho Agent
@@ -77,6 +78,7 @@ TÙY CHỌN BỔ SUNG:
   --max <n>                     Số lượng phần tử tối đa cho snapshot (Mặc định: 80)
   --format <text|json>          Định dạng xuất cho snapshot (Mặc định: text)
   --submit <selector>           Phần tử nút submit sau khi fill form
+  --version, -v                 Hiển thị thông tin phiên bản Agent Pilot CLI
   --help, -h                    Hiển thị hướng dẫn sử dụng này
 
 VÍ DỤ NHANH:

@@ -23,6 +23,7 @@ import (
 	"github.com/ducconit/agent-pilot-extension/cli/mcp"
 	"github.com/ducconit/agent-pilot-extension/cli/service"
 	"github.com/ducconit/agent-pilot-extension/cli/skill"
+	"github.com/ducconit/agent-pilot-extension/cli/version"
 )
 
 // newMCPCommand launches the stdio MCP server. The root command also defaults to
@@ -197,4 +198,50 @@ func newExportMCPCommand() *cobra.Command {
 		fmt.Printf("✅ Đã xuất %d tool schemas MCP thành công vào: %s\n", len(mcp.Tools()), outDir)
 		return nil
 	})
+}
+
+func newVersionCommand() *cobra.Command {
+	cmd := newLeafCommand("version", nil, execVersionCommand)
+	f := cmd.Flags()
+	f.Bool("json", false, "Output version metadata as JSON")
+	f.BoolP("short", "s", false, "Output only the version string (e.g. v1.0.14-beta)")
+	f.String("format", "", "Output format (text|json)")
+	return cmd
+}
+
+func execVersionCommand(args []string) error {
+	cmdArgs, err := parseCmdArgs(args, []FlagDef{
+		{Name: "json", IsBool: true},
+		{Name: "short", Aliases: []string{"s"}, IsBool: true},
+		{Name: "format"},
+		{Name: "help", Aliases: []string{"h"}, IsBool: true},
+	})
+	if err != nil {
+		return fmt.Errorf("❌ Tham số version không hợp lệ: %v", err)
+	}
+	if cmdArgs.Bool("help") || (len(cmdArgs.Positional) > 0 && cmdArgs.Positional[0] == "help") {
+		fmt.Println("Sử dụng: agent-pilot version [--json|--short|--format json]")
+		return nil
+	}
+	if cmdArgs.Bool("json") || strings.EqualFold(cmdArgs.String("format", ""), "json") {
+		payload := map[string]string{
+			"version": version.Raw(),
+			"display": version.String(),
+			"full":    version.Full(),
+			"commit":  version.Commit,
+			"date":    version.Date,
+		}
+		jsonB, mErr := json.MarshalIndent(payload, "", "  ")
+		if mErr != nil {
+			return fmt.Errorf("❌ Lỗi xuất JSON version: %v", mErr)
+		}
+		fmt.Println(string(jsonB))
+		return nil
+	}
+	if cmdArgs.Bool("short") {
+		fmt.Println(version.String())
+		return nil
+	}
+	fmt.Printf("Agent Pilot CLI %s\n", version.Full())
+	return nil
 }

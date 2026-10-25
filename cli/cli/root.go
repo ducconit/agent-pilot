@@ -53,8 +53,8 @@ func Run(args []string) {
 
 // runRoot reproduces the historic no-subcommand behaviour: with a piped stdin it
 // enters the MCP stdio server; interactively it prints the usage text. A stray
-// top-level token (unknown command or flag such as --version) is reported and
-// exits non-zero, while --help/-h prints the usage text and succeeds.
+// top-level token (unknown command or flag) is reported and exits non-zero,
+// while --help/-h prints the usage text and --version/-v prints version info.
 func runRoot(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		stat, err := os.Stdin.Stat()
@@ -68,6 +68,9 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	if args[0] == "--help" || args[0] == "-h" {
 		printUsage()
 		return nil
+	}
+	if args[0] == "--version" || args[0] == "-v" || args[0] == "-version" {
+		return execVersionCommand(args[1:])
 	}
 	fmt.Printf("Lệnh không hợp lệ: %s\n\n", args[0])
 	printUsage()
@@ -229,6 +232,7 @@ func newRootCommand() *cobra.Command {
 		newBatchCommand(),
 		newServerCommand(),
 		newServiceCommand(),
+		newVersionCommand(),
 		newMCPCommand(),
 		newExportMCPCommand(),
 	)
@@ -247,7 +251,7 @@ var legacyLongFlags = []string{
 	"action", "name", "network", "cpu", "theme", "filter", "method", "type", "bridge-port", "instance-id",
 	"limit", "categories", "enabled", "path", "force", "agy", "antigravity",
 	"gc", "port", "step", "step-id", "operation", "index", "title", "url", "steps",
-	"level", "load-timeout",
+	"level", "load-timeout", "version", "json", "short",
 }
 
 // normalizeLegacyFlags rewrites any token that is exactly "-<name>" or starts

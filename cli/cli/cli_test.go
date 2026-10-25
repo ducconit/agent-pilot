@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/ducconit/agent-pilot-extension/cli/config"
+	"github.com/ducconit/agent-pilot-extension/cli/version"
 )
 
 func TestNormalizeJSONNumbersForDisplay_AvoidsScientificNotationForLargeTabID(t *testing.T) {
@@ -161,5 +162,65 @@ func TestConsoleAndMetricsCommandsDispatchExpectedPayloads(t *testing.T) {
 		req4Params["limit"] != float64(15) ||
 		req4Params["tabId"] != float64(1103687583) {
 		t.Fatalf("unexpected network --headers request: %#v", received[3])
+	}
+}
+
+func TestVersionCommandAndFlags(t *testing.T) {
+	origVer, origCommit, origDate := version.Version, version.Commit, version.Date
+	version.Version = "1.0.14-beta"
+	version.Commit = "543152d"
+	version.Date = "2026-10-25T15:18:10Z"
+	t.Cleanup(func() {
+		version.Version = origVer
+		version.Commit = origCommit
+		version.Date = origDate
+	})
+
+	runCapture := func(args ...string) (string, error) {
+		oldStdout := os.Stdout
+		rPipe, wPipe, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("os.Pipe: %v", err)
+		}
+		os.Stdout = wPipe
+		root := newRootCommand()
+		root.SetArgs(normalizeLegacyFlags(args))
+		execErr := root.Execute()
+		_ = wPipe.Close()
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, rPipe)
+		return strings.TrimSpace(buf.String()), execErr
+	}
+
+	wantFull := "Agent Pilot CLI v1.0.14-beta (543152d, 2026-10-25T15:18:10Z)"
+	for _, flagArgs := range [][]string{{"version"}, {"-v"}, {"--version"}, {"-version"}} {
+		out, err := runCapture(flagArgs...)
+		if err != nil {
+			t.Fatalf("args %v failed: %v", flagArgs, err)
+		}
+		if out != wantFull {
+			t.Fatalf("args %v output = %q, want %q", flagArgs, out, wantFull)
+		}
+	}
+
+	shortOut, err := runCapture("version", "--short")
+	if err != nil {
+		t.Fatalf("version --short failed: %v", err)
+	}
+	if shortOut != "v1.0.14-beta" {
+		t.Fatalf("version --short = %q, want v1.0.14-beta", shortOut)
+	}
+
+	jsonOut, err := runCapture("version", "--json")
+	if err != nil {
+		t.Fatalf("version --json failed: %v", err)
+	}
+	var parsed map[string]string
+	if err := json.Unmarshal([]byte(jsonOut), &parsed); err != nil {
+		t.Fatalf("unmarshal version --json: %v (raw: %s)", err, jsonOut)
+	}
+	if parsed["version"] != "1.0.14-beta" || parsed["display"] != "v1.0.14-beta" || parsed["commit"] != "543152d" {
+		t.Fatalf("unexpected version --json payload: %#v", parsed)
 	}
 }
