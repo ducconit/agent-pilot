@@ -247,6 +247,8 @@ func TestOpenWithTabFlagCloseMultipleAndTabsAliases(t *testing.T) {
 				return
 			}
 			_, _ = fmt.Fprintf(w, `{"success":true,"result":{"success":true,"closedTabId":%v}}`, tid)
+		case "page.screenshot":
+			_, _ = w.Write([]byte(`{"success":true,"result":{"dataUrl":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==","annotated":true}}`))
 		default:
 			_, _ = w.Write([]byte(`{"success":true,"result":{"id":1734693237,"title":"Jenkins","url":"https://jenkins.sphoton.com/job/Dulichso/configure"}}`))
 		}
@@ -370,5 +372,35 @@ func TestOpenWithTabFlagCloseMultipleAndTabsAliases(t *testing.T) {
 	expandedLiteralComma := expandKeyArgs([]string{",", "Ctrl+,"})
 	if len(expandedLiteralComma) != 2 || expandedLiteralComma[0] != "," || expandedLiteralComma[1] != "Ctrl+," {
 		t.Fatalf("expandKeyArgs failed to preserve literal comma / Ctrl+,: %#v", expandedLiteralComma)
+	}
+
+	// 7. `screenshot` forwards repeatable --arrow, --callout, --badge, --box, --circle, --icon, --redact, and --spotlight flags
+	received = nil
+	tmpShot := t.TempDir() + "/guide.png"
+	_, err = runCmd(
+		"screenshot", "-o", tmpShot,
+		"--badge", "1:@1:Nhập Email",
+		"--badge", "2:@2:Nhập Mật khẩu",
+		"--arrow", "@1->@2|cyan:Tiếp",
+		"--callout", "@3:Bấm Đăng nhập|green|top",
+		"--box", "#err|red|dashed:Lỗi",
+		"--circle", "#bell|amber",
+		"--icon", "check:@1",
+		"--icon", "click:@3",
+		"--redact", "#token",
+		"--spotlight",
+		"--tab", "1734693237",
+	)
+	if err != nil {
+		t.Fatalf("screenshot with rich annotations failed: %v", err)
+	}
+	if len(received) != 1 || received[0]["method"] != "page.screenshot" {
+		t.Fatalf("expected 1 page.screenshot call, got: %#v", received)
+	}
+	shotParams, _ := received[0]["params"].(map[string]interface{})
+	badgesSlice, _ := shotParams["badges"].([]interface{})
+	iconsSlice, _ := shotParams["icons"].([]interface{})
+	if len(badgesSlice) != 2 || len(iconsSlice) != 2 || shotParams["spotlight"] != true {
+		t.Fatalf("unexpected screenshot annotation params: %#v", shotParams)
 	}
 }

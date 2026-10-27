@@ -903,12 +903,20 @@ func newScreenshotCommand() *cobra.Command {
 			FlagDef{Name: "o", Aliases: []string{"output", "out", "path", "save-path"}},
 			FlagDef{Name: "selector", Aliases: []string{"sel", "s"}},
 			FlagDef{Name: "clip"},
-			FlagDef{Name: "caption", Aliases: []string{"c"}},
+			FlagDef{Name: "caption", Aliases: []string{"c", "text"}},
 			FlagDef{Name: "title"},
 			FlagDef{Name: "description", Aliases: []string{"desc"}},
 			FlagDef{Name: "step"},
-			FlagDef{Name: "caption-pos", Aliases: []string{"caption-position"}},
+			FlagDef{Name: "caption-pos", Aliases: []string{"caption-position", "position", "pos"}},
 			FlagDef{Name: "highlight", Aliases: []string{"highlight-selector"}},
+			FlagDef{Name: "arrow", Aliases: []string{"arrows"}},
+			FlagDef{Name: "callout", Aliases: []string{"callouts"}},
+			FlagDef{Name: "badge", Aliases: []string{"badges"}},
+			FlagDef{Name: "box", Aliases: []string{"boxes", "rect"}},
+			FlagDef{Name: "circle", Aliases: []string{"circles", "ellipse"}},
+			FlagDef{Name: "icon", Aliases: []string{"icons"}},
+			FlagDef{Name: "redact", Aliases: []string{"redactions"}},
+			FlagDef{Name: "spotlight", Aliases: []string{"dim"}, IsBool: true},
 			FlagDef{Name: "timeout"},
 		))
 		if err != nil {
@@ -965,6 +973,30 @@ func newScreenshotCommand() *cobra.Command {
 		if v := cmdArgs.String("highlight", ""); v != "" {
 			extra["highlightSelector"] = v
 		}
+		if vals := cmdArgs.Strings("arrow"); len(vals) > 0 {
+			extra["arrows"] = vals
+		}
+		if vals := cmdArgs.Strings("callout"); len(vals) > 0 {
+			extra["callouts"] = vals
+		}
+		if vals := cmdArgs.Strings("badge"); len(vals) > 0 {
+			extra["badges"] = vals
+		}
+		if vals := cmdArgs.Strings("box"); len(vals) > 0 {
+			extra["boxes"] = vals
+		}
+		if vals := cmdArgs.Strings("circle"); len(vals) > 0 {
+			extra["circles"] = vals
+		}
+		if vals := cmdArgs.Strings("icon"); len(vals) > 0 {
+			extra["icons"] = vals
+		}
+		if vals := cmdArgs.Strings("redact"); len(vals) > 0 {
+			extra["redact"] = vals
+		}
+		if cmdArgs.Bool("spotlight") {
+			extra["spotlight"] = true
+		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -988,6 +1020,14 @@ func newScreenshotCommand() *cobra.Command {
 	f.String("step", "", "Annotation banner step badge (e.g. 1 or 1/7)")
 	f.String("caption-pos", "bottom", "Annotation banner position: bottom|top")
 	f.String("highlight", "", "CSS selector or @ref to highlight on screenshot")
+	f.StringArray("arrow", nil, "Draw arrow to target or between targets (e.g. '@1->@2|red:Label' or '@1')")
+	f.StringArray("callout", nil, "Draw callout label + arrow pointing to target (e.g. '@1:Click here|amber')")
+	f.StringArray("badge", nil, "Draw numbered badge on target (e.g. '1:@1:Enter email')")
+	f.StringArray("box", nil, "Draw rectangle around target (e.g. '@1|red|dashed:Required')")
+	f.StringArray("circle", nil, "Draw circle/ellipse around target (e.g. '@1|green')")
+	f.StringArray("icon", nil, "Draw vector status icon on target (check|error|warn|info|click, e.g. 'check:@1')")
+	f.StringArray("redact", nil, "Mask/redact sensitive element or 'x,y,w,h' region before saving")
+	f.Bool("spotlight", false, "Dim background outside highlighted/annotated elements")
 	f.Int("timeout", 0, "Screenshot timeout in milliseconds")
 	registerInlineWaitPflags(cmd)
 	return cmd

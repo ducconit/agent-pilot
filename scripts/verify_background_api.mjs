@@ -2223,5 +2223,94 @@ record(
   `count=${keySeqRes45.count}, cmds=${rawDownEvents45.slice(0, 2).map((e) => e.commands?.[0]).join(",")}, chars=${JSON.stringify(charEvents45.map((e) => e.text).join(""))}, f5=${comboF5.keyInfo.keyCode}`
 );
 
+// 46. parseAnnotationSpecItem & annotateDataUrlInWorker render arrows, callouts, numbered badges, dashed boxes, circles, vector icons, redactions, and spotlight
+const { parseAnnotationSpecItem } = await import("../extensions/background/screenshot-service.js");
+const parsedArrow46 = parseAnnotationSpecItem("arrow", "@1->@2|red:Chuyển bước");
+const parsedCallout46 = parseAnnotationSpecItem("callout", "ul > li:nth-child(2):Bước 3: Bấm Đăng nhập (CTA)|green|top");
+const parsedBadge46 = parseAnnotationSpecItem("badge", "1:@1:Nhập Email: user@test.com|cyan");
+const parsedBox46 = parseAnnotationSpecItem("box", "#err:not(:disabled)|red|dashed:Lỗi: dữ liệu (bắt buộc)");
+const parsedIcon46 = parseAnnotationSpecItem("icon", "check:@1:Hợp lệ");
+
+const richOps46 = [];
+const prevOffscreen46 = globalThis.OffscreenCanvas;
+const prevBitmap46 = globalThis.createImageBitmap;
+const prevFetch46 = globalThis.fetch;
+globalThis.fetch = async () => ({
+  blob: async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" })
+});
+globalThis.createImageBitmap = async () => ({ width: 1280, height: 720, close: () => {} });
+globalThis.OffscreenCanvas = class MockRichOffscreenCanvas {
+  constructor(w, h) {
+    this.width = w;
+    this.height = h;
+  }
+  getContext() {
+    return {
+      drawImage: () => richOps46.push("drawImage"),
+      save: () => {},
+      restore: () => {},
+      beginPath: () => richOps46.push("beginPath"),
+      moveTo: () => richOps46.push("moveTo"),
+      lineTo: () => richOps46.push("lineTo"),
+      closePath: () => richOps46.push("closePath"),
+      arc: () => richOps46.push("arc"),
+      ellipse: () => richOps46.push("ellipse"),
+      rect: () => richOps46.push("rect"),
+      clip: (rule) => richOps46.push(`clip:${rule}`),
+      fill: () => richOps46.push("fill"),
+      stroke: () => richOps46.push("stroke"),
+      setLineDash: () => richOps46.push("setLineDash"),
+      fillRect: () => richOps46.push("fillRect"),
+      strokeRect: () => richOps46.push("strokeRect"),
+      fillText: (txt) => richOps46.push(`fillText:${txt}`),
+      measureText: (txt) => ({ width: String(txt).length * 8 })
+    };
+  }
+  async convertToBlob() {
+    return new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" });
+  }
+};
+const richAnnRes46 = await annotateDataUrlInWorker("data:image/png;base64,iVBORw0KGgo=", {
+  spotlight: true,
+  redactRects: [{ rect: { x: 20, y: 20, width: 140, height: 30 } }],
+  boxes: [{ rect: { x: 100, y: 100, width: 200, height: 50 }, color: "red", dashed: true, label: "Lỗi dữ liệu" }],
+  circles: [{ rect: { x: 400, y: 100, width: 48, height: 48 }, color: "amber", label: "Chuông" }],
+  arrows: [{ fromRect: { x: 100, y: 100, width: 200, height: 50 }, toRect: { x: 100, y: 220, width: 200, height: 50 }, color: "cyan", label: "Tiếp" }],
+  callouts: [{ rect: { x: 100, y: 340, width: 180, height: 48 }, text: "Bấm Đăng nhập", color: "green", position: "top" }],
+  badges: [{ number: "1", rect: { x: 100, y: 100, width: 200, height: 50 }, label: "Nhập Email", color: "cyan" }],
+  icons: [
+    { type: "check", rect: { x: 100, y: 100, width: 200, height: 50 }, label: "Hợp lệ" },
+    { type: "click", rect: { x: 100, y: 340, width: 180, height: 48 } }
+  ]
+});
+globalThis.OffscreenCanvas = prevOffscreen46;
+globalThis.createImageBitmap = prevBitmap46;
+globalThis.fetch = prevFetch46;
+record(
+  "46. Screenshot annotation engine parses and renders arrows, callouts, badges, dashed boxes, circles, vector icons, redactions, and spotlight",
+  richAnnRes46.annotated === true &&
+    parsedArrow46.from === "@1" &&
+    parsedArrow46.to === "@2" &&
+    parsedArrow46.color === "red" &&
+    parsedArrow46.label === "Chuyển bước" &&
+    parsedCallout46.selector === "ul > li:nth-child(2)" &&
+    parsedCallout46.text === "Bước 3: Bấm Đăng nhập (CTA)" &&
+    parsedCallout46.position === "top" &&
+    parsedBadge46.number === "1" &&
+    parsedBadge46.selector === "@1" &&
+    parsedBadge46.label === "Nhập Email: user@test.com" &&
+    parsedBox46.selector === "#err:not(:disabled)" &&
+    parsedBox46.label === "Lỗi: dữ liệu (bắt buộc)" &&
+    parsedBox46.dashed === true &&
+    parsedIcon46.type === "check" &&
+    richOps46.includes("clip:evenodd") &&
+    richOps46.includes("setLineDash") &&
+    richOps46.includes("ellipse") &&
+    richOps46.includes("arc") &&
+    richOps46.includes("fillText:REDACTED") &&
+    richOps46.includes("fillText:Bấm Đăng nhập"),
+  `annotated=${richAnnRes46.annotated}, ops=${richOps46.length}, hasClip=${richOps46.includes("clip:evenodd")}, hasEllipse=${richOps46.includes("ellipse")}`
+);
+
 recorder.summarize();
 recorder.exitIfFailed();

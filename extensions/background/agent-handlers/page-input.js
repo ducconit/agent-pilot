@@ -561,8 +561,11 @@ export const pageInputHandlers = {
         repeat: params.repeat
       };
       try {
-        if (!attachedTabs.has(tabId)) {
+        const freshlyAttached = !attachedTabs.has(tabId);
+        if (freshlyAttached) {
           await attachDebugger(tabId, client.broadcastFn);
+          // Allow Chrome's debugger infobar layout/focus transition to settle
+          await new Promise(r => setTimeout(r, 45));
         }
         keyRes = await dispatchCdpKeyEvent(tabId, keyInput, params.selector, keyOpts);
       } catch (cdpErr) {

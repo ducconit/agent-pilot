@@ -2,9 +2,49 @@
   "description": "Capture high-resolution PNG screenshot via CDP hardware acceleration (supports background tabs). Defaults to capturing the full visible screen viewport (mode: 'visible'). Supports optional step/title/description banner annotation and element highlight box directly on the PNG without touching page DOM. Supports pre-capture waitMs/waitForSelector/waitForText. Saves to local PNG file by default; set base64: true to return raw base64 dataUrl.",
   "inputSchema": {
     "properties": {
+      "arrows": {
+        "description": "Optional arrows drawn onto screenshot (e.g. ['@1-\u003e@2|red:Next', '@3|amber:Click'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
+      },
+      "badges": {
+        "description": "Optional numbered circular step badges on elements (e.g. ['1:@1:Email', '2:@2:Password'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
+      },
       "base64": {
         "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)",
         "type": "boolean"
+      },
+      "boxes": {
+        "description": "Optional extra highlight rectangles with custom color/dashed/label (e.g. ['@1|red|dashed:Invalid'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
+      },
+      "callouts": {
+        "description": "Optional callout text boxes with arrows pointing to elements (e.g. ['@1:Click to login|green'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
       },
       "caption": {
         "description": "Optional banner title/caption drawn directly onto the screenshot PNG (alias for title)",
@@ -17,6 +57,16 @@
           "top"
         ],
         "type": "string"
+      },
+      "circles": {
+        "description": "Optional circles/ellipses around elements (e.g. ['@1|amber:Notification icon'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
       },
       "clip": {
         "description": "Bounding box coordinates for region mode: { x, y, width, height }",
@@ -71,6 +121,16 @@
         "description": "Optional CSS selector or @ref to highlight with a glowing border on the screenshot",
         "type": "string"
       },
+      "icons": {
+        "description": "Optional vector status icons (check, error, warn, info, click) on elements (e.g. ['check:@1', 'error:#email:Invalid'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
+      },
       "mode": {
         "description": "Capture mode: 'visible' (default full screen viewport), 'full' (entire scrollable page), 'region', or 'element'",
         "type": "string"
@@ -83,6 +143,16 @@
         "description": "Compression quality (1..100) for jpeg/webp formats (default: 85)",
         "type": "integer"
       },
+      "redact": {
+        "description": "Optional selectors or 'x,y,w,h' regions to permanently mask/redact on the screenshot",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
+      },
       "savePath": {
         "description": "Alias for path: output file path to save screenshot image",
         "type": "string"
@@ -94,6 +164,10 @@
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep before capturing screenshot",
         "type": "integer"
+      },
+      "spotlight": {
+        "description": "Dim the background outside highlighted/annotated elements to focus reader attention (default: false)",
+        "type": "boolean"
       },
       "step": {
         "description": "Optional step number or label (e.g. 1 or '1/7') rendered as a badge in the screenshot banner",
@@ -140,9 +214,49 @@
   "name": "browser_screenshot",
   "parameters": {
     "properties": {
+      "arrows": {
+        "description": "Optional arrows drawn onto screenshot (e.g. ['@1-\u003e@2|red:Next', '@3|amber:Click'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
+      },
+      "badges": {
+        "description": "Optional numbered circular step badges on elements (e.g. ['1:@1:Email', '2:@2:Password'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
+      },
       "base64": {
         "description": "Return raw base64 dataUrl in response instead of saving to file (default: false)",
         "type": "boolean"
+      },
+      "boxes": {
+        "description": "Optional extra highlight rectangles with custom color/dashed/label (e.g. ['@1|red|dashed:Invalid'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
+      },
+      "callouts": {
+        "description": "Optional callout text boxes with arrows pointing to elements (e.g. ['@1:Click to login|green'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
       },
       "caption": {
         "description": "Optional banner title/caption drawn directly onto the screenshot PNG (alias for title)",
@@ -155,6 +269,16 @@
           "top"
         ],
         "type": "string"
+      },
+      "circles": {
+        "description": "Optional circles/ellipses around elements (e.g. ['@1|amber:Notification icon'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
       },
       "clip": {
         "description": "Bounding box coordinates for region mode: { x, y, width, height }",
@@ -209,6 +333,16 @@
         "description": "Optional CSS selector or @ref to highlight with a glowing border on the screenshot",
         "type": "string"
       },
+      "icons": {
+        "description": "Optional vector status icons (check, error, warn, info, click) on elements (e.g. ['check:@1', 'error:#email:Invalid'])",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
+      },
       "mode": {
         "description": "Capture mode: 'visible' (default full screen viewport), 'full' (entire scrollable page), 'region', or 'element'",
         "type": "string"
@@ -221,6 +355,16 @@
         "description": "Compression quality (1..100) for jpeg/webp formats (default: 85)",
         "type": "integer"
       },
+      "redact": {
+        "description": "Optional selectors or 'x,y,w,h' regions to permanently mask/redact on the screenshot",
+        "items": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "type": "array"
+      },
       "savePath": {
         "description": "Alias for path: output file path to save screenshot image",
         "type": "string"
@@ -232,6 +376,10 @@
       "sleepMs": {
         "description": "Alias for waitMs: milliseconds to sleep before capturing screenshot",
         "type": "integer"
+      },
+      "spotlight": {
+        "description": "Dim the background outside highlighted/annotated elements to focus reader attention (default: false)",
+        "type": "boolean"
       },
       "step": {
         "description": "Optional step number or label (e.g. 1 or '1/7') rendered as a badge in the screenshot banner",

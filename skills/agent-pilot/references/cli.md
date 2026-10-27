@@ -108,18 +108,25 @@ Batch `actions` must contain objects. For DevTools use `{ "type": "performance_m
 
 Use inline `waitMs`, `waitForSelector`, `waitForText`, or `includeSnapshot` (`--include-snapshot`) on navigation and interaction commands instead of a separate sleep/wait/snapshot command. Batch screenshots (`format: "png" | "jpeg" | "webp"`, `quality: 1..100`) and batch `evaluate` steps with `filePath` (restricted to the workspace or `/tmp`) are written to disk and return file paths rather than raw payloads unless explicitly requested.
 
-## Screenshot annotations (text banner & element highlight box)
+## Screenshot annotations (text banner, arrows, callouts, badges, shapes & icons)
 
-`agent-pilot screenshot` (and batch/MCP `screenshot` steps) can draw a step/title/description banner and a glowing cyan highlight box directly onto the output image (`OffscreenCanvas`) without modifying page DOM:
+`agent-pilot screenshot` (and batch/MCP `screenshot` steps) can draw a step/title/description banner, highlight boxes, circles, directional arrows, text callouts, numbered step badges, vector status icons, spotlight dimming, and redactions directly onto the output image (`OffscreenCanvas`) without modifying page DOM:
 
 - **Text banner flags**:
   - `--step <n|1/7>` (`step`): Step badge rendered on the banner (e.g. `STEP 1/7`).
   - `--title <text>` or `-c` / `--caption <text>` (`title` / `caption`): Bold banner heading.
   - `--description <text>` or `--desc <text>` (`description` / `subtitle`): Multi-line explanation (auto-wrapped up to 3 lines).
   - `--caption-pos <bottom|top>` (`captionPosition: "bottom" | "top"`): Place banner at the bottom (default) or top of the image.
-- **Highlight box flags**:
-  - `--highlight <selector|@ref>` (`highlightSelector` / `highlight`): Draw a translucent fill + `#0ea5e9` border around the target CSS selector or `@ref` (e.g. `--highlight "@1"` or `--highlight "#checkout-btn"`). Automatically scales for `devicePixelRatio` and adjusts coordinates in `element`/`region` capture modes.
-  - `highlightBox: { "x": 100, "y": 200, "width": 300, "height": 80 }` (Batch JSON / MCP): Draw a highlight box at explicit viewport coordinates when no selector is used.
+- **Shapes, arrows, badges & icons** (repeatable flags or `;`-separated; `<target>` accepts `@ref`, CSS selector, or `x,y[,w,h]`; colors: `cyan`, `red`, `green`, `amber`, `purple`, `pink`, `#hex`):
+  - `--highlight <selector|@ref>` (`highlightSelector` / `highlight`): Primary cyan highlight box.
+  - `--box "<target>[|color][|dashed][:label]"` (`boxes`): Extra rectangles (e.g. `--box "@1|red|dashed:Trường bắt buộc"`).
+  - `--circle "<target>[|color][|dashed][:label]"` (`circles`): Circle/ellipse around target (e.g. `--circle "#bell|amber:Thông báo"`).
+  - `--arrow "<from->to|target>[|color][:label]"` (`arrows`): Vector arrow with white halo pointing to `<target>` or from `<from>` to `<to>` (e.g. `--arrow "@1->@2|cyan:Tiếp theo"` or `--arrow "#submit|red:Bấm vào đây"`).
+  - `--callout "<target>:<text>[|color][|top|bottom|left|right]"` (`callouts`): Callout text box + arrow pointing to target edge (e.g. `--callout "@3:Bấm Đăng nhập|green|top"`).
+  - `--badge "<n>:<target>[:label][|color]"` (`badges`): Numbered circular step badge (`1`, `2`, `3`...) at top-left of target (e.g. `--badge "1:@1:Nhập Email" --badge "2:@2:Nhập Mật khẩu"`).
+  - `--icon "<check|error|warn|info|click>:<target>[:label][|color]"` (`icons`): Vector status icon or click-ripple cursor on target (e.g. `--icon "check:@1:Hợp lệ"` `--icon "error:#email:Sai định dạng"` `--icon "click:@3"`).
+  - `--redact "<target>"` (`redact`): Permanently mask sensitive DOM elements or `x,y,w,h` coordinates with a solid `#0f172a` `[REDACTED]` block.
+  - `--spotlight` (`spotlight: true`): Dim the surrounding page (`rgba(15, 23, 42, 0.56)`) while keeping all highlighted/annotated elements bright.
 
 ## Compact DevTools & Virtual WebAuthn workflow
 

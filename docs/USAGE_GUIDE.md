@@ -7,7 +7,7 @@ Chào mừng bạn đến với **Agent Pilot**! Sổ tay này hướng dẫn ch
 ## 1. Hướng Dẫn Cài Đặt Lên Google Chrome
 
 ### Cách A: Cài Đặt Từ Bản Phát Hành ZIP (Khuyên dùng)
-1. Tải bản phát hành mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (ví dụ `agent-pilot-v1.0.15-beta.zip`).
+1. Tải bản phát hành mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) (ví dụ `agent-pilot-v1.0.16-beta.zip`).
 2. Giải nén tệp `.zip` ra một thư mục cố định trên máy tính của bạn.
 3. Mở Google Chrome, truy cập: `chrome://extensions`.
 4. Bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải màn hình.

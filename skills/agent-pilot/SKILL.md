@@ -92,9 +92,13 @@ sequence instead of emitting one tool call per step.
 
 For diagnostics, start with compact output (`detail: "summary"`, `errorsOnly: true`, `excludeStatic: true`) and request full data only for a follow-up investigation. Use `includePreserved: false` (or `navigationId`) on `browser_get_devtools_data` and `browser_list_network_requests` when you only want Console/Network entries from the latest navigation, and pass `msgid` to inspect a single Console message's full arguments/stack trace. Use `includeSnapshot: true` (`--include-snapshot`) on `open`, `navigate`, `click`, `type`, `fill_form`, `upload_file`, `scroll`, `hover`, `drag`, or `press_key` to receive an interactive snapshot in the same round-trip. Save screenshots (`png`, `jpeg`, or `webp` with `quality`) and large `evaluate` outputs (`filePath` / `-o`, scoped to the workspace or `/tmp`) to disk and return paths instead of inline payloads.
 
-When capturing visual evidence or step-by-step QA reports, annotate screenshots directly in the same call without mutating page DOM (`OffscreenCanvas` rendering):
+When capturing visual evidence, user guides, or step-by-step QA reports, annotate screenshots directly in the same call without mutating page DOM (`OffscreenCanvas` rendering):
 - **Write text banner**: `--step "1/5"` (`step`), `--title "..."` or `-c`/`--caption "..."` (`title`/`caption`), `--description "..."` or `--desc "..."` (`description`), and `--caption-pos bottom|top` (`captionPosition: "bottom" | "top"`).
-- **Draw highlight box**: `--highlight "<selector|@ref>"` (`highlightSelector`, e.g. `--highlight "@1"` or `--highlight "#submit-btn"`) or pass explicit `highlightBox: { x, y, width, height }` in Batch/MCP.
+- **Draw shapes, arrows, badges & icons**:
+  - `--highlight "<selector|@ref>"` (`highlightSelector`) or `--box "<target>[|color][|dashed][:label]"` (`boxes`) / `--circle "<target>[|color][:label]"` (`circles`).
+  - `--arrow "<from->to|target>[|color][:label]"` (`arrows`) and `--callout "<target>:<text>[|color][|top|bottom|left|right]"` (`callouts`).
+  - `--badge "<n>:<target>[:label][|color]"` (`badges`, e.g. `--badge "1:@1:Nhập email" --badge "2:@2:Nhập mật khẩu"`).
+  - `--icon "<check|error|warn|info|click>:<target>[:label]"` (`icons`), `--redact "<target>"` (`redact` to mask sensitive fields), and `--spotlight` (`spotlight: true` to dim background outside targets).
 
 ## Bridge
 

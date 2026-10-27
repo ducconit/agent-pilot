@@ -343,6 +343,7 @@ type FlagDef struct {
 
 type FlexibleCmdArgs struct {
 	Flags      map[string]string
+	MultiFlags map[string][]string
 	Positional []string
 }
 
@@ -352,6 +353,7 @@ type FlexibleCmdArgs struct {
 func parseCmdArgs(args []string, allowedFlags []FlagDef) (FlexibleCmdArgs, error) {
 	res := FlexibleCmdArgs{
 		Flags:      make(map[string]string),
+		MultiFlags: make(map[string][]string),
 		Positional: make([]string, 0),
 	}
 
@@ -379,6 +381,7 @@ func parseCmdArgs(args []string, allowedFlags []FlagDef) (FlexibleCmdArgs, error
 					return res, fmt.Errorf("cờ không hợp lệ: %s", parts[0])
 				}
 				res.Flags[def.Name] = parts[1]
+				res.MultiFlags[def.Name] = append(res.MultiFlags[def.Name], parts[1])
 			} else {
 				flagName := strings.TrimLeft(arg, "-")
 				def, ok := lookup[flagName]
@@ -387,11 +390,13 @@ func parseCmdArgs(args []string, allowedFlags []FlagDef) (FlexibleCmdArgs, error
 				}
 				if def.IsBool {
 					res.Flags[def.Name] = "true"
+					res.MultiFlags[def.Name] = append(res.MultiFlags[def.Name], "true")
 				} else {
 					if i+1 >= len(args) {
 						return res, fmt.Errorf("cờ %s yêu cầu một giá trị", arg)
 					}
 					res.Flags[def.Name] = args[i+1]
+					res.MultiFlags[def.Name] = append(res.MultiFlags[def.Name], args[i+1])
 					i++
 				}
 			}
@@ -487,6 +492,25 @@ func (a FlexibleCmdArgs) String(flagName string, defaultVal string) string {
 		return val
 	}
 	return defaultVal
+}
+
+func (a FlexibleCmdArgs) Strings(flagName string) []string {
+	rawVals := a.MultiFlags[flagName]
+	if len(rawVals) == 0 {
+		if single, ok := a.Flags[flagName]; ok && strings.TrimSpace(single) != "" {
+			rawVals = []string{single}
+		}
+	}
+	var out []string
+	for _, v := range rawVals {
+		for _, part := range strings.Split(v, ";") {
+			trimmed := strings.TrimSpace(part)
+			if trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+	}
+	return out
 }
 
 func (a FlexibleCmdArgs) Bool(flagName string) bool {

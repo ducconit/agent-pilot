@@ -275,6 +275,20 @@ agent-pilot screenshot -o /tmp/step-01.png \
 # Using shorthand flags (-c/--caption, --desc, and @ref highlight)
 agent-pilot screenshot -o /tmp/step-02.png --step 2 -c "Bấm Thanh Toán" --desc "Kiểm tra nút CTA" --highlight "@3" --caption-pos top --tab 12345
 
+# Documentation & QA guide screenshot: numbered badges, callout arrow, vector icons, spotlight dimming, and secret redaction
+agent-pilot screenshot -o /tmp/user-guide-login.png \
+  --step "1/3" --title "Hướng dẫn Đăng nhập" --desc "Điền thông tin tài khoản và bấm Đăng nhập" \
+  --spotlight \
+  --badge "1:@1:Nhập Email" \
+  --badge "2:@2:Nhập Mật khẩu" \
+  --callout "@3:Bấm nút Đăng nhập|green|top" \
+  --icon "click:@3" \
+  --box "#error-banner|red|dashed:Cảnh báo lỗi" \
+  --circle "#help-icon|amber:Trợ giúp" \
+  --arrow "@1->@2|cyan" \
+  --redact "#api-token" \
+  --tab 12345
+
 # Capture specific element
 agent-pilot screenshot --mode element --selector ".hero-banner" -o ./banner.png
 
@@ -290,6 +304,14 @@ agent-pilot screenshot --format webp --quality 80 -o /tmp/viewport.webp --tab 12
 | `--description <text>`, `--desc <text>` | `description` / `subtitle` | Multi-line subtitle/description text (auto-wraps up to 3 lines) |
 | `--caption-pos <bottom\|top>` | `captionPosition` | Banner placement: `bottom` (default) or `top` |
 | `--highlight <selector\|@ref>` | `highlightSelector` / `highlight` | Draw a glowing cyan box (`#0ea5e9` border + translucent fill) around the matched DOM element or `@ref` |
+| `--arrow <from->to\|target>[│color][:label]` | `arrows` | Draw a vector arrow pointing to `target` or from `from` to `to` (e.g. `"@1->@2\|red:Tiếp"`) |
+| `--callout <target:text>[│color][│pos]` | `callouts` | Draw a callout label pill + arrow pointing to `target` edge (`pos`: `top\|bottom\|left\|right`) |
+| `--badge <n:target[:label]>[│color]` | `badges` | Draw a circular numbered step badge (`1`, `2`, `3`...) at top-left of `target` |
+| `--box <target>[│color][│dashed][:label]` | `boxes` | Draw custom solid/dashed rectangle(s) around `target` with optional label pill |
+| `--circle <target>[│color][│dashed][:label]` | `circles` | Draw circle/ellipse around `target` with optional label pill |
+| `--icon <type:target[:label]>[│color]` | `icons` | Draw pure vector icon (`check`, `error`/`cross`, `warn`, `info`, `click`) on `target` |
+| `--redact <target>` | `redact` | Permanently mask sensitive element or `x,y,w,h` coordinates with a solid `#0f172a` block |
+| `--spotlight` | `spotlight` | Dim surrounding viewport outside highlighted/annotated elements |
 | *(Batch / MCP JSON only)* | `highlightBox` | Explicit `{ x, y, width, height }` bounding box to highlight on the screenshot |
 
 ---

@@ -79,7 +79,7 @@
 
   const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
     ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
-    : "1.0.15-beta";
+    : "1.0.16-beta";
 
   function resolveTargetElement(selector) {
     if (!selector) return null;
@@ -375,6 +375,8 @@
         viewport: {
           width: window.innerWidth,
           height: window.innerHeight,
+          scrollX: window.scrollX || window.pageXOffset || 0,
+          scrollY: window.scrollY || window.pageYOffset || 0,
           devicePixelRatio: window.devicePixelRatio || 1
         }
       };

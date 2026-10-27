@@ -57,6 +57,18 @@ if (fs.existsSync(skillSourceDir)) {
   }
 }
 
+// Synchronize extensions/ directory -> ~/.agk/extension
+const extSourceDir = path.join(ROOT_DIR, "extensions");
+const targetExtDir = path.join(agkDir, "extension");
+if (fs.existsSync(extSourceDir) && fs.existsSync(targetExtDir)) {
+  try {
+    fs.cpSync(extSourceDir, targetExtDir, { recursive: true });
+    console.log(`✓ Synchronized extension directory -> ${targetExtDir}`);
+  } catch (err) {
+    console.warn("⚠️ Note: Could not copy extension directory to AGK:", err.message);
+  }
+}
+
 function atomicCopyExecutable(src, dest) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const tmp = `${dest}.tmp.${Date.now()}`;

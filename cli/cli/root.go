@@ -252,6 +252,9 @@ var legacyLongFlags = []string{
 	"limit", "categories", "enabled", "path", "force", "agy", "antigravity",
 	"gc", "port", "step", "step-id", "operation", "index", "title", "url", "steps",
 	"level", "load-timeout", "version", "json", "short", "all", "delay", "delay-ms", "repeat",
+	"arrow", "arrows", "callout", "callouts", "badge", "badges", "box", "boxes", "rect",
+	"circle", "circles", "ellipse", "icon", "icons", "redact", "redactions", "spotlight", "dim",
+	"caption", "caption-pos", "caption-position", "position", "pos", "desc", "description", "highlight", "highlight-selector",
 }
 
 // normalizeLegacyFlags rewrites any token that is exactly "-<name>" or starts

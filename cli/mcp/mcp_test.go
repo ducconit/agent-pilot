@@ -488,6 +488,7 @@ func TestBrowserScreenshotSchema(t *testing.T) {
 		"mode", "selector", "clip", "x", "y", "width", "height", "tabId",
 		"path", "savePath", "base64", "caption", "title", "description",
 		"step", "captionPosition", "highlightSelector",
+		"arrows", "callouts", "badges", "boxes", "circles", "icons", "redact", "spotlight",
 		"waitMs", "sleepMs", "waitForSelector", "waitForText",
 	}
 	for _, prop := range expectedProps {

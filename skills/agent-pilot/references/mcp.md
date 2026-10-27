@@ -51,7 +51,7 @@ For a compact DevTools batch, use action objects:
 | Fill several fields | `browser_fill_form` |
 | Click/double-click/type/scroll | `browser_click` (`dblClick: true`), `browser_type`, `browser_scroll` |
 | Upload files | `browser_upload_file` (`via: "auto"` by default; files restricted to workspace or `/tmp`) |
-| Screenshot (`png`/`jpeg`/`webp` + banner/highlight) | `browser_screenshot` (`format`, `quality`, `path`, `step`, `title`/`caption`, `description`, `captionPosition: "bottom"\|"top"`, `highlightSelector` (`@ref` or CSS), `highlightBox`) |
+| Screenshot (`png`/`jpeg`/`webp` + banner/highlight/arrows/badges/icons) | `browser_screenshot` (`format`, `quality`, `path`, `step`, `title`/`caption`, `description`, `captionPosition`, `highlightSelector`, `arrows`, `callouts`, `badges`, `boxes`, `circles`, `icons`, `redact`, `spotlight`) |
 | Console/network/metrics & `msgid` lookup | `browser_get_devtools_data` (`msgid`, `includePreserved`, `navigationId`), `browser_list_network_requests` |
 | Virtual WebAuthn / Passkey testing | `browser_webauthn` (`enable`, `addAuthenticator`, `getCredentials`, `setUserVerified`, `clearCredentials`, `removeAuthenticator`, `disable`) |
 | Trace / Web Vitals / heap | `browser_performance_trace`, `browser_performance_metrics`, `browser_heap_capability`, `browser_take_heapsnapshot`, `browser_analyze_heapsnapshot` |

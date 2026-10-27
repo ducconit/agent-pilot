@@ -33,7 +33,8 @@ async function enableCdpDomains(tabId) {
       sendCdpCommand(tabId, "Network.enable", {}, TIMEOUTS.CDP_DOMAIN_ENABLE_MS).catch((e) => logDebug("Network.enable", e)),
       sendCdpCommand(tabId, "Performance.enable", {}, TIMEOUTS.CDP_DOMAIN_ENABLE_MS).catch((e) => logDebug("Performance.enable", e)),
       sendCdpCommand(tabId, "Page.enable", {}, TIMEOUTS.CDP_DOMAIN_ENABLE_MS).catch((e) => logDebug("Page.enable", e)),
-      sendCdpCommand(tabId, "DOM.enable", {}, TIMEOUTS.CDP_DOMAIN_ENABLE_MS).catch((e) => logDebug("DOM.enable", e))
+      sendCdpCommand(tabId, "DOM.enable", {}, TIMEOUTS.CDP_DOMAIN_ENABLE_MS).catch((e) => logDebug("DOM.enable", e)),
+      sendCdpCommand(tabId, "Emulation.setFocusEmulationEnabled", { enabled: true }, TIMEOUTS.CDP_DOMAIN_ENABLE_MS).catch((e) => logDebug("Emulation.setFocusEmulationEnabled", e))
     ]);
   } catch (err) {
     console.warn("[AgentPilot] Error enabling CDP domains:", err);

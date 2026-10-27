@@ -241,6 +241,9 @@ export async function dispatchCdpKeyEvent(tabId, keyCombo, selector = null, opti
   const rawDelay = Number(options.delayMs ?? options.delay ?? 0);
   const delayMs = Number.isFinite(rawDelay) && rawDelay > 0 ? Math.min(5000, Math.floor(rawDelay)) : 0;
 
+  // Ensure background tabs / unfocused windows treat the page as focused for keyboard input & editing shortcuts
+  await sendCdpCommand(tabId, "Emulation.setFocusEmulationEnabled", { enabled: true }).catch(() => {});
+
   // Focus element first if selector provided
   if (selector) {
     try {

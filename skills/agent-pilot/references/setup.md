@@ -31,7 +31,7 @@ ls ~/.agents/skills/agent-pilot/SKILL.md
 
 ## 2. OS-Specific All-in-One Bundle Installation (Recommended)
 
-Each release provides OS-specific bundles (`agent-pilot-v1.0.15-beta-linux-amd64.zip`, `agent-pilot-v1.0.15-beta-darwin-arm64.zip`, `agent-pilot-v1.0.15-beta-windows-amd64.zip`, plus `arm64`/`amd64` variants) containing:
+Each release provides OS-specific bundles (`agent-pilot-v1.0.16-beta-linux-amd64.zip`, `agent-pilot-v1.0.16-beta-darwin-arm64.zip`, `agent-pilot-v1.0.16-beta-windows-amd64.zip`, plus `arm64`/`amd64` variants) containing:
 - `extensions/` — Chrome/Brave/Edge Manifest V3 unpacked extension
 - `skills/agent-pilot/scripts/agent-pilot` (`agent-pilot.exe` on Windows) — Pre-compiled standalone CLI & MCP server for that OS
 - `install.sh` / `install.ps1` — 1-step automated installer
@@ -41,18 +41,18 @@ Each release provides OS-specific bundles (`agent-pilot-v1.0.15-beta-linux-amd64
 ### Step 1: Run the 1-Step Installer (CLI + Background Service + Skill)
 - **Ubuntu / Linux**:
   ```bash
-  unzip agent-pilot-v1.0.15-beta-linux-amd64.zip -d ~/agent-pilot
-  cd ~/agent-pilot/agent-pilot-v1.0.15-beta-linux-amd64 && ./install.sh
+  unzip agent-pilot-v1.0.16-beta-linux-amd64.zip -d ~/agent-pilot
+  cd ~/agent-pilot/agent-pilot-v1.0.16-beta-linux-amd64 && ./install.sh
   ```
 - **macOS (Apple Silicon / Intel)**:
   ```bash
-  unzip agent-pilot-v1.0.15-beta-darwin-arm64.zip -d ~/agent-pilot
-  cd ~/agent-pilot/agent-pilot-v1.0.15-beta-darwin-arm64 && ./install.sh
+  unzip agent-pilot-v1.0.16-beta-darwin-arm64.zip -d ~/agent-pilot
+  cd ~/agent-pilot/agent-pilot-v1.0.16-beta-darwin-arm64 && ./install.sh
   ```
 - **Windows (PowerShell)**:
   ```powershell
-  Expand-Archive .\agent-pilot-v1.0.15-beta-windows-amd64.zip -DestinationPath "$HOME\agent-pilot"
-  cd "$HOME\agent-pilot\agent-pilot-v1.0.15-beta-windows-amd64"
+  Expand-Archive .\agent-pilot-v1.0.16-beta-windows-amd64.zip -DestinationPath "$HOME\agent-pilot"
+  cd "$HOME\agent-pilot\agent-pilot-v1.0.16-beta-windows-amd64"
   powershell -ExecutionPolicy Bypass -File .\install.ps1
   ```
 

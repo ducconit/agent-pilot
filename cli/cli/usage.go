@@ -69,6 +69,13 @@ TÙY CHỌN BỔ SUNG:
   --description, --desc <text>  Mô tả chi tiết bước test hiển thị trên banner screenshot
   --step <1|1/7>                Badge số thứ tự bước hiển thị trên banner screenshot
   --highlight <selector>        Khoanh vùng nổi bật phần tử DOM trên ảnh screenshot
+  --arrow <from->to|target>     Vẽ mũi tên chỉ hướng lên ảnh screenshot (VD: "@1->@2|red:Chuyển")
+  --callout <target:text>       Vẽ hộp chú thích + mũi tên trỏ vào phần tử (VD: "@1:Bấm Đăng nhập")
+  --badge <n:target:label>      Đánh số bước tròn lên phần tử (VD: "1:@1:Nhập email")
+  --box / --circle <target>     Vẽ khung chữ nhật (nét đứt/đổi màu) hoặc khoanh elip quanh phần tử
+  --icon <type:target:label>    Vẽ icon vector (check|error|warn|info|click, VD: "check:@1")
+  --redact <target>             Tô đen che kín phần tử/vùng thông tin nhạy cảm trên screenshot
+  --spotlight                   Làm tối nền xung quanh để làm nổi bật các vùng được chú thích
   --via <synthetic|cdp|auto>    Backend cho click/drag/upload (upload mặc định: auto = CDP + synthetic fallback)
   --path <dir>                  Thư mục gốc cài skill (mặc định: ~/.agents/skills)
   --agy, --antigravity          Cài skill vào ~/.gemini/config/skills (Antigravity)
