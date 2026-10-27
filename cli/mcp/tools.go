@@ -483,11 +483,14 @@ var mcpTools = []ToolInfo{
 	},
 	{
 		Name:        "browser_press_key",
-		Description: "Dispatch keyboard key event or combination (Enter, Tab, Escape, Control+A, Control+Shift+R...) to active element or selector. Supports inline post-key waitMs/waitForSelector/waitForText and includeSnapshot.",
+		Description: "Dispatch keyboard key event, shortcut combination (Enter, Tab, Escape, F1-F12, Control+A, Control+C, Control+V, Control+X, Control+Z...), or an ordered sequence of keys to the active element or selector. Supports native editing commands (selectAll, copy, paste, cut, undo, redo), delayMs between keys, repeat count, inline post-key waitMs/waitForSelector/waitForText, and includeSnapshot.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"key":             map[string]interface{}{"type": "string", "description": "Key name or combination (e.g., 'Enter', 'Tab', 'Escape', 'Control+A')"},
+				"key":             map[string]interface{}{"type": "string", "description": "Key name, shortcut combination, or comma-separated sequence (e.g., 'Enter', 'Control+A', 'Ctrl+a, Backspace, 1, 2, 3, Enter')"},
+				"keys":            map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Optional ordered array of keys or combinations to press in sequence (e.g., ['Ctrl+a', 'Ctrl+v', '1', '2', '3', 'Enter'])"},
+				"delayMs":         map[string]interface{}{"type": "integer", "description": "Optional delay in milliseconds between keys in a sequence (0..5000, default: 0)"},
+				"repeat":          map[string]interface{}{"type": "integer", "description": "Optional number of times to repeat the key or key sequence (1..100, default: 1)"},
 				"selector":        map[string]interface{}{"type": "string", "description": "Optional target element selector or @ref"},
 				"includeSnapshot": map[string]interface{}{"type": "boolean", "description": "Capture and return an interactive page snapshot after pressing key (default: false)"},
 				"tabId":           map[string]interface{}{"type": "integer", "description": "Target tab ID"},

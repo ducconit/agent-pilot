@@ -143,18 +143,24 @@ async function typeAction(ctx, act) {
   ctx.stepResult.textEntered = res.textEntered;
 }
 
-/** press_key / key — dispatch a key press via the content script. */
+/** press_key / key — dispatch a key press or sequence of keys via the content script. */
 async function pressKeyAction(ctx, act) {
   const targetTabId = await resolveStepTabId(ctx, act);
   if (!targetTabId) throw new Error("No active tab for press_key");
-  await sendTabMessageWithRetry(targetTabId, {
+  const keys = Array.isArray(act.keys) && act.keys.length > 0 ? act.keys : undefined;
+  const primaryKey = act.key || (keys ? keys[0] : "Enter") || "Enter";
+  const res = await sendTabMessageWithRetry(targetTabId, {
     action: "press_key",
-    key: act.key || "Enter",
+    key: primaryKey,
+    keys,
+    delayMs: act.delayMs ?? act.delay,
+    repeat: act.repeat,
     selector: act.selector
   });
   await attachStepSnapshotIfRequested(ctx, targetTabId, act);
   ctx.stepResult.success = true;
-  ctx.stepResult.key = act.key || "Enter";
+  ctx.stepResult.key = res?.key || primaryKey;
+  if (res?.keys) ctx.stepResult.keys = res.keys;
 }
 
 /** scroll / page.scroll — scroll the page by a delta. */

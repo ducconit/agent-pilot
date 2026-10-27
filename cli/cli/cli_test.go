@@ -339,4 +339,36 @@ func TestOpenWithTabFlagCloseMultipleAndTabsAliases(t *testing.T) {
 	if !strings.Contains(outPartial, "[Tab #1734693240]") || !strings.Contains(outPartial, "[Tab #1734693246]") {
 		t.Fatalf("expected both valid tabs to be closed and printed, got: %s", outPartial)
 	}
+
+	// 6. `key` supports multi-key sequences (positional and comma-separated), --delay, --repeat, and preserves literal "," / "Ctrl+,"
+	received = nil
+	outKeys, err := runCmd("key", "Ctrl+a", "Ctrl+v, 1, 2, 3", "Enter", "--delay", "25", "--repeat", "2", "--selector", "#otp", "--tab", "1734693237")
+	if err != nil {
+		t.Fatalf("multi-key command failed: %v", err)
+	}
+	if len(received) != 1 || received[0]["method"] != "page.pressKey" {
+		t.Fatalf("expected 1 page.pressKey call, got: %#v", received)
+	}
+	keyParams, _ := received[0]["params"].(map[string]interface{})
+	rawKeys, ok := keyParams["keys"].([]interface{})
+	if !ok || len(rawKeys) != 6 {
+		t.Fatalf("expected 6 expanded keys in params['keys'], got: %#v", keyParams["keys"])
+	}
+	wantKeys := []string{"Ctrl+a", "Ctrl+v", "1", "2", "3", "Enter"}
+	for i, w := range wantKeys {
+		if rawKeys[i] != w {
+			t.Fatalf("key[%d] = %v, want %s", i, rawKeys[i], w)
+		}
+	}
+	if keyParams["delayMs"] != float64(25) || keyParams["repeat"] != float64(2) || keyParams["selector"] != "#otp" {
+		t.Fatalf("unexpected key params: %#v", keyParams)
+	}
+	if !strings.Contains(outKeys, "Ctrl+a, Ctrl+v, 1, 2, 3, Enter") {
+		t.Fatalf("expected sequence summary in key output, got: %s", outKeys)
+	}
+
+	expandedLiteralComma := expandKeyArgs([]string{",", "Ctrl+,"})
+	if len(expandedLiteralComma) != 2 || expandedLiteralComma[0] != "," || expandedLiteralComma[1] != "Ctrl+," {
+		t.Fatalf("expandKeyArgs failed to preserve literal comma / Ctrl+,: %#v", expandedLiteralComma)
+	}
 }

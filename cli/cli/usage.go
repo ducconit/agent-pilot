@@ -33,7 +33,7 @@ THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT / A
   type <selector> <text>        Gõ phím vào ô nhập liệu (hỗ trợ ref @1 hoặc CSS selector)
   hover <selector>              Di chuột ảo vào phần tử DOM (hỗ trợ ref @1 hoặc CSS selector)
   drag <from> <to>              Kéo thả phần tử, hoặc dùng --from-x/--from-y/--to-x/--to-y cho canvas/game
-  key <keyName>                 Gửi phím đơn hoặc tổ hợp phím (Enter, Tab, Control+A...)
+  key <key1> [key2...]          Gửi phím đơn, tổ hợp phím hoặc chuỗi nhiều phím (Ctrl+A, Ctrl+V, 1, 2, 3, Enter...)
   upload <sel> <file1...>       Tải file từ máy lên ô nhập liệu file input qua CDP
   dialog <accept|dismiss>       Tự động xử lý hộp thoại alert, confirm, prompt
   wait <selector|text>          Chờ selector hoặc text xuất hiện với timeout

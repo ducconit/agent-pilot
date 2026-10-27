@@ -2192,5 +2192,36 @@ record(
   `val=${evalLargeTimeoutVal44}, budget=${savedBudget44}, clamped=${clampedBudget44}, cdpEvalCount=${cdpEvalCount44}, err=${asyncTimeoutErr44?.message}`
 );
 
+// 45. dispatchCdpKeyEvent & page.pressKey support multi-key sequences, native editing commands (selectAll/paste/copy/cut/undo/redo), F1-F12, and Ctrl++
+const { dispatchCdpKeyEvent, parseCdpKeyCombo } = await import("../extensions/background/cdp-input.js");
+attachedTabs.add(945);
+const cdpKeyEvents45 = [];
+globalThis.chrome.debugger.sendCommand = (_target, method, params, cb) => {
+  if (method === "Input.dispatchKeyEvent") {
+    cdpKeyEvents45.push(params);
+  }
+  cb({});
+};
+const comboCtrlPlus = parseCdpKeyCombo("Ctrl++");
+const comboF5 = parseCdpKeyCombo("F5");
+const keySeqRes45 = await dispatchCdpKeyEvent(945, ["Ctrl+a", "Ctrl+v", "1", "2", "3", "Enter"], null, { delayMs: 0 });
+const rawDownEvents45 = cdpKeyEvents45.filter((e) => e.type === "rawKeyDown");
+const charEvents45 = cdpKeyEvents45.filter((e) => e.type === "char");
+cleanupTabResources(945);
+record(
+  "45. dispatchCdpKeyEvent supports multi-key sequence, attaches native editing commands (selectAll/paste), and maps F1-F12 & Ctrl++",
+  keySeqRes45.count === 6 &&
+    rawDownEvents45.length === 6 &&
+    rawDownEvents45[0].commands?.[0] === "selectAll" &&
+    rawDownEvents45[1].commands?.[0] === "paste" &&
+    charEvents45.map((e) => e.text).join("") === "123\r" &&
+    comboCtrlPlus.modifiers === 10 &&
+    comboCtrlPlus.keyInfo.code === "Equal" &&
+    comboCtrlPlus.keyInfo.key === "+" &&
+    comboF5.keyInfo.code === "F5" &&
+    comboF5.keyInfo.keyCode === 116,
+  `count=${keySeqRes45.count}, cmds=${rawDownEvents45.slice(0, 2).map((e) => e.commands?.[0]).join(",")}, chars=${JSON.stringify(charEvents45.map((e) => e.text).join(""))}, f5=${comboF5.keyInfo.keyCode}`
+);
+
 recorder.summarize();
 recorder.exitIfFailed();

@@ -554,16 +554,25 @@ export const pageInputHandlers = {
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
     client.runWithTabLock(tabId, "page.pressKey", async () => {
       let keyRes;
+      const keyInput = Array.isArray(params.keys) && params.keys.length > 0 ? params.keys : (params.key || "Enter");
+      const keyOpts = {
+        keys: Array.isArray(params.keys) ? params.keys : undefined,
+        delayMs: params.delayMs ?? params.delay,
+        repeat: params.repeat
+      };
       try {
         if (!attachedTabs.has(tabId)) {
           await attachDebugger(tabId, client.broadcastFn);
         }
-        keyRes = await dispatchCdpKeyEvent(tabId, params.key || "Enter", params.selector);
+        keyRes = await dispatchCdpKeyEvent(tabId, keyInput, params.selector, keyOpts);
       } catch (cdpErr) {
         console.debug("[AgentPilot] CDP key event failed, falling back to synthetic event:", cdpErr);
         keyRes = await client.sendTabMessageWithRetry(tabId, {
           action: "press_key",
-          key: params.key || "Enter",
+          key: params.key || (Array.isArray(params.keys) ? params.keys[0] : "Enter") || "Enter",
+          keys: Array.isArray(params.keys) ? params.keys : undefined,
+          delayMs: params.delayMs ?? params.delay,
+          repeat: params.repeat,
           code: params.code,
           keyCode: params.keyCode,
           selector: params.selector

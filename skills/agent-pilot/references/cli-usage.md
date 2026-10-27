@@ -176,6 +176,12 @@ agent-pilot type "#email" "user@example.com"
 # Clear field before typing and press Enter afterwards
 agent-pilot type "#search" "agent pilot automation" --clear --enter
 
+# Press a single key, shortcut combination, or an ordered sequence of keys (supports Ctrl+A/C/V/X/Z, F1-F12, digits, symbols)
+agent-pilot key Enter --tab 12345
+agent-pilot key Ctrl+a Backspace 1 2 3 Enter --selector "#otp-input" --delay 30 --tab 12345
+agent-pilot key "Ctrl+a, Ctrl+v, Enter" --selector "#editor" --tab 12345
+agent-pilot key ArrowDown --repeat 5 --delay 20 --tab 12345
+
 # Upload local file(s) to <input type="file"> (CDP first + automatic MAIN-world DataTransfer fallback)
 agent-pilot upload "input[type=file]" ./receipt.png
 agent-pilot upload "#avatar-upload" ./photo1.png ./photo2.jpg --via auto --tab 12345

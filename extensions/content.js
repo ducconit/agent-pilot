@@ -214,7 +214,11 @@
     if (req.eventType && typeof cursor.dispatchKeyEvent === "function") {
       return cursor.dispatchKeyEvent(req.key, req.code, req.keyCode, req.selector, req.eventType, req.modifiers);
     }
-    return cursor.dispatchKey(req.key, req.code, req.keyCode, req.selector);
+    return cursor.dispatchKey(req.key, req.code, req.keyCode, req.selector, {
+      keys: req.keys,
+      delayMs: req.delayMs,
+      repeat: req.repeat
+    });
   };
   const hoverHandler = (req) => cursor.virtualHover(req.selector, { dispatchSynthetic: req.dispatchSynthetic });
   const dragHandler = (req) => cursor.virtualDrag(req.fromSelector || req.from, req.toSelector || req.to, req.steps);

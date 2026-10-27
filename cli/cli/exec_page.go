@@ -654,11 +654,19 @@ func ExecPressKey(key, selector string, tabID interface{}, extra ...map[string]i
 		params["tabId"] = tabID
 	}
 	mergeExtraParams(params, extra...)
+	delete(params, "format")
 	res, err := bridge.DispatchCommand("page.pressKey", params, config.DefaultBridgePort())
 	if err != nil {
 		return err
 	}
-	fmt.Printf("✅ Key dispatched (%s): %v\n", key, normalizeJSONNumbersForDisplay(res))
+	if strings.EqualFold(commandOutputFormat(extra...), "json") {
+		return printCommandResult("json", "", res)
+	}
+	displayKey := key
+	if keys, ok := params["keys"].([]string); ok && len(keys) > 1 {
+		displayKey = strings.Join(keys, ", ")
+	}
+	fmt.Printf("✅ Key dispatched (%s): %s%v\n", displayKey, extractTabTag(res), normalizeJSONNumbersForDisplay(res))
 	return nil
 }
 

@@ -571,10 +571,42 @@ func newDragCommand() *cobra.Command {
 	return cmd
 }
 
+func expandKeyArgs(positional []string) []string {
+	var keys []string
+	for _, raw := range positional {
+		if raw == " " {
+			keys = append(keys, " ")
+			continue
+		}
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
+			continue
+		}
+		if trimmed == "," || strings.HasSuffix(trimmed, "+,") {
+			keys = append(keys, trimmed)
+			continue
+		}
+		if strings.Contains(trimmed, ",") {
+			for _, part := range strings.Split(trimmed, ",") {
+				p := strings.TrimSpace(part)
+				if p != "" {
+					keys = append(keys, p)
+				}
+			}
+			continue
+		}
+		keys = append(keys, trimmed)
+	}
+	return keys
+}
+
 func newKeyCommand() *cobra.Command {
-	cmd := newLeafCommand("key", []string{"press-key"}, func(args []string) error {
+	cmd := newLeafCommand("key", []string{"press-key", "keys"}, func(args []string) error {
 		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
 			FlagDef{Name: "selector", Aliases: []string{"sel", "s"}},
+			FlagDef{Name: "delay", Aliases: []string{"delay-ms"}},
+			FlagDef{Name: "repeat", Aliases: []string{"r"}},
+			FlagDef{Name: "format"},
 			FlagDef{Name: "tab", Aliases: []string{"t"}},
 		))
 		if err != nil {
@@ -586,17 +618,38 @@ func newKeyCommand() *cobra.Command {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
+		delayMs, err := cmdArgs.Int("delay", 0)
+		if err != nil || delayMs < 0 {
+			fmt.Fprintf(os.Stderr, "❌ Error: giá trị delay không hợp lệ: %v\n", cmdArgs.Flags["delay"])
+			return errUsage
+		}
+		repeat, err := cmdArgs.Int("repeat", 1)
+		if err != nil || repeat < 1 {
+			fmt.Fprintf(os.Stderr, "❌ Error: giá trị repeat không hợp lệ: %v\n", cmdArgs.Flags["repeat"])
+			return errUsage
+		}
 		selector := cmdArgs.String("selector", "")
-		if len(cmdArgs.Positional) < 1 {
-			fmt.Println("Sử dụng: agent-pilot key <keyName> [--selector <sel>] [--wait <ms>] [--tab <id>]")
+		keys := expandKeyArgs(cmdArgs.Positional)
+		if len(keys) < 1 {
+			fmt.Println("Sử dụng: agent-pilot key <key1> [key2...] [--selector <sel>] [--delay <ms>] [--repeat <n>] [--format text|json] [--wait <ms>] [--tab <id>]")
 			return errUsage
 		}
 		extra := map[string]interface{}{}
+		if len(keys) > 1 {
+			extra["keys"] = keys
+		}
+		if delayMs > 0 {
+			extra["delayMs"] = delayMs
+		}
+		if repeat > 1 {
+			extra["repeat"] = repeat
+		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
-		if err := ExecPressKey(cmdArgs.Positional[0], selector, tabID, extra); err != nil {
+		extra["format"] = cmdArgs.String("format", "text")
+		if err := ExecPressKey(keys[0], selector, tabID, extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
 		}
@@ -605,6 +658,9 @@ func newKeyCommand() *cobra.Command {
 	f := cmd.Flags()
 	f.StringP("selector", "s", "", "Target element selector")
 	f.String("sel", "", "Alias for --selector")
+	f.Int("delay", 0, "Delay in milliseconds between keys in a sequence")
+	f.IntP("repeat", "r", 1, "Repeat count for the key or key sequence (1..100)")
+	f.String("format", "text", "Output format: text or json")
 	f.IntP("tab", "t", 0, "Target tab ID")
 	registerInlineWaitPflags(cmd)
 	return cmd

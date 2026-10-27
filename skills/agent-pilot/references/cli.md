@@ -26,6 +26,7 @@ agent-pilot open http://127.0.0.1:3000 --include-snapshot --format json
 agent-pilot open http://127.0.0.1:3000/dashboard --tab 123 --format json
 agent-pilot click '#submit' --tab 123 --include-snapshot --format json
 agent-pilot click '#row-1' --dblclick --tab 123 --format json
+agent-pilot key Ctrl+a Backspace 1 2 3 Enter --selector '#otp' --delay 25 --tab 123 --format json
 agent-pilot navigate reload --ignore-cache --tab 123 --format json
 agent-pilot evaluate "(el, v) => el.dataset.id + ':' + v" --arg "@1" --arg "ok" -o /tmp/eval.json --tab 123
 agent-pilot screenshot -o /tmp/step-1.png --step "1/3" --title "Submit form" --desc "Clicked submit button" --highlight "@1" --caption-pos bottom --tab 123

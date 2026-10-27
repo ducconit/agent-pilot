@@ -676,56 +676,210 @@
     return { success: true, scrollX: window.scrollX, scrollY: window.scrollY };
   }
 
+  function splitSyntheticKeyTokens(raw) {
+    if (typeof raw !== "string") return [];
+    const trimmed = raw.trim();
+    if (!trimmed) return raw === " " ? [" "] : [];
+    if (trimmed === "," || /[+]\s*,$/.test(trimmed)) {
+      return [trimmed];
+    }
+    if (trimmed.includes(",")) {
+      return trimmed.split(",").map((p) => p.trim()).filter(Boolean);
+    }
+    return [trimmed];
+  }
+
+  function dispatchSingleKey(target, key = "Enter", code = null, keyCode = null) {
+    let ctrlKey = false, shiftKey = false, altKey = false, metaKey = false;
+    let raw = String(key || "Enter");
+    let trailingPlus = false;
+    if (raw === "+") {
+      trailingPlus = true;
+      raw = "";
+    } else if (raw.endsWith("++")) {
+      trailingPlus = true;
+      raw = raw.slice(0, -2);
+    }
+    const parts = raw ? raw.split("+").map((p) => p.trim()).filter(Boolean) : [];
+    if (trailingPlus) parts.push("+");
+
+    let actualKey = parts.length > 0 ? parts.pop() : "Enter";
+    for (const part of parts) {
+      const p = part.toLowerCase();
+      if (p === "control" || p === "ctrl") ctrlKey = true;
+      else if (p === "shift") shiftKey = true;
+      else if (p === "alt" || p === "option") altKey = true;
+      else if (p === "meta" || p === "cmd" || p === "command" || p === "win") metaKey = true;
+    }
+
+    const lowerActual = actualKey.toLowerCase();
+    if (lowerActual === "space") actualKey = " ";
+    else if (lowerActual === "esc") actualKey = "Escape";
+    else if (lowerActual === "del") actualKey = "Delete";
+    else if (lowerActual === "return") actualKey = "Enter";
+    else if (lowerActual === "up") actualKey = "ArrowUp";
+    else if (lowerActual === "down") actualKey = "ArrowDown";
+    else if (lowerActual === "left") actualKey = "ArrowLeft";
+    else if (lowerActual === "right") actualKey = "ArrowRight";
+    else if (lowerActual === "plus") { actualKey = "+"; shiftKey = true; }
+    else if (lowerActual === "minus") actualKey = "-";
+    else if (lowerActual === "equal") actualKey = "=";
+    else if (lowerActual === "comma") actualKey = ",";
+    else if (lowerActual === "period") actualKey = ".";
+    else if (lowerActual === "slash") actualKey = "/";
+
+    const keyCodeMap = {
+      Enter: 13, Escape: 27, Tab: 9, Backspace: 8, Delete: 46, Insert: 45,
+      ArrowDown: 40, ArrowUp: 38, ArrowLeft: 37, ArrowRight: 39,
+      Home: 36, End: 35, PageUp: 33, PageDown: 34, " ": 32,
+      F1: 112, F2: 113, F3: 114, F4: 115, F5: 116, F6: 117,
+      F7: 118, F8: 119, F9: 120, F10: 121, F11: 122, F12: 123,
+      "-": 189, "_": 189, "=": 187, "+": 187, "[": 219, "{": 219,
+      "]": 221, "}": 221, "\\": 220, "|": 220, ";": 186, ":": 186,
+      "'": 222, "\"": 222, ",": 188, "<": 188, ".": 190, ">": 190,
+      "/": 191, "?": 191, "`": 192, "~": 192
+    };
+    const isAlpha = actualKey.length === 1 && /[a-zA-Z]/.test(actualKey);
+    const isDigit = actualKey.length === 1 && /[0-9]/.test(actualKey);
+    const finalCode = code || (actualKey === " " ? "Space" : isAlpha ? `Key${actualKey.toUpperCase()}` : isDigit ? `Digit${actualKey}` : actualKey);
+    const finalKeyCode = keyCode || keyCodeMap[actualKey] || (actualKey.length === 1 ? actualKey.toUpperCase().charCodeAt(0) : 0);
+    const eventInit = {
+      key: actualKey,
+      code: finalCode,
+      keyCode: finalKeyCode,
+      which: finalKeyCode,
+      ctrlKey,
+      shiftKey,
+      altKey,
+      metaKey,
+      bubbles: true,
+      cancelable: true
+    };
+    const kdEvent = new KeyboardEvent("keydown", eventInit);
+    const notCancelled = target.dispatchEvent(kdEvent);
+    target.dispatchEvent(new KeyboardEvent("keypress", eventInit));
+
+    // Apply synthetic editing behavior when untrusted KeyboardEvent is not cancelled
+    if (notCancelled) {
+      const isTextControl = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+      const isEditable = isTextControl || target.isContentEditable;
+      if ((ctrlKey || metaKey) && !altKey) {
+        const lk = actualKey.toLowerCase();
+        if (lk === "a" && !shiftKey) {
+          if (isTextControl && typeof target.select === "function") {
+            try { target.select(); } catch (_) {}
+          }
+          try { document.execCommand("selectAll", false, null); } catch (_) {}
+        } else if (lk === "c" && !shiftKey) {
+          try { document.execCommand("copy", false, null); } catch (_) {}
+        } else if (lk === "x" && !shiftKey) {
+          try { document.execCommand("cut", false, null); } catch (_) {}
+        } else if (lk === "v" && !shiftKey) {
+          try { document.execCommand("paste", false, null); } catch (_) {}
+        } else if (lk === "z") {
+          try { document.execCommand(shiftKey ? "redo" : "undo", false, null); } catch (_) {}
+        } else if (lk === "y" && !shiftKey) {
+          try { document.execCommand("redo", false, null); } catch (_) {}
+        }
+      } else if (!ctrlKey && !metaKey && !altKey && isEditable) {
+        const proto = (target instanceof HTMLTextAreaElement) ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+        const nativeSetter = isTextControl ? Object.getOwnPropertyDescriptor(proto, "value")?.set : null;
+        const setInputVal = (nextVal, nextCursor) => {
+          if (nativeSetter) nativeSetter.call(target, nextVal);
+          else target.value = nextVal;
+          if (typeof target.setSelectionRange === "function" && typeof nextCursor === "number") {
+            try { target.setSelectionRange(nextCursor, nextCursor); } catch (_) {}
+          }
+          target.dispatchEvent(new Event("input", { bubbles: true }));
+        };
+        if (actualKey.length === 1) {
+          if (isTextControl) {
+            const val = String(target.value || "");
+            const start = typeof target.selectionStart === "number" ? target.selectionStart : val.length;
+            const end = typeof target.selectionEnd === "number" ? target.selectionEnd : val.length;
+            const nextVal = val.slice(0, start) + actualKey + val.slice(end);
+            setInputVal(nextVal, start + 1);
+          } else if (target.isContentEditable) {
+            try { document.execCommand("insertText", false, actualKey); } catch (_) {}
+          }
+        } else if (actualKey === "Backspace" || actualKey === "Delete") {
+          if (isTextControl) {
+            const val = String(target.value || "");
+            const start = typeof target.selectionStart === "number" ? target.selectionStart : val.length;
+            const end = typeof target.selectionEnd === "number" ? target.selectionEnd : val.length;
+            if (start !== end) {
+              setInputVal(val.slice(0, start) + val.slice(end), start);
+            } else if (actualKey === "Backspace" && start > 0) {
+              setInputVal(val.slice(0, start - 1) + val.slice(end), start - 1);
+            } else if (actualKey === "Delete" && start < val.length) {
+              setInputVal(val.slice(0, start) + val.slice(start + 1), start);
+            }
+          } else if (target.isContentEditable) {
+            try { document.execCommand(actualKey === "Backspace" ? "delete" : "forwardDelete", false, null); } catch (_) {}
+          }
+        }
+      }
+    }
+
+    target.dispatchEvent(new KeyboardEvent("keyup", eventInit));
+    if (actualKey === "Enter" && target.form && typeof target.form.requestSubmit === "function") {
+      try {
+        target.form.requestSubmit();
+      } catch (keySubmitErr) {
+        console.debug("[AgentPilot] target.form.requestSubmit failed:", keySubmitErr);
+      }
+    }
+    return { success: true, key: actualKey, modifiers: { ctrlKey, shiftKey, altKey, metaKey } };
+  }
+
   /**
-   * Dispatch keyboard event with support for modifiers (Control+A, Shift+Tab, etc.)
+   * Dispatch keyboard event or sequence of keys with support for modifiers (Control+A, Shift+Tab, etc.)
    */
-  function dispatchKey(key = "Enter", code = null, keyCode = null, selector = null) {
+  async function dispatchKey(key = "Enter", code = null, keyCode = null, selector = null, options = {}) {
     let target = selector ? resolveElement(selector) : null;
     if (!target) {
       target = document.activeElement && document.activeElement !== document.body ? document.activeElement : document.body;
     }
+    if (target && typeof target.focus === "function" && target !== document.body) {
+      try { target.focus(); } catch (_) {}
+    }
+
+    const rawList = Array.isArray(options?.keys) && options.keys.length > 0 ? options.keys : [key];
+    const baseKeys = [];
+    for (const item of rawList) {
+      if (typeof item === "string") {
+        baseKeys.push(...splitSyntheticKeyTokens(item));
+      }
+    }
+    if (baseKeys.length === 0) baseKeys.push("Enter");
+    const parsedRepeat = Number(options?.repeat);
+    const repeatCount = Number.isFinite(parsedRepeat) && parsedRepeat > 1 ? Math.min(100, Math.floor(parsedRepeat)) : 1;
+    const keys = [];
+    for (let r = 0; r < repeatCount; r++) {
+      keys.push(...baseKeys);
+    }
+    const rawDelay = Number(options?.delayMs ?? options?.delay ?? 0);
+    const delayMs = Number.isFinite(rawDelay) && rawDelay > 0 ? Math.min(5000, Math.floor(rawDelay)) : 0;
+
     try {
       setDispatching(true);
-      let ctrlKey = false, shiftKey = false, altKey = false, metaKey = false;
-      let actualKey = key;
-      if (typeof key === "string" && key.includes("+")) {
-        const parts = key.split("+");
-        actualKey = parts.pop().trim();
-        for (const part of parts) {
-          const p = part.trim().toLowerCase();
-          if (p === "control" || p === "ctrl") ctrlKey = true;
-          else if (p === "shift") shiftKey = true;
-          else if (p === "alt") altKey = true;
-          else if (p === "meta" || p === "cmd" || p === "command") metaKey = true;
+      let lastRes = null;
+      for (let i = 0; i < keys.length; i++) {
+        lastRes = dispatchSingleKey(target, keys[i], keys.length === 1 ? code : null, keys.length === 1 ? keyCode : null);
+        if (delayMs > 0 && i < keys.length - 1) {
+          await new Promise((r) => setTimeout(r, delayMs));
         }
       }
-
-      const keyCodeMap = { Enter: 13, Escape: 27, Tab: 9, Backspace: 8, ArrowDown: 40, ArrowUp: 38, ArrowLeft: 37, ArrowRight: 39, Space: 32 };
-      const finalCode = code || (actualKey.length === 1 ? `Key${actualKey.toUpperCase()}` : actualKey);
-      const finalKeyCode = keyCode || keyCodeMap[actualKey] || (actualKey.length === 1 ? actualKey.toUpperCase().charCodeAt(0) : 0);
-      const eventInit = {
-        key: actualKey,
-        code: finalCode,
-        keyCode: finalKeyCode,
-        which: finalKeyCode,
-        ctrlKey,
-        shiftKey,
-        altKey,
-        metaKey,
-        bubbles: true,
-        cancelable: true
-      };
-      target.dispatchEvent(new KeyboardEvent("keydown", eventInit));
-      target.dispatchEvent(new KeyboardEvent("keypress", eventInit));
-      target.dispatchEvent(new KeyboardEvent("keyup", eventInit));
-      if (actualKey === "Enter" && target.form && typeof target.form.requestSubmit === "function") {
-        try {
-          target.form.requestSubmit();
-        } catch (keySubmitErr) {
-          console.debug("[AgentPilot] target.form.requestSubmit failed:", keySubmitErr);
-        }
+      if (keys.length > 1) {
+        return {
+          success: true,
+          key: keys.join(", "),
+          keys,
+          count: keys.length,
+          modifiers: lastRes ? lastRes.modifiers : { ctrlKey: false, shiftKey: false, altKey: false, metaKey: false }
+        };
       }
-      return { success: true, key: actualKey, modifiers: { ctrlKey, shiftKey, altKey, metaKey } };
+      return lastRes;
     } finally {
       setDispatching(false);
     }
