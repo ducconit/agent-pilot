@@ -65,7 +65,7 @@ The Go Bridge daemon provides a high-speed HTTP REST API on port `58765`:
 
 | Method | Endpoint | Description | Request Payload | Response |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Daemon health & connected clients | None | `{"status":"ok","name":"Agent Pilot Go Bridge Server","port":58765,"extensionConnected":true,"clientCount":1,"version":"1.0.14-beta","clients":[{"instanceId":"<id>","browser":"Chromium","os":"linux","isActive":true,"connectedAt":1789295000000}]}` |
+| `GET` | `/health` | Daemon health & connected clients | None | `{"status":"ok","name":"Agent Pilot Go Bridge Server","port":58765,"extensionConnected":true,"clientCount":1,"version":"1.0.15-beta","clients":[{"instanceId":"<id>","browser":"Chromium","os":"linux","isActive":true,"connectedAt":1789295000000}]}` |
 | `POST` | `/api` | Forward any browser RPC command | `{"method":"page.click","params":{...}}` (or `{"action":"...","payload":{...}}`) | `{"success":true,"result":{...}}` |
 | `POST` | `/api/feedback/save` | Channel B: Save feedback to inbox | Feedback payload (JSON) | `{"success":true,"sessionId":"..."}` |
 | `GET` | `/api/feedback/pending` | Channel B: Read pending sessions | `?limit=10&clear=false` | `{"success":true,"sessions":[...]}` |
@@ -136,6 +136,11 @@ Agent Pilot implements a 12-rule Secret Redaction Layer in both Go (`cli/sanitiz
 4. **Auth Tokens**: JWTs (`eyJ...`), Bearer Tokens, OAuth secrets.
 5. **URL Query Params**: `token`, `key`, `secret`, `password`, `apiKey` redacted to `[REDACTED]`.
 6. **JSON Key Redaction**: Recursively redacts keys matching sensitive names (`auth`, `password`, `secret`, `access_token`).
+7. **Bridge Boundary Hardening**:
+   - **WebSocket Origin Policy (`IsWebSocketOriginAllowed`)**: Only accepts `chrome-extension://`, `moz-extension://`, `safari-web-extension://`, or empty non-browser `Origin` headers; blocks `http://localhost:*` / `http://127.0.0.1:*` web pages to prevent Cross-Site WebSocket Hijacking (CSWSH).
+   - **Constant-Time API Key Verification**: Pre-hashes tokens with SHA-256 before `subtle.ConstantTimeCompare` when `AGENT_PILOT_API_KEY` is configured.
+   - **Filesystem Path Containment (`ValidateUploadFilePath`, `ValidateEvalOutputPath`)**: Restricts `page.uploadFile` and `page.evaluate` (`filePath` / `-o`) to the current workspace or OS temp directory (`/tmp`), rejecting symlinks escaping those roots, dot-directories (`.git`, `.ssh`, `.env`, etc.), and executable extensions.
+   - **Evaluation Timeout Cap**: Bounds `page.evaluate` timeouts to `120000ms` (`MaxEvaluateTimeoutMs`) across both the Go bridge and extension background service worker while honoring explicit shorter timeouts.
 
 ---
 

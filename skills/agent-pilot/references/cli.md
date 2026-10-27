@@ -23,11 +23,15 @@ agent-pilot open http://127.0.0.1:3000
 
 # Machine-readable interaction output (add --include-snapshot to get a snapshot in the same round-trip)
 agent-pilot open http://127.0.0.1:3000 --include-snapshot --format json
+agent-pilot open http://127.0.0.1:3000/dashboard --tab 123 --format json
 agent-pilot click '#submit' --tab 123 --include-snapshot --format json
 agent-pilot click '#row-1' --dblclick --tab 123 --format json
-agent-pilot navigate --action reload --ignore-cache --tab 123 --format json
+agent-pilot navigate reload --ignore-cache --tab 123 --format json
 agent-pilot evaluate "(el, v) => el.dataset.id + ':' + v" --arg "@1" --arg "ok" -o /tmp/eval.json --tab 123
+agent-pilot screenshot -o /tmp/step-1.png --step "1/3" --title "Submit form" --desc "Clicked submit button" --highlight "@1" --caption-pos bottom --tab 123
 agent-pilot close --tab 123 --format json
+agent-pilot close 123 124 --format json
+agent-pilot close --all --format json
 agent-pilot emulate --theme dark --format json
 
 # Prefer explicit targeting in multi-agent/browser sessions
@@ -101,7 +105,20 @@ agent-pilot batch flow.json --format json
 
 Batch `actions` must contain objects. For DevTools use `{ "type": "performance_metrics" }`, `{ "type": "performance_trace", "action": "start" }`, `{ "type": "performance_trace", "action": "stop" }`, or `{ "type": "heap_snapshot" }`; unsupported heap capture reports `HEAPPROFILER_UNAVAILABLE` rather than a fake fallback.
 
-Use inline `waitMs`, `waitForSelector`, `waitForText`, or `includeSnapshot` (`--include-snapshot`) on navigation and interaction commands instead of a separate sleep/wait/snapshot command. Batch screenshots (`format: "png" | "jpeg" | "webp"`, `quality: 1..100`) and batch `evaluate` steps with `filePath` are written to disk and return file paths rather than raw payloads unless explicitly requested.
+Use inline `waitMs`, `waitForSelector`, `waitForText`, or `includeSnapshot` (`--include-snapshot`) on navigation and interaction commands instead of a separate sleep/wait/snapshot command. Batch screenshots (`format: "png" | "jpeg" | "webp"`, `quality: 1..100`) and batch `evaluate` steps with `filePath` (restricted to the workspace or `/tmp`) are written to disk and return file paths rather than raw payloads unless explicitly requested.
+
+## Screenshot annotations (text banner & element highlight box)
+
+`agent-pilot screenshot` (and batch/MCP `screenshot` steps) can draw a step/title/description banner and a glowing cyan highlight box directly onto the output image (`OffscreenCanvas`) without modifying page DOM:
+
+- **Text banner flags**:
+  - `--step <n|1/7>` (`step`): Step badge rendered on the banner (e.g. `STEP 1/7`).
+  - `--title <text>` or `-c` / `--caption <text>` (`title` / `caption`): Bold banner heading.
+  - `--description <text>` or `--desc <text>` (`description` / `subtitle`): Multi-line explanation (auto-wrapped up to 3 lines).
+  - `--caption-pos <bottom|top>` (`captionPosition: "bottom" | "top"`): Place banner at the bottom (default) or top of the image.
+- **Highlight box flags**:
+  - `--highlight <selector|@ref>` (`highlightSelector` / `highlight`): Draw a translucent fill + `#0ea5e9` border around the target CSS selector or `@ref` (e.g. `--highlight "@1"` or `--highlight "#checkout-btn"`). Automatically scales for `devicePixelRatio` and adjusts coordinates in `element`/`region` capture modes.
+  - `highlightBox: { "x": 100, "y": 200, "width": 300, "height": 80 }` (Batch JSON / MCP): Draw a highlight box at explicit viewport coordinates when no selector is used.
 
 ## Compact DevTools & Virtual WebAuthn workflow
 

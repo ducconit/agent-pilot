@@ -103,7 +103,7 @@ agent-pilot busy off
 
 ---
 
-## 4. Browser Navigation & Tabs (`open`, `navigate`, `close`, `tabs`)
+## 4. Browser Navigation & Tabs (`open`, `navigate`, `close`, `tabs`, `version`)
 
 ```bash
 # Open a new URL in background inside the 🤖 Agent Pilot tab group (active=false by default)
@@ -112,21 +112,37 @@ agent-pilot open https://example.com
 # Open URL and make it the active tab
 agent-pilot open https://example.com --active
 
+# Navigate an existing tab in-place using open --tab (instead of opening a new tab)
+agent-pilot open https://example.com/settings --tab 12345
+
 # Open or navigate to a Basic Auth protected staging URL (safely encodes @, &, :, # in credentials)
 agent-pilot open https://staging.example.com --user admin --password "p@ss&&word!"
 agent-pilot navigate https://staging.example.com/checkout --user admin --password "p@ss&&word!" --tab 12345
 
 # Rich navigation: history back/forward, cache-bypassing reload, initScript, beforeunload auto-handling, and inline snapshot
+agent-pilot navigate reload --ignore-cache --tab 12345
+agent-pilot navigate back --tab 12345
+agent-pilot navigate forward --tab 12345
 agent-pilot navigate --action reload --ignore-cache --tab 12345
-agent-pilot navigate --action back --tab 12345
-agent-pilot navigate --action forward --tab 12345
 agent-pilot navigate https://example.com/app --init-script "window.__E2E__ = true;" --beforeunload accept --include-snapshot --tab 12345
 
-# Close the current or specified Agent tab when testing is done to free RAM
-agent-pilot close [--tab <id>]
+# Close the current tab, a specific tab, multiple tabs, or all tabs in the 🤖 Agent Pilot group
+agent-pilot close
+agent-pilot close 12345
+agent-pilot close --tab 12345
+agent-pilot close 12345 12346 12347
+agent-pilot close --all
+agent-pilot tabs close --all
 
-# List all open tabs across all browser windows
+# List all open tabs in the 🤖 Agent Pilot group (Aliases: list, list-tabs, ls)
 agent-pilot tabs
+agent-pilot list --format json
+agent-pilot ls
+
+# Display CLI version information
+agent-pilot version
+agent-pilot version --json
+agent-pilot --version
 
 # Machine-readable results for scripts and agents
 agent-pilot open https://example.com --format json
@@ -232,7 +248,7 @@ agent-pilot evaluate -f ./scripts/extract-table.js -o /tmp/table-data.json --tab
 
 > Engine: CDP `Page.captureScreenshot`. CDP is **required for background tabs**; the active tab can fall back to `chrome.tabs.captureVisibleTab`.
 
-Capture high-resolution PNG screenshots via Chrome DevTools Protocol. Supports built-in visual annotations (`--step`, `--title`, `--description`, `--highlight`) rendered directly onto the PNG via `OffscreenCanvas` before saving. When `-o` is omitted, screenshots are saved by default into the OS temporary directory (`os.TempDir()`, e.g., `/tmp/screenshot_<timestamp>.png`) so home and project directories stay clean:
+Capture high-resolution PNG/JPEG/WebP screenshots via Chrome DevTools Protocol. Supports built-in visual annotations (`--step`, `--title`/`--caption`, `--description`/`--desc`, `--caption-pos`, `--highlight`) rendered directly onto the image via `OffscreenCanvas` before saving—without mutating the live page DOM. When `-o` is omitted, screenshots are saved by default into the OS temporary directory (`os.TempDir()`, e.g., `/tmp/screenshot_<timestamp>.png`) so home and project directories stay clean:
 
 ```bash
 # Capture visible viewport (saved to OS temp directory by default)
@@ -241,20 +257,34 @@ agent-pilot screenshot
 # Capture visible viewport to a specific file path
 agent-pilot screenshot -o ./viewport.png
 
-# Capture annotated step screenshot with banner and highlighted element
+# Capture annotated step screenshot with text banner and highlighted element (@ref or CSS selector)
 agent-pilot screenshot -o /tmp/step-01.png \
-  --step 1 \
+  --step "1/5" \
   --title "Chọn gói dịch vụ" \
   --description "Khách hàng chọn gói chụp và bấm Thêm vào giỏ hàng" \
-  --highlight "[data-testid='package-card']"
+  --caption-pos bottom \
+  --highlight "[data-testid='package-card']" \
+  --tab 12345
+
+# Using shorthand flags (-c/--caption, --desc, and @ref highlight)
+agent-pilot screenshot -o /tmp/step-02.png --step 2 -c "Bấm Thanh Toán" --desc "Kiểm tra nút CTA" --highlight "@3" --caption-pos top --tab 12345
 
 # Capture specific element
 agent-pilot screenshot --mode element --selector ".hero-banner" -o ./banner.png
 
 # Capture specific screen region or save as compressed WebP/JPEG
-agent-pilot screenshot --mode region -o ./region.png
+agent-pilot screenshot --mode region --clip "0,0,800,600" -o ./region.png
 agent-pilot screenshot --format webp --quality 80 -o /tmp/viewport.webp --tab 12345
 ```
+
+| Annotation / Capture Flag | Batch / MCP Field | Description |
+| :--- | :--- | :--- |
+| `--step <n\|1/7>` | `step` | Step badge drawn in the banner header (e.g. `STEP 1` or `STEP 1/7`) |
+| `--title <text>`, `-c`, `--caption <text>` | `title` / `caption` | Bold banner title text |
+| `--description <text>`, `--desc <text>` | `description` / `subtitle` | Multi-line subtitle/description text (auto-wraps up to 3 lines) |
+| `--caption-pos <bottom\|top>` | `captionPosition` | Banner placement: `bottom` (default) or `top` |
+| `--highlight <selector\|@ref>` | `highlightSelector` / `highlight` | Draw a glowing cyan box (`#0ea5e9` border + translucent fill) around the matched DOM element or `@ref` |
+| *(Batch / MCP JSON only)* | `highlightBox` | Explicit `{ x, y, width, height }` bounding box to highlight on the screenshot |
 
 ---
 
