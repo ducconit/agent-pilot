@@ -10,10 +10,13 @@
   if (window.__AP_INTERNAL__.__guards.fsHud) return;
   window.__AP_INTERNAL__.__guards.fsHud = true;
 
-  // 1. Create Floating HUD Toolbar DOM Element
+  // 1. Create Floating HUD Toolbar DOM Element in memory (mounted lazily when Feedback Studio starts)
+  const existingHud = document.getElementById("agent-pilot-feedback-hud");
+  if (existingHud) existingHud.remove();
   const hud = document.createElement("div");
   hud.id = "agent-pilot-feedback-hud";
   hud.className = "agent-pilot-feedback-hud hidden";
+  hud.style.display = "none";
   hud.innerHTML = `
     <div class="ap-hud-drag-handle">
       <span class="ap-hud-badge">✏️ CHÚ THÍCH UI</span>
@@ -34,7 +37,20 @@
       <div role="button" tabindex="0" class="ap-hud-close-btn" id="ap-hud-btn-close" title="Thoát chế độ chú thích UI">✕ Thoát</div>
     </div>
   `;
-  document.documentElement.appendChild(hud);
+
+  function canMountUi() {
+    return !window.__AP_INTERNAL__.isHtmlDocument || window.__AP_INTERNAL__.isHtmlDocument();
+  }
+
+  function ensureMounted() {
+    if (!canMountUi()) return false;
+    if (!hud.isConnected) {
+      const stale = document.getElementById("agent-pilot-feedback-hud");
+      if (stale && stale !== hud) stale.remove();
+      (document.body || document.documentElement).appendChild(hud);
+    }
+    return true;
+  }
 
   // Make HUD draggable
   const constants = window.__AP_INTERNAL__.feedbackStudio.constants;
@@ -57,13 +73,13 @@
     const count = items.length;
     const text = `${count} vị trí`;
 
-    const hudItemCount = document.getElementById("ap-hud-item-count");
+    const hudItemCount = hud.querySelector("#ap-hud-item-count") || document.getElementById("ap-hud-item-count");
     if (hudItemCount) hudItemCount.textContent = text;
 
-    const hudListCount = document.getElementById("ap-hud-list-count");
+    const hudListCount = hud.querySelector("#ap-hud-list-count") || document.getElementById("ap-hud-list-count");
     if (hudListCount) hudListCount.textContent = String(count);
 
-    const listTotalCount = document.getElementById("ap-list-total-count");
+    const listTotalCount = window.__AP_INTERNAL__.feedbackStudio.modals?.listModal?.querySelector("#ap-list-total-count") || document.getElementById("ap-list-total-count");
     if (listTotalCount) listTotalCount.textContent = String(count);
 
     // Sync with side panel
@@ -91,15 +107,19 @@
   }
 
   function showHud() {
+    if (!ensureMounted()) return;
     hud.classList.remove("hidden");
+    hud.style.display = "flex";
   }
 
   function hideHud() {
     hud.classList.add("hidden");
+    hud.style.display = "none";
   }
 
   window.__AP_INTERNAL__.feedbackStudio.hud = {
     hud,
+    ensureMounted,
     updateCounters,
     setMode,
     showHud,

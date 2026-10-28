@@ -79,7 +79,7 @@
 
   const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
     ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
-    : "1.2.0";
+    : "1.2.1";
 
   function resolveTargetElement(selector) {
     if (!selector) return null;

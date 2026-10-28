@@ -31,7 +31,7 @@ ls ~/.agents/skills/agent-pilot/SKILL.md
 
 ## 2. OS-Specific All-in-One Bundle Installation (Recommended)
 
-Each release provides 3 OS-specific bundles (`agent-pilot-v1.2.0-linux.zip`, `agent-pilot-v1.2.0-macos.zip`, `agent-pilot-v1.2.0-windows.zip`) containing:
+Each release provides 3 OS-specific bundles (`agent-pilot-v1.2.1-linux.zip`, `agent-pilot-v1.2.1-macos.zip`, `agent-pilot-v1.2.1-windows.zip`) containing:
 - `extensions/` — Chrome/Brave/Edge Manifest V3 unpacked extension
 - `skills/agent-pilot/scripts/agent-pilot` (`agent-pilot.exe` on Windows) — Pre-compiled standalone CLI & MCP server for that OS
 - `install.sh` / `install.ps1` — 1-step automated installer
@@ -41,18 +41,18 @@ Each release provides 3 OS-specific bundles (`agent-pilot-v1.2.0-linux.zip`, `ag
 ### Step 1: Run the 1-Step Installer (CLI + Background Service + Skill)
 - **Ubuntu / Linux**:
   ```bash
-  unzip agent-pilot-v1.2.0-linux.zip -d ~/agent-pilot
-  cd ~/agent-pilot/agent-pilot-v1.2.0-linux && ./install.sh
+  unzip agent-pilot-v1.2.1-linux.zip -d ~/agent-pilot
+  cd ~/agent-pilot/agent-pilot-v1.2.1-linux && ./install.sh
   ```
 - **macOS (Apple Silicon)**:
   ```bash
-  unzip agent-pilot-v1.2.0-macos.zip -d ~/agent-pilot
-  cd ~/agent-pilot/agent-pilot-v1.2.0-macos && ./install.sh
+  unzip agent-pilot-v1.2.1-macos.zip -d ~/agent-pilot
+  cd ~/agent-pilot/agent-pilot-v1.2.1-macos && ./install.sh
   ```
 - **Windows (PowerShell)**:
   ```powershell
-  Expand-Archive .\agent-pilot-v1.2.0-windows.zip -DestinationPath "$HOME\agent-pilot"
-  cd "$HOME\agent-pilot\agent-pilot-v1.2.0-windows"
+  Expand-Archive .\agent-pilot-v1.2.1-windows.zip -DestinationPath "$HOME\agent-pilot"
+  cd "$HOME\agent-pilot\agent-pilot-v1.2.1-windows"
   powershell -ExecutionPolicy Bypass -File .\install.ps1
   ```
 
@@ -193,3 +193,19 @@ In Cursor Settings -> Features -> MCP Servers -> Add New MCP Server:
   2. For `click`/`drag`, use `--via auto` (CDP first, automatic synthetic fallback) or the default synthetic mode for regular DOM pages.
   3. Commands that are inherently CDP-based (`upload`, `dialog`, `emulate`, `resize`, `network`, `trace`, `metrics`, `heap`, background-tab `screenshot`) cannot run without debugger access — use an unrestricted profile.
   4. Remember: synthetic input cannot cross cross-origin iframes or drive canvas/WebGL apps; on those targets CDP access is required.
+
+### Issue 5: Headless Linux / CI (`--load-extension is not allowed in Google Chrome`)
+* **Root Cause**: Starting from Google Chrome Stable v137, consumer Chrome builds ignore the `--load-extension` CLI flag (`WARNING: ... --load-extension is not allowed in Google Chrome, ignoring.`).
+* **Fix**:
+  1. On headless Linux / CI-CD machines where you cannot manually click **Load unpacked** in `chrome://extensions`, use **Google Chrome for Testing** or **Chromium** (and set `CHROME_BIN=/path/to/chrome-for-testing` if not on `PATH`).
+  2. Chrome for Testing also enables experimental CDP features such as `Page.startScreenRecording` (`agent-pilot devtools video-start`) and full isolated contexts (`agent-pilot devtools context-create`).
+
+### Issue 6: `this developer build has no embedded DevTools runtime` on `video-start` / `context-create`
+* **Root Cause**: Either the binary was compiled with bare `go build` without running `npm ci && npm run build:cli`, or an older background bridge daemon (`agent-pilot server`) is still holding port `58765` after a binary upgrade.
+* **Fix**:
+  ```bash
+  # 1. Rebuild with embedded DevTools runtime (or install from the official OS release bundle)
+  npm ci && npm run build:cli && npm run sync:mcp
+  # 2. Restart the background service so the active daemon on port 58765 uses the new binary
+  agent-pilot service restart
+  ```

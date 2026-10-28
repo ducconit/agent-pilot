@@ -55,6 +55,9 @@
   }
 
   function showLockOverlay(action = "") {
+    if (window.__AP_INTERNAL__.isHtmlDocument && !window.__AP_INTERNAL__.isHtmlDocument()) {
+      return;
+    }
     if (!lockOverlayEl || !lockOverlayEl.isConnected) {
       const existingOverlay = document.getElementById("agent-pilot-lock-overlay");
       if (existingOverlay) {
@@ -63,6 +66,7 @@
         if (!lockOverlayEl) {
           lockOverlayEl = document.createElement("div");
           lockOverlayEl.id = "agent-pilot-lock-overlay";
+          lockOverlayEl.style.display = "none";
         }
         (document.body || document.documentElement).appendChild(lockOverlayEl);
       }

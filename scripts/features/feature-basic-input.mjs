@@ -6,25 +6,28 @@
  * records its own result via ctx.record, exactly as the inline code did.
  */
 export async function run({ page, record }) {
-  // 2. Content Script Injected
+  // 2. Content Script Injected (with lazy overlay mounting: no DOM pollution on initial load)
   const domCheck = await page.evaluate(() => {
     return {
-      cursorLayer: !!document.getElementById("agent-pilot-cursor-layer"),
-      inspectorBox: !!document.getElementById("agent-pilot-inspector-box"),
+      cursorLayerMountedOnLoad: !!document.getElementById("agent-pilot-cursor-layer"),
+      inspectorBoxMountedOnLoad: !!document.getElementById("agent-pilot-inspector-box"),
+      feedbackHudMountedOnLoad: !!document.getElementById("agent-pilot-feedback-hud"),
       bridgeReady: !!window.__AGENT_PILOT__,
       version: window.__AGENT_PILOT__?.version
     };
   });
-  record("2. Content Script Injected into Web Page", domCheck.cursorLayer && domCheck.bridgeReady, `Cursor Layer: ${domCheck.cursorLayer}, Bridge: v${domCheck.version}`);
+  const cleanInitialDom = !domCheck.cursorLayerMountedOnLoad && !domCheck.inspectorBoxMountedOnLoad && !domCheck.feedbackHudMountedOnLoad;
+  record("2. Content Script Injected into Web Page", cleanInitialDom && domCheck.bridgeReady, `Clean Initial DOM: ${cleanInitialDom}, Bridge: v${domCheck.version}`);
 
-  // 3. Virtual mouse movement
+  // 3. Virtual mouse movement (mounts cursor layer on demand)
   const moveRes = await page.evaluate(async () => {
     await window.__AGENT_PILOT__.moveMouse(350, 220, 150);
+    const cursorLayer = !!document.getElementById("agent-pilot-cursor-layer");
     const coords = document.getElementById("agent-pilot-coords")?.textContent;
     const pos = await window.__AGENT_PILOT__.getCursorPosition();
-    return { coords, pos };
+    return { cursorLayer, coords, pos };
   });
-  const moveOk = moveRes.pos?.x === 350 && moveRes.pos?.y === 220;
+  const moveOk = moveRes.cursorLayer && moveRes.pos?.x === 350 && moveRes.pos?.y === 220;
   record("3. Virtual Mouse Movement & Floating Coordinates", moveOk, `Target: (350, 220) | Actual: (${moveRes.pos?.x}, ${moveRes.pos?.y}), Badge: ${moveRes.coords}`);
 
   // 4. Virtual mouse click on a real button

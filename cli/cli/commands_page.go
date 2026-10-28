@@ -33,6 +33,9 @@ func newOpenCommand() *cobra.Command {
 		cmdArgs, err := parseCmdArgs(args, withInlineWaitFlags(
 			FlagDef{Name: "tab", Aliases: []string{"t"}},
 			FlagDef{Name: "active", IsBool: true},
+			FlagDef{Name: "context-id", Aliases: []string{"context"}},
+			FlagDef{Name: "isolated-context", Aliases: []string{"isolated"}},
+			FlagDef{Name: "headless", IsBool: true},
 			FlagDef{Name: "username", Aliases: []string{"user", "u"}},
 			FlagDef{Name: "password", Aliases: []string{"pass"}},
 			FlagDef{Name: "init-script"},
@@ -45,7 +48,7 @@ func newOpenCommand() *cobra.Command {
 			return errUsage
 		}
 		if len(cmdArgs.Positional) < 1 {
-			fmt.Println("Sử dụng: agent-pilot open <url> [--tab <id>] [--active] [--format json] [--timeout <ms>] [--user <username>] [--password <password>] [--init-script <js>] [--beforeunload accept|decline] [--include-snapshot] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
+			fmt.Println("Sử dụng: agent-pilot open <url> [--tab <id>] [--active] [--context <contextId>] [--isolated <name>] [--headless] [--format json] [--timeout <ms>] [--user <username>] [--password <password>] [--init-script <js>] [--beforeunload accept|decline] [--include-snapshot] [--wait <ms>] [--wait-for <selector>] [--wait-text <text>]")
 			return errUsage
 		}
 		tabID, err := cmdArgs.TabID()
@@ -64,6 +67,15 @@ func newOpenCommand() *cobra.Command {
 		}
 		if _, hasActive := cmdArgs.Flags["active"]; hasActive {
 			extra["explicitActive"] = true
+		}
+		if cid := cmdArgs.String("context-id", ""); cid != "" {
+			extra["contextId"] = cid
+		}
+		if ic := cmdArgs.String("isolated-context", ""); ic != "" {
+			extra["isolatedContext"] = ic
+		}
+		if _, hasHeadless := cmdArgs.Flags["headless"]; hasHeadless {
+			extra["headless"] = cmdArgs.Bool("headless")
 		}
 		if u := cmdArgs.String("username", ""); u != "" {
 			extra["username"] = u

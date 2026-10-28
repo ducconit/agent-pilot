@@ -26,11 +26,19 @@ export async function performanceTrace(page, key, options) {
     const filePath = await outputPath(requested, requested?.endsWith(".gz") ? ".json.gz" : ".json", "trace");
     await fs.access(filePath).then(() => { throw new Error(`File exists: ${filePath}`); }, error => { if (error.code !== "ENOENT") throw error; });
     const categories = options.categories ? options.categories.split(",").map(c => c.trim()) : ["-*", "devtools.timeline", "v8.execute", "blink.user_timing", "loading", "latencyInfo", "disabled-by-default-devtools.timeline", "disabled-by-default-devtools.timeline.frame", "disabled-by-default-devtools.timeline.stack", "disabled-by-default-v8.cpu_profiler"];
+    const client = page.mainFrame()?.client || page._client?.();
+    if (client) {
+      await client.send("Page.enable", {}).catch(() => {});
+      await client.send("Page.setLifecycleEventsEnabled", { enabled: true }).catch(() => {});
+    }
     await page.tracing.start({ categories });
     activeTrace = { key, filePath, started: Date.now() };
     if (options.reload) {
       try {
         if (options.ignoreCache) await page.setCacheEnabled(false);
+        // Let TracingStartedInBrowser settle before the navigation commit event
+        // so Lighthouse TraceProcessor always precedes NavigationStart in time.
+        await new Promise(resolve => setTimeout(resolve, 60));
         await page.reload({ waitUntil: "load" });
       } catch (error) {
         await page.tracing.stop().catch(() => {}); activeTrace = null; throw error;

@@ -107,6 +107,10 @@ func TestConsoleAndMetricsCommandsDispatchExpectedPayloads(t *testing.T) {
 	root4.SetArgs([]string{"network", "--headers", "--limit", "15", "--tab", "1103687583", "--port", strconv.Itoa(port)})
 	err4 := root4.Execute()
 
+	root5 := newRootCommand()
+	root5.SetArgs([]string{"open", "https://example.com", "--context", "ctx-123", "--isolated", "iso-name", "--headless", "--port", strconv.Itoa(port)})
+	err5 := root5.Execute()
+
 	_ = wPipe.Close()
 	os.Stdout = oldStdout
 	var outBuf bytes.Buffer
@@ -124,8 +128,11 @@ func TestConsoleAndMetricsCommandsDispatchExpectedPayloads(t *testing.T) {
 	if err4 != nil {
 		t.Fatalf("network --headers command failed: %v", err4)
 	}
-	if len(received) != 4 {
-		t.Fatalf("expected 4 bridge requests, got %d", len(received))
+	if err5 != nil {
+		t.Fatalf("open --context --isolated --headless command failed: %v", err5)
+	}
+	if len(received) != 5 {
+		t.Fatalf("expected 5 bridge requests, got %d", len(received))
 	}
 
 	req1Params, _ := received[0]["params"].(map[string]interface{})
@@ -162,6 +169,14 @@ func TestConsoleAndMetricsCommandsDispatchExpectedPayloads(t *testing.T) {
 		req4Params["limit"] != float64(15) ||
 		req4Params["tabId"] != float64(1103687583) {
 		t.Fatalf("unexpected network --headers request: %#v", received[3])
+	}
+
+	req5Params, _ := received[4]["params"].(map[string]interface{})
+	if received[4]["method"] != "tabs.create" ||
+		req5Params["contextId"] != "ctx-123" ||
+		req5Params["isolatedContext"] != "iso-name" ||
+		req5Params["headless"] != true {
+		t.Fatalf("unexpected open --context --isolated --headless request: %#v", received[4])
 	}
 }
 

@@ -65,7 +65,7 @@ The Go Bridge daemon provides a high-speed HTTP REST API on port `58765`:
 
 | Method | Endpoint | Description | Request Payload | Response |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Daemon health & connected clients | None | `{"status":"ok","name":"Agent Pilot Go Bridge Server","port":58765,"extensionConnected":true,"clientCount":1,"version":"1.2.0","clients":[{"instanceId":"<id>","browser":"Chromium","os":"linux","isActive":true,"connectedAt":1789295000000}]}` |
+| `GET` | `/health` | Daemon health & connected clients | None | `{"status":"ok","name":"Agent Pilot Go Bridge Server","port":58765,"extensionConnected":true,"clientCount":1,"version":"1.2.1","clients":[{"instanceId":"<id>","browser":"Chromium","os":"linux","isActive":true,"connectedAt":1789295000000}]}` |
 | `POST` | `/api` | Forward any browser RPC command | `{"method":"page.click","params":{...}}` (or `{"action":"...","payload":{...}}`) | `{"success":true,"result":{...}}` |
 | `POST` | `/api/feedback/save` | Channel B: Save feedback to inbox | Feedback payload (JSON) | `{"success":true,"sessionId":"..."}` |
 | `GET` | `/api/feedback/pending` | Channel B: Read pending sessions | `?limit=10&clear=false` | `{"success":true,"sessions":[...]}` |

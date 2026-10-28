@@ -138,6 +138,9 @@
   // =========================================================================
 
   function startFeedbackStudio() {
+    if (window.__AP_INTERNAL__.isHtmlDocument && !window.__AP_INTERNAL__.isHtmlDocument()) {
+      return;
+    }
     if (state.isActive()) return;
     state.setActive(true);
 
@@ -145,6 +148,11 @@
     if (window.__AP_INTERNAL__.inspector?.toggleInspector) {
       window.__AP_INTERNAL__.inspector.toggleInspector(false);
     }
+
+    hud.ensureMounted?.();
+    pinned.ensureMounted?.();
+    modals.ensureMounted?.();
+    selection.ensureMounted?.();
 
     hud.showHud();
     pinned.renderPinnedBoxes();
@@ -162,7 +170,10 @@
 
     hud.hideHud();
     selection.hideHighlighter();
-    if (selection.cropOverlay) selection.cropOverlay.classList.add("hidden");
+    if (selection.cropOverlay) {
+      selection.cropOverlay.classList.add("hidden");
+      selection.cropOverlay.style.display = "none";
+    }
     modals.closeAllModals();
     pinned.hideDraftBox();
     pinned.renderPinnedBoxes();

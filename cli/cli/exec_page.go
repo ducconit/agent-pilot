@@ -147,15 +147,15 @@ func extractTabTag(v interface{}) string {
 			var idStr string
 			switch n := idVal.(type) {
 			case float64:
-				if !math.IsNaN(n) && !math.IsInf(n, 0) && math.Trunc(n) == n && n > 0 {
+				if !math.IsNaN(n) && !math.IsInf(n, 0) && math.Trunc(n) == n && n != 0 {
 					idStr = strconv.FormatInt(int64(n), 10)
 				}
 			case int:
-				if n > 0 {
+				if n != 0 {
 					idStr = strconv.Itoa(n)
 				}
 			case int64:
-				if n > 0 {
+				if n != 0 {
 					idStr = strconv.FormatInt(n, 10)
 				}
 			case string:

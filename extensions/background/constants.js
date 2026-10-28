@@ -31,7 +31,7 @@ export const MAX_DEVTOOLS_NETWORK_ENTRIES = 300;
 // Extension version resolved once at module load (falls back outside extension contexts)
 export const EXTENSION_VERSION = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest)
   ? (chrome.runtime.getManifest().version_name || chrome.runtime.getManifest().version)
-  : "1.2.0";
+  : "1.2.1";
 export { EXTENSION_BUILD_ID };
 
 /**

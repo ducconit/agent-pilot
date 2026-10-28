@@ -40,7 +40,7 @@ async function runSessionTest() {
     // Step 1: Initial state (session inactive)
     const initialCursor = await page.evaluate(() => {
       const c = document.querySelector(".agent-pilot-virtual-cursor");
-      return c && c.classList.contains("visible");
+      return Boolean(c && c.classList.contains("visible"));
     });
     console.log(`1. Initial cursor visible: ${initialCursor} (Expected: false)`);
     if (initialCursor !== false) throw new Error("Cursor should be hidden initially");

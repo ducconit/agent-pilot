@@ -1,5 +1,6 @@
-// Package devtools runs the private runtime embedded in release binaries.
-// It never searches PATH for Node and never downloads code on a user's machine.
+// Package devtools runs the private runtime embedded in release binaries, with
+// graceful developer-build fallback to cached unpacked runtimes or a local
+// source checkout.
 package devtools
 
 import (
@@ -20,6 +21,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/ducconit/agent-pilot-extension/cli/version"
 )
 
 //go:embed payload
@@ -45,10 +48,151 @@ func NewHost(extension ExtensionRequest) *Host {
 	return &Host{extension: extension, pending: make(map[int64]chan response)}
 }
 
+func runtimeNodeBinaryName() string {
+	if runtime.GOOS == "windows" {
+		return "node.exe"
+	}
+	return "node"
+}
+
+func isValidUnpackedRuntimeDir(dir string) bool {
+	if dir == "" {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".ready")); err != nil {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(dir, runtimeNodeBinaryName())); err != nil {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(dir, "devtools", "runner.mjs")); err != nil {
+		return false
+	}
+	return true
+}
+
+func findCachedUnpackedRuntime(cacheRoot string) string {
+	if strings.TrimSpace(cacheRoot) == "" {
+		return ""
+	}
+	runtimeParent := filepath.Join(cacheRoot, "agent-pilot", "runtime")
+	entries, err := os.ReadDir(runtimeParent)
+	if err != nil {
+		return ""
+	}
+	var bestDir string
+	var bestMod time.Time
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		candidate := filepath.Join(runtimeParent, entry.Name())
+		if !isValidUnpackedRuntimeDir(candidate) {
+			continue
+		}
+		info, statErr := os.Stat(filepath.Join(candidate, ".ready"))
+		if statErr != nil {
+			continue
+		}
+		if bestDir == "" || info.ModTime().After(bestMod) {
+			bestDir = candidate
+			bestMod = info.ModTime()
+		}
+	}
+	return bestDir
+}
+
+func isValidWorkspaceRuntimeRoot(dir string) bool {
+	if dir == "" {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(dir, "devtools", "runner.mjs")); err != nil {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(dir, "node_modules", "lighthouse", "package.json")); err != nil {
+		return false
+	}
+	return true
+}
+
+func resolveNodeExecutable() string {
+	if envNode := strings.TrimSpace(os.Getenv("AGENT_PILOT_BUILD_NODE_BINARY")); envNode != "" {
+		if info, err := os.Stat(envNode); err == nil && !info.IsDir() {
+			return envNode
+		}
+	}
+	if path, err := exec.LookPath(runtimeNodeBinaryName()); err == nil {
+		return path
+	}
+	return ""
+}
+
+func findWorkspaceRuntimeFromSeeds(nodeBin string, seeds []string) (string, string) {
+	if strings.TrimSpace(nodeBin) == "" {
+		return "", ""
+	}
+	seen := make(map[string]bool)
+	for _, seed := range seeds {
+		if strings.TrimSpace(seed) == "" {
+			continue
+		}
+		curr := filepath.Clean(seed)
+		for i := 0; i < 6 && curr != "" && curr != "." && !seen[curr]; i++ {
+			seen[curr] = true
+			if isValidWorkspaceRuntimeRoot(curr) {
+				return nodeBin, filepath.Join(curr, "devtools", "runner.mjs")
+			}
+			parent := filepath.Dir(curr)
+			if parent == curr {
+				break
+			}
+			curr = parent
+		}
+	}
+	return "", ""
+}
+
+func findWorkspaceRuntime() (string, string) {
+	nodeBin := resolveNodeExecutable()
+	if nodeBin == "" {
+		return "", ""
+	}
+	var seeds []string
+	if envRoot := strings.TrimSpace(os.Getenv("AGENT_PILOT_ROOT")); envRoot != "" {
+		seeds = append(seeds, envRoot)
+	}
+	if execPath, err := os.Executable(); err == nil {
+		if realExec, symErr := filepath.EvalSymlinks(execPath); symErr == nil {
+			seeds = append(seeds, filepath.Dir(realExec))
+		}
+		seeds = append(seeds, filepath.Dir(execPath))
+	}
+	if wd, err := os.Getwd(); err == nil {
+		seeds = append(seeds, wd)
+	}
+	return findWorkspaceRuntimeFromSeeds(nodeBin, seeds)
+}
+
+func resolveRuntimeExec() (string, string, error) {
+	directory, err := unpackRuntime()
+	if err == nil {
+		return filepath.Join(directory, runtimeNodeBinaryName()), filepath.Join(directory, "devtools", "runner.mjs"), nil
+	}
+	if cache, cacheErr := os.UserCacheDir(); cacheErr == nil {
+		if cachedDir := findCachedUnpackedRuntime(cache); cachedDir != "" {
+			return filepath.Join(cachedDir, runtimeNodeBinaryName()), filepath.Join(cachedDir, "devtools", "runner.mjs"), nil
+		}
+	}
+	if nodeBin, runnerPath := findWorkspaceRuntime(); nodeBin != "" && runnerPath != "" {
+		return nodeBin, runnerPath, nil
+	}
+	return "", "", err
+}
+
 func unpackRuntime() (string, error) {
 	archive, err := payload.ReadFile("payload/runtime.zip")
 	if err != nil {
-		return "", fmt.Errorf("this developer build has no embedded DevTools runtime; build with npm run build:cli (release binaries include it)")
+		return "", fmt.Errorf("this developer build (%s) has no embedded DevTools runtime; build with 'npm ci && npm run build:cli' (and run 'agent-pilot service restart' if a background bridge server is active)", version.Full())
 	}
 	sum := sha256.Sum256(archive)
 	cache, err := os.UserCacheDir()
@@ -126,15 +270,11 @@ func (h *Host) start() error {
 	if h.cmd != nil {
 		return nil
 	}
-	directory, err := unpackRuntime()
+	nodeBin, runnerPath, err := resolveRuntimeExec()
 	if err != nil {
 		return err
 	}
-	binary := "node"
-	if runtime.GOOS == "windows" {
-		binary = "node.exe"
-	}
-	cmd := exec.Command(filepath.Join(directory, binary), filepath.Join(directory, "devtools", "runner.mjs"))
+	cmd := exec.Command(nodeBin, runnerPath)
 	// Do not let a caller's Node preload options change our private runtime.
 	for _, variable := range os.Environ() {
 		if !strings.HasPrefix(variable, "NODE_OPTIONS=") && !strings.HasPrefix(variable, "NODE_PATH=") {

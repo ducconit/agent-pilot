@@ -29,36 +29,56 @@
   let isSessionActive = false;
   let virtualTypeQueue = Promise.resolve();
 
-  // Create Cursor Layer (remove any stale layer from prior extension reload)
+  // Create Cursor Layer in memory (mounted lazily only when virtual cursor is activated on HTML pages)
   const existingCursorLayer = document.getElementById("agent-pilot-cursor-layer");
   if (existingCursorLayer) existingCursorLayer.remove();
   const cursorLayer = document.createElement("div");
   cursorLayer.id = "agent-pilot-cursor-layer";
-  document.documentElement.appendChild(cursorLayer);
+  cursorLayer.style.display = "none";
 
   // Virtual Pointer Element
   const virtualCursor = document.createElement("div");
   virtualCursor.className = "agent-pilot-virtual-cursor";
+  virtualCursor.style.display = "none";
   virtualCursor.innerHTML = `
-    <svg class="agent-pilot-cursor-svg" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg class="agent-pilot-cursor-svg" width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M4 2 L26 14 L14 16 L10 28 Z" fill="#06b6d4" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
       <circle cx="14" cy="14" r="3" fill="#ffffff" />
     </svg>
     <div class="agent-pilot-cursor-badge" id="agent-pilot-coords">(100, 100)</div>
   `;
+  const coordsBadgeEl = virtualCursor.querySelector("#agent-pilot-coords");
   cursorLayer.appendChild(virtualCursor);
   updateCursorTransform(currentMouseX, currentMouseY);
 
+  function canMountUi() {
+    return !window.__AP_INTERNAL__.isHtmlDocument || window.__AP_INTERNAL__.isHtmlDocument();
+  }
+
+  function ensureCursorLayerMounted() {
+    if (!canMountUi()) return false;
+    if (!cursorLayer.isConnected) {
+      const stale = document.getElementById("agent-pilot-cursor-layer");
+      if (stale && stale !== cursorLayer) stale.remove();
+      (document.body || document.documentElement).appendChild(cursorLayer);
+    }
+    return true;
+  }
+
   function activateCursor(timeoutMs = CONFIG.CURSOR_ACTIVATE_MS) {
-    if (document.hidden) return;
+    if (document.hidden || !ensureCursorLayerMounted()) return;
     if (cursorHideTimeout) {
       clearTimeout(cursorHideTimeout);
       cursorHideTimeout = null;
     }
+    cursorLayer.style.display = "block";
+    virtualCursor.style.display = "block";
     virtualCursor.classList.add("visible");
     if (!isSessionActive && timeoutMs > 0) {
       cursorHideTimeout = setTimeout(() => {
         virtualCursor.classList.remove("visible");
+        virtualCursor.style.display = "none";
+        cursorLayer.style.display = "none";
         cursorHideTimeout = null;
       }, timeoutMs);
     }
@@ -71,6 +91,8 @@
     }
     if (!isSessionActive) {
       virtualCursor.classList.remove("visible");
+      virtualCursor.style.display = "none";
+      cursorLayer.style.display = "none";
     }
   }
 
@@ -81,13 +103,19 @@
         clearTimeout(cursorHideTimeout);
         cursorHideTimeout = null;
       }
-      virtualCursor.classList.add("visible");
+      if (ensureCursorLayerMounted()) {
+        cursorLayer.style.display = "block";
+        virtualCursor.style.display = "block";
+        virtualCursor.classList.add("visible");
+      }
     } else {
       if (cursorHideTimeout) {
         clearTimeout(cursorHideTimeout);
         cursorHideTimeout = null;
       }
       virtualCursor.classList.remove("visible");
+      virtualCursor.style.display = "none";
+      cursorLayer.style.display = "none";
     }
   }
 
@@ -95,7 +123,7 @@
     currentMouseX = x;
     currentMouseY = y;
     virtualCursor.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-    const coordsBadge = document.getElementById("agent-pilot-coords");
+    const coordsBadge = coordsBadgeEl || document.getElementById("agent-pilot-coords");
     if (coordsBadge) coordsBadge.textContent = `(${Math.round(x)}, ${Math.round(y)})`;
   }
 
@@ -109,10 +137,8 @@
   }
 
   function renderClickRipple(x, y) {
-    if (document.hidden) return;
-    if (!cursorLayer.parentNode) {
-      (document.body || document.documentElement).appendChild(cursorLayer);
-    }
+    if (document.hidden || !ensureCursorLayerMounted()) return;
+    cursorLayer.style.display = "block";
     const ripple = document.createElement("div");
     ripple.className = "agent-pilot-click-ripple";
     ripple.style.left = `${Math.round(x)}px`;
@@ -667,7 +693,7 @@
       window.scrollBy({
         top: deltaY,
         left: deltaX,
-        behavior: document.hidden ? "auto" : "smooth"
+        behavior: "auto"
       });
       window.__AP_INTERNAL__.inspector?.recordViewportScroll?.();
     } finally {

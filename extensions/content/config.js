@@ -95,4 +95,28 @@
   };
 
   window.__AP_CONFIG__ = deepFreeze(CONFIG);
+
+  /**
+   * Returns true only when the current document is an HTML / XHTML document where
+   * visual UI overlays (Virtual Cursor, Inspector, Feedback Studio, Toast, Loupe)
+   * can safely be mounted. Returns false for XML (text/xml, application/xml,
+   * image/svg+xml), JSON (application/json), plain text, or XMLDocument trees.
+   */
+  function isHtmlDocument() {
+    if (typeof document === "undefined" || !document.documentElement) return false;
+    if (typeof XMLDocument !== "undefined" && document instanceof XMLDocument) return false;
+    if (document.xmlVersion) return false;
+    if (typeof document.getElementById === "function" && document.getElementById("webkit-xml-viewer-source-xml")) {
+      return false;
+    }
+    const contentType = String(document.contentType || "").toLowerCase().trim();
+    if (contentType && contentType !== "text/html" && contentType !== "application/xhtml+xml") {
+      return false;
+    }
+    const rootTag = String(document.documentElement.tagName || "").toLowerCase();
+    if (rootTag !== "html") return false;
+    return true;
+  }
+
+  window.__AP_INTERNAL__.isHtmlDocument = isHtmlDocument;
 })();

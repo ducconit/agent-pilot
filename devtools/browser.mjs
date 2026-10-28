@@ -15,11 +15,25 @@ export class Browsers {
   owner(params) { return params.agentId || "cli"; }
   async browser(options) {
     if (!this.managedBrowser) {
-      this.managedBrowser = await puppeteer.launch({
-        executablePath: resolveChromiumBin(), headless: options.headless ?? false,
-        pipe: true, defaultViewport: null,
-        args: process.env.AGENT_PILOT_TEST_NO_SANDBOX === "1" ? ["--no-sandbox"] : []
-      });
+      const executablePath = resolveChromiumBin();
+      const baseArgs = process.env.AGENT_PILOT_TEST_NO_SANDBOX === "1" ? ["--no-sandbox", "--disable-setuid-sandbox"] : [];
+      try {
+        this.managedBrowser = await puppeteer.launch({
+          executablePath, headless: options.headless ?? false,
+          pipe: true, defaultViewport: null,
+          args: baseArgs
+        });
+      } catch (err) {
+        if (process.platform === "linux" && !baseArgs.includes("--no-sandbox")) {
+          this.managedBrowser = await puppeteer.launch({
+            executablePath, headless: options.headless ?? false,
+            pipe: true, defaultViewport: null,
+            args: ["--no-sandbox", "--disable-setuid-sandbox"]
+          });
+        } else {
+          throw err;
+        }
+      }
       this.managedBrowser.on("disconnected", () => {
         this.managedBrowser = null; this.contexts.clear(); this.tabs.clear();
       });

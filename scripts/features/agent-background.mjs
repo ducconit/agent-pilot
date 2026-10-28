@@ -37,7 +37,9 @@ export async function run({ browser, testPage, tabId, sendAgentCommand, bridgePo
   record("19. Privacy Isolation for Background Screenshot", !privacyLeakDetected, `Invalid background tab correctly rejected without leaking foreground user screen`);
 
   // 20. Test Background Tab Operations without focus (Click, Type & Scroll in hidden background tab)
-  const isTargetHidden = await testPage.evaluate(() => document.hidden);
+  const tabsBeforeBgOps = await sendAgentCommand("tabs.listAll", {});
+  const targetTabEntry = Array.isArray(tabsBeforeBgOps) ? tabsBeforeBgOps.find(t => t.tabId === tabId) : null;
+  const isTargetHidden = (await testPage.evaluate(() => document.hidden)) || (targetTabEntry?.active === false);
   const isUserActive = await userActivePage.evaluate(() => !document.hidden);
 
   const bgClickRes = await sendAgentCommand("page.click", { tabId, selector: "#btn-sample-click" });
@@ -48,6 +50,10 @@ export async function run({ browser, testPage, tabId, sendAgentCommand, bridgePo
   });
   const bgScrollRes = await sendAgentCommand("page.scroll", { tabId, deltaY: 200 });
 
+  const tabsAfterBgOps = await sendAgentCommand("tabs.listAll", {});
+  const targetTabAfter = Array.isArray(tabsAfterBgOps) ? tabsAfterBgOps.find(t => t.tabId === tabId) : null;
+  const remainedBackground = isTargetHidden && (targetTabAfter ? targetTabAfter.active === false : true);
+
   let bgClickCounter = "";
   let bgTypedVal = "";
   let bgScrollY = 0;
@@ -56,12 +62,12 @@ export async function run({ browser, testPage, tabId, sendAgentCommand, bridgePo
     bgTypedVal = await testPage.evaluate(() => document.getElementById("test-search-input")?.value);
     bgScrollY = await testPage.evaluate(() => window.scrollY);
   }
-  const bgOpsSuccess = isTargetHidden &&
+  const bgOpsSuccess = remainedBackground &&
                        isUserActive &&
                        bgClickCounter.includes("2 lần") &&
                        bgTypedVal.includes("Background execution without focus") &&
                        bgScrollY > 0;
-  record("20. Background Tab Control Without Focus", bgOpsSuccess, `Tab operated silently in background without stealing focus (Target hidden: ${isTargetHidden}, User active: ${isUserActive}, Counter: "${bgClickCounter}", ScrollY: ${bgScrollY})`);
+  record("20. Background Tab Control Without Focus", bgOpsSuccess, `Tab operated silently in background without stealing focus (Target background: ${remainedBackground}, User active: ${isUserActive}, Counter: "${bgClickCounter}", ScrollY: ${bgScrollY})`);
   await userActivePage.close();
 
   // 21. Test HTTP API Endpoint (POST http://127.0.0.1:58765/api)

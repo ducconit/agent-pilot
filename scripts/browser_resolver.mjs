@@ -20,9 +20,38 @@ function which(cmd) {
   }
 }
 
+function findPlaywrightOrPuppeteerChromeForTesting() {
+  const home = os.homedir();
+  const roots = [
+    path.join(home, ".cache", "puppeteer", "chrome"),
+    path.join(home, ".cache", "ms-playwright")
+  ];
+  const found = [];
+  for (const root of roots) {
+    if (!fs.existsSync(root)) continue;
+    try {
+      const entries = fs.readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory());
+      for (const entry of entries) {
+        const subCandidates = [
+          path.join(root, entry.name, "chrome-linux64", "chrome"),
+          path.join(root, entry.name, "chrome-linux", "chrome"),
+          path.join(root, entry.name, "chrome-mac-arm64", "Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing"),
+          path.join(root, entry.name, "chrome-mac-x64", "Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing"),
+          path.join(root, entry.name, "chrome-win64", "chrome.exe")
+        ];
+        for (const sub of subCandidates) {
+          if (fs.existsSync(sub)) found.push(sub);
+        }
+      }
+    } catch (_) {}
+  }
+  return found.sort().at(-1) || null;
+}
+
 /**
  * Resolve the path to a Chrome / Chromium executable
- * Prioritizes environment variables, then system install paths by OS.
+ * Prioritizes environment variables, Chrome for Testing (which supports
+ * --load-extension and Page.startScreenRecording on Chrome 137+), then system install paths by OS.
  */
 export function resolveChromiumBin() {
   if (process.env.CHROME_BIN && fs.existsSync(process.env.CHROME_BIN)) {
@@ -31,6 +60,13 @@ export function resolveChromiumBin() {
   if (process.env.CHROMIUM_BIN && fs.existsSync(process.env.CHROMIUM_BIN)) {
     return process.env.CHROMIUM_BIN;
   }
+
+  for (const cftCmd of ["google-chrome-for-testing", "chrome-for-testing"]) {
+    const resolved = which(cftCmd);
+    if (resolved) return resolved;
+  }
+  const cachedCft = findPlaywrightOrPuppeteerChromeForTesting();
+  if (cachedCft) return cachedCft;
 
   // Prefer well-known browser command names found on PATH.
   const commandCandidates = [

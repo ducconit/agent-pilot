@@ -16,9 +16,12 @@
   // =========================================================================
   // 1. Quick Comment Popover (Element & Region Modes)
   // =========================================================================
+  const existingPopover = document.getElementById("agent-pilot-feedback-popover");
+  if (existingPopover) existingPopover.remove();
   const commentPopover = document.createElement("div");
   commentPopover.id = "agent-pilot-feedback-popover";
   commentPopover.className = "agent-pilot-feedback-popover hidden";
+  commentPopover.style.display = "none";
   commentPopover.innerHTML = `
     <div class="ap-popover-header" title="Nhấp giữ và kéo để di chuyển tự do">
       <div class="ap-popover-title-row">
@@ -40,7 +43,6 @@
       <div role="button" tabindex="0" class="ap-popover-btn ap-btn-submit" id="ap-popover-btn-save">✓ Lưu Chú Thích</div>
     </div>
   `;
-  document.documentElement.appendChild(commentPopover);
 
   // Enable free dragging via header
   if (constants?.makeDraggable) {
@@ -49,14 +51,15 @@
   }
 
   function openCommentPopover(capture, anchorRect) {
+    if (!ensureMounted()) return;
     const state = window.__AP_INTERNAL__.feedbackStudio.state;
     if (state) state.setPendingCapture(capture);
 
-    document.getElementById("ap-popover-title").textContent = capture.mode === "element" ? "Ghi chú phần tử" : "Ghi chú vùng chọn";
-    document.getElementById("ap-popover-img").src = capture.screenshotDataUrl;
-    document.getElementById("ap-popover-input").value = "";
+    byId("ap-popover-title").textContent = capture.mode === "element" ? "Ghi chú phần tử" : "Ghi chú vùng chọn";
+    byId("ap-popover-img").src = capture.screenshotDataUrl;
+    byId("ap-popover-input").value = "";
 
-    const metaEl = document.getElementById("ap-popover-meta");
+    const metaEl = byId("ap-popover-meta");
     let metaHtml = "";
 
     if (capture.component) {
@@ -93,11 +96,12 @@
     commentPopover.style.left = `${left}px`;
     commentPopover.style.top = `${top}px`;
     commentPopover.classList.remove("hidden");
-    document.getElementById("ap-popover-input").focus();
+    commentPopover.style.display = "";
+    byId("ap-popover-input").focus();
   }
 
   function openEditCommentPopover(item, anchorRect) {
-    if (!item) return;
+    if (!item || !ensureMounted()) return;
     const capture = {
       isEditing: true,
       id: item.id,
@@ -111,11 +115,11 @@
     const state = window.__AP_INTERNAL__.feedbackStudio.state;
     if (state) state.setPendingCapture(capture);
 
-    document.getElementById("ap-popover-title").textContent = `Sửa ghi chú (${item.mode === "element" ? "Phần tử" : "Vùng chọn"})`;
-    document.getElementById("ap-popover-img").src = item.screenshotDataUrl || "";
-    document.getElementById("ap-popover-input").value = item.comment || "";
+    byId("ap-popover-title").textContent = `Sửa ghi chú (${item.mode === "element" ? "Phần tử" : "Vùng chọn"})`;
+    byId("ap-popover-img").src = item.screenshotDataUrl || "";
+    byId("ap-popover-input").value = item.comment || "";
 
-    const metaEl = document.getElementById("ap-popover-meta");
+    const metaEl = byId("ap-popover-meta");
     let metaHtml = "";
     if (item.component) {
       metaHtml += `<div class="ap-badge-comp">⚡ ${escapeHtml(item.component.framework || "Component")}: <strong>${escapeHtml(item.component.componentName)}</strong></div>`;
@@ -149,7 +153,8 @@
     commentPopover.style.left = `${left}px`;
     commentPopover.style.top = `${top}px`;
     commentPopover.classList.remove("hidden");
-    const input = document.getElementById("ap-popover-input");
+    commentPopover.style.display = "";
+    const input = byId("ap-popover-input");
     input.focus();
     input.select();
   }
@@ -162,14 +167,18 @@
     if (state) state.setPendingCapture(null);
 
     commentPopover.classList.add("hidden");
+    commentPopover.style.display = "none";
   }
 
   // =========================================================================
   // 2. Annotator Modal (Screen Viewport & Full Page Modes)
   // =========================================================================
+  const existingAnnotator = document.getElementById("agent-pilot-feedback-annotator");
+  if (existingAnnotator) existingAnnotator.remove();
   const annotatorModal = document.createElement("div");
   annotatorModal.id = "agent-pilot-feedback-annotator";
   annotatorModal.className = "agent-pilot-feedback-annotator hidden";
+  annotatorModal.style.display = "none";
   annotatorModal.innerHTML = `
     <div class="ap-annotator-backdrop"></div>
     <div class="ap-annotator-dialog">
@@ -202,7 +211,6 @@
       </div>
     </div>
   `;
-  document.documentElement.appendChild(annotatorModal);
 
   // Shared config with local fallbacks (see content/config.js).
   const T = (window.__AP_CONFIG__ && window.__AP_CONFIG__.timeouts) || {};
@@ -225,15 +233,15 @@
     boxDragState.dragging = false;
     boxDragState.currentRect = null;
     renderSvgAnnotations();
-    const btnPin = document.getElementById("ap-tool-pin");
-    const btnBox = document.getElementById("ap-tool-box");
+    const btnPin = byId("ap-tool-pin");
+    const btnBox = byId("ap-tool-box");
     if (btnPin) btnPin.classList.toggle("active", tool === "pin");
     if (btnBox) btnBox.classList.toggle("active", tool === "box");
   }
 
   function syncSvgDimensions() {
-    const img = document.getElementById("ap-annotator-img");
-    const svg = document.getElementById("ap-annotator-svg");
+    const img = byId("ap-annotator-img");
+    const svg = byId("ap-annotator-svg");
     if (img && svg) {
       const w = img.clientWidth || img.offsetWidth || img.naturalWidth;
       const h = img.clientHeight || img.offsetHeight || img.naturalHeight;
@@ -246,21 +254,23 @@
   }
 
   function openAnnotatorModal(mode, title, dataUrl) {
+    if (!ensureMounted()) return;
     annotatorCaptureData = { mode, title, dataUrl };
     currentAnnotations = [];
     setActiveTool("pin");
 
-    document.getElementById("ap-annotator-title").textContent = title;
-    const img = document.getElementById("ap-annotator-img");
+    byId("ap-annotator-title").textContent = title;
+    const img = byId("ap-annotator-img");
     img.onload = () => {
       syncSvgDimensions();
     };
     img.src = dataUrl;
-    document.getElementById("ap-annotator-comment").value = "";
-    document.getElementById("ap-annotator-svg").innerHTML = "";
+    byId("ap-annotator-comment").value = "";
+    byId("ap-annotator-svg").innerHTML = "";
     renderPinsList();
 
     annotatorModal.classList.remove("hidden");
+    annotatorModal.style.display = "";
     attachAnnotatorDragListeners();
     // The <img> may not have laid out yet right after being shown; re-sync SVG dims
     // once the browser has had a frame to compute the image's rendered size.
@@ -270,13 +280,14 @@
   function closeAnnotatorModal() {
     annotatorCaptureData = null;
     annotatorModal.classList.add("hidden");
+    annotatorModal.style.display = "none";
     detachAnnotatorDragListeners();
     const selection = window.__AP_INTERNAL__.feedbackStudio.selection;
     if (selection) selection.setMode("element");
   }
 
   function renderPinsList() {
-    const list = document.getElementById("ap-pins-list");
+    const list = byId("ap-pins-list");
     if (!currentAnnotations.length) {
       list.innerHTML = `<div class="ap-empty-hint">Chưa có đánh dấu nào. Chọn "Ghim điểm" hoặc "Khung" để đánh dấu vị trí cần sửa trên ảnh.</div>`;
       return;
@@ -317,7 +328,7 @@
   }
 
   function renderSvgAnnotations() {
-    const svg = document.getElementById("ap-annotator-svg");
+    const svg = byId("ap-annotator-svg");
     syncSvgDimensions();
 
     let svgHtml = "";
@@ -371,9 +382,12 @@
   // =========================================================================
   // 3. Feedback Items List Modal (Review, Edit, Delete)
   // =========================================================================
+  const existingListModal = document.getElementById("agent-pilot-feedback-list-modal");
+  if (existingListModal) existingListModal.remove();
   const listModal = document.createElement("div");
   listModal.id = "agent-pilot-feedback-list-modal";
   listModal.className = "agent-pilot-feedback-list-modal hidden";
+  listModal.style.display = "none";
   listModal.innerHTML = `
     <div class="ap-list-backdrop"></div>
     <div class="ap-list-dialog">
@@ -396,10 +410,43 @@
       </div>
     </div>
   `;
-  document.documentElement.appendChild(listModal);
+
+  function byId(id) {
+    return (
+      document.getElementById(id) ||
+      commentPopover.querySelector(`#${id}`) ||
+      annotatorModal.querySelector(`#${id}`) ||
+      listModal.querySelector(`#${id}`)
+    );
+  }
+
+  function canMountUi() {
+    return !window.__AP_INTERNAL__.isHtmlDocument || window.__AP_INTERNAL__.isHtmlDocument();
+  }
+
+  function ensureMounted() {
+    if (!canMountUi()) return false;
+    const parent = document.body || document.documentElement;
+    if (!commentPopover.isConnected) {
+      const stale = document.getElementById("agent-pilot-feedback-popover");
+      if (stale && stale !== commentPopover) stale.remove();
+      parent.appendChild(commentPopover);
+    }
+    if (!annotatorModal.isConnected) {
+      const stale = document.getElementById("agent-pilot-feedback-annotator");
+      if (stale && stale !== annotatorModal) stale.remove();
+      parent.appendChild(annotatorModal);
+    }
+    if (!listModal.isConnected) {
+      const stale = document.getElementById("agent-pilot-feedback-list-modal");
+      if (stale && stale !== listModal) stale.remove();
+      parent.appendChild(listModal);
+    }
+    return true;
+  }
 
   function renderItemsListModal() {
-    const container = document.getElementById("ap-list-items-container");
+    const container = byId("ap-list-items-container");
     const items = window.__AP_INTERNAL__.feedbackStudio.state?.getItems() || [];
     const PIN_COLORS = constants.PIN_COLORS || [];
 
@@ -478,23 +525,23 @@
     container.querySelectorAll(".btn-edit").forEach((btn) => {
       btn.onclick = () => {
         const id = btn.dataset.id;
-        document.getElementById(`comment-text-${id}`)?.classList.add("hidden");
-        document.getElementById(`comment-edit-${id}`)?.classList.remove("hidden");
+        byId(`comment-text-${id}`)?.classList.add("hidden");
+        byId(`comment-edit-${id}`)?.classList.remove("hidden");
       };
     });
 
     container.querySelectorAll(".btn-cancel-edit").forEach((btn) => {
       btn.onclick = () => {
         const id = btn.dataset.id;
-        document.getElementById(`comment-text-${id}`)?.classList.remove("hidden");
-        document.getElementById(`comment-edit-${id}`)?.classList.add("hidden");
+        byId(`comment-text-${id}`)?.classList.remove("hidden");
+        byId(`comment-edit-${id}`)?.classList.add("hidden");
       };
     });
 
     container.querySelectorAll(".btn-save-edit").forEach((btn) => {
       btn.onclick = () => {
         const id = btn.dataset.id;
-        const newText = document.querySelector(`#comment-edit-${id} textarea`)?.value;
+        const newText = container.querySelector(`#comment-edit-${id} textarea`)?.value;
         if (window.__AP_INTERNAL__.feedbackStudio.actions?.updateComment) {
           window.__AP_INTERNAL__.feedbackStudio.actions.updateComment(id, newText);
         }
@@ -503,12 +550,15 @@
   }
 
   function openListModal() {
+    if (!ensureMounted()) return;
     renderItemsListModal();
     listModal.classList.remove("hidden");
+    listModal.style.display = "";
   }
 
   function closeListModal() {
     listModal.classList.add("hidden");
+    listModal.style.display = "none";
   }
 
   function closeAllModals() {
@@ -522,14 +572,14 @@
   // =========================================================================
 
   // Popover buttons
-  document.getElementById("ap-popover-btn-close").onclick = closeCommentPopover;
-  document.getElementById("ap-popover-btn-cancel").onclick = closeCommentPopover;
-  document.getElementById("ap-popover-btn-save").onclick = () => {
+  byId("ap-popover-btn-close").onclick = closeCommentPopover;
+  byId("ap-popover-btn-cancel").onclick = closeCommentPopover;
+  byId("ap-popover-btn-save").onclick = () => {
     const state = window.__AP_INTERNAL__.feedbackStudio.state;
     const pendingCapture = state?.getPendingCapture();
     if (!pendingCapture) return;
 
-    const comment = document.getElementById("ap-popover-input").value.trim();
+    const comment = byId("ap-popover-input").value.trim();
     if (pendingCapture.isEditing && pendingCapture.id) {
       if (window.__AP_INTERNAL__.feedbackStudio.actions?.updateComment) {
         window.__AP_INTERNAL__.feedbackStudio.actions.updateComment(pendingCapture.id, comment);
@@ -544,22 +594,22 @@
   };
 
   // Annotator tool switching buttons
-  const btnToolPin = document.getElementById("ap-tool-pin");
+  const btnToolPin = byId("ap-tool-pin");
   if (btnToolPin) {
     btnToolPin.onclick = () => setActiveTool("pin");
   }
 
-  const btnToolBox = document.getElementById("ap-tool-box");
+  const btnToolBox = byId("ap-tool-box");
   if (btnToolBox) {
     btnToolBox.onclick = () => setActiveTool("box");
   }
 
   // Annotator Canvas Mouse Interaction (Pin Click & Box Drag-to-Draw)
-  const canvasWrapper = document.getElementById("ap-canvas-wrapper");
+  const canvasWrapper = byId("ap-canvas-wrapper");
 
   canvasWrapper.addEventListener("mousedown", (e) => {
     if (activeTool !== "box") return;
-    const img = document.getElementById("ap-annotator-img");
+    const img = byId("ap-annotator-img");
     if (!img) return;
     const imgRect = img.getBoundingClientRect();
 
@@ -578,7 +628,7 @@
 
   function handleAnnotatorBoxMouseMove(e) {
     if (!boxDragState.dragging || activeTool !== "box") return;
-    const img = document.getElementById("ap-annotator-img");
+    const img = byId("ap-annotator-img");
     if (!img) return;
     const imgRect = img.getBoundingClientRect();
 
@@ -629,7 +679,7 @@
 
   canvasWrapper.addEventListener("click", (e) => {
     if (activeTool !== "pin") return;
-    const img = document.getElementById("ap-annotator-img");
+    const img = byId("ap-annotator-img");
     if (!img) return;
     const imgRect = img.getBoundingClientRect();
 
@@ -651,16 +701,16 @@
     renderPinsList();
   });
 
-  document.getElementById("ap-annotator-btn-close").onclick = closeAnnotatorModal;
-  document.getElementById("ap-annotator-btn-cancel").onclick = closeAnnotatorModal;
-  document.getElementById("ap-tool-clear").onclick = () => {
+  byId("ap-annotator-btn-close").onclick = closeAnnotatorModal;
+  byId("ap-annotator-btn-cancel").onclick = closeAnnotatorModal;
+  byId("ap-tool-clear").onclick = () => {
     currentAnnotations = [];
     renderSvgAnnotations();
     renderPinsList();
   };
-  document.getElementById("ap-annotator-btn-save").onclick = () => {
+  byId("ap-annotator-btn-save").onclick = () => {
     if (!annotatorCaptureData) return;
-    const comment = document.getElementById("ap-annotator-comment").value.trim();
+    const comment = byId("ap-annotator-comment").value.trim();
     if (window.__AP_INTERNAL__.feedbackStudio.actions?.addItem) {
       window.__AP_INTERNAL__.feedbackStudio.actions.addItem({
         mode: annotatorCaptureData.mode,
@@ -677,14 +727,14 @@
   };
 
   // List modal buttons
-  document.getElementById("ap-list-btn-close").onclick = closeListModal;
-  document.getElementById("ap-list-btn-back").onclick = closeListModal;
-  document.getElementById("ap-list-btn-clear-all").onclick = () => {
+  byId("ap-list-btn-close").onclick = closeListModal;
+  byId("ap-list-btn-back").onclick = closeListModal;
+  byId("ap-list-btn-clear-all").onclick = () => {
     if (window.__AP_INTERNAL__.feedbackStudio.actions?.clearAll) {
       window.__AP_INTERNAL__.feedbackStudio.actions.clearAll(false);
     }
   };
-  document.getElementById("ap-list-btn-copy-all").onclick = () => {
+  byId("ap-list-btn-copy-all").onclick = () => {
     if (window.__AP_INTERNAL__.feedbackStudio.channels?.copyFeedbackPrompt) {
       window.__AP_INTERNAL__.feedbackStudio.channels.copyFeedbackPrompt();
     }
@@ -695,6 +745,7 @@
     commentPopover,
     annotatorModal,
     listModal,
+    ensureMounted,
     openCommentPopover,
     openEditCommentPopover,
     closeCommentPopover,

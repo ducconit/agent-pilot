@@ -41,20 +41,40 @@
   let cropState = { active: false, startX: 0, startY: 0, currentRect: null };
 
   // =========================================================================
-  // Inspector UI Elements
+  // Inspector UI Elements (mounted lazily on HTML pages when inspector/snap starts)
   // =========================================================================
 
   const existingInspectorBox = document.getElementById("agent-pilot-inspector-box");
   if (existingInspectorBox) existingInspectorBox.remove();
   const inspectorBox = document.createElement("div");
   inspectorBox.id = "agent-pilot-inspector-box";
-  document.documentElement.appendChild(inspectorBox);
+  inspectorBox.style.display = "none";
 
   const existingInspectorTooltip = document.getElementById("agent-pilot-inspector-tooltip");
   if (existingInspectorTooltip) existingInspectorTooltip.remove();
   const inspectorTooltip = document.createElement("div");
   inspectorTooltip.id = "agent-pilot-inspector-tooltip";
-  document.documentElement.appendChild(inspectorTooltip);
+  inspectorTooltip.style.display = "none";
+
+  function canMountUi() {
+    return !window.__AP_INTERNAL__.isHtmlDocument || window.__AP_INTERNAL__.isHtmlDocument();
+  }
+
+  function ensureInspectorMounted() {
+    if (!canMountUi()) return false;
+    const parent = document.body || document.documentElement;
+    if (!inspectorBox.isConnected) {
+      const staleBox = document.getElementById("agent-pilot-inspector-box");
+      if (staleBox && staleBox !== inspectorBox) staleBox.remove();
+      parent.appendChild(inspectorBox);
+    }
+    if (!inspectorTooltip.isConnected) {
+      const staleTip = document.getElementById("agent-pilot-inspector-tooltip");
+      if (staleTip && staleTip !== inspectorTooltip) staleTip.remove();
+      parent.appendChild(inspectorTooltip);
+    }
+    return true;
+  }
 
   // ---------------------------------------------------------------------------
   // Selector / XPath helpers live in content/selector-utils.js, injected just
@@ -543,6 +563,10 @@
   }
 
   function toggleInspector(enabled, showToastNotice = true) {
+    if (enabled && !ensureInspectorMounted()) {
+      isInspectorActive = false;
+      return;
+    }
     if (enabled && isElementSnapActive) {
       stopElementSnap(false);
     }
@@ -684,6 +708,7 @@
   }
 
   function startElementSnap() {
+    if (!ensureInspectorMounted()) return;
     if (isInspectorActive) {
       toggleInspector(false, false);
     }
@@ -716,15 +741,16 @@
   }
 
   // =========================================================================
-  // Region Screenshot Crop Overlay
+  // Region Screenshot Crop Overlay (mounted lazily on HTML pages when crop starts)
   // =========================================================================
 
   const existingCropOverlay = document.getElementById("agent-pilot-crop-overlay");
   if (existingCropOverlay) existingCropOverlay.remove();
   const cropOverlay = document.createElement("div");
   cropOverlay.id = "agent-pilot-crop-overlay";
+  cropOverlay.style.display = "none";
   cropOverlay.innerHTML = `
-    <div id="agent-pilot-crop-box">
+    <div id="agent-pilot-crop-box" style="display: none;">
       <div class="agent-pilot-crop-toolbar">
         <span class="agent-pilot-crop-dims" id="agent-pilot-crop-dims">0 × 0</span>
         <div role="button" tabindex="0" class="agent-pilot-crop-btn" id="agent-pilot-crop-confirm">✓ Chụp vùng này</div>
@@ -732,14 +758,24 @@
       </div>
     </div>
   `;
-  document.documentElement.appendChild(cropOverlay);
 
   const cropBox = cropOverlay.querySelector("#agent-pilot-crop-box");
   const cropDims = cropOverlay.querySelector("#agent-pilot-crop-dims");
   const cropConfirmBtn = cropOverlay.querySelector("#agent-pilot-crop-confirm");
   const cropCancelBtn = cropOverlay.querySelector("#agent-pilot-crop-cancel");
 
+  function ensureCropOverlayMounted() {
+    if (!canMountUi()) return false;
+    if (!cropOverlay.isConnected) {
+      const staleCrop = document.getElementById("agent-pilot-crop-overlay");
+      if (staleCrop && staleCrop !== cropOverlay) staleCrop.remove();
+      (document.body || document.documentElement).appendChild(cropOverlay);
+    }
+    return true;
+  }
+
   function startRegionCrop() {
+    if (!ensureCropOverlayMounted()) return;
     if (isElementSnapActive) stopElementSnap(false);
     if (isInspectorActive) toggleInspector(false, false);
     cropOverlay.style.display = "block";

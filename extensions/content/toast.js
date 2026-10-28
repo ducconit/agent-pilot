@@ -14,6 +14,9 @@
   const TOAST_FADE_MS = T.toastFadeMs || 400;
 
   function showToast(message) {
+    if (window.__AP_INTERNAL__.isHtmlDocument && !window.__AP_INTERNAL__.isHtmlDocument()) {
+      return;
+    }
     const existing = document.querySelector(".agent-pilot-toast");
     if (existing) existing.remove();
 

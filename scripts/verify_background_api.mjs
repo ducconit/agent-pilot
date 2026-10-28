@@ -2312,5 +2312,186 @@ record(
   `annotated=${richAnnRes46.annotated}, ops=${richOps46.length}, hasClip=${richOps46.includes("clip:evenodd")}, hasEllipse=${richOps46.includes("ellipse")}`
 );
 
+// 47. Content scripts do NOT inject UI overlays on XML/JSON documents or at initial page load, and mount lazily only when activated on HTML documents
+const fsNode = await import("node:fs");
+const vmNode = await import("node:vm");
+const pathNode = await import("node:path");
+const contentRoot47 = pathNode.join(process.cwd(), "extensions");
+
+function runContentModulesInSandbox({ contentType = "text/html", xmlVersion = null, rootTag = "HTML" } = {}) {
+  const appendedRootChildren = [];
+  const appendedBodyChildren = [];
+  const makeNode = (tag) => {
+    const children = [];
+    const classes = new Set();
+    const attrs = {};
+    let html = "";
+    const node = {
+      tagName: String(tag || "div").toUpperCase(),
+      id: "",
+      style: { display: "", setProperty: () => {} },
+      dataset: {},
+      isConnected: false,
+      parentNode: null,
+      children,
+      get className() {
+        return [...classes].join(" ");
+      },
+      set className(val) {
+        classes.clear();
+        String(val || "").split(/\s+/).filter(Boolean).forEach((c) => classes.add(c));
+      },
+      classList: {
+        add: (...cs) => cs.forEach((c) => classes.add(c)),
+        remove: (...cs) => cs.forEach((c) => classes.delete(c)),
+        toggle: (c, force) => {
+          const next = force !== undefined ? Boolean(force) : !classes.has(c);
+          if (next) classes.add(c);
+          else classes.delete(c);
+          return next;
+        },
+        contains: (c) => classes.has(c)
+      },
+      get innerHTML() {
+        return html;
+      },
+      set innerHTML(val) {
+        html = String(val || "");
+      },
+      setAttribute: (k, v) => { attrs[k] = String(v); },
+      getAttribute: (k) => attrs[k] ?? null,
+      appendChild: (child) => {
+        child.isConnected = true;
+        child.parentNode = node;
+        children.push(child);
+        return child;
+      },
+      remove: () => {
+        node.isConnected = false;
+        node.parentNode = null;
+      },
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      getBoundingClientRect: () => ({ left: 10, top: 10, width: 100, height: 30, bottom: 40, right: 110 }),
+      querySelector: () => makeNode("div"),
+      querySelectorAll: () => []
+    };
+    return node;
+  };
+  const docEl = makeNode(rootTag);
+  docEl.appendChild = (child) => {
+    child.isConnected = true;
+    child.parentNode = docEl;
+    appendedRootChildren.push(child);
+    return child;
+  };
+  const bodyEl = rootTag.toLowerCase() === "html" ? makeNode("BODY") : null;
+  if (bodyEl) {
+    bodyEl.appendChild = (child) => {
+      child.isConnected = true;
+      child.parentNode = bodyEl;
+      appendedBodyChildren.push(child);
+      return child;
+    };
+  }
+  const sandbox = {
+    window: null,
+    document: {
+      contentType,
+      xmlVersion,
+      hidden: false,
+      documentElement: docEl,
+      body: bodyEl,
+      createElement: (tag) => makeNode(tag),
+      getElementById: () => null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener: () => {},
+      removeEventListener: () => {}
+    },
+    chrome: {
+      runtime: {
+        sendMessage: () => Promise.resolve({ success: true })
+      }
+    },
+    Element: function Element() {},
+    HTMLTextAreaElement: function HTMLTextAreaElement() {},
+    HTMLInputElement: function HTMLInputElement() {},
+    CustomEvent: function CustomEvent(type, init) { this.type = type; this.detail = init?.detail; },
+    performance: { now: () => 0 },
+    requestAnimationFrame: (cb) => setTimeout(() => cb(16), 0),
+    setTimeout,
+    clearTimeout,
+    console
+  };
+  sandbox.window = sandbox;
+  sandbox.window.innerWidth = 1280;
+  sandbox.window.innerHeight = 800;
+  sandbox.window.scrollX = 0;
+  sandbox.window.scrollY = 0;
+  sandbox.window.addEventListener = () => {};
+  sandbox.window.removeEventListener = () => {};
+  sandbox.window.dispatchEvent = () => {};
+
+  const files = [
+    "content/config.js",
+    "content/toast.js",
+    "content/lock-shield.js",
+    "content/cursor-simulator.js",
+    "content/selector-utils.js",
+    "content/dom-inspector.js",
+    "content/eyedropper.js",
+    "content/feedback-studio/constants.js",
+    "content/feedback-studio/item-schema.js",
+    "content/feedback-studio/state.js",
+    "content/feedback-studio/pinned-overlay.js",
+    "content/feedback-studio/hud-toolbar.js",
+    "content/feedback-studio/modals.js",
+    "content/feedback-studio/selection-modes.js",
+    "content/feedback-studio/index.js"
+  ];
+  for (const rel of files) {
+    const code = fsNode.readFileSync(pathNode.join(contentRoot47, rel), "utf8");
+    vmNode.runInNewContext(code, sandbox, { filename: rel });
+  }
+  return { sandbox, appendedRootChildren, appendedBodyChildren };
+}
+
+const xmlRun47 = runContentModulesInSandbox({ contentType: "text/xml", xmlVersion: "1.0", rootTag: "note" });
+const xmlIsHtml = xmlRun47.sandbox.window.__AP_INTERNAL__.isHtmlDocument();
+xmlRun47.sandbox.window.__AP_INTERNAL__.cursor.activateCursor();
+xmlRun47.sandbox.window.__AP_INTERNAL__.feedback.start();
+xmlRun47.sandbox.window.__AP_INTERNAL__.inspector.toggleInspector(true);
+const xmlTotalInjected = xmlRun47.appendedRootChildren.length + xmlRun47.appendedBodyChildren.length;
+
+const jsonRun47 = runContentModulesInSandbox({ contentType: "application/json", xmlVersion: null, rootTag: "HTML" });
+const jsonIsHtml = jsonRun47.sandbox.window.__AP_INTERNAL__.isHtmlDocument();
+jsonRun47.sandbox.window.__AP_INTERNAL__.cursor.activateCursor();
+jsonRun47.sandbox.window.__AP_INTERNAL__.feedback.start();
+const jsonTotalInjected = jsonRun47.appendedRootChildren.length + jsonRun47.appendedBodyChildren.length;
+
+const htmlRun47 = runContentModulesInSandbox({ contentType: "text/html", xmlVersion: null, rootTag: "HTML" });
+const htmlIsHtml = htmlRun47.sandbox.window.__AP_INTERNAL__.isHtmlDocument();
+const htmlInitialInjected = htmlRun47.appendedRootChildren.length + htmlRun47.appendedBodyChildren.length;
+const cursorSvgMarkup = htmlRun47.sandbox.window.__AP_INTERNAL__.cursor.getCursorLayer().children[0]?.innerHTML || "";
+htmlRun47.sandbox.window.__AP_INTERNAL__.cursor.activateCursor(0);
+const htmlAfterCursorInjected = htmlRun47.appendedRootChildren.length + htmlRun47.appendedBodyChildren.length;
+htmlRun47.sandbox.window.__AP_INTERNAL__.feedback.start();
+const htmlAfterFeedbackInjected = htmlRun47.appendedRootChildren.length + htmlRun47.appendedBodyChildren.length;
+
+record(
+  "47. Content scripts skip overlay mounting on XML/JSON documents and lazy-mount overlays only when activated on HTML documents",
+  xmlIsHtml === false &&
+    xmlTotalInjected === 0 &&
+    jsonIsHtml === false &&
+    jsonTotalInjected === 0 &&
+    htmlIsHtml === true &&
+    htmlInitialInjected === 0 &&
+    htmlAfterCursorInjected === 1 &&
+    htmlAfterFeedbackInjected > 1 &&
+    cursorSvgMarkup.includes('width="28" height="28"'),
+  `xmlIsHtml=${xmlIsHtml} (injected=${xmlTotalInjected}), jsonIsHtml=${jsonIsHtml} (injected=${jsonTotalInjected}), htmlInitial=${htmlInitialInjected}, afterCursor=${htmlAfterCursorInjected}, afterFeedback=${htmlAfterFeedbackInjected}`
+);
+
 recorder.summarize();
 recorder.exitIfFailed();

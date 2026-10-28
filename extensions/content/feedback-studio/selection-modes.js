@@ -15,30 +15,61 @@
   const escapeHtml = constants.escapeHtml || ((s) => s);
 
   // =========================================================================
-  // DOM Elements Setup (Highlighter, Tooltip, Crop Overlay)
+  // DOM Elements Setup (mounted lazily when Feedback Studio starts on HTML pages)
   // =========================================================================
 
   // 1. Element Highlighter Box & Tooltip
+  const existingHighlighter = document.getElementById("agent-pilot-feedback-highlighter");
+  if (existingHighlighter) existingHighlighter.remove();
   const highlighter = document.createElement("div");
   highlighter.id = "agent-pilot-feedback-highlighter";
   highlighter.className = "agent-pilot-feedback-highlighter hidden";
-  document.documentElement.appendChild(highlighter);
+  highlighter.style.display = "none";
 
+  const existingTooltip = document.getElementById("agent-pilot-feedback-tooltip");
+  if (existingTooltip) existingTooltip.remove();
   const elementTooltip = document.createElement("div");
   elementTooltip.id = "agent-pilot-feedback-tooltip";
   elementTooltip.className = "agent-pilot-feedback-tooltip hidden";
-  document.documentElement.appendChild(elementTooltip);
+  elementTooltip.style.display = "none";
 
   // 2. Region Crop Overlay & Box
+  const existingCropOverlay = document.getElementById("agent-pilot-feedback-crop-overlay");
+  if (existingCropOverlay) existingCropOverlay.remove();
   const cropOverlay = document.createElement("div");
   cropOverlay.id = "agent-pilot-feedback-crop-overlay";
   cropOverlay.className = "agent-pilot-feedback-crop-overlay hidden";
+  cropOverlay.style.display = "none";
   cropOverlay.innerHTML = `
     <div class="ap-crop-hint">Kéo chuột để chọn vùng cần sửa • Nhấn Esc để hủy</div>
-    <div class="ap-crop-box" id="ap-feedback-crop-box"></div>
+    <div class="ap-crop-box" id="ap-feedback-crop-box" style="display: none;"></div>
   `;
-  document.documentElement.appendChild(cropOverlay);
   const cropBox = cropOverlay.querySelector("#ap-feedback-crop-box");
+
+  function canMountUi() {
+    return !window.__AP_INTERNAL__.isHtmlDocument || window.__AP_INTERNAL__.isHtmlDocument();
+  }
+
+  function ensureMounted() {
+    if (!canMountUi()) return false;
+    const parent = document.body || document.documentElement;
+    if (!highlighter.isConnected) {
+      const stale = document.getElementById("agent-pilot-feedback-highlighter");
+      if (stale && stale !== highlighter) stale.remove();
+      parent.appendChild(highlighter);
+    }
+    if (!elementTooltip.isConnected) {
+      const stale = document.getElementById("agent-pilot-feedback-tooltip");
+      if (stale && stale !== elementTooltip) stale.remove();
+      parent.appendChild(elementTooltip);
+    }
+    if (!cropOverlay.isConnected) {
+      const stale = document.getElementById("agent-pilot-feedback-crop-overlay");
+      if (stale && stale !== cropOverlay) stale.remove();
+      parent.appendChild(cropOverlay);
+    }
+    return true;
+  }
 
   // =========================================================================
   // Mode Controller
@@ -53,9 +84,13 @@
 
     hideHighlighter();
     cropOverlay.classList.add("hidden");
+    cropOverlay.style.display = "none";
 
     if (mode === "region") {
-      cropOverlay.classList.remove("hidden");
+      if (ensureMounted()) {
+        cropOverlay.classList.remove("hidden");
+        cropOverlay.style.display = "";
+      }
     } else if (mode === "screen") {
       triggerScreenCapture();
     } else if (mode === "fullpage") {
@@ -89,11 +124,13 @@
     state.setHoveredElement(target);
     const rect = target.getBoundingClientRect();
 
+    ensureMounted();
     highlighter.style.left = `${rect.left}px`;
     highlighter.style.top = `${rect.top}px`;
     highlighter.style.width = `${rect.width}px`;
     highlighter.style.height = `${rect.height}px`;
     highlighter.classList.remove("hidden");
+    highlighter.style.display = "";
 
     let tagInfo = target.tagName.toLowerCase();
     if (target.id) tagInfo += `#${target.id}`;
@@ -106,6 +143,7 @@
     elementTooltip.style.left = `${Math.max(10, Math.min(window.innerWidth - 220, rect.left))}px`;
     elementTooltip.style.top = `${Math.max(10, rect.top - 28)}px`;
     elementTooltip.classList.remove("hidden");
+    elementTooltip.style.display = "";
   }
 
   async function onElementClick(e) {
@@ -196,7 +234,9 @@
     const state = window.__AP_INTERNAL__.feedbackStudio.state;
     if (state) state.setHoveredElement(null);
     highlighter.classList.add("hidden");
+    highlighter.style.display = "none";
     elementTooltip.classList.add("hidden");
+    elementTooltip.style.display = "none";
   }
 
   // =========================================================================
@@ -357,6 +397,7 @@
     highlighter,
     elementTooltip,
     cropOverlay,
+    ensureMounted,
     setMode,
     hideHighlighter,
     attachSelectionListeners,

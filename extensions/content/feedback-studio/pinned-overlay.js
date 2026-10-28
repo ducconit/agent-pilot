@@ -10,25 +10,40 @@
   if (window.__AP_INTERNAL__.__guards.fsPinned) return;
   window.__AP_INTERNAL__.__guards.fsPinned = true;
 
-  // Setup DOM Elements (remove any stale layer from prior extension reload)
+  // Setup DOM Elements in memory (mounted lazily when Feedback Studio starts on HTML pages)
   const existingPinnedLayer = document.getElementById("agent-pilot-feedback-pinned-layer");
   if (existingPinnedLayer) existingPinnedLayer.remove();
   const pinnedLayer = document.createElement("div");
   pinnedLayer.id = "agent-pilot-feedback-pinned-layer";
   pinnedLayer.className = "agent-pilot-feedback-pinned-layer hidden";
-  document.documentElement.appendChild(pinnedLayer);
+  pinnedLayer.style.display = "none";
 
   const draftBox = document.createElement("div");
   draftBox.id = "agent-pilot-feedback-draft-box";
   draftBox.className = "ap-pinned-box draft hidden";
+  draftBox.style.display = "none";
   draftBox.innerHTML = `<span class="ap-pinned-badge" id="ap-draft-badge">Đang soạn...</span>`;
   pinnedLayer.appendChild(draftBox);
+
+  function canMountUi() {
+    return !window.__AP_INTERNAL__.isHtmlDocument || window.__AP_INTERNAL__.isHtmlDocument();
+  }
+
+  function ensureMounted() {
+    if (!canMountUi()) return false;
+    if (!pinnedLayer.isConnected) {
+      const stale = document.getElementById("agent-pilot-feedback-pinned-layer");
+      if (stale && stale !== pinnedLayer) stale.remove();
+      (document.body || document.documentElement).appendChild(pinnedLayer);
+    }
+    return true;
+  }
 
   /**
    * Show animated draft box while user is writing comment for a selected region
    */
   function showDraftBox(clip, itemNumber) {
-    if (!clip) return;
+    if (!clip || !ensureMounted()) return;
     const pageX = (clip.pageX !== undefined) ? clip.pageX : (clip.x + (clip.scrollX !== undefined ? clip.scrollX : window.scrollX));
     const pageY = (clip.pageY !== undefined) ? clip.pageY : (clip.y + (clip.scrollY !== undefined ? clip.scrollY : window.scrollY));
 
@@ -48,7 +63,9 @@
     }
 
     draftBox.classList.remove("hidden");
+    draftBox.style.display = "";
     pinnedLayer.classList.remove("hidden");
+    pinnedLayer.style.display = "";
   }
 
   /**
@@ -56,10 +73,12 @@
    */
   function hideDraftBox() {
     draftBox.classList.add("hidden");
+    draftBox.style.display = "none";
     const items = window.__AP_INTERNAL__.feedbackStudio.state?.getItems() || [];
     const hasItemsWithClip = items.some((it) => it.clip && it.clip.width > 0);
     if (!hasItemsWithClip) {
       pinnedLayer.classList.add("hidden");
+      pinnedLayer.style.display = "none";
     }
   }
 
@@ -73,18 +92,23 @@
     const isFeedbackActive = window.__AP_INTERNAL__.feedbackStudio.state?.isActive() || false;
     if (!isFeedbackActive) {
       pinnedLayer.classList.add("hidden");
+      pinnedLayer.style.display = "none";
       draftBox.classList.add("hidden");
+      draftBox.style.display = "none";
       return;
     }
 
+    ensureMounted();
     const items = window.__AP_INTERNAL__.feedbackStudio.state?.getItems() || [];
     const itemsWithClip = items.filter((it) => it.clip && it.clip.width > 0 && it.clip.height > 0);
     if (!itemsWithClip.length && draftBox.classList.contains("hidden")) {
       pinnedLayer.classList.add("hidden");
+      pinnedLayer.style.display = "none";
       return;
     }
 
     pinnedLayer.classList.remove("hidden");
+    pinnedLayer.style.display = "";
     const constants = window.__AP_INTERNAL__.feedbackStudio.constants || {};
     const PIN_COLORS = constants.PIN_COLORS || [];
     const escapeHtml = constants.escapeHtml || ((s) => s);
@@ -165,6 +189,7 @@
   window.__AP_INTERNAL__.feedbackStudio.pinned = {
     pinnedLayer,
     draftBox,
+    ensureMounted,
     showDraftBox,
     hideDraftBox,
     renderPinnedBoxes

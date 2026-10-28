@@ -234,7 +234,7 @@ async function run() {
     }
     if (testPage) {
       await testPage.waitForSelector("#btn-sample-click");
-      await testPage.waitForFunction(() => !!document.getElementById("agent-pilot-cursor-layer"));
+      await testPage.waitForFunction(() => !!window.__AGENT_PILOT__);
     }
 
     // Target tab ID returned from tabs.create
@@ -242,17 +242,19 @@ async function run() {
     const tabsList = await sendAgentCommand("tabs.query", {});
     console.log(`[Test] Active tabs count: ${tabsList.length}, targetTabId: ${tabId}`);
 
-    // Verify Virtual Cursor is HIDDEN by default on page load
+    // Verify Virtual Cursor is HIDDEN / UNMOUNTED by default on page load
     let initialCursorHidden = false;
-    let initialOpacity = "1";
+    let initialCursorState = "visible";
     if (testPage) {
-      initialOpacity = await testPage.evaluate(() => {
+      initialCursorState = await testPage.evaluate(() => {
         const cursor = document.querySelector(".agent-pilot-virtual-cursor");
-        return cursor ? window.getComputedStyle(cursor).opacity : null;
+        if (!cursor) return "unmounted";
+        const style = window.getComputedStyle(cursor);
+        return style.display === "none" || style.opacity === "0" ? "hidden" : "visible";
       });
-      initialCursorHidden = initialOpacity === "0";
+      initialCursorHidden = initialCursorState === "unmounted" || initialCursorState === "hidden";
     }
-    record("4. Cursor Initial Hidden State", initialCursorHidden, `Initial cursor opacity: ${initialOpacity} (Expected 0)`);
+    record("4. Cursor Initial Hidden State", initialCursorHidden, `Initial cursor state: ${initialCursorState} (Expected unmounted or hidden)`);
 
     // Verify Clean DOM (In-page badge removed, replaced by Chrome Native Tab Groups)
     let domBadgeRemoved = false;

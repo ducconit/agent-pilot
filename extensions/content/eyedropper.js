@@ -136,6 +136,9 @@
   let scrollDebounce = null;
 
   function initLoupeUI() {
+    if (window.__AP_INTERNAL__.isHtmlDocument && !window.__AP_INTERNAL__.isHtmlDocument()) {
+      return;
+    }
     if (loupeEl && document.getElementById("agent-pilot-eyedropper-loupe")) {
       return;
     }
@@ -145,6 +148,7 @@
       loupeEl = document.createElement("div");
       loupeEl.id = "agent-pilot-eyedropper-loupe";
       loupeEl.className = "agent-pilot-loupe-container";
+      loupeEl.style.display = "none";
       loupeEl.innerHTML = `
         <div class="agent-pilot-loupe-lens">
           <canvas id="agent-pilot-loupe-canvas" width="132" height="132"></canvas>

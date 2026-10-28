@@ -107,6 +107,30 @@ if (fs.existsSync(binarySource)) {
       console.log(`✓ Synchronized skill binary -> ${geminiSkillBin}`);
     }
 
+    const userLocalBin = path.join(homeDir, ".local", "bin", binaryName);
+    try {
+      if (fs.existsSync(userLocalBin)) {
+        const lstat = fs.lstatSync(userLocalBin);
+        if (!lstat.isSymbolicLink() || fs.realpathSync(userLocalBin) !== fs.realpathSync(targetBin)) {
+          atomicCopyExecutable(binarySource, userLocalBin);
+          console.log(`✓ Synchronized user PATH binary -> ${userLocalBin}`);
+        }
+      }
+    } catch (_) {}
+
+    const globalSkillBin = path.join(homeDir, ".gemini", "config", "skills", "agent-pilot", "scripts", binaryName);
+    if (fs.existsSync(path.dirname(path.dirname(globalSkillBin)))) {
+      try {
+        atomicCopyExecutable(binarySource, globalSkillBin);
+        console.log(`✓ Synchronized global skill binary -> ${globalSkillBin}`);
+      } catch (_) {}
+    }
+
+    try {
+      execSync(`"${binarySource}" service restart`, { stdio: "ignore" });
+      console.log(`✓ Restarted active Agent Pilot background service with upgraded binary`);
+    } catch (_) {}
+
     // Export & synchronize MCP tool schemas
     const mcpTargets = [
       path.join(ROOT_DIR, "mcp", "agent-pilot"),
