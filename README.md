@@ -179,7 +179,7 @@ flowchart LR
 ### 1. Cài Đặt Chrome Extension
 
 #### Cách A: Cài đặt từ Bản Phát Hành (Khuyên dùng)
-1. Tải **gói bundle** cho đúng nền tảng của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) — ví dụ `agent-pilot-v1.0.16-beta-linux-amd64.zip` (đã gồm sẵn extension + CLI + skills + README hướng dẫn), hoặc tệp chỉ-chứa-extension `agent-pilot-v1.0.16-beta.zip` nếu bạn chỉ cần phần Chrome.
+1. Tải **gói bundle** cho đúng hệ điều hành của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) — ví dụ `agent-pilot-v1.2.0-linux.zip`, `agent-pilot-v1.2.0-macos.zip`, hoặc `agent-pilot-v1.2.0-windows.zip` (đã gồm sẵn `extensions/` + `skills/` có binary CLI của OS đó + script cài đặt + `README.md` hướng dẫn).
 2. Giải nén tệp `.zip` ra một thư mục cố định.
 3. Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
 4. Gạt bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải.
@@ -193,11 +193,10 @@ flowchart LR
 git clone https://github.com/ducconit/agent-pilot-extension.git
 cd agent-pilot-extension
 npm ci
-npm run pack                  # Chỉ extension -> dist/agent-pilot-v*.zip
-npm run pack:bundle           # Đóng gói cả 3 OS -> dist/bundles/agent-pilot-v*-<os>-<arch>.zip
-npm run pack:bundle:ubuntu    # Chỉ đóng gói bản Ubuntu/Linux (amd64 + arm64)
-npm run pack:bundle:macos     # Chỉ đóng gói bản macOS (arm64 + amd64)
-npm run pack:bundle:windows   # Chỉ đóng gói bản Windows (amd64 + arm64)
+npm run pack:bundle           # Đóng gói cả 3 OS -> dist/bundles/agent-pilot-v*-<linux|macos|windows>.zip
+npm run pack:bundle:ubuntu    # Chỉ đóng gói bản Ubuntu/Linux (linux-amd64)
+npm run pack:bundle:macos     # Chỉ đóng gói bản macOS (darwin-arm64)
+npm run pack:bundle:windows   # Chỉ đóng gói bản Windows (windows-amd64)
 ```
 Sau đó nạp thư mục `extensions/` trực tiếp vào `chrome://extensions`.
 
@@ -208,13 +207,13 @@ Sau đó nạp thư mục `extensions/` trực tiếp vào `chrome://extensions`
 Bản binary độc lập tích hợp **WebSocket/REST Bridge Server (cổng 58765)**, **MCP Server (stdio)**, **CLI** và runtime DevTools nhúng. Máy sử dụng không phải cài Node.js/npm/FFmpeg hoặc chạy cài dependency. Nhóm DevTools nâng cao tự khởi chạy runtime khi cần và dùng RAM theo tác vụ audit/trace. [Chi tiết](docs/DEVTOOLS.md).
 
 #### Cách A: Tải Bundle Biên Dịch Sẵn Theo 3 Hệ Điều Hành (GitHub Releases)
-Mỗi bundle chứa sẵn `extensions/` + binary đúng nền tảng + script cài đặt 1 lệnh (`install.sh` / `install.ps1`) + `skills/` + `README.md` chuyên biệt cho hệ điều hành đó:
+Mỗi bundle chứa sẵn `extensions/` + `skills/` (đã kèm binary `skills/agent-pilot/scripts/agent-pilot(.exe)` của OS đó) + script cài đặt 1 lệnh (`install.sh` / `install.ps1`) + `README.md` chuyên biệt cho hệ điều hành đó:
 
 | Bản Hệ Điều Hành | Kiến Trúc | Tên Tệp Tải Về | Cài Đặt 1 Lệnh & Tài Liệu Riêng |
 | :--- | :--- | :--- | :--- |
-| 🐧 **Ubuntu / Linux** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.16-beta-linux-amd64.zip`<br/>`agent-pilot-v1.0.16-beta-linux-arm64.zip` | `./install.sh` • [📄 Tài liệu Ubuntu](docs/bundles/README.ubuntu.md) |
-| 🍎 **macOS** | Apple Silicon (`arm64`) / Intel (`amd64`) | `agent-pilot-v1.0.16-beta-darwin-arm64.zip`<br/>`agent-pilot-v1.0.16-beta-darwin-amd64.zip` | `./install.sh` *(tự gỡ `xattr`)* • [📄 Tài liệu macOS](docs/bundles/README.macos.md) |
-| 🪟 **Windows** | x86_64 (`amd64`) / ARM64 (`arm64`) | `agent-pilot-v1.0.16-beta-windows-amd64.zip`<br/>`agent-pilot-v1.0.16-beta-windows-arm64.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` • [📄 Tài liệu Windows](docs/bundles/README.windows.md) |
+| 🐧 **Ubuntu / Linux** | x86_64 (`amd64`) | `agent-pilot-v1.2.0-linux.zip` | `./install.sh` • [📄 Tài liệu Ubuntu](docs/bundles/README.ubuntu.md) |
+| 🍎 **macOS** | Apple Silicon (`arm64`) | `agent-pilot-v1.2.0-macos.zip` | `./install.sh` *(tự gỡ `xattr`)* • [📄 Tài liệu macOS](docs/bundles/README.macos.md) |
+| 🪟 **Windows** | x86_64 (`amd64`) | `agent-pilot-v1.2.0-windows.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` • [📄 Tài liệu Windows](docs/bundles/README.windows.md) |
 
 Trong mỗi bundle, binary nằm trong `skills/agent-pilot/scripts/` theo đúng OS/kiến trúc. Nạp extension rồi trỏ cấu hình MCP vào binary là dùng được, không cần chạy script cài đặt. Script chỉ hỗ trợ đưa binary vào PATH và cài service nếu muốn.
 

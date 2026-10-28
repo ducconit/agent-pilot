@@ -2,20 +2,19 @@
 /**
  * Agent Pilot - Release bundle packer (3 OS editions: Ubuntu/Linux, macOS, Windows)
  *
- * Builds one ZIP per platform (linux/darwin/windows × amd64/arm64) containing:
+ * Builds 3 OS ZIP archives (linux, macos, windows) containing:
  *
- *   agent-pilot-v<version>-<os>-<arch>/
+ *   agent-pilot-v<version>-<os>/
  *   ├── extensions/            Chrome extension (Load unpacked source)
  *   ├── install.sh / .ps1      One-step OS-specific installer script
  *   ├── skills/agent-pilot/    Agent skill bundle + native scripts/ binary
  *   └── README.md              OS-specific installation & MCP guide (docs/bundles/README.<os>.md)
  *
  * Usage:
- *   node scripts/pack_bundle.mjs                      # all 3 OSes (6 platforms)
- *   node scripts/pack_bundle.mjs --os ubuntu          # Ubuntu/Linux only (amd64 + arm64)
- *   node scripts/pack_bundle.mjs --os macos           # macOS only (arm64 + amd64)
- *   node scripts/pack_bundle.mjs --os windows         # Windows only (amd64 + arm64)
- *   node scripts/pack_bundle.mjs --platform linux-amd64
+ *   node scripts/pack_bundle.mjs                      # all 3 OSes (linux, macos, windows)
+ *   node scripts/pack_bundle.mjs --os ubuntu          # Ubuntu/Linux only (linux-amd64)
+ *   node scripts/pack_bundle.mjs --os macos           # macOS only (darwin-arm64)
+ *   node scripts/pack_bundle.mjs --os windows         # Windows only (windows-amd64)
  *   node scripts/pack_bundle.mjs --keep-stage         # keep the staging tree
  *
  * Cross-compilation is pure Go (CGO_ENABLED=0), so every target builds from the
@@ -42,12 +41,9 @@ const BUNDLES_DIR = path.join(DIST_DIR, "bundles");
 const STAGE_DIR = path.join(BUNDLES_DIR, ".stage");
 
 const ALL_PLATFORMS = [
-  { goos: "linux", goarch: "amd64" },
-  { goos: "linux", goarch: "arm64" },
-  { goos: "darwin", goarch: "amd64" },
-  { goos: "darwin", goarch: "arm64" },
-  { goos: "windows", goarch: "amd64" },
-  { goos: "windows", goarch: "arm64" }
+  { osId: "linux", goos: "linux", goarch: "amd64" },
+  { osId: "macos", goos: "darwin", goarch: "arm64" },
+  { osId: "windows", goos: "windows", goarch: "amd64" }
 ];
 
 const OS_EDITION_ASSETS = {
@@ -83,7 +79,11 @@ function normalizeOSAlias(raw) {
 }
 
 function normalizePlatformToken(raw) {
-  return String(raw || "").trim().toLowerCase().replace("/", "-");
+  const token = String(raw || "").trim().toLowerCase().replace("/", "-");
+  if (token === "linux" || token === "ubuntu" || token === "linux-amd64") return "linux";
+  if (token === "macos" || token === "darwin" || token === "darwin-arm64") return "macos";
+  if (token === "windows" || token === "win" || token === "windows-amd64") return "windows";
+  return token;
 }
 
 function parseArgs(argv) {
@@ -109,6 +109,10 @@ function parseArgs(argv) {
 }
 
 function platformLabel(platform) {
+  return platform.osId;
+}
+
+function archLabel(platform) {
   return `${platform.goos}-${platform.goarch}`;
 }
 
@@ -239,11 +243,18 @@ if (platforms.length === 0) {
 console.log("==================================================================");
 console.log("📦 AGENT PILOT - PACKAGING OS-SPECIFIC RELEASE BUNDLES");
 console.log(`📌 Version  : v${version}`);
-console.log(`📌 Platforms: ${platforms.map(platformLabel).join(", ")}`);
+console.log(`📌 Platforms: ${platforms.map((p) => `${platformLabel(p)} (${archLabel(p)})`).join(", ")}`);
 console.log("==================================================================");
 
 fs.mkdirSync(BUNDLES_DIR, { recursive: true });
 fs.rmSync(STAGE_DIR, { recursive: true, force: true });
+if (platforms.length === ALL_PLATFORMS.length) {
+  for (const entry of fs.readdirSync(BUNDLES_DIR)) {
+    if (entry.endsWith(".zip")) {
+      fs.rmSync(path.join(BUNDLES_DIR, entry), { force: true });
+    }
+  }
+}
 
 const bundleResults = [];
 
@@ -254,7 +265,7 @@ for (const platform of platforms) {
   const stageBase = path.join(STAGE_DIR, label);
   const bundleRoot = path.join(stageBase, folderName);
 
-  console.log(`\n→ [${label}] (${assets.editionName}) Building CLI binary & OS bundle...`);
+  console.log(`\n→ [${label}] (${assets.editionName} - ${archLabel(platform)}) Building CLI binary & OS bundle...`);
   fs.mkdirSync(bundleRoot, { recursive: true });
 
   // 1. Extension (same excludes as the Chrome Web Store archive)
@@ -262,7 +273,12 @@ for (const platform of platforms) {
 
   // 2. Skills bundle and its platform-native CLI/MCP binary
   fs.cpSync(SKILLS_DIR, path.join(bundleRoot, "skills"), { recursive: true });
-  const skillBinaryPath = path.join(bundleRoot, "skills", "agent-pilot", "scripts", binaryName(platform));
+  const skillScriptsDir = path.join(bundleRoot, "skills", "agent-pilot", "scripts");
+  fs.mkdirSync(skillScriptsDir, { recursive: true });
+  for (const staleBin of ["agent-pilot", "agent-pilot.exe"]) {
+    fs.rmSync(path.join(skillScriptsDir, staleBin), { force: true });
+  }
+  const skillBinaryPath = path.join(skillScriptsDir, binaryName(platform));
   await buildBinary(platform, skillBinaryPath);
   if (platform.goos !== "windows") {
     fs.chmodSync(skillBinaryPath, 0o755);
@@ -293,6 +309,7 @@ for (const platform of platforms) {
 const checksumLines = bundleResults.map((b) => `${b.sha256}  ${b.zipName}`).join("\n") + "\n";
 const checksumPath = path.join(BUNDLES_DIR, "checksums.txt");
 fs.writeFileSync(checksumPath, checksumLines, "utf-8");
+fs.writeFileSync(path.join(DIST_DIR, "checksums.txt"), checksumLines, "utf-8");
 
 if (!options.keepStage) {
   fs.rmSync(STAGE_DIR, { recursive: true, force: true });

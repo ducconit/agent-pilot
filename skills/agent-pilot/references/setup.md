@@ -31,7 +31,7 @@ ls ~/.agents/skills/agent-pilot/SKILL.md
 
 ## 2. OS-Specific All-in-One Bundle Installation (Recommended)
 
-Each release provides OS-specific bundles (`agent-pilot-v1.0.16-beta-linux-amd64.zip`, `agent-pilot-v1.0.16-beta-darwin-arm64.zip`, `agent-pilot-v1.0.16-beta-windows-amd64.zip`, plus `arm64`/`amd64` variants) containing:
+Each release provides 3 OS-specific bundles (`agent-pilot-v1.2.0-linux.zip`, `agent-pilot-v1.2.0-macos.zip`, `agent-pilot-v1.2.0-windows.zip`) containing:
 - `extensions/` — Chrome/Brave/Edge Manifest V3 unpacked extension
 - `skills/agent-pilot/scripts/agent-pilot` (`agent-pilot.exe` on Windows) — Pre-compiled standalone CLI & MCP server for that OS
 - `install.sh` / `install.ps1` — 1-step automated installer
@@ -41,18 +41,18 @@ Each release provides OS-specific bundles (`agent-pilot-v1.0.16-beta-linux-amd64
 ### Step 1: Run the 1-Step Installer (CLI + Background Service + Skill)
 - **Ubuntu / Linux**:
   ```bash
-  unzip agent-pilot-v1.0.16-beta-linux-amd64.zip -d ~/agent-pilot
-  cd ~/agent-pilot/agent-pilot-v1.0.16-beta-linux-amd64 && ./install.sh
+  unzip agent-pilot-v1.2.0-linux.zip -d ~/agent-pilot
+  cd ~/agent-pilot/agent-pilot-v1.2.0-linux && ./install.sh
   ```
-- **macOS (Apple Silicon / Intel)**:
+- **macOS (Apple Silicon)**:
   ```bash
-  unzip agent-pilot-v1.0.16-beta-darwin-arm64.zip -d ~/agent-pilot
-  cd ~/agent-pilot/agent-pilot-v1.0.16-beta-darwin-arm64 && ./install.sh
+  unzip agent-pilot-v1.2.0-macos.zip -d ~/agent-pilot
+  cd ~/agent-pilot/agent-pilot-v1.2.0-macos && ./install.sh
   ```
 - **Windows (PowerShell)**:
   ```powershell
-  Expand-Archive .\agent-pilot-v1.0.16-beta-windows-amd64.zip -DestinationPath "$HOME\agent-pilot"
-  cd "$HOME\agent-pilot\agent-pilot-v1.0.16-beta-windows-amd64"
+  Expand-Archive .\agent-pilot-v1.2.0-windows.zip -DestinationPath "$HOME\agent-pilot"
+  cd "$HOME\agent-pilot\agent-pilot-v1.2.0-windows"
   powershell -ExecutionPolicy Bypass -File .\install.ps1
   ```
 
