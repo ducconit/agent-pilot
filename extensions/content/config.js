@@ -96,27 +96,90 @@
 
   window.__AP_CONFIG__ = deepFreeze(CONFIG);
 
+  let cachedHtmlDoc = null;
+
+  function isXmlDomDocument() {
+    if (typeof document === "undefined") return false;
+    if (typeof XMLDocument !== "undefined" && document instanceof XMLDocument) return true;
+    if (document.xmlVersion) return true;
+    return false;
+  }
+
+  function getHtmlFactoryDocument() {
+    if (cachedHtmlDoc) return cachedHtmlDoc;
+    if (typeof document !== "undefined" && document.implementation && typeof document.implementation.createHTMLDocument === "function") {
+      cachedHtmlDoc = document.implementation.createHTMLDocument("");
+      return cachedHtmlDoc;
+    }
+    return null;
+  }
+
   /**
-   * Returns true only when the current document is an HTML / XHTML document where
-   * visual UI overlays (Virtual Cursor, Inspector, Feedback Studio, Toast, Loupe)
-   * can safely be mounted. Returns false for XML (text/xml, application/xml,
-   * image/svg+xml), JSON (application/json), plain text, or XMLDocument trees.
+   * Safely set innerHTML on an element even when the active document is an XMLDocument
+   * (e.g. https://www.w3schools.com/xml/note.xml), avoiding XML parser SyntaxErrors on
+   * HTML void elements (<img>, <input>, <br>) and preserving XHTML/SVG namespaces.
+   */
+  function setHtmlContent(el, html = "") {
+    if (!el) return el;
+    const markup = String(html ?? "");
+    const htmlDoc = isXmlDomDocument() ? getHtmlFactoryDocument() : null;
+    if (htmlDoc && typeof el.replaceChildren === "function") {
+      const isSvg = String(el.tagName || "").toLowerCase() === "svg";
+      if (!markup) {
+        el.replaceChildren();
+        return el;
+      }
+      const wrapper = htmlDoc.createElement("div");
+      wrapper.innerHTML = isSvg ? `<svg xmlns="http://www.w3.org/2000/svg">${markup}</svg>` : markup;
+      const sourceParent = isSvg && wrapper.firstElementChild ? wrapper.firstElementChild : wrapper;
+      const adoptedChildren = Array.from(sourceParent.childNodes).map((node) =>
+        typeof document.adoptNode === "function" ? document.adoptNode(node) : node
+      );
+      el.replaceChildren(...adoptedChildren);
+      return el;
+    }
+    el.innerHTML = markup;
+    return el;
+  }
+
+  /**
+   * Create an HTML element in the XHTML namespace (`http://www.w3.org/1999/xhtml`) so
+   * `.style`, `.className`, HTML5 `innerHTML`, and `content.css` rules always work even
+   * when injected into Chrome's XML Viewer (`XMLDocument`, `text/xml`).
+   */
+  function createHtmlElement(tagName = "div", html = "") {
+    const htmlDoc = isXmlDomDocument() ? getHtmlFactoryDocument() : null;
+    let el;
+    if (htmlDoc) {
+      el = htmlDoc.createElement(tagName);
+      if (html) el.innerHTML = String(html);
+      if (typeof document.adoptNode === "function") {
+        el = document.adoptNode(el);
+      }
+    } else if (typeof document.createElementNS === "function" && isXmlDomDocument()) {
+      el = document.createElementNS("http://www.w3.org/1999/xhtml", tagName);
+      if (html) setHtmlContent(el, html);
+    } else {
+      el = document.createElement(tagName);
+      if (html) el.innerHTML = String(html);
+    }
+    return el;
+  }
+
+  /**
+   * Returns true when the current document has an `<html>` root element (including
+   * normal HTML pages, Chrome's XML Viewer on `text/xml` pages like `note.xml`, and
+   * Chrome's JSON viewer) where XHTML UI overlays can be mounted on demand.
+   * Returns false on raw unrendered XML/SVG roots (`<note>`, `<svg>`) without `<html>`.
    */
   function isHtmlDocument() {
     if (typeof document === "undefined" || !document.documentElement) return false;
-    if (typeof XMLDocument !== "undefined" && document instanceof XMLDocument) return false;
-    if (document.xmlVersion) return false;
-    if (typeof document.getElementById === "function" && document.getElementById("webkit-xml-viewer-source-xml")) {
-      return false;
-    }
-    const contentType = String(document.contentType || "").toLowerCase().trim();
-    if (contentType && contentType !== "text/html" && contentType !== "application/xhtml+xml") {
-      return false;
-    }
     const rootTag = String(document.documentElement.tagName || "").toLowerCase();
     if (rootTag !== "html") return false;
     return true;
   }
 
   window.__AP_INTERNAL__.isHtmlDocument = isHtmlDocument;
+  window.__AP_INTERNAL__.createHtmlElement = createHtmlElement;
+  window.__AP_INTERNAL__.setHtmlContent = setHtmlContent;
 })();

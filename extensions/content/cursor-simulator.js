@@ -29,24 +29,32 @@
   let isSessionActive = false;
   let virtualTypeQueue = Promise.resolve();
 
+  function createEl(tagName = "div", html = "") {
+    if (window.__AP_INTERNAL__.createHtmlElement) {
+      return window.__AP_INTERNAL__.createHtmlElement(tagName, html);
+    }
+    const el = document.createElement(tagName);
+    if (html) el.innerHTML = html;
+    return el;
+  }
+
   // Create Cursor Layer in memory (mounted lazily only when virtual cursor is activated on HTML pages)
   const existingCursorLayer = document.getElementById("agent-pilot-cursor-layer");
   if (existingCursorLayer) existingCursorLayer.remove();
-  const cursorLayer = document.createElement("div");
+  const cursorLayer = createEl("div");
   cursorLayer.id = "agent-pilot-cursor-layer";
   cursorLayer.style.display = "none";
 
   // Virtual Pointer Element
-  const virtualCursor = document.createElement("div");
-  virtualCursor.className = "agent-pilot-virtual-cursor";
-  virtualCursor.style.display = "none";
-  virtualCursor.innerHTML = `
+  const virtualCursor = createEl("div", `
     <svg class="agent-pilot-cursor-svg" width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M4 2 L26 14 L14 16 L10 28 Z" fill="#06b6d4" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
       <circle cx="14" cy="14" r="3" fill="#ffffff" />
     </svg>
     <div class="agent-pilot-cursor-badge" id="agent-pilot-coords">(100, 100)</div>
-  `;
+  `);
+  virtualCursor.className = "agent-pilot-virtual-cursor";
+  virtualCursor.style.display = "none";
   const coordsBadgeEl = virtualCursor.querySelector("#agent-pilot-coords");
   cursorLayer.appendChild(virtualCursor);
   updateCursorTransform(currentMouseX, currentMouseY);
@@ -139,7 +147,7 @@
   function renderClickRipple(x, y) {
     if (document.hidden || !ensureCursorLayerMounted()) return;
     cursorLayer.style.display = "block";
-    const ripple = document.createElement("div");
+    const ripple = createEl("div");
     ripple.className = "agent-pilot-click-ripple";
     ripple.style.left = `${Math.round(x)}px`;
     ripple.style.top = `${Math.round(y)}px`;

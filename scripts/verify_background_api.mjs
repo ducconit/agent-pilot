@@ -2312,28 +2312,36 @@ record(
   `annotated=${richAnnRes46.annotated}, ops=${richOps46.length}, hasClip=${richOps46.includes("clip:evenodd")}, hasEllipse=${richOps46.includes("ellipse")}`
 );
 
-// 47. Content scripts do NOT inject UI overlays on XML/JSON documents or at initial page load, and mount lazily only when activated on HTML documents
+// 47. Content scripts do NOT inject UI overlays at initial page load, block raw non-HTML roots (<note>), and support Feedback Studio & overlays on Chrome XML Viewer (text/xml with <html> root) via XHTML factory
 const fsNode = await import("node:fs");
 const vmNode = await import("node:vm");
 const pathNode = await import("node:path");
 const contentRoot47 = pathNode.join(process.cwd(), "extensions");
 
-function runContentModulesInSandbox({ contentType = "text/html", xmlVersion = null, rootTag = "HTML" } = {}) {
+function runContentModulesInSandbox({ contentType = "text/xml", xmlVersion = null, rootTag = "HTML" } = {}) {
   const appendedRootChildren = [];
   const appendedBodyChildren = [];
-  const makeNode = (tag) => {
+  const isXmlDoc = Boolean(xmlVersion);
+
+  const makeNode = (tag, { isHtmlNamespace = true } = {}) => {
     const children = [];
     const classes = new Set();
     const attrs = {};
     let html = "";
     const node = {
       tagName: String(tag || "div").toUpperCase(),
+      namespaceURI: isHtmlNamespace ? "http://www.w3.org/1999/xhtml" : null,
       id: "",
-      style: { display: "", setProperty: () => {} },
+      // In a real XMLDocument, document.createElement() produces an XML Element with .style === undefined
+      style: isHtmlNamespace ? { display: "", setProperty: () => {} } : undefined,
       dataset: {},
       isConnected: false,
       parentNode: null,
       children,
+      childNodes: children,
+      get firstElementChild() {
+        return children[0] || null;
+      },
       get className() {
         return [...classes].join(" ");
       },
@@ -2356,7 +2364,25 @@ function runContentModulesInSandbox({ contentType = "text/html", xmlVersion = nu
         return html;
       },
       set innerHTML(val) {
-        html = String(val || "");
+        const str = String(val || "");
+        // Simulate Chrome's strict XML fragment parser when setting innerHTML directly on a node in an XMLDocument
+        if (node._inXmlDoc && /<(img|input|br)\b[^/>]*>/i.test(str)) {
+          throw new Error("DOMException: Failed to set the 'innerHTML' property on 'Element': The provided markup is invalid XML");
+        }
+        html = str;
+        children.length = 0;
+        if (str) {
+          const parsedChild = makeNode("div", { isHtmlNamespace: true });
+          parsedChild._rawHtml = str;
+          children.push(parsedChild);
+        }
+      },
+      replaceChildren: (...newChildren) => {
+        children.length = 0;
+        newChildren.forEach((c) => {
+          c.parentNode = node;
+          children.push(c);
+        });
       },
       setAttribute: (k, v) => { attrs[k] = String(v); },
       getAttribute: (k) => attrs[k] ?? null,
@@ -2372,20 +2398,22 @@ function runContentModulesInSandbox({ contentType = "text/html", xmlVersion = nu
       },
       addEventListener: () => {},
       removeEventListener: () => {},
+      focus: () => {},
+      select: () => {},
       getBoundingClientRect: () => ({ left: 10, top: 10, width: 100, height: 30, bottom: 40, right: 110 }),
-      querySelector: () => makeNode("div"),
+      querySelector: () => makeNode("div", { isHtmlNamespace: true }),
       querySelectorAll: () => []
     };
     return node;
   };
-  const docEl = makeNode(rootTag);
+  const docEl = makeNode(rootTag, { isHtmlNamespace: true });
   docEl.appendChild = (child) => {
     child.isConnected = true;
     child.parentNode = docEl;
     appendedRootChildren.push(child);
     return child;
   };
-  const bodyEl = rootTag.toLowerCase() === "html" ? makeNode("BODY") : null;
+  const bodyEl = rootTag.toLowerCase() === "html" ? makeNode("BODY", { isHtmlNamespace: true }) : null;
   if (bodyEl) {
     bodyEl.appendChild = (child) => {
       child.isConnected = true;
@@ -2402,7 +2430,20 @@ function runContentModulesInSandbox({ contentType = "text/html", xmlVersion = nu
       hidden: false,
       documentElement: docEl,
       body: bodyEl,
-      createElement: (tag) => makeNode(tag),
+      createElement: (tag) => {
+        const n = makeNode(tag, { isHtmlNamespace: !isXmlDoc });
+        n._inXmlDoc = isXmlDoc;
+        return n;
+      },
+      adoptNode: (node) => {
+        node._inXmlDoc = isXmlDoc;
+        return node;
+      },
+      implementation: {
+        createHTMLDocument: () => ({
+          createElement: (tag) => makeNode(tag, { isHtmlNamespace: true })
+        })
+      },
       getElementById: () => null,
       querySelector: () => null,
       querySelectorAll: () => [],
@@ -2457,19 +2498,31 @@ function runContentModulesInSandbox({ contentType = "text/html", xmlVersion = nu
   return { sandbox, appendedRootChildren, appendedBodyChildren };
 }
 
-const xmlRun47 = runContentModulesInSandbox({ contentType: "text/xml", xmlVersion: "1.0", rootTag: "note" });
-const xmlIsHtml = xmlRun47.sandbox.window.__AP_INTERNAL__.isHtmlDocument();
-xmlRun47.sandbox.window.__AP_INTERNAL__.cursor.activateCursor();
-xmlRun47.sandbox.window.__AP_INTERNAL__.feedback.start();
-xmlRun47.sandbox.window.__AP_INTERNAL__.inspector.toggleInspector(true);
-const xmlTotalInjected = xmlRun47.appendedRootChildren.length + xmlRun47.appendedBodyChildren.length;
+// 47a. Raw non-HTML root (<note>) -> isHtmlDocument() === false, 0 overlays injected
+const rawXmlRun47 = runContentModulesInSandbox({ contentType: "text/xml", xmlVersion: "1.0", rootTag: "note" });
+const rawXmlIsHtml = rawXmlRun47.sandbox.window.__AP_INTERNAL__.isHtmlDocument();
+rawXmlRun47.sandbox.window.__AP_INTERNAL__.cursor.activateCursor();
+rawXmlRun47.sandbox.window.__AP_INTERNAL__.feedback.start();
+rawXmlRun47.sandbox.window.__AP_INTERNAL__.inspector.toggleInspector(true);
+const rawXmlTotalInjected = rawXmlRun47.appendedRootChildren.length + rawXmlRun47.appendedBodyChildren.length;
 
-const jsonRun47 = runContentModulesInSandbox({ contentType: "application/json", xmlVersion: null, rootTag: "HTML" });
-const jsonIsHtml = jsonRun47.sandbox.window.__AP_INTERNAL__.isHtmlDocument();
-jsonRun47.sandbox.window.__AP_INTERNAL__.cursor.activateCursor();
-jsonRun47.sandbox.window.__AP_INTERNAL__.feedback.start();
-const jsonTotalInjected = jsonRun47.appendedRootChildren.length + jsonRun47.appendedBodyChildren.length;
+// 47b. Chrome XML Viewer (text/xml, xmlVersion="1.0", rootTag="HTML" like w3schools note.xml) ->
+// 0 elements at initial load, and Feedback Studio + Popover + Annotator + Cursor mount cleanly in XHTML namespace when activated
+const xmlViewerRun47 = runContentModulesInSandbox({ contentType: "text/xml", xmlVersion: "1.0", rootTag: "HTML" });
+const xmlViewerIsHtml = xmlViewerRun47.sandbox.window.__AP_INTERNAL__.isHtmlDocument();
+const xmlViewerInitialInjected = xmlViewerRun47.appendedRootChildren.length + xmlViewerRun47.appendedBodyChildren.length;
+xmlViewerRun47.sandbox.window.__AP_INTERNAL__.feedback.start();
+xmlViewerRun47.sandbox.window.__AP_INTERNAL__.feedbackStudio.modals.openCommentPopover(
+  { mode: "element", screenshotDataUrl: "data:image/png;base64,iVBORw0KGgo=", dom: { tagName: "note", selector: "note" } },
+  { left: 20, top: 20, bottom: 50 }
+);
+xmlViewerRun47.sandbox.window.__AP_INTERNAL__.cursor.activateCursor(0);
+const xmlViewerAfterActivate = xmlViewerRun47.appendedRootChildren.length + xmlViewerRun47.appendedBodyChildren.length;
+const xmlViewerAllHaveXhtmlNamespace = [...xmlViewerRun47.appendedRootChildren, ...xmlViewerRun47.appendedBodyChildren].every(
+  (el) => el.namespaceURI === "http://www.w3.org/1999/xhtml" && el.style !== undefined
+);
 
+// 47c. Normal HTML page -> 0 elements at initial load, lazy-mounted on demand
 const htmlRun47 = runContentModulesInSandbox({ contentType: "text/html", xmlVersion: null, rootTag: "HTML" });
 const htmlIsHtml = htmlRun47.sandbox.window.__AP_INTERNAL__.isHtmlDocument();
 const htmlInitialInjected = htmlRun47.appendedRootChildren.length + htmlRun47.appendedBodyChildren.length;
@@ -2480,17 +2533,19 @@ htmlRun47.sandbox.window.__AP_INTERNAL__.feedback.start();
 const htmlAfterFeedbackInjected = htmlRun47.appendedRootChildren.length + htmlRun47.appendedBodyChildren.length;
 
 record(
-  "47. Content scripts skip overlay mounting on XML/JSON documents and lazy-mount overlays only when activated on HTML documents",
-  xmlIsHtml === false &&
-    xmlTotalInjected === 0 &&
-    jsonIsHtml === false &&
-    jsonTotalInjected === 0 &&
+  "47. Content scripts mount 0 overlays at initial load, skip raw <note> roots, and mount XHTML overlays cleanly when Feedback Studio is activated on Chrome XML Viewer (text/xml)",
+  rawXmlIsHtml === false &&
+    rawXmlTotalInjected === 0 &&
+    xmlViewerIsHtml === true &&
+    xmlViewerInitialInjected === 0 &&
+    xmlViewerAfterActivate > 1 &&
+    xmlViewerAllHaveXhtmlNamespace === true &&
     htmlIsHtml === true &&
     htmlInitialInjected === 0 &&
     htmlAfterCursorInjected === 1 &&
     htmlAfterFeedbackInjected > 1 &&
     cursorSvgMarkup.includes('width="28" height="28"'),
-  `xmlIsHtml=${xmlIsHtml} (injected=${xmlTotalInjected}), jsonIsHtml=${jsonIsHtml} (injected=${jsonTotalInjected}), htmlInitial=${htmlInitialInjected}, afterCursor=${htmlAfterCursorInjected}, afterFeedback=${htmlAfterFeedbackInjected}`
+  `rawXml=${rawXmlIsHtml}(${rawXmlTotalInjected}), xmlViewer=${xmlViewerIsHtml}(init=${xmlViewerInitialInjected},active=${xmlViewerAfterActivate},xhtml=${xmlViewerAllHaveXhtmlNamespace}), htmlInit=${htmlInitialInjected}`
 );
 
 recorder.summarize();

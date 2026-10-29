@@ -10,19 +10,27 @@
   if (window.__AP_INTERNAL__.__guards.fsPinned) return;
   window.__AP_INTERNAL__.__guards.fsPinned = true;
 
+  function createEl(tagName = "div", html = "") {
+    if (window.__AP_INTERNAL__.createHtmlElement) {
+      return window.__AP_INTERNAL__.createHtmlElement(tagName, html);
+    }
+    const el = document.createElement(tagName);
+    if (html) el.innerHTML = html;
+    return el;
+  }
+
   // Setup DOM Elements in memory (mounted lazily when Feedback Studio starts on HTML pages)
   const existingPinnedLayer = document.getElementById("agent-pilot-feedback-pinned-layer");
   if (existingPinnedLayer) existingPinnedLayer.remove();
-  const pinnedLayer = document.createElement("div");
+  const pinnedLayer = createEl("div");
   pinnedLayer.id = "agent-pilot-feedback-pinned-layer";
   pinnedLayer.className = "agent-pilot-feedback-pinned-layer hidden";
   pinnedLayer.style.display = "none";
 
-  const draftBox = document.createElement("div");
+  const draftBox = createEl("div", `<span class="ap-pinned-badge" id="ap-draft-badge">Đang soạn...</span>`);
   draftBox.id = "agent-pilot-feedback-draft-box";
   draftBox.className = "ap-pinned-box draft hidden";
   draftBox.style.display = "none";
-  draftBox.innerHTML = `<span class="ap-pinned-badge" id="ap-draft-badge">Đang soạn...</span>`;
   pinnedLayer.appendChild(draftBox);
 
   function canMountUi() {
@@ -119,7 +127,7 @@
       const pageX = (item.clip.pageX !== undefined) ? item.clip.pageX : (item.clip.x + (item.clip.scrollX !== undefined ? item.clip.scrollX : 0));
       const pageY = (item.clip.pageY !== undefined) ? item.clip.pageY : (item.clip.y + (item.clip.scrollY !== undefined ? item.clip.scrollY : 0));
 
-      const box = document.createElement("div");
+      const box = createEl("div");
       box.className = "ap-pinned-box";
       box.dataset.id = item.id;
       box.style.setProperty("--box-color", palette.color);
@@ -137,14 +145,13 @@
         box.classList.add("flip-badge-inside");
       }
 
-      const badge = document.createElement("span");
-      badge.className = "ap-pinned-badge";
-      badge.innerHTML = `
+      const badge = createEl("span", `
         <span class="ap-pinned-badge-num" title="Bấm để sửa ghi chú #${idx + 1}">#${idx + 1}</span>
         <span role="button" tabindex="0" class="ap-pinned-edit-btn" title="Sửa ghi chú #${idx + 1}">✏️</span>
         <span role="button" tabindex="0" class="ap-pinned-del-btn" title="Xóa vị trí #${idx + 1}">✕</span>
         ${item.comment ? `<div class="ap-pinned-tooltip" title="Bấm để sửa"><strong>#${idx + 1}:</strong> ${escapeHtml(item.comment)}</div>` : ""}
-      `;
+      `);
+      badge.className = "ap-pinned-badge";
 
       const editBtn = badge.querySelector(".ap-pinned-edit-btn");
       if (editBtn) {

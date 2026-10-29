@@ -13,16 +13,29 @@
   const constants = window.__AP_INTERNAL__.feedbackStudio.constants || {};
   const escapeHtml = constants.escapeHtml || ((s) => s);
 
+  function createEl(tagName = "div", html = "") {
+    if (window.__AP_INTERNAL__.createHtmlElement) {
+      return window.__AP_INTERNAL__.createHtmlElement(tagName, html);
+    }
+    const el = document.createElement(tagName);
+    if (html) el.innerHTML = html;
+    return el;
+  }
+
+  function setHtml(el, html = "") {
+    if (window.__AP_INTERNAL__.setHtmlContent) {
+      return window.__AP_INTERNAL__.setHtmlContent(el, html);
+    }
+    if (el) el.innerHTML = html;
+    return el;
+  }
+
   // =========================================================================
   // 1. Quick Comment Popover (Element & Region Modes)
   // =========================================================================
   const existingPopover = document.getElementById("agent-pilot-feedback-popover");
   if (existingPopover) existingPopover.remove();
-  const commentPopover = document.createElement("div");
-  commentPopover.id = "agent-pilot-feedback-popover";
-  commentPopover.className = "agent-pilot-feedback-popover hidden";
-  commentPopover.style.display = "none";
-  commentPopover.innerHTML = `
+  const commentPopover = createEl("div", `
     <div class="ap-popover-header" title="Nhấp giữ và kéo để di chuyển tự do">
       <div class="ap-popover-title-row">
         <span class="ap-popover-drag-icon">⋮⋮</span>
@@ -42,7 +55,10 @@
       <div role="button" tabindex="0" class="ap-popover-btn ap-btn-cancel" id="ap-popover-btn-cancel">Hủy</div>
       <div role="button" tabindex="0" class="ap-popover-btn ap-btn-submit" id="ap-popover-btn-save">✓ Lưu Chú Thích</div>
     </div>
-  `;
+  `);
+  commentPopover.id = "agent-pilot-feedback-popover";
+  commentPopover.className = "agent-pilot-feedback-popover hidden";
+  commentPopover.style.display = "none";
 
   // Enable free dragging via header
   if (constants?.makeDraggable) {
@@ -76,7 +92,7 @@
       metaHtml += `<div class="ap-meta-pos">📐 ${capture.clip.width}×${capture.clip.height}px (x:${capture.clip.x}, y:${capture.clip.y})</div>`;
     }
 
-    metaEl.innerHTML = metaHtml;
+    setHtml(metaEl, metaHtml);
 
     // Position popover near anchor (supports both DOMRect and {x, y, width, height})
     const aLeft = anchorRect.left ?? anchorRect.x ?? 0;
@@ -134,7 +150,7 @@
     } else if (item.clip) {
       metaHtml += `<div class="ap-meta-pos">📐 ${item.clip.width}×${item.clip.height}px (x:${item.clip.x}, y:${item.clip.y})</div>`;
     }
-    metaEl.innerHTML = metaHtml;
+    setHtml(metaEl, metaHtml);
 
     // Position popover near anchor
     const aLeft = anchorRect?.left ?? anchorRect?.x ?? 0;
@@ -175,11 +191,7 @@
   // =========================================================================
   const existingAnnotator = document.getElementById("agent-pilot-feedback-annotator");
   if (existingAnnotator) existingAnnotator.remove();
-  const annotatorModal = document.createElement("div");
-  annotatorModal.id = "agent-pilot-feedback-annotator";
-  annotatorModal.className = "agent-pilot-feedback-annotator hidden";
-  annotatorModal.style.display = "none";
-  annotatorModal.innerHTML = `
+  const annotatorModal = createEl("div", `
     <div class="ap-annotator-backdrop"></div>
     <div class="ap-annotator-dialog">
       <div class="ap-annotator-header">
@@ -210,7 +222,10 @@
         <div role="button" tabindex="0" class="ap-popover-btn ap-btn-submit" id="ap-annotator-btn-save">✓ Lưu Chú Thích Này</div>
       </div>
     </div>
-  `;
+  `);
+  annotatorModal.id = "agent-pilot-feedback-annotator";
+  annotatorModal.className = "agent-pilot-feedback-annotator hidden";
+  annotatorModal.style.display = "none";
 
   // Shared config with local fallbacks (see content/config.js).
   const T = (window.__AP_CONFIG__ && window.__AP_CONFIG__.timeouts) || {};
@@ -266,7 +281,7 @@
     };
     img.src = dataUrl;
     byId("ap-annotator-comment").value = "";
-    byId("ap-annotator-svg").innerHTML = "";
+    setHtml(byId("ap-annotator-svg"), "");
     renderPinsList();
 
     annotatorModal.classList.remove("hidden");
@@ -289,10 +304,10 @@
   function renderPinsList() {
     const list = byId("ap-pins-list");
     if (!currentAnnotations.length) {
-      list.innerHTML = `<div class="ap-empty-hint">Chưa có đánh dấu nào. Chọn "Ghim điểm" hoặc "Khung" để đánh dấu vị trí cần sửa trên ảnh.</div>`;
+      setHtml(list, `<div class="ap-empty-hint">Chưa có đánh dấu nào. Chọn "Ghim điểm" hoặc "Khung" để đánh dấu vị trí cần sửa trên ảnh.</div>`);
       return;
     }
-    list.innerHTML = currentAnnotations.map((ann, idx) => {
+    setHtml(list, currentAnnotations.map((ann, idx) => {
       const num = idx + 1;
       const isBox = ann.type === "box";
       const icon = isBox ? "⬜" : "📍";
@@ -308,7 +323,7 @@
         <div role="button" tabindex="0" class="ap-pin-del" data-idx="${idx}" title="Xóa đánh dấu #${num}">🗑️</div>
       </div>
     `;
-    }).join("");
+    }).join(""));
 
     list.querySelectorAll(".ap-pin-input").forEach((input) => {
       input.oninput = (e) => {
@@ -376,7 +391,7 @@
       `;
     }
 
-    svg.innerHTML = svgHtml;
+    setHtml(svg, svgHtml);
   }
 
   // =========================================================================
@@ -384,11 +399,7 @@
   // =========================================================================
   const existingListModal = document.getElementById("agent-pilot-feedback-list-modal");
   if (existingListModal) existingListModal.remove();
-  const listModal = document.createElement("div");
-  listModal.id = "agent-pilot-feedback-list-modal";
-  listModal.className = "agent-pilot-feedback-list-modal hidden";
-  listModal.style.display = "none";
-  listModal.innerHTML = `
+  const listModal = createEl("div", `
     <div class="ap-list-backdrop"></div>
     <div class="ap-list-dialog">
       <div class="ap-list-header">
@@ -409,7 +420,10 @@
         </div>
       </div>
     </div>
-  `;
+  `);
+  listModal.id = "agent-pilot-feedback-list-modal";
+  listModal.className = "agent-pilot-feedback-list-modal hidden";
+  listModal.style.display = "none";
 
   function byId(id) {
     return (
@@ -451,19 +465,19 @@
     const PIN_COLORS = constants.PIN_COLORS || [];
 
     if (!items.length) {
-      container.innerHTML = `
+      setHtml(container, `
         <div class="ap-empty-state">
           <div class="ap-empty-icon">✏️</div>
           <div class="ap-empty-title">Chưa có vị trí nào được đánh dấu</div>
           <div class="ap-empty-desc">Chọn "Phần tử", "Vùng chọn" hoặc "Màn hình" trên thanh HUD để thêm yêu cầu sửa đổi cho Agent.</div>
         </div>
-      `;
+      `);
       return;
     }
 
     const itemSchema = window.__AP_INTERNAL__.feedbackStudio.itemSchema;
 
-    container.innerHTML = items.map((item, idx) => {
+    setHtml(container, items.map((item, idx) => {
       const palette = PIN_COLORS[idx % PIN_COLORS.length] || { color: "#38bdf8" };
       const safeId = escapeHtml(item.id);
       const mode = (itemSchema && itemSchema.MODES.includes(item.mode)) ? item.mode : "element";
@@ -511,7 +525,7 @@
         </div>
       </div>
     `;
-    }).join("");
+    }).join(""));
 
     // Bind Edit & Delete buttons
     container.querySelectorAll(".btn-delete").forEach((btn) => {

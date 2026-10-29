@@ -13,6 +13,13 @@
   const TOAST_DURATION = T.toastMs || 3200;
   const TOAST_FADE_MS = T.toastFadeMs || 400;
 
+  function createEl(tagName = "div") {
+    if (window.__AP_INTERNAL__.createHtmlElement) {
+      return window.__AP_INTERNAL__.createHtmlElement(tagName);
+    }
+    return document.createElement(tagName);
+  }
+
   function showToast(message) {
     if (window.__AP_INTERNAL__.isHtmlDocument && !window.__AP_INTERNAL__.isHtmlDocument()) {
       return;
@@ -20,11 +27,11 @@
     const existing = document.querySelector(".agent-pilot-toast");
     if (existing) existing.remove();
 
-    const toast = document.createElement("div");
+    const toast = createEl("div");
     toast.className = "agent-pilot-toast";
-    const icon = document.createElement("span");
+    const icon = createEl("span");
     icon.textContent = "🚀";
-    const text = document.createElement("div");
+    const text = createEl("div");
     text.textContent = String(message ?? "");
     toast.appendChild(icon);
     toast.appendChild(text);

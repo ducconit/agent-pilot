@@ -176,12 +176,15 @@
       showToast(`📋 Đã copy ${items.length} vị trí kèm chẩn đoán QA! Hãy dán (Ctrl+V) vào khung chat Agent.`);
     } catch (err) {
       // Fallback via textarea
-      const ta = document.createElement("textarea");
+      const ta = window.__AP_INTERNAL__.createHtmlElement
+        ? window.__AP_INTERNAL__.createHtmlElement("textarea")
+        : document.createElement("textarea");
       ta.value = md;
-      document.body.appendChild(ta);
+      const parent = document.body || document.documentElement;
+      parent.appendChild(ta);
       ta.select();
       document.execCommand("copy");
-      document.body.removeChild(ta);
+      parent.removeChild(ta);
       showToast(`📋 Đã copy ${items.length} vị trí chú thích vào Clipboard!`);
     }
   }

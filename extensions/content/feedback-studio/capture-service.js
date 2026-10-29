@@ -76,7 +76,9 @@
           return resolve(fullDataUrl);
         }
 
-        const canvas = document.createElement("canvas");
+        const canvas = window.__AP_INTERNAL__.createHtmlElement
+          ? window.__AP_INTERNAL__.createHtmlElement("canvas")
+          : document.createElement("canvas");
         canvas.width = sw;
         canvas.height = sh;
         const ctx = canvas.getContext("2d");

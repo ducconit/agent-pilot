@@ -179,7 +179,7 @@ flowchart LR
 ### 1. Cài Đặt Chrome Extension
 
 #### Cách A: Cài đặt từ Bản Phát Hành (Khuyên dùng)
-1. Tải **gói bundle** cho đúng hệ điều hành của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) — ví dụ `agent-pilot-v1.2.1-linux.zip`, `agent-pilot-v1.2.1-macos.zip`, hoặc `agent-pilot-v1.2.1-windows.zip` (đã gồm sẵn `extensions/` + `skills/` có binary CLI của OS đó + script cài đặt + `README.md` hướng dẫn).
+1. Tải **gói bundle** cho đúng hệ điều hành của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases) — ví dụ `agent-pilot-v1.3.0-linux.zip`, `agent-pilot-v1.3.0-macos.zip`, hoặc `agent-pilot-v1.3.0-windows.zip` (đã gồm sẵn `extensions/` + `skills/` có binary CLI của OS đó + script cài đặt + `README.md` hướng dẫn).
 2. Giải nén tệp `.zip` ra một thư mục cố định.
 3. Mở trình duyệt Chrome, truy cập: `chrome://extensions`.
 4. Gạt bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải.
@@ -211,9 +211,9 @@ Mỗi bundle chứa sẵn `extensions/` + `skills/` (đã kèm binary `skills/ag
 
 | Bản Hệ Điều Hành | Kiến Trúc | Tên Tệp Tải Về | Cài Đặt 1 Lệnh & Tài Liệu Riêng |
 | :--- | :--- | :--- | :--- |
-| 🐧 **Ubuntu / Linux** | x86_64 (`amd64`) | `agent-pilot-v1.2.1-linux.zip` | `./install.sh` • [📄 Tài liệu Ubuntu](docs/bundles/README.ubuntu.md) |
-| 🍎 **macOS** | Apple Silicon (`arm64`) | `agent-pilot-v1.2.1-macos.zip` | `./install.sh` *(tự gỡ `xattr`)* • [📄 Tài liệu macOS](docs/bundles/README.macos.md) |
-| 🪟 **Windows** | x86_64 (`amd64`) | `agent-pilot-v1.2.1-windows.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` • [📄 Tài liệu Windows](docs/bundles/README.windows.md) |
+| 🐧 **Ubuntu / Linux** | x86_64 (`amd64`) | `agent-pilot-v1.3.0-linux.zip` | `./install.sh` • [📄 Tài liệu Ubuntu](docs/bundles/README.ubuntu.md) |
+| 🍎 **macOS** | Apple Silicon (`arm64`) | `agent-pilot-v1.3.0-macos.zip` | `./install.sh` *(tự gỡ `xattr`)* • [📄 Tài liệu macOS](docs/bundles/README.macos.md) |
+| 🪟 **Windows** | x86_64 (`amd64`) | `agent-pilot-v1.3.0-windows.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` • [📄 Tài liệu Windows](docs/bundles/README.windows.md) |
 
 Trong mỗi bundle, binary nằm trong `skills/agent-pilot/scripts/` theo đúng OS/kiến trúc. Nạp extension rồi trỏ cấu hình MCP vào binary là dùng được, không cần chạy script cài đặt. Script chỉ hỗ trợ đưa binary vào PATH và cài service nếu muốn.
 

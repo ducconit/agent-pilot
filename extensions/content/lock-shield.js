@@ -64,7 +64,9 @@
         lockOverlayEl = existingOverlay;
       } else {
         if (!lockOverlayEl) {
-          lockOverlayEl = document.createElement("div");
+          lockOverlayEl = window.__AP_INTERNAL__.createHtmlElement
+            ? window.__AP_INTERNAL__.createHtmlElement("div")
+            : document.createElement("div");
           lockOverlayEl.id = "agent-pilot-lock-overlay";
           lockOverlayEl.style.display = "none";
         }

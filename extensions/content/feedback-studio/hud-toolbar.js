@@ -13,11 +13,7 @@
   // 1. Create Floating HUD Toolbar DOM Element in memory (mounted lazily when Feedback Studio starts)
   const existingHud = document.getElementById("agent-pilot-feedback-hud");
   if (existingHud) existingHud.remove();
-  const hud = document.createElement("div");
-  hud.id = "agent-pilot-feedback-hud";
-  hud.className = "agent-pilot-feedback-hud hidden";
-  hud.style.display = "none";
-  hud.innerHTML = `
+  const hudMarkup = `
     <div class="ap-hud-drag-handle">
       <span class="ap-hud-badge">✏️ CHÚ THÍCH UI</span>
       <span class="ap-hud-status" id="ap-hud-item-count">0 vị trí</span>
@@ -37,6 +33,16 @@
       <div role="button" tabindex="0" class="ap-hud-close-btn" id="ap-hud-btn-close" title="Thoát chế độ chú thích UI">✕ Thoát</div>
     </div>
   `;
+  const hud = window.__AP_INTERNAL__.createHtmlElement
+    ? window.__AP_INTERNAL__.createHtmlElement("div", hudMarkup)
+    : (() => {
+        const el = document.createElement("div");
+        el.innerHTML = hudMarkup;
+        return el;
+      })();
+  hud.id = "agent-pilot-feedback-hud";
+  hud.className = "agent-pilot-feedback-hud hidden";
+  hud.style.display = "none";
 
   function canMountUi() {
     return !window.__AP_INTERNAL__.isHtmlDocument || window.__AP_INTERNAL__.isHtmlDocument();

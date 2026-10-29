@@ -145,11 +145,7 @@
 
     loupeEl = document.getElementById("agent-pilot-eyedropper-loupe");
     if (!loupeEl) {
-      loupeEl = document.createElement("div");
-      loupeEl.id = "agent-pilot-eyedropper-loupe";
-      loupeEl.className = "agent-pilot-loupe-container";
-      loupeEl.style.display = "none";
-      loupeEl.innerHTML = `
+      const loupeHtml = `
         <div class="agent-pilot-loupe-lens">
           <canvas id="agent-pilot-loupe-canvas" width="132" height="132"></canvas>
         </div>
@@ -162,6 +158,15 @@
           <div class="agent-pilot-loupe-hint">Click để chọn • Esc để hủy</div>
         </div>
       `;
+      if (window.__AP_INTERNAL__.createHtmlElement) {
+        loupeEl = window.__AP_INTERNAL__.createHtmlElement("div", loupeHtml);
+      } else {
+        loupeEl = document.createElement("div");
+        loupeEl.innerHTML = loupeHtml;
+      }
+      loupeEl.id = "agent-pilot-eyedropper-loupe";
+      loupeEl.className = "agent-pilot-loupe-container";
+      loupeEl.style.display = "none";
       (document.body || document.documentElement).appendChild(loupeEl);
     }
 
@@ -186,7 +191,9 @@
           const img = new Image();
           img.onload = () => {
             if (!snapshotCanvas) {
-              snapshotCanvas = document.createElement("canvas");
+              snapshotCanvas = window.__AP_INTERNAL__.createHtmlElement
+                ? window.__AP_INTERNAL__.createHtmlElement("canvas")
+                : document.createElement("canvas");
             }
             snapshotCanvas.width = img.naturalWidth;
             snapshotCanvas.height = img.naturalHeight;

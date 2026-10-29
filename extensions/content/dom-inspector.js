@@ -44,15 +44,32 @@
   // Inspector UI Elements (mounted lazily on HTML pages when inspector/snap starts)
   // =========================================================================
 
+  function createEl(tagName = "div", html = "") {
+    if (window.__AP_INTERNAL__.createHtmlElement) {
+      return window.__AP_INTERNAL__.createHtmlElement(tagName, html);
+    }
+    const el = document.createElement(tagName);
+    if (html) el.innerHTML = html;
+    return el;
+  }
+
+  function setHtml(el, html = "") {
+    if (window.__AP_INTERNAL__.setHtmlContent) {
+      return window.__AP_INTERNAL__.setHtmlContent(el, html);
+    }
+    if (el) el.innerHTML = html;
+    return el;
+  }
+
   const existingInspectorBox = document.getElementById("agent-pilot-inspector-box");
   if (existingInspectorBox) existingInspectorBox.remove();
-  const inspectorBox = document.createElement("div");
+  const inspectorBox = createEl("div");
   inspectorBox.id = "agent-pilot-inspector-box";
   inspectorBox.style.display = "none";
 
   const existingInspectorTooltip = document.getElementById("agent-pilot-inspector-tooltip");
   if (existingInspectorTooltip) existingInspectorTooltip.remove();
-  const inspectorTooltip = document.createElement("div");
+  const inspectorTooltip = createEl("div");
   inspectorTooltip.id = "agent-pilot-inspector-tooltip";
   inspectorTooltip.style.display = "none";
 
@@ -489,7 +506,7 @@
       ? `<div style="font-size: 10px; color: #38bdf8; margin-top: 2px;">🧪 ${escapeHtml(testInfo.attr)}="${escapeHtml(testInfo.value)}"</div>`
       : "";
 
-    inspectorTooltip.innerHTML = `
+    setHtml(inspectorTooltip, `
       <div class="agent-pilot-tooltip-header">
         <span class="agent-pilot-tag">&lt;${safeTag}&gt;</span>
         <span class="agent-pilot-class">${safeClasses}</span>
@@ -498,7 +515,7 @@
       <div class="agent-pilot-selector">${safeSelector}</div>
       ${testIdLine}
       <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Tọa độ: (${Math.round(rect.left)}, ${Math.round(rect.top)})</div>
-    `;
+    `);
 
     // Position tooltip above or below element
     let tooltipTop = rect.top - (testInfo ? 70 : 54);
@@ -624,13 +641,13 @@
     inspectorBox.style.display = "block";
 
     const safeTag = escapeHtml(target.tagName.toLowerCase());
-    inspectorTooltip.innerHTML = `
+    setHtml(inspectorTooltip, `
       <div class="agent-pilot-tooltip-header" style="color: #a855f7;">
         <span class="agent-pilot-tag" style="background: rgba(168, 85, 247, 0.2); color: #d8b4fe;">📸 &lt;${safeTag}&gt;</span>
         <span class="agent-pilot-dimensions">${Math.round(rect.width)} × ${Math.round(rect.height)}</span>
       </div>
       <div style="font-size: 11px; color: #cbd5e1; margin-top: 3px;">🎯 Click để chụp phần tử này • Esc để hủy</div>
-    `;
+    `);
 
     let tooltipTop = rect.top - 52;
     if (tooltipTop < 10) tooltipTop = rect.bottom + 10;
@@ -746,10 +763,7 @@
 
   const existingCropOverlay = document.getElementById("agent-pilot-crop-overlay");
   if (existingCropOverlay) existingCropOverlay.remove();
-  const cropOverlay = document.createElement("div");
-  cropOverlay.id = "agent-pilot-crop-overlay";
-  cropOverlay.style.display = "none";
-  cropOverlay.innerHTML = `
+  const cropOverlay = createEl("div", `
     <div id="agent-pilot-crop-box" style="display: none;">
       <div class="agent-pilot-crop-toolbar">
         <span class="agent-pilot-crop-dims" id="agent-pilot-crop-dims">0 × 0</span>
@@ -757,7 +771,9 @@
         <div role="button" tabindex="0" class="agent-pilot-crop-btn cancel" id="agent-pilot-crop-cancel">✕ Hủy</div>
       </div>
     </div>
-  `;
+  `);
+  cropOverlay.id = "agent-pilot-crop-overlay";
+  cropOverlay.style.display = "none";
 
   const cropBox = cropOverlay.querySelector("#agent-pilot-crop-box");
   const cropDims = cropOverlay.querySelector("#agent-pilot-crop-dims");

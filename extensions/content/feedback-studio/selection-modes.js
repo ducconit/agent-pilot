@@ -18,17 +18,26 @@
   // DOM Elements Setup (mounted lazily when Feedback Studio starts on HTML pages)
   // =========================================================================
 
+  function createEl(tagName = "div", html = "") {
+    if (window.__AP_INTERNAL__.createHtmlElement) {
+      return window.__AP_INTERNAL__.createHtmlElement(tagName, html);
+    }
+    const el = document.createElement(tagName);
+    if (html) el.innerHTML = html;
+    return el;
+  }
+
   // 1. Element Highlighter Box & Tooltip
   const existingHighlighter = document.getElementById("agent-pilot-feedback-highlighter");
   if (existingHighlighter) existingHighlighter.remove();
-  const highlighter = document.createElement("div");
+  const highlighter = createEl("div");
   highlighter.id = "agent-pilot-feedback-highlighter";
   highlighter.className = "agent-pilot-feedback-highlighter hidden";
   highlighter.style.display = "none";
 
   const existingTooltip = document.getElementById("agent-pilot-feedback-tooltip");
   if (existingTooltip) existingTooltip.remove();
-  const elementTooltip = document.createElement("div");
+  const elementTooltip = createEl("div");
   elementTooltip.id = "agent-pilot-feedback-tooltip";
   elementTooltip.className = "agent-pilot-feedback-tooltip hidden";
   elementTooltip.style.display = "none";
@@ -36,14 +45,13 @@
   // 2. Region Crop Overlay & Box
   const existingCropOverlay = document.getElementById("agent-pilot-feedback-crop-overlay");
   if (existingCropOverlay) existingCropOverlay.remove();
-  const cropOverlay = document.createElement("div");
+  const cropOverlay = createEl("div", `
+    <div class="ap-crop-hint">Kéo chuột để chọn vùng cần sửa • Nhấn Esc để hủy</div>
+    <div class="ap-crop-box" id="ap-feedback-crop-box" style="display: none;"></div>
+  `);
   cropOverlay.id = "agent-pilot-feedback-crop-overlay";
   cropOverlay.className = "agent-pilot-feedback-crop-overlay hidden";
   cropOverlay.style.display = "none";
-  cropOverlay.innerHTML = `
-    <div class="ap-crop-hint">Kéo chuột để chọn vùng cần sửa • Nhấn Esc để hủy</div>
-    <div class="ap-crop-box" id="ap-feedback-crop-box" style="display: none;"></div>
-  `;
   const cropBox = cropOverlay.querySelector("#ap-feedback-crop-box");
 
   function canMountUi() {
