@@ -17,8 +17,15 @@ const BINARY_NAME = process.platform === "win32" ? "agent-pilot.exe" : "agent-pi
 const binaryPath = path.join(ROOT_DIR, "cli", BINARY_NAME);
 
 if (!fs.existsSync(binaryPath)) {
-  console.error(`❌ CLI binary not found at ${binaryPath}. Run "npm run build:cli" first.`);
-  process.exit(1);
+  console.log(`→ CLI binary not found at ${binaryPath}. Running build:cli first...`);
+  const buildRes = spawnSync(process.execPath, [path.join(ROOT_DIR, "scripts", "build_cli.mjs")], {
+    cwd: ROOT_DIR,
+    stdio: "inherit"
+  });
+  if (buildRes.error || (buildRes.status ?? 1) !== 0 || !fs.existsSync(binaryPath)) {
+    console.error(`❌ Failed to build CLI binary for export.`);
+    process.exit(1);
+  }
 }
 
 const targets = [

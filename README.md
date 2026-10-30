@@ -136,7 +136,7 @@ agent-pilot-extension/
 │   ├── build_cli.mjs                   # Build CLI tĩnh cross-platform (thay cho env-var prefix POSIX)
 │   ├── embed_skills.mjs                # Nhúng kỹ năng vào CLI Go dạng base64 (cli/internal/skill/assets.go)
 │   ├── export_mcp.mjs                  # Xuất schema MCP ra repo + config Antigravity (không cần `~`)
-│   ├── export_mcp_schemas.mjs          # Trích xuất schema MCP tự động (SSOT)
+│   ├── export_mcp.mjs                  # Trích xuất schema MCP tự động (SSOT)
 │   ├── lint.mjs                        # Syntax-check mọi file .js/.mjs trong extensions/ và scripts/
 │   ├── pack_extension.mjs              # Đóng gói tiện ích ra ZIP (kiểm tra manifest, dùng cho CWS)
 │   ├── pack_bundle.mjs                 # Đóng gói bundle từng nền tảng: extensions + binary + skills + README

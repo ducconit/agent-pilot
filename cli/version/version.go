@@ -7,7 +7,7 @@
 //	-X github.com/ducconit/agent-pilot-extension/cli/version.Commit=abc1234
 //	-X github.com/ducconit/agent-pilot-extension/cli/version.Date=2026-09-19T10:00:00Z
 //
-// scripts/build_cli.mjs, scripts/pack_bundle.mjs and scripts/export_mcp_schemas.mjs
+// scripts/build_cli.mjs, scripts/pack_bundle.mjs and scripts/export_mcp.mjs
 // pass these flags. A bare `go build` (no flags) reports Version "dev".
 package version
 
