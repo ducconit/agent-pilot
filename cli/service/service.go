@@ -522,7 +522,7 @@ type WindowsServiceManager struct {
 func (m *WindowsServiceManager) Install() error {
 	// Escape single quotes for PowerShell
 	escapedExec := strings.ReplaceAll(m.execPath, "'", "''")
-	psCmd := fmt.Sprintf(`$action = New-ScheduledTaskAction -Execute '%s' -Argument '%s'; $trigger = New-ScheduledTaskTrigger -AtLogOn; $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0; Register-ScheduledTask -TaskName '%s' -Action $action -Trigger $trigger -Settings $settings -Description 'Agent Pilot Universal AI Agent Browser Bridge' -Force; Start-ScheduledTask -TaskName '%s'`, escapedExec, config.ServerSubcommand, config.TaskNameWindows, config.TaskNameWindows)
+	psCmd := fmt.Sprintf(`$action = New-ScheduledTaskAction -Execute '%s' -Argument '%s'; $trigger = New-ScheduledTaskTrigger -AtLogOn; $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0; $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive; Register-ScheduledTask -TaskName '%s' -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description 'Agent Pilot Universal AI Agent Browser Bridge' -Force; try { Stop-ScheduledTask -TaskName '%s' -ErrorAction SilentlyContinue } catch {}; Start-ScheduledTask -TaskName '%s'`, escapedExec, config.ServerSubcommand, config.TaskNameWindows, config.TaskNameWindows, config.TaskNameWindows)
 
 	out, err := m.runCmd("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psCmd)
 	if err != nil {

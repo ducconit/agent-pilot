@@ -180,7 +180,17 @@ function renderBundleReadme(version, platform) {
 function copyOSInstaller(platform, bundleRoot) {
   const assets = OS_EDITION_ASSETS[platform.goos];
   const destPath = path.join(bundleRoot, assets.installerDest);
-  fs.copyFileSync(assets.installerSrc, destPath);
+  if (platform.goos === "windows") {
+    let content = fs.readFileSync(assets.installerSrc, "utf8");
+    while (content.charCodeAt(0) === 0xfeff) {
+      content = content.slice(1);
+    }
+    content = content.replace(/\r?\n/g, "\r\n");
+    const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+    fs.writeFileSync(destPath, Buffer.concat([bom, Buffer.from(content, "utf8")]));
+  } else {
+    fs.copyFileSync(assets.installerSrc, destPath);
+  }
   if (assets.executable) {
     fs.chmodSync(destPath, 0o755);
   }
