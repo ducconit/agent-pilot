@@ -7,11 +7,59 @@ import { analyzeTraceEvents } from "../extensions/background/cdp-performance.js"
 const traces = new Map();
 let activeTrace = null;
 
+/**
+ * Chrome 156+ no longer emits `TracingStartedInBrowser`, which the trace
+ * engine relies on to identify the main frame. It emits `markAsMainFrame`
+ * instead. Synthesize the legacy event so the engine can attribute main-frame
+ * navigations and compute insight sets.
+ */
+function normalizeTraceEvents(events) {
+  if (!Array.isArray(events)) return events;
+  const hasTracingStarted = events.some(e => e?.name === "TracingStartedInBrowser");
+  if (hasTracingStarted) return events;
+  let frameId = events.find(e => e?.name === "markAsMainFrame")?.args?.frame;
+  let pid = events.find(e => e?.name === "markAsMainFrame")?.pid;
+  let tid = events.find(e => e?.name === "markAsMainFrame")?.tid;
+  let ts = events.find(e => e?.name === "markAsMainFrame")?.ts;
+  if (!frameId) {
+    const nav = events.find(e => e?.name === "navigationStart" && e?.args?.frame);
+    frameId = nav?.args?.frame;
+    pid = nav?.pid ?? pid;
+    tid = nav?.tid ?? tid;
+    ts = nav?.ts ?? ts;
+  }
+  if (!frameId) return events;
+  const normalized = [...events];
+  const synthetic = {
+    name: "TracingStartedInBrowser",
+    cat: "disabled-by-default-devtools.timeline",
+    ph: "I",
+    pid: pid ?? 0,
+    tid: tid ?? 0,
+    ts: Math.max(0, (ts || 0) - 1000),
+    args: {
+      data: {
+        frames: [{
+          frame: frameId,
+          url: "",
+          processId: pid ?? 0,
+          parent: null,
+          isInPrimaryMainFrame: true,
+          isOutermostMainFrame: true
+        }]
+      }
+    }
+  };
+  normalized.unshift(synthetic);
+  return normalized;
+}
+
 async function parseTrace(events) {
   const { TraceProcessor, TraceHandlers, Helpers } = await import("lighthouse/core/lib/trace-engine.js");
-  Helpers.SyntheticEvents.SyntheticEventsManager.createAndActivate(events);
+  const normalized = normalizeTraceEvents(events);
+  Helpers.SyntheticEvents.SyntheticEventsManager.createAndActivate(normalized);
   const processor = new TraceProcessor(TraceHandlers);
-  await processor.parse(events, { metadata: {}, resolveSourceMap: async () => null });
+  await processor.parse(normalized, { metadata: {}, resolveSourceMap: async () => null });
   return processor.insights || new Map();
 }
 function listInsights(insights) {
@@ -50,7 +98,7 @@ export async function performanceTrace(page, key, options) {
     }
     return { success: true, action, filePath, categories };
   }
-  if (action !== "stop") throw new Error("Trace action must be start or stop");
+  if (action !== "stop") throw new Error("Trace action must be stop");
   if (!activeTrace || activeTrace.key !== key) throw new Error("No active trace for this tab");
   const session = activeTrace;
   let data;
