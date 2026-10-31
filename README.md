@@ -3,7 +3,7 @@
 ![Agent Pilot Banner](assets/banner.svg)
 
 # 🚀 Agent Pilot
-### Universal AI Agent Browser Controller • Antigravity-First
+### Universal AI Agent Browser Controller • Skills + CLI & MCP
 
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-blue?style=flat-square&logo=googlechrome)](extensions/manifest.json)
 [![Documentation](https://img.shields.io/badge/Docs-VitePress-06b6d4?style=flat-square&logo=vitepress)](https://ducconit.github.io/agent-pilot/)
@@ -17,7 +17,7 @@
 [English](README.md) • [Tiếng Việt](README.vi.md) • [Documentation](https://ducconit.github.io/agent-pilot/) • [Contributing](CONTRIBUTING.md)
 
 <p align="center">
-  <b>Agent Pilot</b> is a lightweight, zero-dependency browser controller built for <b>AI Coding Agents</b> (Google Antigravity, Claude Code, Cursor, Codex). It bridges Chrome via a <b>Manifest V3 Extension</b>, a <b>Standalone Go CLI</b>, and a <b>Model Context Protocol (MCP) Server</b>.
+  <b>Agent Pilot</b> is a lightweight, zero-dependency browser controller built for any <b>AI Coding Agent or Automation Tool</b> supporting <b>Agent Skills + Command Line (CLI)</b> or <b>Model Context Protocol (MCP)</b> (Claude Code, Cursor, Windsurf, Google Antigravity, Cline, OpenCode, Codex, Aider).
 </p>
 
 </div>
@@ -33,13 +33,34 @@
 
 ---
 
-## 🌟 Key Capabilities
+## 🎯 Project Origin & Core Capabilities
 
-- **Human-Like Browser Simulation**: Virtual neon cursor with click-ripple animation, real-time typing, drag-and-drop, and automated form filling.
-- **Dual Execution Engine (DOM + Trusted CDP)**: Blazing-fast synthetic DOM manipulation by default; seamlessly escalates to Chrome DevTools Protocol (`--via cdp`) for cross-origin iframes, Canvas, and WebGL applications.
-- **Zero Runtime Dependencies**: The single Go binary embeds the MCP server, WebSocket/REST bridge, and an embedded DevTools runtime (Lighthouse, heap profiler, tracing). No Node.js or FFmpeg required on the client machine.
-- **Background Multi-Agent Isolation**: Automates tabs inside a dedicated tab group (`🤖 Agent Pilot`) without hijacking user focus. Supports multiple concurrent agents via `--tab <id>` and `--port <port>`.
-- **In-Page Feedback Studio**: An interactive side panel that allows developers and QA testers to inspect DOM, pick pixel-accurate colors, annotate UI bugs, and push feedback directly to AI agents.
+**Agent Pilot** was originally created for personal use to **replace the default Chrome MCP on Google Antigravity** and eliminate the need for **AI agents to generate ad-hoc Python scripts just to manipulate the browser or draw text/annotations onto screenshots** during web testing.
+
+It provides **effortless, token-efficient browser control**, empowering AI coding agents and QA engineers with a complete native **Web Testing, QA/QC, and Web Debugging** toolkit:
+
+- **Ultra-Low Token Footprint (>50% Savings)**: Compact interactive DOM snapshots (`@1`, `@2`) and single-roundtrip Batch Execution minimize context token consumption across both **Skills + CLI** and **MCP** modes.
+- **Annotated Screenshots & Visual QA**: Capture viewport, full-page, or element screenshots with automatic bounding-box highlights and custom QA title banners.
+- **Workflow Video Recording**: Record smooth `.mp4` screencasts of automated browser runs and bug reproductions (including virtual neon cursor trajectories and click ripples).
+- **Action Recorder, Replay & Playwright Export**: Record live user or AI interactions, replay test flows deterministically, and export directly to production-ready **Playwright** test code.
+- **Performance & Lighthouse Auditing**: Run native Lighthouse audits, measure Core Web Vitals (LCP, CLS, INP), and analyze performance traces.
+- **Memory Leak Detection (V8 Heap Diff)**: Capture and diff V8 Heap snapshots before/after user flows to pinpoint memory leaks and detached DOM nodes.
+- **Deep Web Debugging & Secret Protection**: Monitor real-time Console errors, inspect failed HTTP 4xx/5xx requests, extract computed CSS, and automatically mask 29 secret patterns (API keys, JWTs, private keys).
+- **In-Page Feedback Studio & Background Isolation**: Pin visual bug annotations directly on the webpage, sample pixel colors, and orchestrate multiple concurrent agents in background tab groups (`🤖 Agent Pilot`) without stealing user focus.
+
+### ⚖️ Key Differences: Agent Pilot vs. Standard Chrome MCP
+
+| Capability | Standard Chrome MCP | 🚀 Agent Pilot |
+| :--- | :--- | :--- |
+| **Connection Modes & Token Cost** | MCP-only; verbose JSON-RPC schemas & raw DOM dumps consume large amounts of context tokens. | Supports both **Skills + CLI** (>50% token savings) and **MCP Server**, with compact `@1, @2` snapshots & Batch Execution. |
+| **Visual QA & Image Annotation** | Plain screenshots only; AI agents frequently generate ad-hoc Python scripts (`Pillow`/`OpenCV`) to draw text or highlight boxes on images. | **Native Annotated Screenshots** (viewport, full-page, element) with automatic bounding-box highlights and QA title banners—zero Python scripts required. |
+| **Browser Session & Focus Isolation** | Often launches a separate browser profile or steals active window/cursor focus while you work. | Operates inside your existing Chrome browser inside isolated background tab groups (`🤖 Agent Pilot`) without stealing user focus. |
+| **Video, Replay & Playwright Export** | One-off command execution with no recording, replay, or test generation. | Built-in `.mp4` workflow video capture, deterministic **Action Replay**, and direct **Playwright** test code export. |
+| **Performance, Memory Leak & Security** | Basic DOM interaction and raw console/network inspection. | Native **Lighthouse** audits, Core Web Vitals, **V8 Heap Snapshot Diff** for memory leaks, **Feedback Studio**, and **29-rule secret redaction**. |
+
+### 🧭 Future Direction
+
+> **Stability First**: Because Agent Pilot already provides a complete toolkit for Web Testing, QA/QC, and Debugging, **our future goal is strictly focused on ensuring the stability, reliability, and compatibility of existing features** rather than developing new features.
 
 ---
 

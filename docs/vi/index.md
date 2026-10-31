@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "Agent Pilot"
-  text: "Động Cơ Điều Khiển Trình Duyệt Cho AI Agent"
-  tagline: "Antigravity First • Zero Dependencies • Động Cơ Kép (DOM + Trusted CDP) • Cách Ly Tab Chạy Ngầm"
+  text: "Điều Khiển, Kiểm Thử & Debug Web Toàn Diện Cho AI"
+  tagline: "Tốn Ít Token • Tương Thích Skills+CLI & MCP • Chụp Màn Hình & Ghi Chú Thích • Quay Video • Replay & Xuất Code Playwright • Đo Performance & Tìm Memory Leak"
   image:
     src: /logo.svg
     alt: Agent Pilot Logo
@@ -13,11 +13,11 @@ hero:
       text: Bắt Đầu Nhanh 🚀
       link: /vi/USAGE_GUIDE
     - theme: alt
-      text: Xem Kiến Trúc 🏛️
-      link: /vi/ARCHITECTURE
+      text: Prompt Mẫu 💡
+      link: /vi/PROMPT_RECIPES
     - theme: alt
-      text: GitHub ⭐️
-      link: https://github.com/ducconit/agent-pilot
+      text: Lập Trình Viên 🛠️
+      link: /vi/DEVELOPER_GUIDE
 
 ---
 
@@ -37,55 +37,99 @@ hero:
   </div>
 </div>
 
+## 🎯 Giới Thiệu, Mục Đích & Bộ Công Cụ Kiểm Thử, QA/QC, Debug Web
+
+**Agent Pilot** ban đầu được xây dựng phục vụ nhu cầu cá nhân nhằm **thay thế Chrome MCP mặc định trên Google Antigravity**, đồng thời giải quyết triệt để sự bất tiện khi **AI Agent phải tự sinh các đoạn code Python tạm bợ để thao tác trình duyệt hoặc vẽ chữ/khoanh vùng lên hình ảnh** trong quá trình kiểm thử web.
+
+Hiện tại, dự án hỗ trợ mọi công cụ AI điều khiển trình duyệt với tiêu chí cốt lõi: **thao tác trình duyệt thuận tiện, tốn ít token nhất**, tích hợp sẵn trọn bộ công cụ chuyên dụng phục vụ **kiểm thử tự động (Web Testing), QA/QC và Debug ứng dụng web**.
+
 <div class="ap-feature-grid">
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">01 // MÔ PHỎNG NGƯỜI DÙNG</div>
-    <div class="ap-feature-title">Chuột Ảo Neon & Phím Thật</div>
+    <div class="ap-feature-badge">01 // TIẾT KIỆM TOKEN</div>
+    <div class="ap-feature-title">Điều Khiển Thuận Tiện & Ít Token</div>
     <div class="ap-feature-desc">
-      Quỹ đạo lướt chuột mượt mà (cubic ease-out), hiệu ứng sóng click-ripple phát sáng, gõ phím theo nhịp tự nhiên và cuộn trang không giật lag.
+      Cây DOM tương tác được rút gọn thông minh (<code>@1</code>, <code>@2</code>) cùng cơ chế thực thi theo lô (Batch Execution), giúp tiết kiệm hơn 50% lượng token tiêu thụ trên cả Skills+CLI lẫn MCP.
     </div>
   </div>
 
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">02 // ĐỘNG CƠ KÉP</div>
-    <div class="ap-feature-title">Synthetic DOM + Trusted CDP</div>
+    <div class="ap-feature-badge">02 // MINH CHỨNG QA/QC</div>
+    <div class="ap-feature-title">Chụp Màn Hình & Ghi Chú Thích</div>
     <div class="ap-feature-desc">
-      Thao tác DOM siêu tốc dưới 1ms theo mặc định; tự động leo thang lên Chrome DevTools Protocol khi gặp cross-origin iframe, Canvas và WebGL.
+      Chụp khung nhìn hiện tại, chụp toàn trang (full-page) hoặc từng phần tử; hỗ trợ tự động khoanh vùng highlight phần tử lỗi và đóng dấu tiêu đề báo cáo kiểm thử.
     </div>
   </div>
 
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">03 // CÁCH LY TIẾN TRÌNH</div>
-    <div class="ap-feature-title">Đa Agent Chạy Ngầm Độc Lập</div>
+    <div class="ap-feature-badge">03 // QUAY VIDEO</div>
+    <div class="ap-feature-title">Ghi Video Luồng Kiểm Thử</div>
     <div class="ap-feature-desc">
-      Tự động gom tab vào nhóm riêng ('🤖 Agent Pilot') không cướp focus của lập trình viên. Điều phối song song nhiều agent qua mã định danh tab.
+      Quay video trực tiếp quá trình tương tác, kiểm thử và tái hiện lỗi trên trình duyệt (kèm hiệu ứng chuột ảo neon và sóng click) để làm bằng chứng báo cáo trực quan.
     </div>
   </div>
 
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">04 // ZERO DEPENDENCIES</div>
-    <div class="ap-feature-title">Binary Golang Độc Lập</div>
+    <div class="ap-feature-badge">04 // PLAYWRIGHT & REPLAY</div>
+    <div class="ap-feature-title">Ghi Nhận, Replay & Xuất Playwright</div>
     <div class="ap-feature-desc">
-      Tích hợp sẵn WebSocket/REST bridge, MCP server và DevTools runtime vào một binary thực thi duy nhất. Không cần cài Node.js hay FFmpeg.
+      Tự động ghi lại chuỗi thao tác thực tế trên trang, phát lại (replay) kịch bản kiểm thử bất kỳ lúc nào và xuất (export) trực tiếp ra mã nguồn kiểm thử Playwright chuẩn chỉnh.
     </div>
   </div>
 
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">05 // VISUAL QA STUDIO</div>
-    <div class="ap-feature-title">In-Page Feedback Studio</div>
+    <div class="ap-feature-badge">05 // ĐO HIỆU NĂNG</div>
+    <div class="ap-feature-title">Đo Performance & Lighthouse</div>
     <div class="ap-feature-desc">
-      Side Panel tương tác soi thông số DOM, kính lúp lấy mã màu pixel cực nét, ghim lỗi trực tiếp trên giao diện và đẩy phản hồi về AI agent.
+      Chạy kiểm định Lighthouse thực tế ngay từ dòng lệnh hoặc qua AI, đo lường các chỉ số Core Web Vitals (LCP, CLS, INP), phân tích performance trace và tốc độ tải tài nguyên.
     </div>
   </div>
 
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">06 // CHẨN ĐOÁN CHUYÊN SÂU</div>
-    <div class="ap-feature-title">Lighthouse & Heap Profiling</div>
+    <div class="ap-feature-badge">06 // BẮT LỖI BỘ NHỚ</div>
+    <div class="ap-feature-title">Tìm Memory Leak (V8 Heap Diff)</div>
     <div class="ap-feature-desc">
-      Kiểm định Lighthouse thực tế, so sánh snapshot rò rỉ bộ nhớ V8 Heap, performance tracing và giám sát luồng network/console thời gian thực.
+      Chụp và đối chiếu chênh lệch giữa các bản chụp bộ nhớ V8 Heap trước/sau thao tác để phát hiện chính xác rò rỉ bộ nhớ, các node DOM bị treo hoặc sự kiện chưa giải phóng.
+    </div>
+  </div>
+
+  <div class="ap-feature-card">
+    <div class="ap-feature-badge">07 // DEBUG WEB</div>
+    <div class="ap-feature-title">Bắt Lỗi Console, Network & DOM</div>
+    <div class="ap-feature-desc">
+      Giám sát lỗi Console thời gian thực, lọc các truy vấn mạng thất bại (HTTP 4xx/5xx), soi thuộc tính CSS thực tế và tự động che giấu 29 loại thông tin nhạy cảm (API key, token).
+    </div>
+  </div>
+
+  <div class="ap-feature-card">
+    <div class="ap-feature-badge">08 // TRỰC QUAN & CÁCH LY</div>
+    <div class="ap-feature-title">Feedback Studio & Chạy Ngầm</div>
+    <div class="ap-feature-desc">
+      Ghim chú thích lỗi trực tiếp lên giao diện web, lấy mã màu pixel chuẩn xác để đẩy về AI; đồng thời gom tab tự động vào nhóm riêng không bao giờ cướp chuột của người dùng.
     </div>
   </div>
 </div>
+
+---
+
+## ⚖️ Điểm Khác Biệt Giữa Agent Pilot & Chrome MCP Thông Thường
+
+Tại sao nên dùng **Agent Pilot** thay vì Chrome MCP mặc định trên Antigravity hoặc các trình điều khiển MCP thông thường?
+
+| Tiêu chí so sánh | Chrome MCP Thông Thường | 🚀 Agent Pilot |
+| :--- | :--- | :--- |
+| **Phương thức kết nối & Chi phí Token** | Chỉ hỗ trợ MCP; cấu trúc JSON-RPC và cây DOM thô tiêu tốn rất nhiều token ngữ cảnh. | Hỗ trợ song song cả **Skills + CLI** (tiết kiệm >50% token) lẫn **MCP Server**; rút gọn phần tử thành nhãn `@1, @2` và hỗ trợ gộp lệnh (Batch Execution). |
+| **Chụp ảnh & Vẽ chú thích báo cáo QA** | Chỉ chụp ảnh màn hình thô; AI thường phải tự sinh code Python (`Pillow`/`OpenCV`) tạm bợ để vẽ chữ hoặc khoanh vùng lỗi lên ảnh. | **Tích hợp sẵn chụp ảnh kèm chú thích** (khung nhìn, full-page, từng phần tử), tự động vẽ khung viền highlight đỏ và đóng dấu tiêu đề báo cáo mà không cần sinh script Python. |
+| **Phiên trình duyệt & Chạy ngầm** | Thường mở cửa sổ trình duyệt mới (mất trạng thái đăng nhập) hoặc liên tục cướp chuột/focus màn hình khi đang làm việc. | Chạy trực tiếp trên trình duyệt Chrome đang mở (giữ nguyên cookie/phiên đăng nhập), tự động gom tab vào nhóm riêng (`🤖 Agent Pilot`) chạy ngầm không cướp focus. |
+| **Quay Video, Replay & Xuất Playwright** | Chỉ thực thi từng lệnh rời rạc, không có cơ chế lưu lại thao tác hay sinh mã kiểm thử tự động. | Quay trực tiếp video `.mp4` (kèm chuột ảo neon), ghi nhận & **Replay** lại kịch bản kiểm thử, và **xuất trực tiếp ra code Playwright**. |
+| **Debug chuyên sâu & Bảo mật Secret** | Chủ yếu dừng ở thao tác DOM cơ bản và đọc log thô. | Tích hợp đo Core Web Vitals, chạy **Lighthouse**, so sánh **V8 Heap Diff** tìm Memory Leak, **Feedback Studio** ghim lỗi trên trang và tự động che giấu **29 mẫu secret/token**. |
+
+---
+
+## 🧭 Định Hướng Trong Tương Lai
+
+::: info ƯU TIÊN ĐẢM BẢO SỰ ỔN ĐỊNH — CHƯA CÓ DỰ ĐỊNH PHÁT TRIỂN TÍNH NĂNG MỚI
+Hiện tại bộ công cụ của **Agent Pilot** đã đáp ứng đầy đủ nhu cầu điều khiển trình duyệt, kiểm thử QA/QC và debug web. **Mục tiêu trọng tâm của dự án trong tương lai là duy trì, tối ưu và đảm bảo các tính năng hiện có hoạt động thật ổn định**, tương thích tốt với các bản cập nhật trình duyệt và hệ điều hành, **chưa có dự định phát triển thêm tính năng mới**.
+:::
 
 ---
 
@@ -127,8 +171,22 @@ agent-pilot service install
 agent-pilot service status
 ```
 
-### Bước 3: Cấu Hình MCP Server (`mcp.json`)
-Dành cho **Google Antigravity**, **Claude Code**, hoặc **Cursor**:
+### Bước 3: Kết Nối Với Bất Kỳ AI Agent Hoặc Công Cụ Nào
+
+Agent Pilot tương thích đa năng với mọi trợ lý AI coding hoặc công cụ tự động hóa có hỗ trợ **Agent Skills + Command Line (CLI)** hoặc **Model Context Protocol (MCP)**:
+
+#### Cách A: Dùng Agent Skills + Command Line (CLI)
+Hoạt động tức thì với **Claude Code**, **Cursor**, **Windsurf**, **Google Antigravity**, **Cline / Roo Code**, **OpenCode**, **Codex**, **Aider**, hoặc bất kỳ agent nào có quyền thực thi lệnh terminal:
+```bash
+# Cài đặt qua hệ sinh thái skills.sh
+npx skills add https://github.com/ducconit/agent-pilot -g --all
+
+# Hoặc cài trực tiếp bằng CLI độc lập
+agent-pilot install-skill --all
+```
+
+#### Cách B: Cấu Hình MCP Server (`mcp.json`)
+Tương thích với mọi MCP Client (**Claude Desktop**, **Claude Code**, **Cursor**, **Windsurf**, **Google Antigravity**, **Zed**, **Continue**, v.v.):
 ```json
 {
   "mcpServers": {

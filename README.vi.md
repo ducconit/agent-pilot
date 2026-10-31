@@ -3,7 +3,7 @@
 ![Agent Pilot Banner](assets/banner.svg)
 
 # 🚀 AGENT PILOT
-### Universal AI Agent Browser Controller • Antigravity-First
+### Universal AI Agent Browser Controller • Skills + CLI & MCP
 
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-blue?style=flat-square&logo=googlechrome)](extensions/manifest.json)
 [![Documentation](https://img.shields.io/badge/Docs-VitePress-06b6d4?style=flat-square&logo=vitepress)](https://ducconit.github.io/agent-pilot/)
@@ -17,7 +17,7 @@
 [English](README.md) • [Tiếng Việt](README.vi.md) • [Trang tài liệu Public](https://ducconit.github.io/agent-pilot/) • [Đóng góp](CONTRIBUTING.md)
 
 <p align="center">
-  <b>Agent Pilot</b> là bộ công cụ điều khiển trình duyệt chuyên sâu cho <b>AI Coding Agent</b> (tối ưu hóa cho Google Antigravity, Claude Code, Cursor, Codex). Kết hợp sức mạnh giữa <b>Chrome Extension (Manifest V3)</b>, <b>Standalone Go CLI</b> và <b>MCP Server</b> (Model Context Protocol).
+  <b>Agent Pilot</b> là bộ công cụ điều khiển trình duyệt đa năng dành cho mọi <b>AI Coding Agent hoặc Công cụ tự động hóa</b> hỗ trợ <b>Agent Skills + Command Line (CLI)</b> hoặc <b>Model Context Protocol (MCP)</b> (Claude Code, Cursor, Windsurf, Google Antigravity, Cline, OpenCode, Codex, Aider).
 </p>
 
 </div>
@@ -33,13 +33,34 @@
 
 ---
 
-## 🌟 Tính Năng Nổi Bật
+## 🎯 Giới Thiệu & Bộ Công Cụ Kiểm Thử, QA/QC, Debug Web
 
-- **Mô phỏng Thao tác Người dùng Thật**: Chuột ảo Neon với hiệu ứng ripple, gõ phím theo thời gian thực (human-like typing), kéo thả canvas/game, upload file.
-- **Dual Engine (DOM + Trusted CDP)**: Chạy nhanh và nhẹ trên DOM ảo mặc định; tự động nâng cấp lên Chrome DevTools Protocol (`--via cdp`) khi cần xử lý cross-origin iframe, Canvas, WebGL.
-- **Nền tảng Tự hành (Zero Runtime Dependency)**: Binary Go duy nhất tích hợp sẵn MCP Server, REST/WebSocket Bridge, DevTools runtime nhúng (Lighthouse, heap analysis, tracing) — không cần cài đặt Node.js hay FFmpeg trên máy client.
-- **Background Multi-Agent Isolation**: Mở tab ngầm trong Tab Group riêng (`🤖 Agent Pilot`), tuyệt đối không cướp focus của người dùng; hỗ trợ nhiều Agent chạy đồng thời qua `--tab <id>`.
-- **Feedback Studio & UI Annotator**: Bảng điều khiển Side Panel cho phép người dùng khoanh vùng UI, ghim ghi chú lỗi và đẩy trực tiếp cho AI Agent sửa code.
+**Agent Pilot** ban đầu được phát triển phục vụ mục đích cá nhân nhằm **thay thế Chrome MCP mặc định trên Google Antigravity**, đồng thời chấm dứt tình trạng **AI Agent phải tự sinh code Python để thao tác trình duyệt hoặc vẽ chữ/chú thích lên hình ảnh** trong quá trình kiểm thử web.
+
+Dự án giúp các AI Coding Agent và kỹ sư QA/QC **điều khiển trình duyệt thuận tiện, tốn ít token nhất**, đồng thời trang bị trọn bộ công cụ chuyên dụng cho **Kiểm thử Web (Web Testing), QA/QC và Debug ứng dụng Web**:
+
+- **Tiết Kiệm Tối Đa Token (>50% Savings)**: Cây DOM tương tác được rút gọn thông minh (`@1`, `@2`) cùng cơ chế thực thi gộp lệnh (Batch Execution) giảm hơn 50% lượng token tiêu thụ trên cả hai chế độ **Skills + CLI** và **MCP**.
+- **Chụp Màn Hình & Ghi Chú Thích (Annotated Screenshots)**: Chụp vùng nhìn thấy, toàn trang (full-page) hoặc từng phần tử; tự động khoanh vùng highlight lỗi và đóng dấu tiêu đề báo cáo QA.
+- **Quay Video Luồng Thao Tác (Video Recording)**: Ghi lại video `.mp4` toàn bộ quá trình kiểm thử tự động và tái hiện lỗi (bao gồm quỹ đạo chuột ảo neon và hiệu ứng sóng click).
+- **Ghi Nhận, Replay Thao Tác & Xuất Code Playwright**: Ghi lại chuỗi tương tác thực tế của người dùng hoặc AI, phát lại (replay) kịch bản tức thì và xuất trực tiếp ra mã nguồn kiểm thử **Playwright** hoàn chỉnh.
+- **Đo Lường Performance & Kiểm Định Lighthouse**: Chạy kiểm định Lighthouse thực tế, đo các chỉ số Core Web Vitals (LCP, CLS, INP) và phân tích performance trace.
+- **Tìm Memory Leak (V8 Heap Snapshot Diff)**: Chụp và so sánh đối chiếu các bản chụp bộ nhớ V8 Heap trước/sau thao tác để phát hiện rò rỉ bộ nhớ và các node DOM bị treo.
+- **Debug Web Chuyên Sâu & Bảo Mật Secret**: Bắt lỗi Console thời gian thực, lọc các truy vấn mạng lỗi (HTTP 4xx/5xx), soi thuộc tính CSS thực tế và tự động che giấu 29 loại thông tin nhạy cảm (API key, JWT, khóa bí mật).
+- **Feedback Studio & Chạy Ngầm Đa Agent**: Ghim chú thích lỗi trực tiếp lên giao diện web, lấy mã màu pixel chuẩn xác, và gom tab tự động vào nhóm riêng (`🤖 Agent Pilot`) không bao giờ cướp chuột của lập trình viên.
+
+### ⚖️ Điểm Khác Biệt Giữa Agent Pilot & Chrome MCP Thông Thường
+
+| Tiêu chí so sánh | Chrome MCP Thông Thường | 🚀 Agent Pilot |
+| :--- | :--- | :--- |
+| **Phương thức kết nối & Chi phí Token** | Chỉ hỗ trợ MCP; cấu trúc JSON-RPC và cây DOM thô tiêu tốn rất nhiều token ngữ cảnh. | Hỗ trợ song song cả **Skills + CLI** (tiết kiệm >50% token) lẫn **MCP Server**; rút gọn phần tử thành nhãn `@1, @2` và hỗ trợ gộp lệnh (Batch Execution). |
+| **Chụp ảnh & Vẽ chú thích báo cáo QA** | Chỉ chụp ảnh màn hình thô; AI thường phải tự sinh code Python (`Pillow`/`OpenCV`) tạm bợ để vẽ chữ hoặc khoanh vùng lỗi lên ảnh. | **Tích hợp sẵn chụp ảnh kèm chú thích** (khung nhìn, full-page, từng phần tử), tự động vẽ khung viền highlight đỏ và đóng dấu tiêu đề báo cáo mà không cần sinh script Python. |
+| **Phiên trình duyệt & Chạy ngầm** | Thường mở cửa sổ trình duyệt mới (mất trạng thái đăng nhập) hoặc liên tục cướp chuột/focus màn hình khi đang làm việc. | Chạy trực tiếp trên trình duyệt Chrome đang mở (giữ nguyên cookie/phiên đăng nhập), tự động gom tab vào nhóm riêng (`🤖 Agent Pilot`) chạy ngầm không cướp focus. |
+| **Quay Video, Replay & Xuất Playwright** | Chỉ thực thi từng lệnh rời rạc, không có cơ chế lưu lại thao tác hay sinh mã kiểm thử tự động. | Quay trực tiếp video `.mp4` (kèm chuột ảo neon), ghi nhận & **Replay** lại kịch bản kiểm thử, và **xuất trực tiếp ra code Playwright**. |
+| **Debug chuyên sâu & Bảo mật Secret** | Chủ yếu dừng ở thao tác DOM cơ bản và đọc log thô. | Tích hợp đo Core Web Vitals, chạy **Lighthouse**, so sánh **V8 Heap Diff** tìm Memory Leak, **Feedback Studio** ghim lỗi trên trang và tự động che giấu **29 mẫu secret/token**. |
+
+### 🧭 Định Hướng Trong Tương Lai
+
+> **Ưu tiên sự ổn định**: Hiện tại bộ tính năng của Agent Pilot đã đáp ứng trọn vẹn nhu cầu điều khiển trình duyệt, kiểm thử QA/QC và debug web. **Mục tiêu trong tương lai của dự án là đảm bảo các tính năng hiện có hoạt động ổn định, tin cậy**, chưa có dự định phát triển thêm tính năng mới.
 
 ---
 
@@ -53,8 +74,8 @@ flowchart LR
 
 ### Bước 1: Nạp Extension vào Chrome
 1. Tải bản phát hành mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot/releases).
-2. Mở Chrome $\to$ `chrome://extensions` $\to$ bật **Developer mode**.
-3. Bấm **Load unpacked** $\to$ chọn thư mục `extensions/` và ghim biểu tượng **Agent Pilot (📌)**.
+2. Mở Chrome → `chrome://extensions` → bật **Developer mode**.
+3. Bấm **Load unpacked** → chọn thư mục `extensions/` và ghim biểu tượng **Agent Pilot (📌)**.
 
 ### Bước 2: Tải Binary CLI theo Hệ Điều Hành
 

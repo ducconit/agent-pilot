@@ -1,22 +1,66 @@
-# 🚀 Hướng Dẫn Tích Hợp Antigravity-First (Agent Pilot)
+# 🤖 Hướng Dẫn Tích Hợp AI Agent (Skills + CLI & MCP)
 
-**Agent Pilot** được thiết kế với triết lý **Antigravity-First**, cho phép các AI coding & automation agent của Antigravity có thể "nhìn", "hiểu" và "điều khiển" trình duyệt của lập trình viên một cách an toàn, chính xác và trực quan.
+**Agent Pilot** là bộ điều khiển trình duyệt đa năng, hoạt động mượt mà với **bất kỳ AI coding agent hoặc công cụ tự động hóa nào** có hỗ trợ một trong hai cơ chế:
+1. **Agent Skills + Command Line (CLI)** (`skills.sh` + thực thi lệnh terminal)
+2. **Model Context Protocol (MCP)** (cấu hình JSON `mcpServers`)
+
+Các công cụ tương thích hoàn toàn bao gồm: **Claude Code**, **Cursor**, **Windsurf**, **Google Antigravity**, **Cline / Roo Code**, **OpenCode**, **Codex**, **Aider**, **Zed**, và bất kỳ LLM agent tùy chỉnh nào có khả năng chạy lệnh shell hoặc kết nối MCP.
 
 ---
 
-## 1. Mô hình Kết nối Antigravity & Agent Pilot
+## 1. Hai Chế Độ Tích Hợp Linh Hoạt
+
+### Chế Độ A: Agent Skills + Command Line (CLI) — Khuyên dùng để tối ưu Token
+Mọi AI Agent có khả năng đọc tài liệu hướng dẫn (`SKILL.md`) và chạy lệnh terminal đều có thể điều khiển trình duyệt thông qua binary độc lập `agent-pilot`:
+
+```bash
+# 1. Cài đặt Agent Skill toàn cục cho toàn bộ công cụ AI trên máy
+npx skills add https://github.com/ducconit/agent-pilot -g --all
+
+# Hoặc cài trực tiếp bằng trình cài đặt tích hợp sẵn trong CLI:
+agent-pilot install-skill --all
+```
+
+Sau khi cài đặt, AI Agent tự động nắm vững bộ lệnh CLI gọn nhẹ (`agent-pilot open`, `agent-pilot snapshot`, `agent-pilot click`, `agent-pilot screenshot`) mà không làm tốn bộ nhớ ngữ cảnh (context window) bởi hàng chục schema phức tạp.
+
+### Chế Độ B: Model Context Protocol (MCP) Server
+Dành cho các IDE và ứng dụng hỗ trợ chuẩn MCP, Agent Pilot tích hợp sẵn MCP server giao tiếp qua `stdio` cung cấp trọn bộ 51 công cụ điều khiển trình duyệt và DevTools:
+
+```json
+{
+  "mcpServers": {
+    "agent-pilot": {
+      "command": "agent-pilot",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+| AI Agent / Công cụ | Chế độ hỗ trợ | File cấu hình / Lệnh cài đặt |
+| :--- | :--- | :--- |
+| **Claude Code** | Skills + CLI, MCP | `npx skills add ...` hoặc `claude mcp add agent-pilot -- agent-pilot mcp` |
+| **Cursor** | Skills + CLI, MCP | `.cursor/mcp.json` hoặc `~/.cursor/mcp.json` |
+| **Windsurf** | Skills + CLI, MCP | `~/.codeium/windsurf/mcp_config.json` |
+| **Google Antigravity** | Skills + CLI, MCP | `~/.gemini/config/mcp_config.json` hoặc thư mục `skills/` |
+| **Cline / Roo Code** | Skills + CLI, MCP | VS Code MCP Settings JSON |
+| **OpenCode / Codex** | Skills + CLI, MCP | `npx skills add ...` hoặc cấu hình MCP dự án |
+
+---
+
+## 2. Mô Hình Kiến Trúc Kết Nối
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            HỆ THỐNG MÁY TÍNH HOST                           │
 │                                                                             │
 │  ┌───────────────────────────┐                ┌──────────────────────────┐  │
-│  │   Antigravity AI Agent    │                │  Lập Trình Viên / User   │  │
-│  │   (Coding Assistant)      │                │  (Quan sát trực tiếp)    │  │
+│  │     Mọi AI Coding Agent   │                │  Lập Trình Viên / User   │  │
+│  │ (Claude/Cursor/Antigravity│                │  (Quan sát trực tiếp)    │  │
 │  └─────────────┬─────────────┘                └────────────┬─────────────┘  │
 │                │                                           │                │
-│                │ 1. Phát JSON Action                       │ Quan sát chuột │
-│                │    hoặc gọi Script / MCP                  │ ảo & logs      │
+│                │ 1. Phát lệnh điều khiển                   │ Quan sát chuột │
+│                │    qua Skills+CLI hoặc MCP                │ ảo & logs      │
 │                ▼                                           ▼                │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │                 CHROME BROWSER (AGENT PILOT EXTENSION)                │  │
@@ -41,7 +85,7 @@
 
 ---
 
-## 2. Giao thức Hành động JSON (Agent Control Protocol - ACP)
+## 3. Giao Thức Hành Động JSON (Agent Control Protocol - ACP)
 
 Antigravity có thể tạo ra các chuỗi lệnh JSON có cấu trúc để nạp vào Agent Pilot thực thi theo kịch bản:
 

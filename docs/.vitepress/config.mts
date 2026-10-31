@@ -12,14 +12,16 @@ export default withMermaid(
       root: {
         label: 'English',
         lang: 'en-US',
-        description: 'Universal AI Agent Browser Controller (Antigravity First)',
+        description: 'Universal AI Agent Browser Controller (Skills + CLI & MCP)',
         themeConfig: {
           nav: [
             { text: 'Guide', link: '/USAGE_GUIDE' },
-            { text: 'Architecture', link: '/ARCHITECTURE' },
+            { text: '💡 Prompt Recipes', link: '/PROMPT_RECIPES' },
             {
-              text: 'Core & APIs',
+              text: 'Developer 🛠️',
               items: [
+                { text: 'Operational Flow & Contributing', link: '/DEVELOPER_GUIDE' },
+                { text: 'System Architecture', link: '/ARCHITECTURE' },
                 { text: 'CDP Engine & Trusted Input', link: '/CDP_GUIDE' },
                 { text: 'DevTools & Diagnostics', link: '/DEVTOOLS' },
                 { text: 'API & Message Reference', link: '/API_REFERENCE' },
@@ -27,41 +29,40 @@ export default withMermaid(
               ]
             },
             {
-              text: 'Ecosystem',
-              items: [
-                { text: 'Google Antigravity & MCP', link: '/ANTIGRAVITY_INTEGRATION' },
-                { text: 'OS Installation Bundles', link: '/BUNDLE_README' },
-                { text: 'GitHub Releases (v1.3.0)', link: 'https://github.com/ducconit/agent-pilot/releases' },
-                { text: 'Contributing Guide', link: 'https://github.com/ducconit/agent-pilot/blob/main/CONTRIBUTING.md' }
-              ]
+              text: '🐞 Report Bugs',
+              link: '/COMMUNITY_SUPPORT'
             }
           ],
 
           sidebar: [
             {
-              text: 'Getting Started',
+              text: '📘 General Documentation',
               items: [
-                { text: 'Overview & Installation', link: '/USAGE_GUIDE' },
-                { text: 'Antigravity & MCP Integration', link: '/ANTIGRAVITY_INTEGRATION' },
-                { text: 'OS Release Bundles', link: '/BUNDLE_README' },
+                { text: '📖 Installation & Features', link: '/USAGE_GUIDE' },
+                { text: '💡 Sample Prompts & Recipes', link: '/PROMPT_RECIPES' },
+                { text: '🤖 AI Agent Setup (Skills, CLI & MCP)', link: '/ANTIGRAVITY_INTEGRATION' },
+                { text: '📦 OS Release Bundles', link: '/BUNDLE_README' },
                 { text: '🐧 Ubuntu / Linux Setup', link: '/bundles/README.ubuntu' },
                 { text: '🍎 macOS Setup', link: '/bundles/README.macos' },
                 { text: '🪟 Windows Setup', link: '/bundles/README.windows' },
               ]
             },
             {
-              text: 'Core Engine & Architecture',
+              text: '🛠️ Developer',
               items: [
-                { text: 'System Architecture', link: '/ARCHITECTURE' },
-                { text: 'CDP Protocol & Trusted Input', link: '/CDP_GUIDE' },
-                { text: 'DevTools & Heap Diagnostics', link: '/DEVTOOLS' },
-                { text: 'Benchmarks & Latency', link: '/BENCHMARKS' },
+                { text: '🌿 Operational Flow & Contributing', link: '/DEVELOPER_GUIDE' },
+                { text: '🏛️ System Architecture', link: '/ARCHITECTURE' },
+                { text: '⚡ CDP Protocol & Trusted Input', link: '/CDP_GUIDE' },
+                { text: '🔬 DevTools & Heap Diagnostics', link: '/DEVTOOLS' },
+                { text: '📊 Benchmarks & Latency', link: '/BENCHMARKS' },
+                { text: '📋 API & Message Reference', link: '/API_REFERENCE' },
               ]
             },
             {
-              text: 'Reference',
+              text: '🐞 Support & Feedback',
               items: [
-                { text: 'API & Message Reference', link: '/API_REFERENCE' },
+                { text: '🐞 Report Bugs & Feature Requests', link: '/COMMUNITY_SUPPORT' },
+                { text: '🚀 GitHub Releases (v1.3.0)', link: 'https://github.com/ducconit/agent-pilot/releases' },
               ]
             }
           ],
@@ -87,14 +88,16 @@ export default withMermaid(
         label: 'Tiếng Việt',
         lang: 'vi-VN',
         link: '/vi/',
-        description: 'Bộ điều khiển trình duyệt chuyên dụng cho AI Coding Agent (Antigravity First)',
+        description: 'Bộ điều khiển trình duyệt đa năng cho AI Agent (Skills + CLI & MCP)',
         themeConfig: {
           nav: [
             { text: 'Hướng Dẫn', link: '/vi/USAGE_GUIDE' },
-            { text: 'Kiến Trúc', link: '/vi/ARCHITECTURE' },
+            { text: '💡 Prompt Mẫu', link: '/vi/PROMPT_RECIPES' },
             {
-              text: 'Core & APIs',
+              text: 'Lập Trình Viên 🛠️',
               items: [
+                { text: 'Luồng Hoạt Động & Đóng Góp', link: '/vi/DEVELOPER_GUIDE' },
+                { text: 'Kiến Trúc Hệ Thống', link: '/vi/ARCHITECTURE' },
                 { text: 'Giao Thức CDP & Trusted Input', link: '/vi/CDP_GUIDE' },
                 { text: 'Bộ DevTools & Diagnostics', link: '/vi/DEVTOOLS' },
                 { text: 'API & Message Reference', link: '/vi/API_REFERENCE' },
@@ -102,41 +105,40 @@ export default withMermaid(
               ]
             },
             {
-              text: 'Hệ Sinh Thái',
-              items: [
-                { text: 'Google Antigravity & MCP', link: '/vi/ANTIGRAVITY_INTEGRATION' },
-                { text: 'Gói Cài Đặt Theo OS', link: '/vi/BUNDLE_README' },
-                { text: 'GitHub Releases (v1.3.0)', link: 'https://github.com/ducconit/agent-pilot/releases' },
-                { text: 'Hướng Dẫn Đóng Góp', link: 'https://github.com/ducconit/agent-pilot/blob/main/CONTRIBUTING.md' }
-              ]
+              text: '🐞 Báo Lỗi',
+              link: '/vi/COMMUNITY_SUPPORT'
             }
           ],
 
           sidebar: [
             {
-              text: 'Bắt Đầu (Getting Started)',
+              text: '📘 Tài Liệu Chung',
               items: [
-                { text: 'Giới Thiệu & Cài Đặt', link: '/vi/USAGE_GUIDE' },
-                { text: 'Tích Hợp Antigravity & MCP', link: '/vi/ANTIGRAVITY_INTEGRATION' },
-                { text: 'Gói Cài Đặt Theo Hệ Điều Hành', link: '/vi/BUNDLE_README' },
+                { text: '📖 Hướng Dẫn & Cài Đặt', link: '/vi/USAGE_GUIDE' },
+                { text: '💡 Prompt Mẫu & Kịch Bản AI', link: '/vi/PROMPT_RECIPES' },
+                { text: '🤖 Tích Hợp AI Agent (Skills, CLI & MCP)', link: '/vi/ANTIGRAVITY_INTEGRATION' },
+                { text: '📦 Gói Cài Đặt Theo Hệ Điều Hành', link: '/vi/BUNDLE_README' },
                 { text: '🐧 Cài Đặt Trên Ubuntu / Linux', link: '/vi/bundles/README.ubuntu' },
                 { text: '🍎 Cài Đặt Trên macOS', link: '/vi/bundles/README.macos' },
                 { text: '🪟 Cài Đặt Trên Windows', link: '/vi/bundles/README.windows' },
               ]
             },
             {
-              text: 'Kiến Trúc & Động Cơ (Core Engine)',
+              text: '🛠️ Lập Trình Viên',
               items: [
-                { text: 'Kiến Trúc Hệ Thống', link: '/vi/ARCHITECTURE' },
-                { text: 'Giao Thức CDP & Trusted Input', link: '/vi/CDP_GUIDE' },
-                { text: 'Bộ Công Cụ DevTools Nâng Cao', link: '/vi/DEVTOOLS' },
-                { text: 'Đo Lường Hiệu Năng & Benchmarks', link: '/vi/BENCHMARKS' },
+                { text: '🌿 Luồng Hoạt Động & Đóng Góp', link: '/vi/DEVELOPER_GUIDE' },
+                { text: '🏛️ Kiến Trúc Hệ Thống', link: '/vi/ARCHITECTURE' },
+                { text: '⚡ Giao Thức CDP & Trusted Input', link: '/vi/CDP_GUIDE' },
+                { text: '🔬 Bộ Công Cụ DevTools Nâng Cao', link: '/vi/DEVTOOLS' },
+                { text: '📊 Đo Lường Hiệu Năng & Benchmarks', link: '/vi/BENCHMARKS' },
+                { text: '📋 API & Message Reference', link: '/vi/API_REFERENCE' },
               ]
             },
             {
-              text: 'Tham Chiếu (Reference)',
+              text: '🐞 Hỗ Trợ & Báo Lỗi',
               items: [
-                { text: 'API & Message Reference', link: '/vi/API_REFERENCE' },
+                { text: '🐞 Báo Lỗi & Đề Xuất', link: '/vi/COMMUNITY_SUPPORT' },
+                { text: '🚀 GitHub Releases (v1.3.0)', link: 'https://github.com/ducconit/agent-pilot/releases' },
               ]
             }
           ],

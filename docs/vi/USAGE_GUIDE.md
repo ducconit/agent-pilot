@@ -1,6 +1,6 @@
 # 📖 Sổ Tay Hướng Dẫn Sử Dụng (Agent Pilot User Guide)
 
-Chào mừng bạn đến với **Agent Pilot**! Sổ tay này hướng dẫn chi tiết từng bước cài đặt và vận hành toàn bộ các tính năng của tiện ích mở rộng.
+Chào mừng bạn đến với **Agent Pilot**! Dự án ban đầu được xây dựng phục vụ nhu cầu cá nhân nhằm **thay thế Chrome MCP mặc định trên Google Antigravity**, đồng thời loại bỏ việc **AI Agent phải tự sinh code Python để thao tác trình duyệt hoặc vẽ chữ lên hình ảnh** trong quá trình kiểm thử web. Sổ tay này hướng dẫn chi tiết từng bước cài đặt và vận hành toàn bộ các tính năng của công cụ.
 
 ::: warning ⚠️ Cảnh Báo: Dự Án 100% Vibe Coding & Miễn Trừ Trách Nhiệm
 **Agent Pilot là dự án thử nghiệm mã nguồn mở được phát triển 100% bằng hình thức "Vibe Coding" với Google Antigravity.**
@@ -18,7 +18,7 @@ Toàn bộ kiến trúc, mã nguồn Go CLI, script Chrome Extension MV3 và MCP
 2. Giải nén tệp `.zip` ra một thư mục cố định trên máy tính của bạn.
 3. Mở Google Chrome, truy cập: `chrome://extensions`.
 4. Bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải màn hình.
-5. Nhấp nút **Load unpacked** (Tải tiện ích đã giải nén) ở góc trên bên trái $\rightarrow$ Chọn thư mục vừa giải nén.
+5. Nhấp nút **Load unpacked** (Tải tiện ích đã giải nén) ở góc trên bên trái → Chọn thư mục vừa giải nén.
 6. Nhấp vào biểu tượng mảnh ghép (Extensions icon) trên thanh công cụ và chọn **Ghim (Pin)** biểu tượng **Agent Pilot (📌)**.
 
 ### Cách B: Cài Đặt Từ Mã Nguồn (Source Code)
@@ -37,7 +37,7 @@ Toàn bộ kiến trúc, mã nguồn Go CLI, script Chrome Extension MV3 và MCP
 
 Bạn có thể dễ dàng mở trung tâm điều khiển Side Panel bằng 2 cách trực quan:
 1. **Cách 1 (Nhanh & thuận tiện nhất)**: Nhấp chuột trực tiếp vào biểu tượng **Agent Pilot (📌)** đã ghim trên thanh công cụ Chrome. Bảng điều khiển sẽ trượt mở tức thì bên phải.
-2. **Cách 2 (Menu chuột phải)**: Nhấp chuột phải vào bất kỳ vị trí nào trên trang web $\rightarrow$ Chọn **Mở Agent Pilot (Side Panel)**.
+2. **Cách 2 (Menu chuột phải)**: Nhấp chuột phải vào bất kỳ vị trí nào trên trang web → Chọn **Mở Agent Pilot (Side Panel)**.
 
 > 💡 **Cấu hình phím tắt (Tùy chọn)**: Để tránh hoàn toàn xung đột với các phím tắt hệ điều hành hoặc trình quản lý cửa sổ (như rofi, i3wm), tiện ích không gán phím tắt mặc định. Nếu bạn muốn gán phím tắt riêng:
 > - Mở tab mới và nhập: `chrome://extensions/shortcuts`
@@ -115,7 +115,7 @@ Chuyển sang tab **✏️ Chú thích UI** trên Side Panel hoặc nhấp nút 
 
 #### 4 Chế Độ Thu Thập Phản Hồi Trực Quan:
 1. **🎯 Chọn phần tử (Element Mode)**:
-   - Rà chuột highlight phần tử trên trang web $\rightarrow$ Bấm chuột để chọn.
+   - Rà chuột highlight phần tử trên trang web → Bấm chuột để chọn.
    - Hệ thống tự động cắt ảnh phần tử và bóc tách tệp nguồn framework (`fileName:lineNumber` của React Fiber `_debugSource`, Vue Component `__file`, hoặc Astro).
 2. **✂️ Kéo chọn vùng (Region Crop Mode)**:
    - Giữ và kéo chuột trái để tạo khung chọn vùng lỗi trên trang web.
@@ -133,9 +133,9 @@ Chuyển sang tab **✏️ Chú thích UI** trên Side Panel hoặc nhấp nút 
 - **Đồng bộ thời gian thực hai chiều**: Mọi thao tác thêm, sửa, xóa trên trang web hay trên Side Panel đều được đồng bộ tức thì.
 
 #### 3 Kênh Xuất Phản Hồi Độc Lập:
-1. **🚀 Kênh A (Live Push Long-Polling)**: Bấm **"🚀 Gửi Agent"** $\rightarrow$ Dữ liệu phản hồi gửi thẳng tới AI Agent đang gọi công cụ `browser_wait_for_feedback()` trong thời gian thực.
-2. **💾 Kênh B (Hộp Thư Persistent Inbox)**: Bấm **"💾 Lưu Inbox"** $\rightarrow$ Lưu toàn bộ phiên phản hồi vào thư mục `~/.agent-pilot/inbox/feedback/<timestamp>/` (gồm `session.json`, `prompt.md`, `item_*.png`). AI Agent có thể truy vấn mọi lúc bằng `browser_get_pending_feedback()`.
-3. **📋 Kênh C (1-Click Clipboard Prompt)**: Bấm **"📋 Copy Prompt"** $\rightarrow$ Xuất ra prompt Markdown đầy đủ thông số và cấu trúc sẵn sàng dán vào khung chat của bất kỳ mô hình LLM nào.
+1. **🚀 Kênh A (Live Push Long-Polling)**: Bấm **"🚀 Gửi Agent"** → Dữ liệu phản hồi gửi thẳng tới AI Agent đang gọi công cụ `browser_wait_for_feedback()` trong thời gian thực.
+2. **💾 Kênh B (Hộp Thư Persistent Inbox)**: Bấm **"💾 Lưu Inbox"** → Lưu toàn bộ phiên phản hồi vào thư mục `~/.agent-pilot/inbox/feedback/<timestamp>/` (gồm `session.json`, `prompt.md`, `item_*.png`). AI Agent có thể truy vấn mọi lúc bằng `browser_get_pending_feedback()`.
+3. **📋 Kênh C (1-Click Clipboard Prompt)**: Bấm **"📋 Copy Prompt"** → Xuất ra prompt Markdown đầy đủ thông số và cấu trúc sẵn sàng dán vào khung chat của bất kỳ mô hình LLM nào.
 
 ---
 

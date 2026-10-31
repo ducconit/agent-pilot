@@ -1,3 +1,7 @@
+<script setup>
+import { withBase } from 'vitepress'
+</script>
+
 # 📊 MCP vs Standalone CLI Performance Benchmarks
 
 This document records the empirical comparison between the **MCP Server** (`stdio` JSON-RPC) and the **Standalone CLI** (`agent-pilot`) on identical Chrome environments and browser automation workflows.
@@ -17,8 +21,23 @@ Both interfaces were tested against bridge `http://127.0.0.1:58766` on the same 
 7. **`close`**: Close the tab and release memory.
 
 Videos and screenshots recorded during benchmark:
-- [Video workflow via MCP](../artifacts/browser-comparison/mcp-example-com.mp4) · [Screenshot MCP](../artifacts/browser-comparison/mcp-example-com.png)
-- [Video workflow via CLI](../artifacts/browser-comparison/cli-example-com.mp4) · [Screenshot CLI](../artifacts/browser-comparison/cli-example-com.png)
+- <a :href="withBase('/artifacts/browser-comparison/mcp-example-com.mp4')" target="_blank" rel="noopener">🎬 Video workflow via MCP</a> · <a :href="withBase('/artifacts/browser-comparison/mcp-example-com.png')" target="_blank" rel="noopener">🖼️ Screenshot MCP</a>
+- <a :href="withBase('/artifacts/browser-comparison/cli-example-com.mp4')" target="_blank" rel="noopener">🎬 Video workflow via CLI</a> · <a :href="withBase('/artifacts/browser-comparison/cli-example-com.png')" target="_blank" rel="noopener">🖼️ Screenshot CLI</a>
+
+<div class="ap-feature-grid">
+  <div class="ap-feature-card">
+    <div class="ap-feature-badge">MCP WORKFLOW RECORDING</div>
+    <video controls preload="metadata" :poster="withBase('/artifacts/browser-comparison/mcp-example-com.png')" style="width: 100%; border-radius: 6px; margin-top: 0.5rem;">
+      <source :src="withBase('/artifacts/browser-comparison/mcp-example-com.mp4')" type="video/mp4" />
+    </video>
+  </div>
+  <div class="ap-feature-card">
+    <div class="ap-feature-badge">CLI WORKFLOW RECORDING</div>
+    <video controls preload="metadata" :poster="withBase('/artifacts/browser-comparison/cli-example-com.png')" style="width: 100%; border-radius: 6px; margin-top: 0.5rem;">
+      <source :src="withBase('/artifacts/browser-comparison/cli-example-com.mp4')" type="video/mp4" />
+    </video>
+  </div>
+</div>
 
 > **Note on "Token Proxy"**: Output-size proxy is calculated as `ceil(raw_bytes / 4)` representing the payload volume parsed by the agent model context (excluding hidden system prompt and reasoning tokens).
 

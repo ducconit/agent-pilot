@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "Agent Pilot"
-  text: "Autonomous Browser Engine for AI Agents"
-  tagline: "Antigravity First • Zero Dependencies • Dual-Engine (DOM + Trusted CDP) • Background Tab Isolation"
+  text: "Token-Efficient Browser Control, Web Testing & Debugging for AI"
+  tagline: "Low Token Footprint • Skills+CLI & MCP • Annotated Screenshots • Video Recording • Action Replay & Playwright Export • Performance & Memory Leak Detection"
   image:
     src: /logo.svg
     alt: Agent Pilot Logo
@@ -13,11 +13,11 @@ hero:
       text: Get Started 🚀
       link: /USAGE_GUIDE
     - theme: alt
-      text: Architecture 🏛️
-      link: /ARCHITECTURE
+      text: Prompt Recipes 💡
+      link: /PROMPT_RECIPES
     - theme: alt
-      text: GitHub ⭐️
-      link: https://github.com/ducconit/agent-pilot
+      text: Developer Guide 🛠️
+      link: /DEVELOPER_GUIDE
 
 ---
 
@@ -37,55 +37,99 @@ hero:
   </div>
 </div>
 
+## 🎯 Core Purpose & Web Testing, QA/QC, Debugging Toolkit
+
+**Agent Pilot** was originally built as a personal project to **replace the default Chrome MCP on Google Antigravity** and eliminate the frustrating workflow where **AI agents had to generate ad-hoc Python scripts just to interact with the browser or draw text/annotations onto images** during web testing.
+
+Today, it solves the fundamental bottleneck of AI browser automation across any AI coding assistant: **effortless browser control with minimal token consumption**, paired with a complete suite of native tools for **automated web testing, QA/QC verification, and deep web debugging**.
+
 <div class="ap-feature-grid">
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">01 // HUMAN SIMULATION</div>
-    <div class="ap-feature-title">Virtual Neon Cursor</div>
+    <div class="ap-feature-badge">01 // TOKEN EFFICIENCY</div>
+    <div class="ap-feature-title">Effortless & Low-Token Control</div>
     <div class="ap-feature-desc">
-      Fluid cubic ease-out trajectories with luminous click-ripple animations, realistic keystroke cadences, and smooth scrolling without frame drops.
+      Compact interactive DOM snapshots (<code>@1</code>, <code>@2</code>) and single-roundtrip Batch Execution cut context token consumption by over 50% across both Skills+CLI and MCP modes.
     </div>
   </div>
 
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">02 // DUAL ENGINE</div>
-    <div class="ap-feature-title">DOM + Trusted CDP</div>
+    <div class="ap-feature-badge">02 // VISUAL QA PROOF</div>
+    <div class="ap-feature-title">Annotated Screenshots</div>
     <div class="ap-feature-desc">
-      Sub-millisecond synthetic DOM execution by default; escalates seamlessly to Chrome DevTools Protocol for cross-origin iframes, Canvas, and WebGL.
+      Capture visible viewports, full-page scrolls, or specific DOM elements with automatic bounding-box highlights and custom report title banners for QA documentation.
     </div>
   </div>
 
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">03 // ISOLATION</div>
-    <div class="ap-feature-title">Background Multi-Agent</div>
+    <div class="ap-feature-badge">03 // VIDEO RECORDING</div>
+    <div class="ap-feature-title">Workflow Video Capture</div>
     <div class="ap-feature-desc">
-      Operates inside dedicated tab groups without hijacking developer focus. Concurrently orchestrates parallel coding agents via explicit tab handles.
+      Record smooth screencast videos of automated test runs and bug reproductions (complete with virtual neon cursor trajectories and click ripples) for visual QA sign-off.
     </div>
   </div>
 
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">04 // ZERO DEPENDENCIES</div>
-    <div class="ap-feature-title">Standalone Go Binary</div>
+    <div class="ap-feature-badge">04 // PLAYWRIGHT & REPLAY</div>
+    <div class="ap-feature-title">Record, Replay & Export Playwright</div>
     <div class="ap-feature-desc">
-      Embeds the WebSocket/REST bridge, MCP server, and DevTools runtime into a single compiled binary. Zero Node.js or external toolchains needed.
+      Record live user or AI interaction sequences, replay multi-step flows deterministically on demand, and export recorded journeys directly into production-ready Playwright test code.
     </div>
   </div>
 
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">05 // VISUAL QA</div>
-    <div class="ap-feature-title">In-Page Feedback Studio</div>
+    <div class="ap-feature-badge">05 // PERFORMANCE</div>
+    <div class="ap-feature-title">Performance & Lighthouse Audits</div>
     <div class="ap-feature-desc">
-      Interactive HUD for DOM element inspection, pixel-precise eyedropper color sampling, UI bug annotation, and direct feedback push to AI agents.
+      Execute native Lighthouse audits, measure Core Web Vitals (LCP, CLS, INP), capture performance timelines, and diagnose slow resource waterfalls.
     </div>
   </div>
 
   <div class="ap-feature-card">
-    <div class="ap-feature-badge">06 // DEEP DIAGNOSTICS</div>
-    <div class="ap-feature-title">Audits & Profiling</div>
+    <div class="ap-feature-badge">06 // MEMORY DIAGNOSTICS</div>
+    <div class="ap-feature-title">Memory Leak Detection (Heap Diff)</div>
     <div class="ap-feature-desc">
-      Native Lighthouse audits, V8 heap snapshot diffing for memory leaks, performance tracing, and live network/console telemetry streaming.
+      Capture and diff V8 Heap snapshots before and after user flows to pinpoint memory leaks, detached DOM trees, and growing closure retainers.
+    </div>
+  </div>
+
+  <div class="ap-feature-card">
+    <div class="ap-feature-badge">07 // WEB DEBUGGING</div>
+    <div class="ap-feature-title">Console, Network & DOM Debugging</div>
+    <div class="ap-feature-desc">
+      Monitor real-time Console errors, inspect failed HTTP 4xx/5xx network payloads, extract computed CSS styles, and automatically redact 29 secret patterns.
+    </div>
+  </div>
+
+  <div class="ap-feature-card">
+    <div class="ap-feature-badge">08 // INTERACTIVE QA</div>
+    <div class="ap-feature-title">Feedback Studio & Tab Isolation</div>
+    <div class="ap-feature-desc">
+      Pin visual bug annotations directly on the webpage, sample pixel-accurate colors, and run multiple AI agents concurrently in background tab groups without stealing focus.
     </div>
   </div>
 </div>
+
+---
+
+## ⚖️ Key Differences: Agent Pilot vs. Standard Chrome MCP
+
+Why use **Agent Pilot** instead of the default Chrome MCP in Antigravity or generic browser MCP servers?
+
+| Capability | Standard Chrome MCP | 🚀 Agent Pilot |
+| :--- | :--- | :--- |
+| **Connection Modes & Token Cost** | MCP-only (`stdio`/SSE); large JSON-RPC schemas & verbose DOM trees consume heavy context tokens. | Supports both **Skills + CLI** (>50% token savings) and **MCP Server**, plus compact `@1, @2` snapshots & Batch Execution. |
+| **Visual QA & Annotated Screenshots** | Captures plain screenshots; AI often has to write ad-hoc Python scripts (`Pillow`/`OpenCV`) to draw boxes or text labels. | **Built-in Annotated Screenshots** (viewport, full-page, element) with automatic bounding-box highlights and QA report title banners—zero Python scripts needed. |
+| **Browser Session & Focus Isolation** | Typically spawns a separate browser window or steals active window/mouse focus while you work. | Runs directly inside your active Chrome profile (preserving login sessions) inside isolated background tab groups (`🤖 Agent Pilot`) without stealing focus. |
+| **Video Recording, Replay & Playwright** | Executes one-off commands with no built-in recording, action replay, or test code generation. | Native `.mp4` workflow video capture (with virtual neon cursor), deterministic **Action Replay**, and 1-click **Playwright** test code export. |
+| **Deep Web Debugging & Security** | Basic DOM interaction and raw console/network inspection. | Native **Lighthouse** audits, Core Web Vitals, **V8 Heap Snapshot Diff** for memory leaks, **In-Page Feedback Studio**, and automatic masking of **29 secret patterns**. |
+
+---
+
+## 🧭 Future Direction & Roadmap
+
+::: info STABILITY FIRST — NO NEW FEATURE EXPANSION PLANNED
+Because **Agent Pilot** already covers the complete end-to-end workflow for personal and team Web Testing, QA/QC, and Debugging, **the primary goal for the future is to ensure rock-solid stability, reliability, and compatibility of the existing feature set** across browser and OS updates. There are currently **no plans to develop new features**.
+:::
 
 ---
 
@@ -128,15 +172,22 @@ agent-pilot service install
 agent-pilot service status
 ```
 
-### Step 3: Connect to Your AI Coding Agent
+### Step 3: Connect to Any AI Agent or Tool
 
-#### Option A: Agent Skills Ecosystem ([skills.sh](https://skills.sh/))
+Agent Pilot works universally with any AI coding assistant or automation tool that supports **Agent Skills + Command Line (CLI)** or **Model Context Protocol (MCP)**:
+
+#### Option A: Agent Skills + Command Line (CLI)
+Works out-of-the-box with **Claude Code**, **Cursor**, **Windsurf**, **Google Antigravity**, **Cline / Roo Code**, **OpenCode**, **Codex**, **Aider**, and any agent capable of running shell commands:
 ```bash
+# Install via skills.sh ecosystem
 npx skills add https://github.com/ducconit/agent-pilot -g --all
+
+# Or install directly via the standalone CLI
+agent-pilot install-skill --all
 ```
 
-#### Option B: MCP Server Configuration (`mcp.json`)
-For **Google Antigravity**, **Claude Code**, or **Cursor**:
+#### Option B: Model Context Protocol (MCP) Server (`mcp.json`)
+Works with any MCP-compatible client (**Claude Desktop**, **Claude Code**, **Cursor**, **Windsurf**, **Google Antigravity**, **Zed**, **Continue**, etc.):
 ```json
 {
   "mcpServers": {

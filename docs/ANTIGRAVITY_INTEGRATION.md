@@ -1,22 +1,66 @@
-# 🚀 Antigravity-First Integration Guide (Agent Pilot)
+# 🤖 AI Agent Integration Guide (Skills + CLI & MCP)
 
-**Agent Pilot** is engineered with an **Antigravity-First** philosophy, empowering Google Antigravity AI coding and automation agents to "see", "understand", and "drive" developers' browsers safely, accurately, and intuitively.
+**Agent Pilot** is a universal browser controller designed to work seamlessly with **any AI coding agent or automation tool** that supports either:
+1. **Agent Skills + Command Line (CLI)** (`skills.sh` + shell execution)
+2. **Model Context Protocol (MCP)** (`mcpServers` JSON configuration)
+
+Compatible agents & tools include **Claude Code**, **Cursor**, **Windsurf**, **Google Antigravity**, **Cline / Roo Code**, **OpenCode**, **Codex**, **Aider**, **Zed**, and any custom LLM agent with terminal or MCP capabilities.
 
 ---
 
-## 1. Antigravity & Agent Pilot Architectural Topology
+## 1. Dual Integration Modes
+
+### Mode A: Agent Skills + Command Line (CLI) — Recommended for Token Efficiency
+Any AI agent capable of reading markdown skill instructions (`SKILL.md`) and executing terminal commands can control Chrome via the standalone `agent-pilot` CLI binary:
+
+```bash
+# 1. Install the Agent Skill globally across all detected AI tools
+npx skills add https://github.com/ducconit/agent-pilot -g --all
+
+# Or use the built-in CLI installer:
+agent-pilot install-skill --all
+```
+
+Once installed, the agent automatically learns how to run compact CLI commands (`agent-pilot open`, `agent-pilot snapshot`, `agent-pilot click`, `agent-pilot screenshot`) without loading heavy tool schemas into its context window.
+
+### Mode B: Model Context Protocol (MCP) Server
+For MCP-enabled IDEs and desktop clients, Agent Pilot includes a built-in stdio MCP server exposing 51 browser & DevTools tools:
+
+```json
+{
+  "mcpServers": {
+    "agent-pilot": {
+      "command": "agent-pilot",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+| AI Agent / Tool | Supported Modes | Configuration File / Command |
+| :--- | :--- | :--- |
+| **Claude Code** | Skills + CLI, MCP | `npx skills add ...` or `claude mcp add agent-pilot -- agent-pilot mcp` |
+| **Cursor** | Skills + CLI, MCP | `.cursor/mcp.json` or `~/.cursor/mcp.json` |
+| **Windsurf** | Skills + CLI, MCP | `~/.codeium/windsurf/mcp_config.json` |
+| **Google Antigravity** | Skills + CLI, MCP | `~/.gemini/config/mcp_config.json` or `skills/` |
+| **Cline / Roo Code** | Skills + CLI, MCP | VS Code MCP Settings JSON |
+| **OpenCode / Codex** | Skills + CLI, MCP | `npx skills add ...` or project MCP config |
+
+---
+
+## 2. Architectural Topology
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              HOST WORKSTATION                               │
 │                                                                             │
 │  ┌───────────────────────────┐                ┌──────────────────────────┐  │
-│  │   Antigravity AI Agent    │                │  Developer / QA Tester   │  │
-│  │   (Coding Assistant)      │                │  (Direct Observer)       │  │
+│  │     Any AI Coding Agent   │                │  Developer / QA Tester   │  │
+│  │ (Claude/Cursor/Antigravity│                │  (Direct Observer)       │  │
 │  └─────────────┬─────────────┘                └────────────┬─────────────┘  │
 │                │                                           │                │
-│                │ 1. Dispatches JSON Actions                │ Observes neon  │
-│                │    via CLI or MCP                         │ cursor & logs  │
+│                │ 1. Dispatches Commands                    │ Observes neon  │
+│                │    via Skills+CLI or MCP                  │ cursor & logs  │
 │                ▼                                           ▼                │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │                 CHROME BROWSER (AGENT PILOT EXTENSION)                │  │
@@ -41,7 +85,7 @@
 
 ---
 
-## 2. Agent Control Protocol (ACP) - JSON Action Schema
+## 3. Agent Control Protocol (ACP) - JSON Action Schema
 
 Antigravity generates structured JSON action pipelines executed sequentially by Agent Pilot:
 

@@ -1,6 +1,6 @@
 # 📖 Agent Pilot User Guide
 
-Welcome to **Agent Pilot**! This comprehensive guide walks you through every step of installing, configuring, and operating the full capability suite of the browser controller.
+Welcome to **Agent Pilot**! Originally built for personal use to **replace the default Chrome MCP on Google Antigravity** and eliminate the need for **AI agents to generate ad-hoc Python scripts to manipulate the browser or draw text/annotations onto images** during web testing, Agent Pilot provides a complete, token-efficient browser control and QA/QC suite. This guide walks you through installing, configuring, and operating every feature.
 
 ::: warning ⚠️ 100% Vibe Coding Notice & Legal Disclaimer
 **Agent Pilot is an experimental open-source tool developed 100% via "vibe coding" using Google Antigravity.**
@@ -18,7 +18,7 @@ All architecture, Go CLI binaries, Chrome MV3 extension scripts, and MCP tooling
 2. Unpack the `.zip` archive to a permanent directory on your computer.
 3. Open Google Chrome and navigate to: `chrome://extensions`.
 4. Enable **Developer mode** toggle in the top-right corner.
-5. Click **Load unpacked** in the top-left $\rightarrow$ Select the unpacked folder.
+5. Click **Load unpacked** in the top-left → Select the unpacked folder.
 6. Click the Extensions puzzle icon in the Chrome toolbar and **Pin (📌)** the **Agent Pilot** icon.
 
 ### Method B: Install from Source Code
@@ -37,7 +37,7 @@ All architecture, Go CLI binaries, Chrome MV3 extension scripts, and MCP tooling
 
 Open the Agent Pilot control center using either method:
 1. **Method 1 (Fastest)**: Click the pinned **Agent Pilot (📌)** icon in the Chrome toolbar. The side panel slides open instantly on the right.
-2. **Method 2 (Context Menu)**: Right-click anywhere on any web page $\rightarrow$ Select **Open Agent Pilot (Side Panel)**.
+2. **Method 2 (Context Menu)**: Right-click anywhere on any web page → Select **Open Agent Pilot (Side Panel)**.
 
 > 💡 **Custom Keyboard Shortcut (Optional)**: To avoid conflicts with system window managers (e.g. rofi, i3wm, macOS Spotlight), no default shortcut is registered. To set your own:
 > - Open a new tab and enter: `chrome://extensions/shortcuts`
@@ -103,7 +103,7 @@ Switch to the **🎯 Inspector & Colors** tab:
 ### 3.6 Screenshot Studio
 Switch to the **📸 Screenshots** tab:
 - **🖥️ Full Viewport**: Captures the entire visible area of the current tab.
-- **✂️ Region Crop**: The page dims with crosshair cursor; drag a rectangle over the target area $\rightarrow$ Click **✓ Capture Region**.
+- **✂️ Region Crop**: The page dims with crosshair cursor; drag a rectangle over the target area → Click **✓ Capture Region**.
 - **🎯 Element Capture**: Hover over the web page to select an element (purple outline and tooltip). Clicking captures the element bounds and exits selection mode.
 - **📋 Auto-Copy to Clipboard (Toggle)**: Automatically copies captured screenshots to system clipboard without additional clicks.
 - After capture, preview appears in the Side Panel with real pixel dimensions, **💾 Download PNG**, and **📋 Copy** buttons.
@@ -115,7 +115,7 @@ Switch to the **✏️ UI Feedback** tab on the Side Panel or click the floating
 
 #### 4 Visual Feedback Capture Modes:
 1. **🎯 Element Mode**:
-   - Hover to highlight element $\rightarrow$ Click to select.
+   - Hover to highlight element → Click to select.
    - Crops element snapshot and extracts framework source location (`fileName:lineNumber` from React Fiber `_debugSource`, Vue Component `__file`, or Astro).
 2. **✂️ Region Crop Mode**:
    - Drag a rectangle over the bug area.
@@ -133,9 +133,9 @@ Switch to the **✏️ UI Feedback** tab on the Side Panel or click the floating
 - **Real-Time Bidirectional Sync**: All additions, edits, and deletions sync instantly across page and Side Panel.
 
 #### 3 Export Channels:
-1. **🚀 Channel A (Live Agent Push)**: Click **"🚀 Send to Agent"** $\rightarrow$ Dispatches payload directly to the AI agent holding a `browser_wait_for_feedback()` long-poll.
-2. **💾 Channel B (Shared Persistent Inbox)**: Click **"💾 Save to Inbox"** $\rightarrow$ Persists session to `~/.agent-pilot/inbox/feedback/<timestamp>/` (`session.json`, clean `prompt.md`, `item_*.png`). AI agent queries anytime with `browser_get_pending_feedback()`.
-3. **📋 Channel C (1-Click Clipboard Prompt)**: Click **"📋 Copy Prompt"** $\rightarrow$ Formats rich Markdown with all metrics and file locations ready to paste into any LLM chat.
+1. **🚀 Channel A (Live Agent Push)**: Click **"🚀 Send to Agent"** → Dispatches payload directly to the AI agent holding a `browser_wait_for_feedback()` long-poll.
+2. **💾 Channel B (Shared Persistent Inbox)**: Click **"💾 Save to Inbox"** → Persists session to `~/.agent-pilot/inbox/feedback/<timestamp>/` (`session.json`, clean `prompt.md`, `item_*.png`). AI agent queries anytime with `browser_get_pending_feedback()`.
+3. **📋 Channel C (1-Click Clipboard Prompt)**: Click **"📋 Copy Prompt"** → Formats rich Markdown with all metrics and file locations ready to paste into any LLM chat.
 
 ---
 
