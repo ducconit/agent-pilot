@@ -30,7 +30,8 @@ import { collectDevtoolsData } from "./background/agent-handlers/devtools.js";
 import {
   getActiveTabId,
   markTabAsAgentControlled,
-  runWithTabLock
+  runWithTabLock,
+  isTabInAgentGroup
 } from "./background/tab-manager.js";
 
 import { captureTabScreenshot } from "./background/screenshot-service.js";
@@ -215,12 +216,14 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (agentBridge && !agentBridge.connected && agentBridge.enabled) {
     agentBridge.requestReconnect();
   }
-  if (changeInfo.url) {
-    await ensureFlowRecorderHydrated();
-    recordTabNavigation(tabId, changeInfo.url);
-  } else if (changeInfo.status === "complete" && tab?.url) {
-    await ensureFlowRecorderHydrated();
-    recordTabNavigation(tabId, tab.url);
+  if (changeInfo.url || (changeInfo.status === "complete" && tab?.url)) {
+    const navUrl = changeInfo.url || tab.url;
+    const isManaged = await isTabInAgentGroup(tabId);
+    const flowState = getFlowState(tabId);
+    if (isManaged || flowState?.recording) {
+      await ensureFlowRecorderHydrated();
+      recordTabNavigation(tabId, navUrl);
+    }
   }
   // If user manually ungroups a tab or moves it into a non-Agent tab group, revoke agent access
   if (changeInfo.groupId !== undefined && agentControlledTabs.has(tabId)) {
@@ -474,6 +477,12 @@ const BACKGROUND_ACTION_HANDLERS = {
   record_flow_step: async (request, sender) => {
     await ensureFlowRecorderHydrated();
     const tabId = sender?.tab?.id || request.tabId;
+    if (!tabId) return { success: false, ignored: true };
+    const isManaged = await isTabInAgentGroup(tabId);
+    const flowState = getFlowState(tabId);
+    if (!isManaged && !flowState?.recording) {
+      return { success: false, ignored: true, reason: "tab_not_managed_or_recording" };
+    }
     const step = appendFlowStep(tabId, request.step);
     return { success: Boolean(step), step, state: getFlowState(tabId) };
   },

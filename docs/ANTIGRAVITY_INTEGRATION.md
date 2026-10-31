@@ -141,11 +141,11 @@ Antigravity generates structured JSON action pipelines executed sequentially by 
 
 ---
 
-## 3. WebSocket Bridge & Model Context Protocol (MCP) Server (Port 58765)
+## 4. WebSocket Bridge & Model Context Protocol (MCP) Server (Port 58765)
 
 Agent Pilot operates a dual **Model Context Protocol (MCP)** and **WebSocket** bridge server on private IANA port **`58765`** (`49152 – 65535`, avoiding port collisions with standard development servers).
 
-### 3.1. Starting the Bridge Server
+### 4.1. Starting the Bridge Server
 ```bash
 # Using the Go standalone binary (recommended):
 agent-pilot server
@@ -157,7 +157,7 @@ npm run server
 AGENT_PILOT_PORT=58765 agent-pilot server
 ```
 
-### 3.2. Configuring Antigravity MCP Server
+### 4.2. Configuring Antigravity MCP Server
 Add the following configuration to your Antigravity MCP settings (`~/.gemini/config/mcp_config.json` or project MCP config) to grant agents complete browser control:
 
 ```json
@@ -171,7 +171,7 @@ Add the following configuration to your Antigravity MCP settings (`~/.gemini/con
 }
 ```
 
-### 3.3. Key MCP Tools Provided to AI Agents (68 Tools):
+### 4.3. Key MCP Tools Provided to AI Agents (68 Tools):
 1. `browser_open_tab(url, active)`: Opens a new tab (defaults to background to preserve developer focus; groups into `🤖 Agent Pilot`).
 2. `browser_list_tabs()`: Lists all tabs and isolation states.
 3. `browser_navigate(url, tabId)`: Navigates specified or active tab.
@@ -198,7 +198,7 @@ Add the following configuration to your Antigravity MCP settings (`~/.gemini/con
 
 ---
 
-## 4. In-Page Bridge API (`window.__AGENT_PILOT__`)
+## 5. In-Page Bridge API (`window.__AGENT_PILOT__`)
 
 The extension automatically exposes `window.__AGENT_PILOT__` in the page context for direct programmatic automation:
 
@@ -223,7 +223,7 @@ console.log("Color codes:", color.hex, color.rgb, color.rgba, color.hsl, color.o
 
 ---
 
-## 5. Antigravity Autonomous Debugging Workflow
+## 6. Antigravity Autonomous Debugging Workflow
 
 1. **Start Dev Server**: Antigravity spins up local application server (`http://localhost:3000`).
 2. **Launch Target Tab**: Agent opens background tab via Agent Pilot.

@@ -57,11 +57,11 @@ agent-pilot tabs
      ```
 2. **Khởi động trực tiếp để soi nhật ký (Debug logs)**:
    ```bash
-   agent-pilot serve --port 58765
+   agent-pilot server --port 58765
    ```
    Nếu cổng `58765` bị trùng, bạn có thể chuyển sang cổng khác:
    ```bash
-   agent-pilot serve --port 59000
+   agent-pilot server --port 59000
    ```
    *(Nhớ chỉnh lại số cổng tương ứng trong phần cài đặt của Side Panel trên Chrome).*
 3. **Kiểm tra tiện ích Chrome**:
@@ -255,9 +255,9 @@ Hoặc dùng dấu gạch chéo xuôi (`/`), Windows hỗ trợ hoàn toàn bìn
 ## 6. Vẫn Cần Hỗ Trợ?
 
 Nếu vấn đề của bạn chưa được giải quyết:
-1. Xem log máy chủ trực tiếp:
+1. Xem nhật ký máy chủ trực tiếp khi chạy ở chế độ foreground:
    ```bash
-   agent-pilot serve --debug
+   agent-pilot server
    ```
 2. Xem log chạy ngầm của Chrome Extension:
    - Mở `chrome://extensions`.

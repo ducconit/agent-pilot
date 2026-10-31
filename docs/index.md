@@ -96,7 +96,7 @@ Today, it solves the fundamental bottleneck of AI browser automation across any 
     <div class="ap-feature-badge">07 // WEB DEBUGGING</div>
     <div class="ap-feature-title">Console, Network & DOM Debugging</div>
     <div class="ap-feature-desc">
-      Monitor real-time Console errors, inspect failed HTTP 4xx/5xx network payloads, extract computed CSS styles, and automatically redact 29 secret patterns.
+      Monitor real-time Console errors, inspect failed HTTP 4xx/5xx network payloads, extract computed CSS styles, and automatically redact sensitive information (13 regex patterns & 23 sensitive keys).
     </div>
   </div>
 
@@ -121,7 +121,7 @@ Why use **Agent Pilot** instead of the default Chrome MCP in Antigravity or gene
 | **Visual QA & Annotated Screenshots** | Captures plain screenshots; AI often has to write ad-hoc Python scripts (`Pillow`/`OpenCV`) to draw boxes or text labels. | **Built-in Annotated Screenshots** (viewport, full-page, element) with automatic bounding-box highlights and QA report title banners—zero Python scripts needed. |
 | **Browser Session & Focus Isolation** | Typically spawns a separate browser window or steals active window/mouse focus while you work. | Runs directly inside your active Chrome profile (preserving login sessions) inside isolated background tab groups (`🤖 Agent Pilot`) without stealing focus. |
 | **Video Recording, Replay & Playwright** | Executes one-off commands with no built-in recording, action replay, or test code generation. | Native `.mp4` workflow video capture (with virtual neon cursor), deterministic **Action Replay**, and 1-click **Playwright** test code export. |
-| **Deep Web Debugging & Security** | Basic DOM interaction and raw console/network inspection. | Native **Lighthouse** audits, Core Web Vitals, **V8 Heap Snapshot Diff** for memory leaks, **In-Page Feedback Studio**, and automatic masking of **29 secret patterns**. |
+| **Deep Web Debugging & Security** | Basic DOM interaction and raw console/network inspection. | Native **Lighthouse** audits, Core Web Vitals, **V8 Heap Snapshot Diff** for memory leaks, **In-Page Feedback Studio**, and dual-layer masking of **sensitive secrets (13 regex patterns + 23 property keys)**. |
 
 ---
 

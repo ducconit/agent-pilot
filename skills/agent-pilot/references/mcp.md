@@ -57,7 +57,7 @@ For a compact DevTools batch, use action objects:
 | Device emulation & viewport resizing | `browser_emulate` (`device`, `viewport`, `userAgent`), `browser_resize_page` (`width`, `height`, `deviceScaleFactor`, `mobile`) |
 | Isolated multi-tenant browser contexts | `browser_create_context` (`name`), `browser_list_contexts`, `browser_close_context` (`contextId`) |
 | Screenshot (`png`/`jpeg`/`webp` + banner/highlight/arrows/badges/icons) | `browser_screenshot` (`format`, `quality`, `path`, `step`, `title`/`caption`, `description`, `captionPosition`, `highlightSelector`, `arrows`, `callouts`, `badges`, `boxes`, `circles`, `icons`, `redact`, `spotlight`, `clip`) |
-| Native MP4 screen recording (screencast) | `browser_screencast_start` (`format: "mp4"`, `quality`, `crop`), `browser_screencast_stop` (`filePath`) |
+| Native MP4 screen recording (screencast) | `browser_screencast_start` (`filePath`, `fps`, `tabId`), `browser_screencast_stop` (`tabId`) |
 | Console/network/metrics, HTTP bodies & DevTools health | `browser_devtools_status`, `browser_get_devtools_data` (`msgid`, `includePreserved`, `navigationId`), `browser_list_network_requests`, `browser_get_network_request` (`requestId`, `filePath`), `browser_get_css_styles` (`detail: "summary"\|"computed"\|"rules"\|"full"`) |
 | Human UI Feedback Studio (Channel A / Channel B) | `browser_get_pending_feedback` (`limit`, `sessionId`, `clear`), `browser_wait_for_feedback` (`timeout`) |
 | Virtual WebAuthn / Passkey testing | `browser_webauthn` (`enable`, `addAuthenticator`, `getCredentials`, `setUserVerified`, `clearCredentials`, `removeAuthenticator`, `disable`) |

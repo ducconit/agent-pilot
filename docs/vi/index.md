@@ -96,7 +96,7 @@ Hiện tại, dự án hỗ trợ mọi công cụ AI điều khiển trình duy
     <div class="ap-feature-badge">07 // DEBUG WEB</div>
     <div class="ap-feature-title">Bắt Lỗi Console, Network & DOM</div>
     <div class="ap-feature-desc">
-      Giám sát lỗi Console thời gian thực, lọc các truy vấn mạng thất bại (HTTP 4xx/5xx), soi thuộc tính CSS thực tế và tự động che giấu 29 loại thông tin nhạy cảm (API key, token).
+      Giám sát lỗi Console thời gian thực, lọc các truy vấn mạng thất bại (HTTP 4xx/5xx), soi thuộc tính CSS thực tế và tự động che giấu thông tin nhạy cảm (13 mẫu regex & 23 khóa thuộc tính).
     </div>
   </div>
 
@@ -121,7 +121,7 @@ Tại sao nên dùng **Agent Pilot** thay vì Chrome MCP mặc định trên Ant
 | **Chụp ảnh & Vẽ chú thích báo cáo QA** | Chỉ chụp ảnh màn hình thô; AI thường phải tự sinh code Python (`Pillow`/`OpenCV`) tạm bợ để vẽ chữ hoặc khoanh vùng lỗi lên ảnh. | **Tích hợp sẵn chụp ảnh kèm chú thích** (khung nhìn, full-page, từng phần tử), tự động vẽ khung viền highlight đỏ và đóng dấu tiêu đề báo cáo mà không cần sinh script Python. |
 | **Phiên trình duyệt & Chạy ngầm** | Thường mở cửa sổ trình duyệt mới (mất trạng thái đăng nhập) hoặc liên tục cướp chuột/focus màn hình khi đang làm việc. | Chạy trực tiếp trên trình duyệt Chrome đang mở (giữ nguyên cookie/phiên đăng nhập), tự động gom tab vào nhóm riêng (`🤖 Agent Pilot`) chạy ngầm không cướp focus. |
 | **Quay Video, Replay & Xuất Playwright** | Chỉ thực thi từng lệnh rời rạc, không có cơ chế lưu lại thao tác hay sinh mã kiểm thử tự động. | Quay trực tiếp video `.mp4` (kèm chuột ảo neon), ghi nhận & **Replay** lại kịch bản kiểm thử, và **xuất trực tiếp ra code Playwright**. |
-| **Debug chuyên sâu & Bảo mật Secret** | Chủ yếu dừng ở thao tác DOM cơ bản và đọc log thô. | Tích hợp đo Core Web Vitals, chạy **Lighthouse**, so sánh **V8 Heap Diff** tìm Memory Leak, **Feedback Studio** ghim lỗi trên trang và tự động che giấu **29 mẫu secret/token**. |
+| **Debug chuyên sâu & Bảo mật Secret** | Chủ yếu dừng ở thao tác DOM cơ bản và đọc log thô. | Tích hợp đo Core Web Vitals, chạy **Lighthouse**, so sánh **V8 Heap Diff** tìm Memory Leak, **Feedback Studio** ghim lỗi trên trang và tự động che giấu **thông tin nhạy cảm qua 2 lớp (13 mẫu regex + 23 khóa thuộc tính)**. |
 
 ---
 

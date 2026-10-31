@@ -93,10 +93,18 @@ function parseArgs(argv) {
     if (arg === "--keep-stage") {
       options.keepStage = true;
     } else if (arg === "--platform") {
+      if (i + 1 >= argv.length) {
+        console.error("❌ Missing value for --platform");
+        process.exit(1);
+      }
       options.platforms.push(normalizePlatformToken(argv[++i]));
     } else if (arg.startsWith("--platform=")) {
       options.platforms.push(normalizePlatformToken(arg.slice("--platform=".length)));
     } else if (arg === "--os") {
+      if (i + 1 >= argv.length) {
+        console.error("❌ Missing value for --os");
+        process.exit(1);
+      }
       options.osList.push(normalizeOSAlias(argv[++i]));
     } else if (arg.startsWith("--os=")) {
       options.osList.push(normalizeOSAlias(arg.slice("--os=".length)));

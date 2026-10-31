@@ -4,7 +4,7 @@ Chào mừng bạn đến với **Agent Pilot**! Dự án ban đầu được x�
 
 ::: warning ⚠️ Cảnh Báo: Dự Án 100% Vibe Coding & Miễn Trừ Trách Nhiệm
 **Agent Pilot là dự án thử nghiệm mã nguồn mở được phát triển 100% bằng hình thức "Vibe Coding" với Google Antigravity.**
-Toàn bộ kiến trúc, mã nguồn Go CLI, script Chrome Extension MV3 và MCP Server đều do AI coding agent tự động sinh mã thông qua prompt engineering. Dù đã có hệ thống kiểm thử tự động và bộ lọc che giấu secret 29 quy tắc, vui lòng lưu ý:
+Toàn bộ kiến trúc, mã nguồn Go CLI, script Chrome Extension MV3 và MCP Server đều do AI coding agent tự động sinh mã thông qua prompt engineering. Dù đã có hệ thống kiểm thử tự động và bộ lọc che giấu secret 2 lớp (13 mẫu biểu thức chính quy và 23 khóa thuộc tính bảo mật), vui lòng lưu ý:
 - **Thử nghiệm trên Sandbox**: Luôn chạy thử nghiệm các tác vụ AI tự động trên profile Chrome riêng biệt (`--user-data-dir`) hoặc môi trường non-production.
 - **Miễn trừ trách nhiệm**: Tác giả, cộng tác viên và đội ngũ bảo trì không chịu bất kỳ trách nhiệm pháp lý nào đối với các sự cố mất mát dữ liệu, phí dịch vụ phát sinh ngoài ý muốn hay hư hại hệ thống do AI Agent gây ra khi dùng Agent Pilot.
 :::
@@ -141,7 +141,7 @@ Chuyển sang tab **🎯 Inspector & Màu**:
 
 ---
 
-### 3.7 Bộ Công Cụ Chụp Màn Hình (Screenshot Studio)
+### 3.6 Bộ Công Cụ Chụp Màn Hình (Screenshot Studio)
 Chuyển sang tab **📸 Chụp ảnh**:
 - **🖥️ Chụp Toàn màn hình**: Chụp lại toàn bộ khung nhìn hiển thị hiện tại của tab.
 - **✂️ Kéo chọn vùng (Crop)**: Trang web sẽ mờ đi kèm con trỏ dấu cộng; bạn chỉ cần giữ chuột trái và kéo một khung chữ nhật quanh khu vực cần chụp -> Nhấp **✓ Chụp vùng này**.
@@ -151,7 +151,7 @@ Chuyển sang tab **📸 Chụp ảnh**:
 
 ---
 
-### 3.8 Hệ Thống Chú Thích & Chỉ Điểm UI Cho Agent (Feedback Studio)
+### 3.7 Hệ Thống Chú Thích & Chỉ Điểm UI Cho Agent (Feedback Studio)
 Chuyển sang tab **✏️ Chú thích UI** trên Side Panel hoặc nhấp nút Feedback Studio nổi trên trang:
 
 #### 4 Chế Độ Thu Thập Phản Hồi Trực Quan:

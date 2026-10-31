@@ -1,6 +1,6 @@
 # 🍎 Agent Pilot — macOS Setup Guide
 
-Dedicated installation bundle for **macOS (Apple Silicon M1-M4 & Intel)**, packaging the Chrome Extension, static MCP Server binary, and Agent Skill:
+Dedicated installation bundle for **macOS (darwin-arm64 — Apple Silicon M1-M4)**, packaging the Chrome Extension, static MCP Server binary, and Agent Skill:
 
 ```text
 agent-pilot-v1.3.0-macos/

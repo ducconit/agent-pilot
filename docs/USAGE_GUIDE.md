@@ -4,7 +4,7 @@ Welcome to **Agent Pilot**! Originally built for personal use to **replace the d
 
 ::: warning ⚠️ 100% Vibe Coding Notice & Legal Disclaimer
 **Agent Pilot is an experimental open-source tool developed 100% via "vibe coding" using Google Antigravity.**
-All architecture, Go CLI binaries, Chrome MV3 extension scripts, and MCP tooling were generated autonomously by AI models via prompt engineering. While automated tests and a 29-rule secret sanitization filter are implemented, please exercise caution:
+All architecture, Go CLI binaries, Chrome MV3 extension scripts, and MCP tooling were generated autonomously by AI models via prompt engineering. While automated tests and a dual-layer secret sanitization engine (13 regex patterns and 23 sensitive property keys) are implemented, please exercise caution:
 - **Sandbox Testing**: Always test automated browser interactions in separate user profiles (`--user-data-dir`) or non-production environments.
 - **Limitation of Liability**: The authors, contributors, and maintainers assume no liability for any data corruption, financial charges, or unintended actions taken by autonomous AI agents operating through this browser controller.
 :::

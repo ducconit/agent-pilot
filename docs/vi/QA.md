@@ -92,7 +92,7 @@ agent-pilot screenshot -o bug-checkout.png --highlight "@1" --title "Lỗi #402:
 Hoặc thông qua công cụ MCP:
 ```json
 {
-  "tool": "page_screenshot",
+  "tool": "browser_screenshot",
   "arguments": {
     "tabId": 12345,
     "highlightSelector": "#btn-checkout",
@@ -126,13 +126,13 @@ Agent Pilot cho phép chụp và so sánh dung lượng bộ nhớ Heap trước
 
 ```bash
 # 1. Chụp ảnh bộ nhớ ban đầu (Baseline)
-agent-pilot devtools heap-snapshot baseline.heapsnapshot --tab 12345
+agent-pilot heap snapshot baseline.heapsnapshot --tab 12345
 
 # 2. Thực hiện thao tác lặp (ví dụ: mở đóng popup 10 lần)
 agent-pilot batch test-popup-cycle.json
 
 # 3. Chụp ảnh bộ nhớ sau thao tác để phân tích sự chênh lệch đối tượng chưa được GC
-agent-pilot devtools heap-snapshot post-cycle.heapsnapshot --tab 12345
+agent-pilot heap snapshot post-cycle.heapsnapshot --tab 12345
 ```
 
 ---
@@ -143,12 +143,12 @@ agent-pilot devtools heap-snapshot post-cycle.heapsnapshot --tab 12345
 
 ```bash
 # Bắt đầu quay video tab
-agent-pilot video start --tab 12345
+agent-pilot devtools video-start --tab 12345
 
 # Thực hiện chuỗi thao tác kiểm thử
 agent-pilot click "@1" --tab 12345
 agent-pilot type "@2" "dữ liệu kiểm thử" --enter --tab 12345
 
 # Dừng quay và lưu tệp video .mp4
-agent-pilot video stop -o test-workflow.mp4 --tab 12345
+agent-pilot devtools video-stop --tab 12345
 ```

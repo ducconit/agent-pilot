@@ -43,7 +43,7 @@ truyền đúng `PATH`.
 1. Mở trình duyệt Chrome/Chromium, truy cập `chrome://extensions`.
 2. Bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải.
 3. Nhấn **Load unpacked** (Tải tiện ích đã giải nén) → chọn thư mục `extensions/` trong gói này.
-4. Ghim biểu tượng **Agent Pilot (📌)** lên thanh công cụ và mở Side Panel bằng phím tắt <kbd>Ctrl+Shift+P</kbd>.
+4. Ghim biểu tượng **Agent Pilot (📌)** lên thanh công cụ và nhấp vào biểu tượng để mở Side Panel (hoặc tự cấu hình phím tắt tại `chrome://extensions/shortcuts`).
 
 ### Bước 2: Cài đặt CLI / MCP Server & Service (`systemd --user`)
 ```bash

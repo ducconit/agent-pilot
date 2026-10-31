@@ -141,11 +141,11 @@ Antigravity có thể tạo ra các chuỗi lệnh JSON có cấu trúc để n�
 
 ---
 
-## 3. Máy Chủ Cầu Nối WebSocket & MCP Server (Cổng 58765)
+## 4. Máy Chủ Cầu Nối WebSocket & MCP Server (Cổng 58765)
 
 Agent Pilot trang bị sẵn một máy chủ cầu nối hai chiều chuẩn **Model Context Protocol (MCP)** và **WebSocket** tại cổng chuyên dụng **`58765`** (dải cổng riêng tư IANA `49152 – 65535`, chống trùng lặp hoàn toàn với các dịch vụ dev thông thường).
 
-### 3.1. Khởi chạy Máy chủ Cầu nối (Bridge Server):
+### 4.1. Khởi chạy Máy chủ Cầu nối (Bridge Server):
 ```bash
 # Sử dụng binary Go (khuyên dùng, không phụ thuộc Node.js):
 agent-pilot server
@@ -157,7 +157,7 @@ npm run server
 AGENT_PILOT_PORT=58765 agent-pilot server
 ```
 
-### 3.2. Cấu hình Antigravity MCP Server:
+### 4.2. Cấu hình Antigravity MCP Server:
 MCP hiện cung cấp 68 tool; các tool DevTools mở rộng được mô tả trong [DevTools nâng cao](DEVTOOLS.md).
 Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/config/mcp_config.json` hoặc cấu hình MCP dự án) để AI Agent tự động sở hữu toàn bộ 68 công cụ điều khiển trình duyệt. Binary phát hành nhúng sẵn runtime DevTools; máy sử dụng không cần cài Node/npm/FFmpeg hoặc dependency:
 ```json
@@ -172,7 +172,7 @@ Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/c
 ```
 *(Nếu cài đặt binary ở đường dẫn riêng, thay `"agent-pilot"` bằng đường dẫn tuyệt đối như `"/home/ubuntu/.agk/bin/agent-pilot"` hoặc `"/usr/local/bin/agent-pilot"`)*.
 
-### 3.3. Bộ Công Cụ MCP Cung Cấp Cho AI Agent (68 Tools — trích lược):
+### 4.3. Bộ Công Cụ MCP Cung Cấp Cho AI Agent (68 Tools — trích lược):
 1. `browser_open_tab(url, active)`: Mở tab trình duyệt mới (mặc định mở nền không cướp focus của người dùng, tự động phân nhóm Chrome Tab Group).
 2. `browser_list_tabs()`: Liệt kê toàn bộ các tab trình duyệt kèm trạng thái tab do Agent quản lý.
 3. `browser_navigate(url, tabId)`: Điều hướng tab đang hoạt động hoặc tab chỉ định.
@@ -200,7 +200,7 @@ Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/c
 
 ---
 
-## 4. Cầu nối In-Page API (`window.__AGENT_PILOT__`)
+## 5. Cầu nối In-Page API (`window.__AGENT_PILOT__`)
 
 Khi trang web được nạp, Content Script tự động phơi bày đối tượng toàn cục `window.__AGENT_PILOT__`. Các script tự động hóa hoặc test runner (Jest, Playwright, Cypress, Puppeteer) có thể tương tác trực tiếp:
 
@@ -225,7 +225,7 @@ console.log("Mã màu đã nhặt:", color.hex, color.rgb, color.rgba, color.hsl
 
 ---
 
-## 5. Quy trình Antigravity Debug Tự động (End-to-End Workflow)
+## 6. Quy trình Antigravity Debug Tự động (End-to-End Workflow)
 
 1. **Khởi chạy ứng dụng dev**: Antigravity chạy server phát triển cục bộ (`http://localhost:3000` hoặc `test-page.html`).
 2. **Mở tab kiểm thử**: Agent gửi lệnh mở tab mới hoặc điều hướng đến trang kiểm thử qua Agent Pilot.

@@ -57,11 +57,11 @@ agent-pilot tabs
      ```
 2. **Run in Foreground Mode to Inspect Logs**:
    ```bash
-   agent-pilot serve --port 58765
+   agent-pilot server --port 58765
    ```
    If port `58765` is already in use by another software, specify a different port:
    ```bash
-   agent-pilot serve --port 59000
+   agent-pilot server --port 59000
    ```
    *(Remember to configure the extension Side Panel settings to connect to the new port).*
 3. **Verify Chrome Extension**:
@@ -255,9 +255,9 @@ Or use forward slashes, which Windows handles correctly:
 ## 6. Still Having Issues?
 
 If your issue is not listed above:
-1. Check the live server log:
+1. Check the live server log in foreground mode:
    ```bash
-   agent-pilot serve --debug
+   agent-pilot server
    ```
 2. Open Chrome's extension background log:
    - Navigate to `chrome://extensions`.

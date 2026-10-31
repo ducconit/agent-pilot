@@ -452,6 +452,14 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 						}
 						client.WriteMu.Unlock()
 					}
+				} else if idVal, hasID := msg["id"]; hasID {
+					client.WriteMu.Lock()
+					_ = client.WS.SetWriteDeadline(time.Now().Add(config.WSWriteControlTimeout))
+					_ = client.WS.WriteJSON(map[string]interface{}{
+						"id":    idVal,
+						"error": "invalid feedback payload: expected JSON object",
+					})
+					client.WriteMu.Unlock()
 				}
 			}
 		}

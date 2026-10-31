@@ -10,7 +10,7 @@ Dù công cụ của bạn hoạt động theo cơ chế **Agent Skills + Comman
 
 ## 🎯 Cơ Chế Hoạt Động Của Prompt Với Agent Pilot
 
-Khi bạn kết nối Agent Pilot vào AI Agent qua **Skills + Command Line (`npx skills add`)** hoặc **MCP (`mcp.json`)**, trợ lý AI sẽ tự động biết cách gọi lệnh CLI (`agent-pilot open`, `agent-pilot click`, `agent-pilot screenshot`) hoặc công cụ MCP (`browser_open_tab`, `page_click`, `page_screenshot`, `devtools_audit_lighthouse`).
+Khi bạn kết nối Agent Pilot vào AI Agent qua **Skills + Command Line (`npx skills add`)** hoặc **MCP (`mcp.json`)**, trợ lý AI sẽ tự động biết cách gọi lệnh CLI (`agent-pilot open`, `agent-pilot click`, `agent-pilot screenshot`) hoặc công cụ MCP (`browser_open_tab`, `browser_click`, `browser_screenshot`, `browser_lighthouse_audit`).
 
 Bạn chỉ cần diễn đạt yêu cầu bằng ngôn ngữ tự nhiên—AI Agent sẽ tự động phân tích DOM, mô phỏng thao tác người dùng và kiểm chứng kết quả thực tế trên trình duyệt Chrome.
 
@@ -41,7 +41,7 @@ Kiểm tra độ tương thích responsive của trang landing page http://local
 1. Đổi kích thước màn hình sang 375x812 (iPhone X/13), chụp toàn bộ trang (full-page) và kiểm tra xem có bị tràn ngang (scrollWidth > innerWidth) hay không.
 2. Đổi sang 768x1024 (iPad dọc), kiểm tra xem thanh menu đã tự động chuyển sang menu hamburger chưa.
 3. Đổi sang 1440x900 (Desktop), kiểm tra căn chỉnh lưới sản phẩm và tỉ lệ ảnh banner.
-4. Nếu phát hiện phần tử bị vỡ layout, hãy dùng agent-pilot screenshot --highlight <selector> (hoặc công cụ MCP page_screenshot với tham số highlightSelector) để khoanh vùng lỗi và đề xuất code CSS cần sửa.
+4. Nếu phát hiện phần tử bị vỡ layout, hãy dùng agent-pilot screenshot --highlight <selector> (hoặc công cụ MCP browser_screenshot với tham số highlightSelector) để khoanh vùng lỗi và đề xuất code CSS cần sửa.
 ```
 
 ---

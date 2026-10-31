@@ -28,7 +28,7 @@
 > **Agent Pilot is an experimental open-source project created 100% via "vibe coding" using Google Antigravity.**
 >
 > - **AI-Authored Codebase**: Every single component (Go CLI binary, Manifest V3 Chrome extension, MCP protocol server, and automated tests) was generated, iterated, and refactored autonomously by AI agents driven by prompt engineering.
-> - **Exercise Caution**: While the repository includes automated test suites, linting, and a 29-rule secret sanitization layer, AI-generated code may contain unexpected edge cases or behavioral quirks. **Always test in sandboxed, isolated browser profiles or non-production environments** before granting autonomous control over sensitive web accounts or production infrastructure.
+> - **Exercise Caution**: While the repository includes automated test suites, linting, and a dual-layer secret sanitization engine (13 regex patterns and 23 sensitive property keys), AI-generated code may contain unexpected edge cases or behavioral quirks. **Always test in sandboxed, isolated browser profiles or non-production environments** before granting autonomous control over sensitive web accounts or production infrastructure.
 > - **Disclaimer of Liability**: This software is provided **"AS IS"**, without warranty of any kind, express or implied. In no event shall the authors, contributors, or maintainers be liable for any claims, damages, data loss, browser corruption, financial loss, or unauthorized actions performed by autonomous AI agents through this controller. Use entirely at your own risk.
 
 ---
@@ -45,7 +45,7 @@ It provides **effortless, token-efficient browser control**, empowering AI codin
 - **Action Recorder, Replay & Playwright Export**: Record live user or AI interactions, replay test flows deterministically, and export directly to production-ready **Playwright** test code.
 - **Performance & Lighthouse Auditing**: Run native Lighthouse audits, measure Core Web Vitals (LCP, CLS, INP), and analyze performance traces.
 - **Memory Leak Detection (V8 Heap Diff)**: Capture and diff V8 Heap snapshots before/after user flows to pinpoint memory leaks and detached DOM nodes.
-- **Deep Web Debugging & Secret Protection**: Monitor real-time Console errors, inspect failed HTTP 4xx/5xx requests, extract computed CSS, and automatically mask 29 secret patterns (API keys, JWTs, private keys).
+- **Deep Web Debugging & Secret Protection**: Monitor real-time Console errors, inspect failed HTTP 4xx/5xx requests, extract computed CSS, and automatically mask sensitive information (13 regex patterns and 23 sensitive property keys).
 - **In-Page Feedback Studio & Background Isolation**: Pin visual bug annotations directly on the webpage, sample pixel colors, and orchestrate multiple concurrent agents in background tab groups (`🤖 Agent Pilot`) without stealing user focus.
 
 ### ⚖️ Key Differences: Agent Pilot vs. Standard Chrome MCP
@@ -56,7 +56,7 @@ It provides **effortless, token-efficient browser control**, empowering AI codin
 | **Visual QA & Image Annotation** | Plain screenshots only; AI agents frequently generate ad-hoc Python scripts (`Pillow`/`OpenCV`) to draw text or highlight boxes on images. | **Native Annotated Screenshots** (viewport, full-page, element) with automatic bounding-box highlights and QA title banners—zero Python scripts required. |
 | **Browser Session & Focus Isolation** | Often launches a separate browser profile or steals active window/cursor focus while you work. | Operates inside your existing Chrome browser inside isolated background tab groups (`🤖 Agent Pilot`) without stealing user focus. |
 | **Video, Replay & Playwright Export** | One-off command execution with no recording, replay, or test generation. | Built-in `.mp4` workflow video capture, deterministic **Action Replay**, and direct **Playwright** test code export. |
-| **Performance, Memory Leak & Security** | Basic DOM interaction and raw console/network inspection. | Native **Lighthouse** audits, Core Web Vitals, **V8 Heap Snapshot Diff** for memory leaks, **Feedback Studio**, and **29-rule secret redaction**. |
+| **Performance, Memory Leak & Security** | Basic DOM interaction and raw console/network inspection. | Native **Lighthouse** audits, Core Web Vitals, **V8 Heap Snapshot Diff** for memory leaks, **Feedback Studio**, and **dual-layer secret redaction (13 regex patterns + 23 sensitive keys)**. |
 
 ### 🧭 Future Direction
 

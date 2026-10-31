@@ -92,7 +92,7 @@ agent-pilot screenshot -o bug-report.png --highlight "@1" --title "Issue #402: C
 Or via MCP:
 ```json
 {
-  "tool": "page_screenshot",
+  "tool": "browser_screenshot",
   "arguments": {
     "tabId": 12345,
     "highlightSelector": "#checkout-btn",
@@ -126,13 +126,13 @@ Agent Pilot can capture baseline and post-interaction V8 Heap Snapshots, computi
 
 ```bash
 # 1. Take baseline snapshot before user interaction
-agent-pilot devtools heap-snapshot baseline.heapsnapshot --tab 12345
+agent-pilot heap snapshot baseline.heapsnapshot --tab 12345
 
 # 2. Perform repetitive interaction (e.g. open/close modal 10 times)
 agent-pilot batch test-modal-cycle.json
 
 # 3. Take second snapshot and inspect heap diff
-agent-pilot devtools heap-snapshot post-cycle.heapsnapshot --tab 12345
+agent-pilot heap snapshot post-cycle.heapsnapshot --tab 12345
 ```
 
 ---
@@ -143,12 +143,12 @@ To record a visual demonstration with neon cursor motion and click ripples:
 
 ```bash
 # Start recording
-agent-pilot video start --tab 12345
+agent-pilot devtools video-start --tab 12345
 
 # Perform workflow actions
 agent-pilot click "@1" --tab 12345
 agent-pilot type "@2" "test message" --enter --tab 12345
 
 # Stop recording and save MP4 file
-agent-pilot video stop -o test-flow.mp4 --tab 12345
+agent-pilot devtools video-stop --tab 12345
 ```

@@ -3,12 +3,12 @@
 ![Agent Pilot Banner](assets/banner.svg)
 
 # 🚀 AGENT PILOT
-### Universal AI Agent Browser Controller • Skills + CLI & MCP
+### Bộ Điều Khiển Trình Duyệt Đa Năng Cho AI Agent • Skills + CLI & MCP
 
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-blue?style=flat-square&logo=googlechrome)](extensions/manifest.json)
 [![Documentation](https://img.shields.io/badge/Docs-VitePress-06b6d4?style=flat-square&logo=vitepress)](https://ducconit.github.io/agent-pilot/)
 [![Status: Public Beta](https://img.shields.io/badge/Status-Public%20Beta-amber?style=flat-square&logo=statuspage)](#)
-[![CDP Protocol](https://img.shields.io/badge/Engine-Chrome%20DevTools%20Protocol-06b6d4?style=flat-square)](docs/CDP_GUIDE.md)
+[![CDP Protocol](https://img.shields.io/badge/Engine-Chrome%20DevTools%20Protocol-06b6d4?style=flat-square)](docs/vi/CDP_GUIDE.md)
 [![Cross-Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blueviolet?style=flat-square)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![100% Vibe Coded](https://img.shields.io/badge/100%25-Vibe%20Coded-purple?style=flat-square&logo=visualstudiocode)](#-tuyen-bo-mien-tru-trach-nhiem--vibe-coding)
@@ -28,7 +28,7 @@
 > **Agent Pilot là dự án thử nghiệm mã nguồn mở được kiến tạo 100% bằng hình thức "Vibe Coding" với Google Antigravity.**
 >
 > - **Mã nguồn hoàn toàn do AI sinh ra**: Mọi thành phần (binary Go CLI, Chrome extension Manifest V3, MCP Server và các bộ kiểm thử tự động) đều do các AI coding agent tự động thiết kế, triển khai và tái cấu trúc thông qua prompt engineering.
-> - **Khuyến cáo cẩn trọng**: Mặc dù dự án đã vượt qua hệ thống kiểm thử tự động, linter và cơ chế lọc che giấu secret 29 quy tắc, mã nguồn AI vẫn có thể tiềm ẩn những lỗi ngoại lệ (edge cases) chưa lường hết. **Luôn thử nghiệm trên profile Chrome riêng biệt (sandbox) hoặc môi trường non-production** trước khi cho phép AI toàn quyền thao tác trên các phiên làm việc hoặc tài khoản quan trọng.
+> - **Khuyến cáo cẩn trọng**: Mặc dù dự án đã vượt qua hệ thống kiểm thử tự động, linter và cơ chế lọc che giấu secret 2 lớp (13 mẫu regex và 23 khóa thuộc tính bảo mật), mã nguồn AI vẫn có thể tiềm ẩn những lỗi ngoại lệ (edge cases) chưa lường hết. **Luôn thử nghiệm trên profile Chrome riêng biệt (sandbox) hoặc môi trường non-production** trước khi cho phép AI toàn quyền thao tác trên các phiên làm việc hoặc tài khoản quan trọng.
 > - **Tuyên bố miễn trừ trách nhiệm (Disclaimer)**: Phần mềm được cung cấp theo nguyên trạng **"AS IS"**, không có bất kỳ sự đảm bảo nào. Trong mọi trường hợp, tác giả và các cộng tác viên không chịu trách nhiệm pháp lý hay tài chính đối với bất kỳ thiệt hại dữ liệu, lỗi trình duyệt, tài khoản bị khoá hay các thao tác ngoài ý muốn do AI Agent gây ra khi dùng công cụ này.
 
 ---
@@ -45,7 +45,7 @@ Dự án giúp các AI Coding Agent và kỹ sư QA/QC **điều khiển trình 
 - **Ghi Nhận, Replay Thao Tác & Xuất Code Playwright**: Ghi lại chuỗi tương tác thực tế của người dùng hoặc AI, phát lại (replay) kịch bản tức thì và xuất trực tiếp ra mã nguồn kiểm thử **Playwright** hoàn chỉnh.
 - **Đo Lường Performance & Kiểm Định Lighthouse**: Chạy kiểm định Lighthouse thực tế, đo các chỉ số Core Web Vitals (LCP, CLS, INP) và phân tích performance trace.
 - **Tìm Memory Leak (V8 Heap Snapshot Diff)**: Chụp và so sánh đối chiếu các bản chụp bộ nhớ V8 Heap trước/sau thao tác để phát hiện rò rỉ bộ nhớ và các node DOM bị treo.
-- **Debug Web Chuyên Sâu & Bảo Mật Secret**: Bắt lỗi Console thời gian thực, lọc các truy vấn mạng lỗi (HTTP 4xx/5xx), soi thuộc tính CSS thực tế và tự động che giấu 29 loại thông tin nhạy cảm (API key, JWT, khóa bí mật).
+- **Debug Web Chuyên Sâu & Bảo Mật Secret**: Bắt lỗi Console thời gian thực, lọc các truy vấn mạng lỗi (HTTP 4xx/5xx), soi thuộc tính CSS thực tế và tự động che giấu thông tin nhạy cảm qua 2 lớp (13 mẫu regex và 23 khóa thuộc tính).
 - **Feedback Studio & Chạy Ngầm Đa Agent**: Ghim chú thích lỗi trực tiếp lên giao diện web, lấy mã màu pixel chuẩn xác, và gom tab tự động vào nhóm riêng (`🤖 Agent Pilot`) không bao giờ cướp chuột của lập trình viên.
 
 ### ⚖️ Điểm Khác Biệt Giữa Agent Pilot & Chrome MCP Thông Thường
@@ -56,7 +56,7 @@ Dự án giúp các AI Coding Agent và kỹ sư QA/QC **điều khiển trình 
 | **Chụp ảnh & Vẽ chú thích báo cáo QA** | Chỉ chụp ảnh màn hình thô; AI thường phải tự sinh code Python (`Pillow`/`OpenCV`) tạm bợ để vẽ chữ hoặc khoanh vùng lỗi lên ảnh. | **Tích hợp sẵn chụp ảnh kèm chú thích** (khung nhìn, full-page, từng phần tử), tự động vẽ khung viền highlight đỏ và đóng dấu tiêu đề báo cáo mà không cần sinh script Python. |
 | **Phiên trình duyệt & Chạy ngầm** | Thường mở cửa sổ trình duyệt mới (mất trạng thái đăng nhập) hoặc liên tục cướp chuột/focus màn hình khi đang làm việc. | Chạy trực tiếp trên trình duyệt Chrome đang mở (giữ nguyên cookie/phiên đăng nhập), tự động gom tab vào nhóm riêng (`🤖 Agent Pilot`) chạy ngầm không cướp focus. |
 | **Quay Video, Replay & Xuất Playwright** | Chỉ thực thi từng lệnh rời rạc, không có cơ chế lưu lại thao tác hay sinh mã kiểm thử tự động. | Quay trực tiếp video `.mp4` (kèm chuột ảo neon), ghi nhận & **Replay** lại kịch bản kiểm thử, và **xuất trực tiếp ra code Playwright**. |
-| **Debug chuyên sâu & Bảo mật Secret** | Chủ yếu dừng ở thao tác DOM cơ bản và đọc log thô. | Tích hợp đo Core Web Vitals, chạy **Lighthouse**, so sánh **V8 Heap Diff** tìm Memory Leak, **Feedback Studio** ghim lỗi trên trang và tự động che giấu **29 mẫu secret/token**. |
+| **Debug chuyên sâu & Bảo mật Secret** | Chủ yếu dừng ở thao tác DOM cơ bản và đọc log thô. | Tích hợp đo Core Web Vitals, chạy **Lighthouse**, so sánh **V8 Heap Diff** tìm Memory Leak, **Feedback Studio** ghim lỗi trên trang và tự động che giấu secret qua 2 lớp (13 mẫu regex + 23 khóa nhạy cảm). |
 
 ### 🧭 Định Hướng Trong Tương Lai
 
@@ -80,9 +80,9 @@ Tải gói cài đặt tối ưu cho hệ điều hành của bạn:
 
 | Hệ Điều Hành | Gói Phát Hành | Lệnh Cài Đặt Tự Động | Hướng Dẫn |
 | :--- | :--- | :--- | :--- |
-| 🐧 **Ubuntu / Linux** | `agent-pilot-*-linux.zip` | `./install.sh` | [README.ubuntu.md](docs/bundles/README.ubuntu.md) |
-| 🍎 **macOS** | `agent-pilot-*-macos.zip` | `./install.sh` | [README.macos.md](docs/bundles/README.macos.md) |
-| 🪟 **Windows** | `agent-pilot-*-windows.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` | [README.windows.md](docs/bundles/README.windows.md) |
+| 🐧 **Ubuntu / Linux** | `agent-pilot-*-linux.zip` | `./install.sh` | [README.ubuntu.md](docs/vi/bundles/README.ubuntu.md) |
+| 🍎 **macOS** | `agent-pilot-*-macos.zip` | `./install.sh` | [README.macos.md](docs/vi/bundles/README.macos.md) |
+| 🪟 **Windows** | `agent-pilot-*-windows.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` | [README.windows.md](docs/vi/bundles/README.windows.md) |
 
 Script cài đặt sẽ đưa binary vào `PATH` và khởi động dịch vụ chạy ngầm:
 ```bash
@@ -151,13 +151,13 @@ agent-pilot close --tab 12345
 
 ## 📚 Hệ Thống Tài Liệu Kỹ Thuật
 
-- 🏛️ **[Kiến trúc Hệ thống (ARCHITECTURE.md)](docs/ARCHITECTURE.md)**: Thiết kế Manifest V3, IPC Bridge và cơ chế cách ly tiến trình.
-- 🤖 **[Tích hợp Antigravity & MCP](docs/ANTIGRAVITY_INTEGRATION.md)**: Hướng dẫn kết nối toàn diện với AI coding agents.
-- ⚡ **[Sổ tay Chrome DevTools Protocol](docs/CDP_GUIDE.md)**: Tương tác cấp thấp CDP, Network, Console và Trusted Input.
-- 🔬 **[Bộ công cụ DevTools Nâng Cao](docs/DEVTOOLS.md)**: Lighthouse audit, heap snapshot, tracing, video screencast.
-- 📖 **[Sổ tay Sử dụng Đầy đủ (USAGE_GUIDE.md)](docs/USAGE_GUIDE.md)**: Hướng dẫn chi tiết từng tính năng cho người dùng và QA.
-- 📊 **[Đo Lường Hiệu Năng MCP vs CLI](docs/BENCHMARKS.md)**: Báo cáo thực nghiệm so sánh token, độ trễ và video demo.
-- 📦 **[Hướng dẫn Cài đặt theo OS (BUNDLE_README.md)](docs/BUNDLE_README.md)**: Chi tiết thiết lập cho Linux, macOS và Windows.
+- 🏛️ **[Kiến trúc Hệ thống (ARCHITECTURE.md)](docs/vi/ARCHITECTURE.md)**: Thiết kế Manifest V3, IPC Bridge và cơ chế cách ly tiến trình.
+- 🤖 **[Tích hợp Antigravity & MCP](docs/vi/ANTIGRAVITY_INTEGRATION.md)**: Hướng dẫn kết nối toàn diện với AI coding agents.
+- ⚡ **[Sổ tay Chrome DevTools Protocol](docs/vi/CDP_GUIDE.md)**: Tương tác cấp thấp CDP, Network, Console và Trusted Input.
+- 🔬 **[Bộ công cụ DevTools Nâng Cao](docs/vi/DEVTOOLS.md)**: Lighthouse audit, heap snapshot, tracing, video screencast.
+- 📖 **[Sổ tay Sử dụng Đầy đủ (USAGE_GUIDE.md)](docs/vi/USAGE_GUIDE.md)**: Hướng dẫn chi tiết từng tính năng cho người dùng và QA.
+- 📊 **[Đo Lường Hiệu Năng MCP vs CLI](docs/vi/BENCHMARKS.md)**: Báo cáo thực nghiệm so sánh token, độ trễ và video demo.
+- 📦 **[Hướng dẫn Cài đặt theo OS (BUNDLE_README.md)](docs/vi/BUNDLE_README.md)**: Chi tiết thiết lập cho Linux, macOS và Windows.
 
 ---
 

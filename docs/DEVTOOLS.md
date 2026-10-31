@@ -96,3 +96,13 @@ agent-pilot recorder replay --file checkout.recorder.json --tab 123 --format jso
 agent-pilot devtools context-create --params '{"name":"account-a"}'
 agent-pilot devtools workers --params '{"action":"list"}'
 ```
+
+Multi-step start/stop commands require the same running bridge/MCP server to preserve state, exactly like standard MCP sessions.
+
+Recorder uses `chrome.storage` to restore flows across service worker wakeups. `browser_recorder_measure` requires a positive Chrome tab ID and reports `failurePhase` if trace/replay errors occur or replay transitions across tabs; it omits `eventsSummary` by default to reduce payload size (`includeEvents: true` to receive complete events). Import/export preserves Chrome Recorder metadata, but replaying on extension tabs rejects unsupported steps (such as cross-origin iframes, alternate targets, and custom assertions) rather than reporting false successes.
+
+## For Builders
+
+Only the build machine requires Go and Node to run `npm ci` followed by `npm run build:cli`. The build script downloads a pinned Node distribution, verifies its SHA-256 checksum, bundles runtime dependencies, and embeds the archive into the Go binary. `npm run pack:bundle` executes this step for each target OS/architecture. Running `go build` directly without preparing the embedded payload produces a developer binary with basic functionality only; do not use raw builds for production release.
+
+The embedded runtime contains Node/Lighthouse/Puppeteer code, licenses, and dependencies; end users do not need to install them separately. The Go bridge itself builds with `CGO_ENABLED=0`, while the embedded Chrome/Node runtime targets the respective operating system platform.

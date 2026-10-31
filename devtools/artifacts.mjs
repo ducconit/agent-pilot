@@ -4,8 +4,37 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 export const artifactRoot = process.env.AGENT_PILOT_ARTIFACT_DIR || path.join(os.homedir(), ".agent-pilot", "artifacts");
+
+const forbiddenSystemPrefixes = [
+  "/etc", "/proc", "/sys", "/dev", "/boot", "/root",
+  "/bin", "/sbin", "/usr", "/lib"
+];
+
+export function validateSafeOutputPath(targetPath) {
+  const resolved = path.resolve(targetPath);
+  for (const forbidden of forbiddenSystemPrefixes) {
+    if (resolved === forbidden || resolved.startsWith(forbidden + path.sep) || resolved.startsWith(forbidden + "/")) {
+      throw new Error(`Access denied: writing to sensitive system path "${resolved}" is not permitted`);
+    }
+  }
+  const lower = resolved.toLowerCase();
+  if (
+    lower.includes(path.sep + ".ssh" + path.sep) || lower.endsWith(path.sep + ".ssh") ||
+    lower.includes("authorized_keys") ||
+    lower.endsWith(".bashrc") || lower.endsWith(".zshrc") || lower.endsWith(".profile")
+  ) {
+    throw new Error(`Access denied: writing to sensitive user configuration "${resolved}" is not permitted`);
+  }
+  return resolved;
+}
+
 export async function outputPath(requested, extension, prefix) {
-  const destination = path.resolve(requested || path.join(artifactRoot, `${prefix}-${Date.now()}-${randomUUID().slice(0, 8)}${extension}`));
+  let destination;
+  if (requested) {
+    destination = validateSafeOutputPath(requested);
+  } else {
+    destination = path.resolve(path.join(artifactRoot, `${prefix}-${Date.now()}-${randomUUID().slice(0, 8)}${extension}`));
+  }
   if (!destination.toLowerCase().endsWith(extension)) throw new Error(`Output file must end with ${extension}`);
   await fs.mkdir(path.dirname(destination), { recursive: true });
   return destination;

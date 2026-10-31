@@ -10,7 +10,7 @@ Whether your agent uses **Agent Skills + Command Line (`agent-pilot` CLI)** or t
 
 ## 🎯 How Prompting Works with Agent Pilot
 
-When Agent Pilot is connected via **Skills + Command Line (`npx skills add`)** or **MCP (`mcp.json`)**, your AI assistant automatically knows how to invoke CLI commands (`agent-pilot open`, `agent-pilot click`, `agent-pilot screenshot`) or MCP tools (`browser_open_tab`, `page_click`, `page_screenshot`, `devtools_audit_lighthouse`).
+When Agent Pilot is connected via **Skills + Command Line (`npx skills add`)** or **MCP (`mcp.json`)**, your AI assistant automatically knows how to invoke CLI commands (`agent-pilot open`, `agent-pilot click`, `agent-pilot screenshot`) or MCP tools (`browser_open_tab`, `browser_click`, `browser_screenshot`, `browser_lighthouse_audit`).
 
 You simply tell your AI assistant what to achieve in natural language—the agent inspects the DOM, synthesizes actions, and verifies the result.
 
@@ -41,7 +41,7 @@ Audit the landing page http://localhost:3000/ for responsiveness across mobile, 
 1. Resize the viewport to 375x812 (iPhone X/13), take a full-page screenshot, and check for any horizontal overflow (scrollWidth > innerWidth).
 2. Resize to 768x1024 (iPad portrait), verify that the navigation bar properly switches to the hamburger menu.
 3. Resize to 1440x900 (Desktop), verify grid alignment and image aspect ratios.
-4. If you discover any misaligned elements or layout breaks, highlight them using agent-pilot screenshot --highlight <selector> (or MCP tool page_screenshot with highlightSelector) and describe the CSS fix needed.
+4. If you discover any misaligned elements or layout breaks, highlight them using agent-pilot screenshot --highlight <selector> (or MCP tool browser_screenshot with highlightSelector) and describe the CSS fix needed.
 ```
 
 ---

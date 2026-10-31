@@ -6,9 +6,9 @@ Mỗi gói phát hành (Release Bundle) của **Agent Pilot** được đóng g�
 
 | Hệ Điều Hành | Kiến Trúc | Tài Liệu Hướng Dẫn Chuyên Biệt | Script Cài Đặt Đi Kèm | Dịch Vụ Chạy Ngầm |
 | :--- | :--- | :--- | :--- | :--- |
-| 🐧 **Ubuntu / Linux** | `linux-amd64` | [**docs/bundles/README.ubuntu.md**](bundles/README.ubuntu.md) | `install.sh` | `systemd --user` (`~/.config/systemd/user/agent-pilot.service`) |
-| 🍎 **macOS** | `darwin-arm64` (Apple Silicon M1-M4) | [**docs/bundles/README.macos.md**](bundles/README.macos.md) | `install.sh` | `launchd` (`~/Library/LaunchAgents/com.agentpilot.bridge.plist`) |
-| 🪟 **Windows** | `windows-amd64` | [**docs/bundles/README.windows.md**](bundles/README.windows.md) | `install.ps1` | `Task Scheduler` (`AgentPilotBridge`) |
+| 🐧 **Ubuntu / Linux** | `linux-amd64` | [**Hướng Dẫn Cài Đặt Ubuntu / Linux**](/vi/bundles/README.ubuntu) | `install.sh` | `systemd --user` (`~/.config/systemd/user/agent-pilot.service`) |
+| 🍎 **macOS** | `darwin-arm64` (Apple Silicon M1-M4) | [**Hướng Dẫn Cài Đặt macOS**](/vi/bundles/README.macos) | `install.sh` | `launchd` (`~/Library/LaunchAgents/com.agentpilot.bridge.plist`) |
+| 🪟 **Windows** | `windows-amd64` | [**Hướng Dẫn Cài Đặt Windows**](/vi/bundles/README.windows) | `install.ps1` | `Task Scheduler` (`AgentPilotBridge`) |
 
 ---
 

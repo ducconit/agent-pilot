@@ -1,6 +1,6 @@
 # 🍎 Agent Pilot — Hướng Dẫn Cài Đặt Trên macOS
 
-Gói cài đặt chuyên biệt dành cho **macOS (Apple Silicon M1-M4 & Intel)**, tích hợp sẵn Chrome Extension, MCP Server tĩnh và Agent Skill:
+Gói cài đặt chuyên biệt dành cho **macOS (darwin-arm64 — Apple Silicon M1-M4)**, tích hợp sẵn Chrome Extension, MCP Server tĩnh và Agent Skill:
 
 ```text
 agent-pilot-v1.3.0-macos/
@@ -76,7 +76,7 @@ tail -f ~/Library/Logs/agent-pilot.log ~/Library/Logs/agent-pilot.err
 1. Mở Chrome, truy cập `chrome://extensions`.
 2. Bật **Developer mode** (góc trên bên phải).
 3. Nhấn **Load unpacked** → chọn thư mục `extensions/` trong gói này.
-4. Ghim biểu tượng **Agent Pilot (📌)** lên thanh công cụ và mở Side Panel bằng phím tắt <kbd>Cmd + Shift + P</kbd>.
+4. Ghim biểu tượng **Agent Pilot (📌)** lên thanh công cụ và nhấp vào biểu tượng để mở Side Panel (hoặc tự cấu hình phím tắt tại `chrome://extensions/shortcuts`).
 
 ---
 
@@ -126,7 +126,7 @@ agent-pilot skill install --agy --force    # Antigravity: ~/.gemini/config/skill
 | :--- | :--- |
 | macOS báo *"agent-pilot cannot be opened because the developer cannot be verified"* | Chạy `xattr -d com.apple.quarantine ./skills/agent-pilot/scripts/agent-pilot` (hoặc `xattr -cr .` tại thư mục giải nén), hoặc vào **System Settings → Privacy & Security → Allow Anyway**. |
 | MCP báo `spawn agent-pilot ENOENT` trong Claude / Cursor | Do ứng dụng GUI trên macOS không nhận `PATH` của `~/.zshrc`. Hãy đổi `"command": "agent-pilot"` thành đường dẫn tuyệt đối `"/Users/<user>/.local/bin/agent-pilot"` hoặc `"/usr/local/bin/agent-pilot"`. |
-| Phím tắt mở Side Panel bị trùng | Mặc định trên macOS là <kbd>Cmd + Shift + P</kbd>. Bạn có thể đổi tại `chrome://extensions/shortcuts`. |
+| Cài đặt phím tắt mở Side Panel | Tiện ích không gán phím tắt mặc định để tránh xung đột hệ thống. Bạn có thể tự gán tại `chrome://extensions/shortcuts`. |
 | `Another debugger is already attached` | Đóng cửa sổ DevTools (<kbd>Cmd + Option + I</kbd>) trên tab đang điều khiển rồi thử lại. |
 
 ---
