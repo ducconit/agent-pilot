@@ -78,3 +78,6 @@ Video và ảnh chụp màn hình thực tế trong quá trình benchmark:
 2. **Dùng MCP (`agent-pilot mcp`) cho các ứng dụng Desktop / IDE chỉ hỗ trợ Tool Calling**:
    - Phù hợp với *Claude Desktop, Zed, Continue* hoặc khi không cấp quyền chạy lệnh shell trực tiếp.
    - Cung cấp kiểm tra kiểu dữ liệu đầu vào chặt chẽ và thông tin truy vết chi tiết.
+
+3. **Quy tắc chạy đồng thời nhiều Agent (Concurrency Rule)**:
+   - Khi chạy nhiều agent đồng thời, luôn truyền cờ `--tab <id>` và `--port <58765>` rõ ràng để tránh xung đột tab giữa các agent.

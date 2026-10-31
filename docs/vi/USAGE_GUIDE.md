@@ -191,34 +191,207 @@ Thêm vào file cấu hình MCP của Antigravity, Claude Desktop, hoặc Cursor
 ```
 
 ### 4.4. Bộ Lệnh Dành Cho Tester / Kỹ Sư QC Tự Động Hóa
-Kỹ sư kiểm thử tự động có thể điều khiển Chrome trực tiếp qua terminal:
+
+Kỹ sư kiểm thử tự động và AI Agent có thể điều khiển Chrome trực tiếp qua terminal thông qua file nhị phân độc lập `agent-pilot`. Dưới đây là bảng tra cứu đầy đủ phân loại theo nhóm lệnh, ví dụ chi tiết, cờ tối ưu Inline Wait Flags, điều khiển CDP và cấu trúc kịch bản Batch JSON.
+
+#### 4.4.1. Bảng Tra Cứu Toàn Bộ Lệnh CLI
+
+##### Nhóm 1: Thao Tác Tương Tác Trang Web (17 Lệnh)
+
+| Lệnh | Cú pháp | Mô tả chi tiết | Cần CDP? |
+| :--- | :--- | :--- | :--- |
+| `open` | `agent-pilot open <url>` | Mở URL trong tab chạy ngầm thuộc nhóm `🤖 Agent Pilot` (hoặc điều hướng tab mục tiêu với `--tab`) | ❌ Không |
+| `navigate` | `agent-pilot navigate <url\|back\|forward\|reload>` | Điều hướng tab với lịch sử back/forward, bỏ qua cache, nạp script ban đầu hoặc xử lý beforeunload | ❌ Không |
+| `click` | `agent-pilot click <selector>` | Click chuột ảo hoặc theo tọa độ (`--x`, `--y`); hỗ trợ `--dblclick`, `--button` và `--via cdp` | ⚙️ Tùy chọn (`--via cdp`) |
+| `type` | `agent-pilot type <selector> <text>` | Gõ văn bản mô phỏng người dùng; hỗ trợ `--clear` trước khi gõ và `--enter` sau khi gõ | ❌ Không |
+| `fill` | `agent-pilot fill <fields.json>` | Điền toàn bộ các trường của form và tự động submit chỉ trong 1 thao tác duy nhất | ❌ Không |
+| `scroll` | `agent-pilot scroll [down\|up\|left\|right\|dx dy]` | Cuộn trang hoặc phần tử theo hướng (`down`, `up`, `right`, `left`) hoặc khoảng cách pixel (`--dx`, `--dy`) | ❌ Không |
+| `hover` | `agent-pilot hover <selector>` | Di chuột ảo vào phần tử DOM để kích hoạt hiệu ứng CSS `:hover` và popup tooltip | ❌ Không |
+| `drag` | `agent-pilot drag <from> <to>` | Kéo thả phần tử hoặc tọa độ (`--from-x`, `--from-y`, `--to-x`, `--to-y`); hỗ trợ `--hold` và `--via cdp` | ⚙️ Tùy chọn (`--via cdp`) |
+| `key` | `agent-pilot key <key1> [key2...]` | Gửi phím đơn, tổ hợp phím tắt (`Ctrl+A`, `Ctrl+V`), hoặc chuỗi phím (`--delay`, `--repeat`) | ❌ Không |
+| `wait` | `agent-pilot wait [selector\|text\|ms]` | Chờ selector, đoạn text, trạng thái (`visible`, `attached`), hoặc sleep số mili-giây cố định | ❌ Không |
+| `upload` | `agent-pilot upload <selector> <files...>` | Tải file từ máy lên ô input file qua CDP hoặc cơ chế fallback synthetic `DataTransfer` | ⚙️ Tùy chọn (`--via auto`) |
+| `dialog` | `agent-pilot dialog <accept\|dismiss>` | Tự động xử lý các hộp thoại JavaScript (`alert`, `confirm`, `prompt`) kèm nội dung phản hồi | ✅ Có |
+| `inspect` | `agent-pilot inspect <selector>` | Soi tọa độ khung bao (rect), CSS selector, XPath, text và thuộc tính CSS tính toán (`--styles`) | ❌ Không |
+| `snapshot` | `agent-pilot snapshot` | Trích xuất bản đồ tương tác siêu nhẹ (`@1`, `@2`...) tối ưu cho context window của LLM | ❌ Không |
+| `screenshot` | `agent-pilot screenshot` | Chụp ảnh màn hình độ nét cao kèm chú thích (`--highlight`, `--step`, `--title`, `--arrow`, `--badge`) | ✅ Có (tab ngầm) |
+| `close` | `agent-pilot close [ids...\|--all]` | Đóng tab hiện tại, danh sách tab ID chỉ định hoặc toàn bộ tab trong nhóm `🤖 Agent Pilot` | ❌ Không |
+| `tabs` | `agent-pilot tabs` | Liệt kê danh sách tất cả các tab đang mở trong nhóm `🤖 Agent Pilot` (Alias: `list`, `ls`) | ❌ Không |
+
+##### Nhóm 2: Đánh Giá & Bộ Công Cụ DevTools (11 Lệnh)
+
+| Lệnh | Cú pháp | Mô tả chi tiết | Cần CDP? |
+| :--- | :--- | :--- | :--- |
+| `eval` / `evaluate` | `agent-pilot eval <script>` | Thực thi JavaScript trong ngữ cảnh trang (`MAIN` world, truy cập `window` và state React/Vue) | ❌ Không (fallback CDP) |
+| `console` | `agent-pilot console [list\|errors\|clear]` | Xem danh sách log console, cảnh báo hoặc các ngoại lệ runtime của trang (`errors`) | ✅ Có |
+| `network` | `agent-pilot network [list\|get <id>\|clear]` | Theo dõi HTTP requests/responses, lọc theo URL/loại tài nguyên/lần tải trang, xem body | ✅ Có |
+| `metrics` | `agent-pilot metrics` | Thu thập chỉ số chuyên sâu Core Web Vitals (LCP, CLS, FCP, TTFB, TBT), DOM health và Heap | ✅ Có |
+| `trace` | `agent-pilot trace <start\|stop>` | Ghi timeline hiệu năng DevTools, phát hiện Long Tasks (>=50ms), layout reflows và bottleneck | ✅ Có |
+| `heap` | `agent-pilot heap [snapshot\|baseline\|diff\|gc]` | Chụp V8 Heap Snapshot, phân tích rò rỉ bộ nhớ (Memory Leak) hoặc kích hoạt dọn rác GC | ✅ Có |
+| `resize` | `agent-pilot resize <width> <height>` | Thay đổi kích thước khung nhìn viewport phục vụ kiểm thử giao diện responsive | ✅ Có |
+| `emulate` | `agent-pilot emulate` | Giả lập giới hạn băng thông mạng (`slow-3g`, `offline`), bóp CPU (throttling), giao diện sáng/tối | ✅ Có |
+| `webauthn` | `agent-pilot webauthn <action>` | Quản lý thiết bị xác thực ảo WebAuthn và Passkey phục vụ kiểm thử đăng nhập không mật khẩu | ✅ Có |
+| `extensions` | `agent-pilot extensions [list\|toggle]` | Quản lý, xem danh sách và bật/tắt các tiện ích mở rộng Extension trên trình duyệt | ✅ Có |
+| `cdp` | `agent-pilot cdp status` | Kiểm tra trạng thái gắn kết debugger CDP trước khi thực thi các thao tác mức thấp | ✅ Có |
+
+##### Nhóm 3: Quản Lý Phiên, Bảo Vệ & Tự Động Hóa (6 Lệnh)
+
+| Lệnh | Cú pháp | Mô tả chi tiết | Cần CDP? |
+| :--- | :--- | :--- | :--- |
+| `session` | `agent-pilot session [start\|end\|status]` | Duy trì phiên làm việc liên tục, giữ con trỏ neon và viền bảo vệ hiển thị xuyên suốt | ❌ Không |
+| `busy` | `agent-pilot busy [on\|off]` | Bật/tắt nhanh lớp chắn khóa tương tác người dùng kèm thông báo trạng thái Agent | ❌ Không |
+| `service` | `agent-pilot service <action>` | Quản lý daemon chạy ngầm hệ điều hành (`install`, `uninstall`, `start`, `stop`, `restart`, `status`) | ❌ Không |
+| `skill` | `agent-pilot skill install` | Cài đặt skill `agent-pilot` tích hợp sẵn vào thư mục agent skills (`--agy`, `--path`) | ❌ Không |
+| `batch` | `agent-pilot batch <flow.json>` | Thực thi chuỗi hành động kiểm thử tự động trong 1 lượt gửi mạng duy nhất | ❌ Không (tùy bước) |
+| `recorder` | `agent-pilot recorder <operation>` | Ghi nhận, phát lại, đo lường và xuất/nhập kịch bản DevTools Recorder chuẩn | ❌ Không (tùy bước) |
+
+---
+
+#### 4.4.2. Ví Dụ Thực Tế Cho Từng Nhóm Lệnh
+
 ```bash
-# Mở một địa chỉ web
+# === 1. THAO TÁC TRÊN TRANG ===
+# Mở một địa chỉ web và đưa lên tiêu điểm
 agent-pilot open "https://example.com" --active
 
-# Gõ văn bản vào form và nhấn Enter
-agent-pilot type "#search-box" "laptop gaming" --enter
+# Tải lại trang bỏ qua bộ nhớ đệm
+agent-pilot navigate reload --ignore-cache --tab 12345
 
-# Click chuột ảo vào phần tử
-agent-pilot click ".btn-search"
+# Chụp cây DOM tương tác siêu nhẹ (@1, @2...)
+agent-pilot snapshot --tab 12345
 
-# Soi thông số phần tử DOM
-agent-pilot inspect "#product-price"
+# Gõ văn bản vào ô tìm kiếm và nhấn Enter
+agent-pilot type "#search-box" "laptop gaming" --clear --enter
 
-# Chụp ảnh màn hình lưu ra tệp PNG
-agent-pilot screenshot -o search_results.png --mode visible
+# Click chuột ảo kèm hiệu ứng gợn sóng neon
+agent-pilot click ".btn-search" --tab 12345
 
-# Xem danh sách các tab đang mở
+# Điền toàn bộ thông tin form và submit
+agent-pilot fill form_data.json --submit "#btn-submit"
+
+# Cuộn trang xuống 800px hoặc theo hướng
+agent-pilot scroll down --tab 12345
+agent-pilot scroll --dy 800 --tab 12345
+
+# Rê chuột vào menu dropdown
+agent-pilot hover ".dropdown-menu-trigger" --tab 12345
+
+# Gửi phím tắt hoặc tổ hợp phím
+agent-pilot key Ctrl+a Backspace 1 2 3 Enter --selector "#otp-input" --tab 12345
+
+# Chờ selector xuất hiện hoặc chờ văn bản hiển thị
+agent-pilot wait "#success-banner" --state visible --timeout 5000
+agent-pilot wait --text "Payment Successful" --timeout 5000
+
+# Tải file đính kèm lên ô <input type="file">
+agent-pilot upload "input[type=file]" ./document.pdf --via auto --tab 12345
+
+# Tự động đồng ý hộp thoại alert/confirm của JavaScript
+agent-pilot dialog accept --tab 12345
+
+# Soi thông số chi tiết của phần tử DOM
+agent-pilot inspect "#product-price" --styles --tab 12345
+
+# Chụp ảnh màn hình đính kèm thông tin bước test
+agent-pilot screenshot -o /tmp/checkout.png --step "1/3" --title "Thanh toán" --highlight "@1" --tab 12345
+
+# Quản lý danh sách tab
 agent-pilot tabs
+agent-pilot close --tab 12345
+
+# === 2. ĐÁNH GIÁ & DEVTOOLS ===
+# Chạy mã JavaScript trực tiếp trong trang (truy cập window, state React/Vue)
+agent-pilot eval "document.title" --tab 12345
+agent-pilot eval -f ./extract-data.js -o /tmp/extracted.json --tab 12345
+
+# Xem lỗi runtime và log console
+agent-pilot console errors --tab 12345
+agent-pilot console list --level warn --limit 20 --tab 12345
+
+# Theo dõi request mạng thuộc lần tải trang hiện tại
+agent-pilot network list --current-nav --tab 12345
+agent-pilot network get req_abc123 --tab 12345
+
+# Đo lường Core Web Vitals & sức khỏe DOM
+agent-pilot metrics --tab 12345
+
+# Ghi timeline hiệu năng và phát hiện bottleneck
+agent-pilot trace start --tab 12345
+agent-pilot click "#compute-btn" --tab 12345
+agent-pilot trace stop --tab 12345
+
+# Phát hiện rò rỉ bộ nhớ (Memory Leak) qua V8 heap snapshot
+agent-pilot heap baseline --tab -12345 --file /tmp/base.heapsnapshot
+agent-pilot heap diff --tab -12345 --file /tmp/curr.heapsnapshot
+
+# Thay đổi kích thước khung nhìn kiểm tra responsive
+agent-pilot resize 375 812 --tab 12345
+
+# Giả lập giới hạn băng thông mạng 3G và dark theme
+agent-pilot emulate --network slow-3g --cpu 4x --theme dark --tab 12345
+
+# Khởi tạo thiết bị xác thực WebAuthn / Passkey ảo
+agent-pilot webauthn enable --tab 12345
+agent-pilot webauthn add --protocol ctap2 --transport internal --tab 12345
+
+# Kiểm tra trạng thái extensions
+agent-pilot extensions list
+
+# === 3. QUẢN LÝ PHIÊN, BẢO MỆ & TỰ ĐỘNG HÓA ===
+# Duy trì phiên làm việc liên tục với con trỏ chuột neon
+agent-pilot session start --name "Kịch bản Kiểm thử Đặt hàng" --tab 12345
+agent-pilot busy on --action "Đang xử lý đơn hàng tự động..." --tab 12345
+agent-pilot busy off --tab 12345
+agent-pilot session end --tab 12345
+
+# Ghi nhận và phát lại luồng thao tác Chrome DevTools Recorder
+agent-pilot recorder start --title "Luồng Đăng nhập" --tab 12345
+agent-pilot click "#login-button" --tab 12345
+agent-pilot recorder stop --tab 12345
+agent-pilot recorder export --tab 12345 --format json > flow.recorder.json
+agent-pilot recorder replay --file flow.recorder.json --tab 12345
 
 # Chạy một kịch bản Batch Automation hoàn chỉnh từ file JSON
 agent-pilot batch flow_test.json
-
-# Xem danh sách các phiên phản hồi UI
-agent-pilot feedback list
 ```
 
-#### Điều khiển Cross-Origin Iframe / Canvas / Game bằng CDP (tùy chọn)
+---
+
+#### 4.4.3. Tính Năng Cờ Đợi Nội Dòng (Inline Wait Flags - Tiết Kiệm Token & Giảm Roundtrip)
+
+Trong tự động hóa trình duyệt thông thường, việc thực hiện một chuỗi thao tác thường đòi hỏi 3 round-trip mạng rời rạc:
+1. Gửi lệnh `click` phần tử -> chờ trình duyệt phản hồi.
+2. Gửi lệnh `wait_for_selector` -> chờ selector xuất hiện.
+3. Gửi lệnh `snapshot` -> chờ trả về bản đồ tương tác.
+
+Agent Pilot cung cấp cơ chế **Inline Wait Flags**, cho phép AI Agent gộp chung điều kiện chờ và chụp snapshot trực tiếp vào lệnh tương tác (`open`, `navigate`, `click`, `type`, `fill`, `scroll`, `hover`, `drag`, `key`, `upload`) chỉ trong **1 lệnh gọi nguyên tử (atomic call)**:
+
+| Cờ Inline Wait | Alias | Ý nghĩa & Mô tả |
+| :--- | :--- | :--- |
+| `--wait <ms>` | `--sleep`, `--wait-ms`, `--sleep-ms` | Chờ thêm số mili-giây sau khi hành động thực thi xong (VD: `--wait 500` hoặc `--wait 500ms`) |
+| `--wait-for <selector>` | `--wait-selector` | Chờ CSS selector hoặc `@ref` mục tiêu xuất hiện/gắn vào DOM trước khi trả kết quả |
+| `--wait-text <text>` | *(không có)* | Chờ đoạn văn bản chỉ định xuất hiện trên giao diện trang trước khi trả kết quả |
+| `--include-snapshot` | `--snapshot` | Tự động chụp và trả về cây tương tác DOM mới nhất (`@1`, `@2`...) ngay trong phản hồi |
+
+**Lợi ích vượt trội**:
+- **Tiết kiệm ~80% Token**: Cắt giảm hoàn toàn các lượt hỏi đáp qua lại giữa Agent và Bridge Server cho các bước đợi và lấy snapshot.
+- **Triệt tiêu hiện tượng Flaky**: Trình điều khiển nội tại Chrome Bridge chủ động đợi phần tử sẵn sàng trước khi kết xuất snapshot, tránh lỗi đọc giao diện khi DOM chưa render xong.
+
+**Ví dụ thực tế**:
+```bash
+# Click nút gửi form, đợi màn hình dashboard xuất hiện và nhận snapshot mới nhất chỉ trong 1 lệnh duy nhất:
+agent-pilot click "#btn-submit" --wait-for "#dashboard-view" --include-snapshot --tab 12345
+
+# Nhập từ khóa tìm kiếm, ấn Enter, chờ 500ms render kết quả và trả snapshot:
+agent-pilot type "#search-box" "laptop gaming" --enter --wait 500 --include-snapshot --tab 12345
+
+# Mở URL và đợi văn bản chào mừng xuất hiện trước khi trả kết quả:
+agent-pilot open "https://example.com" --wait-text "Xin chào" --include-snapshot
+```
+
+---
+
+#### 4.4.4. Điều Khiển Cross-Origin Iframe / Canvas / Game Bằng CDP (Tùy Chọn)
 
 Mặc định `click`/`drag` dùng synthetic DOM event (nhanh, có con trỏ neon). Khi cần điều khiển **iframe khác origin, `<canvas>`, WebGL/Unity game**, hãy bật engine CDP trusted:
 
@@ -226,8 +399,8 @@ Mặc định `click`/`drag` dùng synthetic DOM event (nhanh, có con trỏ neo
 # Kiểm tra debugger có gắn được không (DevTools đang mở trên tab sẽ chặn)
 agent-pilot cdp status --tab 12345
 
-# Click trusted theo tọa độ (mặc định vẫn là synthetic nếu không có --via)
-agent-pilot click -x 733 -y 668 --via cdp --tab 12345
+# Click trusted theo tọa độ (dùng cờ chuẩn GNU/Cobra --x và --y)
+agent-pilot click --x 733 --y 668 --via cdp --tab 12345
 
 # Kéo slingshot trong game: kéo từ điểm A tới B, giữ 800ms rồi thả
 agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --hold 800 --via cdp --tab 12345
@@ -236,11 +409,17 @@ agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --ho
 agent-pilot click "#play-button" --via auto --tab 12345
 ```
 
-- `--via cdp` **không fallback âm thầm**: nếu gắn debugger thất bại sẽ báo lỗi `CDP_UNAVAILABLE` kèm gợi ý.
-- `--via auto` phù hợp khi muốn chạy được trên cả trang DOM thường lẫn iframe/canvas.
+- `--via cdp` **không fallback âm thầm**: nếu gắn debugger thất bại sẽ báo lỗi `CDP_UNAVAILABLE: <reason>` kèm gợi ý cụ thể.
+- `--via auto` phù hợp khi muốn chạy mượt mà trên cả trang DOM thường lẫn iframe/canvas.
+- Con trỏ neon và hiệu ứng gợn sóng chỉ do **synthetic engine** vẽ. Input qua CDP là sự kiện mức hệ thống nên sẽ không hiển thị con trỏ ảo.
 - Các lệnh `upload`, `dialog`, `emulate`, `resize`, `network`, `trace`, `metrics`, `heap` và screenshot tab ngầm **bắt buộc CDP** — xem `skills/agent-pilot/references/cli-usage.md` §1.1.
 
-#### Cấu Trúc File Batch Automation JSON (`flow_test.json`):
+---
+
+#### 4.4.5. Cấu Trúc File Batch Automation JSON (`flow_test.json`)
+
+Kịch bản Batch Automation cho phép gộp chuỗi nhiều hành động thành một file JSON duy nhất để thực thi tuần tự:
+
 ```json
 [
   { "action": "open", "url": "https://google.com", "active": true },
@@ -249,6 +428,22 @@ agent-pilot click "#play-button" --via auto --tab 12345
   { "action": "wait", "ms": 2000 },
   { "action": "screenshot", "label": "google_search_results" }
 ]
+```
+
+Hoặc sử dụng định dạng đối tượng có mảng `actions`:
+
+```json
+{
+  "actions": [
+    { "type": "open", "url": "https://example.com/login" },
+    { "type": "wait_for_selector", "selector": "#username", "timeout": 5000 },
+    { "type": "type", "selector": "#username", "text": "tester@example.com" },
+    { "type": "type", "selector": "#password", "text": "Secret123!" },
+    { "type": "click", "selector": "#btn-submit" },
+    { "type": "screenshot", "mode": "visible", "path": "/tmp/step-login.png", "title": "Hoàn tất đăng nhập" },
+    { "type": "close" }
+  ]
+}
 ```
 
 ---

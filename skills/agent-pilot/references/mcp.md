@@ -44,20 +44,29 @@ For a compact DevTools batch, use action objects:
 
 | Need | MCP tool |
 | --- | --- |
-| Open/navigate/back/forward/reload/close | `browser_open_tab`, `browser_navigate` (`action: "url"\|"back"\|"forward"\|"reload"`, `ignoreCache`, `initScript`, `handleBeforeUnload`), `browser_close_tab` |
-| Find interactive controls | `browser_snapshot` (or `includeSnapshot: true` on interaction/navigation tools) |
-| Inspect one element | `browser_get_element` |
-| Evaluate JS with `@ref`/selector args or disk I/O | `browser_evaluate` (`script` or `sourcePath`, `args: ["@1", ...]`, `filePath`) |
-| Fill several fields | `browser_fill_form` |
-| Click/double-click/type/scroll | `browser_click` (`dblClick: true`), `browser_type`, `browser_scroll` |
-| Upload files | `browser_upload_file` (`via: "auto"` by default; files restricted to workspace or `/tmp`) |
-| Screenshot (`png`/`jpeg`/`webp` + banner/highlight/arrows/badges/icons) | `browser_screenshot` (`format`, `quality`, `path`, `step`, `title`/`caption`, `description`, `captionPosition`, `highlightSelector`, `arrows`, `callouts`, `badges`, `boxes`, `circles`, `icons`, `redact`, `spotlight`) |
-| Console/network/metrics & `msgid` lookup | `browser_get_devtools_data` (`msgid`, `includePreserved`, `navigationId`), `browser_list_network_requests` |
+| Open/navigate/back/forward/reload/close/list | `browser_open_tab`, `browser_navigate` (`action: "url"\|"back"\|"forward"\|"reload"`, `ignoreCache`, `initScript`, `handleBeforeUnload`), `browser_close_tab`, `browser_list_tabs` |
+| Multi-browser instance discovery & routing | `browser_list_instances`, `browser_select_instance` (`instanceId`) |
+| Persistent agent session & visual busy lock | `browser_start_session` (`name`), `browser_end_session` (`closeTab`), `browser_set_busy` (`busy`, `action`) |
+| Batch action pipeline (multi-step single round-trip) | `browser_run_actions` (`actions: [{type/action, ...}]`, `stopOnError`, `omitDataUrls`) |
+| Find interactive controls / accessibility snapshot | `browser_snapshot` (or `includeSnapshot: true` on interaction/navigation tools) |
+| Inspect one element / sample pixel color | `browser_get_element` (`includeStyles`), `browser_pick_color` (`x`, `y`) |
+| Evaluate JS with `@ref`/selector args or disk I/O | `browser_evaluate` (`script` or `sourcePath`, `args: ["@1", ...]`, `filePath`, `waitMs`/`sleepMs`, `waitForSelector`, `waitForText`) |
+| Fill several form fields / upload files | `browser_fill_form` (`fields`), `browser_upload_file` (`files`, `selector`, `via: "auto"\|"cdp"`) |
+| Mouse & keyboard interaction | `browser_click` (`dblClick: true`, `via`), `browser_type` (`clear`, `pressEnter`), `browser_scroll` (`deltaX`, `deltaY`), `browser_hover` (`selector`, `via`), `browser_drag` (`from`, `to`, `fromX`, `fromY`, `toX`, `toY`, `steps`, `holdMs`, `via`), `browser_press_key` (`key`, `selector`, `eventType`, `modifiers`) |
+| Wait for DOM state / JavaScript dialogs | `browser_wait_for` (`selector`, `text`, `state`, `timeoutMs`), `browser_handle_dialog` (`accept`, `promptText`) |
+| Device emulation & viewport resizing | `browser_emulate` (`device`, `viewport`, `userAgent`), `browser_resize_page` (`width`, `height`, `deviceScaleFactor`, `mobile`) |
+| Isolated multi-tenant browser contexts | `browser_create_context` (`name`), `browser_list_contexts`, `browser_close_context` (`contextId`) |
+| Screenshot (`png`/`jpeg`/`webp` + banner/highlight/arrows/badges/icons) | `browser_screenshot` (`format`, `quality`, `path`, `step`, `title`/`caption`, `description`, `captionPosition`, `highlightSelector`, `arrows`, `callouts`, `badges`, `boxes`, `circles`, `icons`, `redact`, `spotlight`, `clip`) |
+| Native MP4 screen recording (screencast) | `browser_screencast_start` (`format: "mp4"`, `quality`, `crop`), `browser_screencast_stop` (`filePath`) |
+| Console/network/metrics, HTTP bodies & DevTools health | `browser_devtools_status`, `browser_get_devtools_data` (`msgid`, `includePreserved`, `navigationId`), `browser_list_network_requests`, `browser_get_network_request` (`requestId`, `filePath`), `browser_get_css_styles` (`detail: "summary"\|"computed"\|"rules"\|"full"`) |
+| Human UI Feedback Studio (Channel A / Channel B) | `browser_get_pending_feedback` (`limit`, `sessionId`, `clear`), `browser_wait_for_feedback` (`timeout`) |
 | Virtual WebAuthn / Passkey testing | `browser_webauthn` (`enable`, `addAuthenticator`, `getCredentials`, `setUserVerified`, `clearCredentials`, `removeAuthenticator`, `disable`) |
-| Trace / Web Vitals / heap | `browser_performance_trace`, `browser_performance_metrics`, `browser_heap_capability`, `browser_take_heapsnapshot`, `browser_analyze_heapsnapshot` |
-| Advanced DevTools | `browser_lighthouse_audit`, `browser_lighthouse_analyze_audit`, `browser_performance_analyze_insight`, `browser_accessibility_snapshot`, `browser_service_workers` |
-| Extension lifecycle | `browser_manage_extensions` |
-| Chrome Recorder flow | `browser_recorder_start/stop/state/replay/measure/export/import/edit/clear` |
+| Trace / Web Vitals / heap analysis | `browser_performance_trace`, `browser_performance_metrics`, `browser_heap_capability`, `browser_take_heapsnapshot`, `browser_analyze_heapsnapshot` |
+| Advanced DevTools & Service Workers | `browser_lighthouse_audit`, `browser_lighthouse_analyze_audit`, `browser_performance_analyze_insight`, `browser_accessibility_snapshot`, `browser_service_workers` |
+| Progressive Web Apps (PWA) | `browser_get_os_app_state`, `browser_install_pwa`, `browser_launch_pwa`, `browser_uninstall_pwa` |
+| WebMCP & 3P Developer Tools | `browser_list_webmcp_tools`, `browser_execute_webmcp_tool`, `browser_list_3p_developer_tools`, `browser_execute_3p_developer_tool` |
+| Extension lifecycle | `browser_manage_extensions` (`action: "list"\|"setEnabled"\|"toggle"\|"install"\|"reload"\|"triggerAction"\|"uninstall"`) |
+| Chrome Recorder flow | `browser_recorder_start/stop/state/replay/measure/export/import/edit/clear` (9 tools: `browser_recorder_start`, `browser_recorder_stop`, `browser_recorder_state`, `browser_recorder_replay`, `browser_recorder_measure`, `browser_recorder_export`, `browser_recorder_import`, `browser_recorder_edit`, `browser_recorder_clear`) |
 
 ## Token-efficient observation
 

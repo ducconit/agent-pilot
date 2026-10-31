@@ -17,11 +17,11 @@ Each official release of **Agent Pilot** is packaged specifically for target pla
 Running `npm run pack:bundle` produces standalone release `.zip` archives under `dist/bundles/`:
 
 ```text
-agent-pilot-{{VERSION}}-{{PLATFORM}}/
+agent-pilot-v1.3.0-<os>/
 ├── extensions/            Chrome Extension (Manifest V3) — loaded unpacked in Chrome
 ├── install.sh / .ps1      1-step platform installer script
-├── skills/agent-pilot/    Agent Skill + scripts/{{BINARY_NAME}} native CLI/MCP
-└── README.md              OS-specific guide compiled for {{PLATFORM}}
+├── skills/agent-pilot/    Agent Skill + scripts/agent-pilot(.exe) native CLI/MCP
+└── README.md              OS-specific guide compiled for the platform
 ```
 
 ---

@@ -21,8 +21,8 @@ flowchart TB
         DualMode{"<b>Dual Mode Engine</b><br/>Port Busy?"}
         Master["<b>Master Mode</b><br/>Binds WebSocket ws://127.0.0.1:58765"]
         Forwarder["<b>Forwarder Mode</b><br/>Forwards Stdio to HTTP POST /api"]
-        VerifyClient["<b>verifyClient Security Guard</b><br/>Validates Origin: chrome-ext & localhost"]
-        ServerRedactor["<b>Secret Redaction Filter</b><br/>Masks 12 Key Patterns with *"]
+        VerifyClient["<b>verifyClient Security Guard</b><br/>WebSocket Origin: chrome-ext & loopback nội bộ"]
+        ServerRedactor["<b>Secret Redaction Filter</b><br/>Masks 13 Dedicated Regex Patterns with *"]
         InboxFS["<b>Local Inbox Storage</b><br/>~/.agent-pilot/inbox/feedback/"]
     end
 
@@ -127,7 +127,7 @@ sequenceDiagram
     Note over Ext,Tab: 4. NHẢ KHÓA & TRẢ DỮ LIỆU BẢO MẬT
     Tab->>Content: chrome.tabs.sendMessage("SET_BUSY", { busy: false })
     Content->>DOM: Ẩn Viền Neon & Thanh Pill Hành Động
-    Ext->>Ext: sanitizeData(result) -> Quét 12 mẫu Secret / Private Key
+    Ext->>Ext: sanitizeData(result) -> Quét 13 mẫu Regex chuyên biệt
     Ext-->>Server: WebSocket Response: { id: 42, result: { ... }, secretFilterEnabled: true }
     Server->>Server: sanitizeServerData(result) (Lớp lọc bảo mật thứ hai)
     Server-->>Agent: MCP Tool Response: { success: true, clicked: true }
@@ -153,8 +153,8 @@ sequenceDiagram
         Agent->>Server: browser_wait_for_feedback({ timeout: 120 })
         Server-->>Server: Giữ kết nối chờ (pendingFeedbackWaiters)
         User->>HUD: Chọn vùng / Ghim điểm & Bấm "🚀 Gửi Agent"
-        HUD->>Ext: chrome.runtime.sendMessage("FEEDBACK_PUSH_AGENT", payload)
-        Ext->>Server: POST /api/feedback/wait (resolve pending waiter)
+        HUD->>Ext: chrome.runtime.sendMessage({ action: "push_feedback_live", payload })
+        Ext->>Server: POST /api/feedback/push (resolve pending waiter)
         Server->>Inbox: Lưu session.json + item_*.png
         Server-->>Agent: Trả về kết quả tức thì (Component source, line, selector, note, images)
         Agent->>Agent: Tự động sửa code đúng file & dòng chỉ điểm
@@ -177,18 +177,20 @@ sequenceDiagram
 
 ## 4. 🛡️ Các Cơ Chế An Ninh & Phòng Thủ Trọng Yếu
 
-1. **Khóa Nguồn Gốc WebSocket Server (`verifyClient`)**:
-   - Sử dụng bộ phân tích URL chuẩn (`new URL(origin).hostname`).
-   - Chỉ cho phép: `chrome-extension://`, `127.0.0.1`, `localhost`.
-   - Ngăn chặn triệt để tấn công Cross-Site WebSocket Hijacking (CSWSH) từ bất kỳ website độc hại nào người dùng truy cập.
+1. **Khóa Nguồn Gốc WebSocket Server (`IsWebSocketOriginAllowed`)**:
+   - Được hiện thực tại `IsWebSocketOriginAllowed` trong `cli/bridge/connections.go`.
+   - Quá trình nâng cấp kết nối WebSocket (Upgrade) **chặn hoàn toàn** các origin web `localhost` và `127.0.0.1` từ trình duyệt để chống tấn công Cross-Site WebSocket Hijacking (CSWSH).
+   - Chỉ cho phép các extension Chrome hợp lệ (`chrome-extension://<id>`) hoặc các tiến trình loopback nội bộ không mang header Origin (`Origin: ""`).
+   - Extension ID có thể được ghim chặt chẽ qua biến môi trường `AGENT_PILOT_EXTENSION_ID`.
 2. **Lớp Lọc Dữ Liệu Nhạy Cảm 2 Tầng (Dual-Layer Secret Redaction)**:
-   - Tự động nhận diện và che dấu bằng dấu sao `*` 12 loại thông tin (OpenAI, Anthropic, Gemini, AWS, Stripe, GitHub, Slack, JWT, Bearer token, Private Keys RSA/SSH/PGP, URL parameters, JSON sensitive keys).
-   - Bảo vệ chống tràn ngăn đệ quy vô tận bằng `WeakSet` (`[Circular]`).
-   - Lọc ở Service Worker trước khi truyền qua mạng và lọc ở Server trước khi trả về cho LLM.
+   - Tự động nhận diện và che giấu bằng dấu sao `*` với **13 mẫu Regex chuyên biệt** (bao gồm Private Keys RSA/EC/SSH/PGP, OpenAI, Anthropic, Google, GitHub, AWS, Stripe, Slack, JWT, Bearer token, thông tin URL Basic Auth `https://user:password@host` tại mẫu số 11, tham số URL secret và cặp khóa-giá trị nhạy cảm) cùng bộ từ điển 23 khóa thuộc tính nhạy cảm (`sensitivePropRegex`).
+   - Bảo vệ chống tràn đệ quy vô tận bằng `WeakSet` (`[Circular]`) và giới hạn độ sâu đệ quy (`maxSanitizeDepth = 64`).
+   - Lọc ở Service Worker trước khi truyền qua mạng và lọc dự phòng ở tầng Go server (`SanitizeData`) trước khi trả về cho LLM.
 3. **Cách Ly Tuyệt Đối Giữa Main World & Content Script**:
    - `main-world-bridge.js` chạy trong ngữ cảnh của trang web (`world: "MAIN"`), cung cấp `window.__AGENT_PILOT__` nhưng hoàn toàn **không có quyền hạn `chrome.*`**.
    - Giao tiếp với Extension thông qua các sự kiện tùy biến `CustomEvent` (`__AGENT_PILOT_REQ__` và `__AGENT_PILOT_RES__`).
 4. **Bảo Vệ Độc Quyền Theo Tab (Tab-Level Mutex Lock)**:
    - `runWithTabLock` ngăn chặn hai hành động của Agent hoặc một hành động của Agent và thao tác gõ/click của người dùng xung đột với nhau trên cùng một tab.
-5. **Mô Hình Tin Cậy Của Bridge (Bridge Trust Model)**:
-   - Bridge chỉ mở trên `127.0.0.1:58765`, allowlist nguồn gốc WebSocket gồm `localhost`, `127.0.0.1` và `chrome-extension://`, nhưng **không có token xác thực** — vì vậy bất kỳ tiến trình cục bộ nào cũng có thể điều khiển trình duyệt. Chỉ chạy phần mềm cục bộ đáng tin cậy và không công khai cổng này ra mạng ngoài.
+5. **Mô Hình Tin Cậy & Xác Thực Của Bridge (Bridge Trust & Authentication Model)**:
+   - Bridge chỉ lắng nghe trên giao diện cục bộ `127.0.0.1:58765`. Mặc định không bắt buộc token xác thực để thuận tiện cho phát triển cục bộ.
+   - Hệ thống **đã hỗ trợ bảo mật nâng cao** qua biến môi trường `AGENT_PILOT_API_KEY` (xác thực qua header `X-Agent-Pilot-Key`, `Authorization: Bearer <token>` cho HTTP và frame `HANDSHAKE` đầu tiên cho WebSocket) cùng khóa `AGENT_PILOT_EXTENSION_ID` ghim extension ID hợp lệ (khớp với `cli/bridge/auth.go`).

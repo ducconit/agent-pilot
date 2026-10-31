@@ -41,7 +41,7 @@ Audit the landing page http://localhost:3000/ for responsiveness across mobile, 
 1. Resize the viewport to 375x812 (iPhone X/13), take a full-page screenshot, and check for any horizontal overflow (scrollWidth > innerWidth).
 2. Resize to 768x1024 (iPad portrait), verify that the navigation bar properly switches to the hamburger menu.
 3. Resize to 1440x900 (Desktop), verify grid alignment and image aspect ratios.
-4. If you discover any misaligned elements or layout breaks, highlight them using page_screenshot --highlight and describe the CSS fix needed.
+4. If you discover any misaligned elements or layout breaks, highlight them using agent-pilot screenshot --highlight <selector> (or MCP tool page_screenshot with highlightSelector) and describe the CSS fix needed.
 ```
 
 ---
@@ -119,7 +119,9 @@ Use Agent Pilot's Recorder on http://localhost:3000:
 1. Start recording an interaction flow (recorder start) titled "Checkout Flow".
 2. Execute the journey: Search for a product -> Click "Add to Cart" -> Proceed to Checkout.
 3. Stop recording (recorder stop) and replay the flow (recorder replay) to verify determinism.
-4. Export the recorded flow directly into a Playwright test specification at ./tests/checkout.spec.ts.
+4. Export the flow:
+   - To export standard Chrome DevTools Recorder JSON (for direct import into the Chrome DevTools Recorder tab), run CLI command `agent-pilot recorder export`.
+   - To export ready-to-run TypeScript Playwright test code directly, use MCP tool `browser_recorder_export` and save it to ./tests/checkout.spec.ts.
 ```
 
 ---

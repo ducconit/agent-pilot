@@ -312,7 +312,7 @@ agent-pilot screenshot --format webp --quality 80 -o /tmp/viewport.webp --tab 12
 | `--icon <type:target[:label]>[│color]` | `icons` | Draw pure vector icon (`check`, `error`/`cross`, `warn`, `info`, `click`) on `target` |
 | `--redact <target>` | `redact` | Permanently mask sensitive element or `x,y,w,h` coordinates with a solid `#0f172a` block |
 | `--spotlight` | `spotlight` | Dim surrounding viewport outside highlighted/annotated elements |
-| *(Batch / MCP JSON only)* | `highlightBox` | Explicit `{ x, y, width, height }` bounding box to highlight on the screenshot |
+| *(Batch / MCP JSON only)* | `boxes` / `clip` | `boxes`: array of custom highlight rectangles (`'@1\|red\|dashed:Label'`); `clip`: explicit `{ x, y, width, height }` region crop |
 
 ---
 

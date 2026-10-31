@@ -41,7 +41,7 @@ Kiểm tra độ tương thích responsive của trang landing page http://local
 1. Đổi kích thước màn hình sang 375x812 (iPhone X/13), chụp toàn bộ trang (full-page) và kiểm tra xem có bị tràn ngang (scrollWidth > innerWidth) hay không.
 2. Đổi sang 768x1024 (iPad dọc), kiểm tra xem thanh menu đã tự động chuyển sang menu hamburger chưa.
 3. Đổi sang 1440x900 (Desktop), kiểm tra căn chỉnh lưới sản phẩm và tỉ lệ ảnh banner.
-4. Nếu phát hiện phần tử bị vỡ layout, hãy dùng page_screenshot --highlight để khoanh vùng lỗi và đề xuất code CSS cần sửa.
+4. Nếu phát hiện phần tử bị vỡ layout, hãy dùng agent-pilot screenshot --highlight <selector> (hoặc công cụ MCP page_screenshot với tham số highlightSelector) để khoanh vùng lỗi và đề xuất code CSS cần sửa.
 ```
 
 ---
@@ -119,7 +119,9 @@ Sử dụng tính năng Recorder của Agent Pilot tại http://localhost:3000:
 1. Bắt đầu ghi nhận kịch bản (recorder start) với tiêu đề "Checkout Flow".
 2. Thực hiện luồng: Tìm kiếm sản phẩm -> Thêm vào giỏ hàng -> Đi tới trang Thanh toán.
 3. Dừng ghi nhận (recorder stop) và chạy phát lại (recorder replay) để kiểm tra tính ổn định.
-4. Xuất kịch bản vừa ghi thành file kiểm thử Playwright hoàn chỉnh lưu tại ./tests/checkout.spec.ts.
+4. Xuất kịch bản kiểm thử:
+   - Để xuất định dạng chuẩn Chrome DevTools Recorder JSON (dùng để import trực tiếp vào tab Recorder của Chrome DevTools), sử dụng lệnh CLI `agent-pilot recorder export`.
+   - Để xuất mã nguồn TypeScript Playwright trực tiếp, sử dụng công cụ MCP `browser_recorder_export` và lưu file kiểm thử tại ./tests/checkout.spec.ts.
 ```
 
 ---

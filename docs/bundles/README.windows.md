@@ -1,19 +1,19 @@
-# 🪟 Agent Pilot {{VERSION}} — Windows ({{PLATFORM}})
+# 🪟 Agent Pilot — Windows Setup Guide
 
-Dedicated installation bundle for **Windows 10 / Windows 11 ({{ARCH}})**, packaging the Chrome/Edge Extension, static MCP Server binary, and Agent Skill:
+Dedicated installation bundle for **Windows 10 / Windows 11 (x86_64 / amd64)**, packaging the Chrome/Edge Extension, static MCP Server binary, and Agent Skill:
 
 ```text
-agent-pilot-{{VERSION}}-{{PLATFORM}}\
+agent-pilot-v1.3.0-windows\
 ├── extensions\            Chrome Extension (Manifest V3) — loaded unpacked in Chrome/Edge/Brave
 ├── install.ps1            1-step automated PowerShell installer for Windows
-├── skills\agent-pilot\    Agent Skill + scripts\{{BINARY_NAME}} native binary
+├── skills\agent-pilot\    Agent Skill + scripts\agent-pilot.exe native binary
 └── README.md              Documentation for Windows
 ```
 
 ## System Requirements
-- **OS**: Windows 10 / Windows 11 ({{ARCH}})
+- **OS**: Windows 10 / Windows 11 (amd64)
 - **Browser**: Google Chrome 116+, Microsoft Edge, or Brave (Side Panel API support)
-- **Dependencies**: Zero runtime dependencies (`skills\agent-pilot\scripts\{{BINARY_NAME}}` runs standalone without Administrator privileges)
+- **Dependencies**: Zero runtime dependencies (`skills\agent-pilot\scripts\agent-pilot.exe` runs standalone without Administrator privileges)
 
 ---
 
@@ -50,8 +50,8 @@ $targetDir = "$env:LOCALAPPDATA\Programs\agent-pilot"
 New-Item -ItemType Directory -Force -Path $targetDir
 
 # Unblock and copy binary
-Unblock-File -Path ".\skills\agent-pilot\scripts\{{BINARY_NAME}}"
-Copy-Item ".\skills\agent-pilot\scripts\{{BINARY_NAME}}" "$targetDir\agent-pilot.exe"
+Unblock-File -Path ".\skills\agent-pilot\scripts\agent-pilot.exe"
+Copy-Item ".\skills\agent-pilot\scripts\agent-pilot.exe" "$targetDir\agent-pilot.exe"
 
 # Add to User PATH
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")

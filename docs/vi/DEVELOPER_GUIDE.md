@@ -38,7 +38,7 @@ sequenceDiagram
 | **Giai đoạn 1** | **Tiếp Nhận Ý Định (Intent Dispatch)** | AI Agent chuyển đổi yêu cầu ngôn ngữ tự nhiên của người dùng thành lệnh điều khiển chuẩn hóa thông qua CLI hoặc giao thức MCP. |
 | **Giai đoạn 2** | **Điều Phối Qua Bridge (Bridge Routing)** | Dịch vụ chạy ngầm trên máy trạm tiếp nhận yêu cầu, quản lý khóa đồng thời khi có nhiều AI chạy song song và định tuyến lệnh tới đúng phiên trình duyệt. |
 | **Giai đoạn 3** | **Thực Thi Động Cơ Kép (Dual-Engine)** | Chrome Extension tự động chọn phương thức tối ưu: dùng mô phỏng DOM tốc độ cao (kèm hiệu ứng chuột ảo neon) cho các tác vụ thông thường, hoặc nâng cấp lên Chrome DevTools Protocol (CDP) khi xử lý iframe chéo miền, Canvas, WebGL và đo lường bộ nhớ. |
-| **Giai đoạn 4** | **Làm Sạch & Phản Hồi (Sanitization)** | Trước khi dữ liệu rời khỏi trình duyệt để trả về cho mô hình AI, bộ lọc 29 quy tắc sẽ tự động che giấu mật khẩu, API key, JWT token và khóa bí mật trong cả DOM lẫn log console. |
+| **Giai đoạn 4** | **Làm Sạch & Phản Hồi (Sanitization)** | Trước khi dữ liệu rời khỏi trình duyệt để trả về cho mô hình AI, bộ lọc Secret Sanitizer (13 mẫu Regex chuyên biệt & 23 khóa thuộc tính nhạy cảm) sẽ tự động che giấu mật khẩu, API key, JWT token, URL Basic Auth và khóa bí mật trong cả DOM lẫn log console. |
 
 ---
 
@@ -129,7 +129,7 @@ flowchart LR
    - Duy trì tính đồng bộ song ngữ (Tiếng Anh và Tiếng Việt) khi bổ sung hoặc cập nhật tài liệu.
 4. **Đảm Bảo Tiêu Chuẩn Chất Lượng**:
    - **Không gây lỗi hồi quy (Zero Regression)**: Giữ nguyên tính tương thích của các tính năng điều khiển DOM, CDP và MCP hiện có.
-   - **An toàn dữ liệu**: Bảo toàn 100% các quy tắc che giấu thông tin bí mật.
+   - **An toàn dữ liệu**: Bảo toàn 100% 13 mẫu Regex chuyên biệt và các quy tắc che giấu thông tin bí mật.
    - **Lịch sử rõ ràng**: Đặt tiêu đề commit ngắn gọn, súc tích theo chuẩn Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`).
 5. **Gửi Yêu Cầu Hợp Nhất (Pull Request)**: Tạo Pull Request về nhánh `main` kèm mô tả rõ vấn đề giải quyết, phạm vi ảnh hưởng và kết quả kiểm chứng thực tế.
 

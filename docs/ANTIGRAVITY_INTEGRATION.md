@@ -24,7 +24,7 @@ agent-pilot install-skill --all
 Once installed, the agent automatically learns how to run compact CLI commands (`agent-pilot open`, `agent-pilot snapshot`, `agent-pilot click`, `agent-pilot screenshot`) without loading heavy tool schemas into its context window.
 
 ### Mode B: Model Context Protocol (MCP) Server
-For MCP-enabled IDEs and desktop clients, Agent Pilot includes a built-in stdio MCP server exposing 51 browser & DevTools tools:
+For MCP-enabled IDEs and desktop clients, Agent Pilot includes a built-in stdio MCP server exposing 68 browser & DevTools tools:
 
 ```json
 {
@@ -91,40 +91,40 @@ Antigravity generates structured JSON action pipelines executed sequentially by 
 
 ### Action Pipeline Example:
 ```json
-[
-  {
-    "action": "navigate",
-    "url": "http://localhost:3000/dashboard"
-  },
-  {
-    "action": "wait",
-    "ms": 1000
-  },
-  {
-    "action": "mouse_move",
-    "x": 380,
-    "y": 240,
-    "duration": 400
-  },
-  {
-    "action": "mouse_click",
-    "x": 380,
-    "y": 240
-  },
-  {
-    "action": "type",
-    "selector": "input[name='search']",
-    "text": "Antigravity Browser Control"
-  },
-  {
-    "action": "scroll",
-    "deltaY": 400
-  },
-  {
-    "action": "screenshot",
-    "mode": "visible"
-  }
-]
+{
+  "actions": [
+    {
+      "action": "navigate",
+      "url": "http://localhost:3000/dashboard"
+    },
+    {
+      "action": "wait",
+      "ms": 1000
+    },
+    {
+      "action": "hover",
+      "selector": "input[name='search']"
+    },
+    {
+      "action": "click",
+      "selector": "input[name='search']"
+    },
+    {
+      "action": "type",
+      "selector": "input[name='search']",
+      "text": "Antigravity Browser Control"
+    },
+    {
+      "action": "scroll",
+      "deltaY": 400
+    },
+    {
+      "action": "screenshot",
+      "mode": "visible"
+    }
+  ],
+  "stopOnError": true
+}
 ```
 
 ### Supported Actions:
@@ -132,9 +132,9 @@ Antigravity generates structured JSON action pipelines executed sequentially by 
 | :--- | :--- | :--- |
 | `navigate` | `url` (string) | Navigates the target tab to URL |
 | `wait` | `ms` (number) | Pauses execution for millisecond duration |
-| `mouse_move` | `x`, `y`, `duration` (ms) | Moves virtual cursor smoothly along Bezier curve to coordinates |
-| `mouse_click` | `x`, `y`, `via?` ("synthetic" \| "cdp" \| "auto") | Emits ripple effect and DOM click cascade; `via: "cdp"` issues trusted click (required for cross-origin iframes, Canvas, WebGL) |
-| `mouse_drag` | `from`/`to` (selector) or `fromX/fromY/toX/toY`, `steps?`, `holdMs?`, `via?` | Drag-and-drop gesture; use coordinates + `via: "cdp"` for canvas games |
+| `hover` | `selector` (string) or `x`, `y` | Moves virtual cursor smoothly / hovers element or coordinates |
+| `click` | `selector?`, `x?`, `y?`, `via?` ("synthetic" \| "cdp" \| "auto") | Emits ripple effect and DOM click cascade; `via: "cdp"` issues trusted click (required for cross-origin iframes, Canvas, WebGL) |
+| `drag` | `from`/`to` (selector) or `fromX/fromY/toX/toY`, `steps?`, `holdMs?`, `via?` | Drag-and-drop gesture; use coordinates + `via: "cdp"` for canvas games |
 | `type` | `selector` (string), `text` (string) | Focuses input element and types text sequentially |
 | `scroll` | `deltaX`, `deltaY` (px) | Smooth scrolling along X/Y axes |
 | `screenshot` | `mode` ("visible" \| "element" \| "region" \| "full") | Triggers screenshot engine |
@@ -171,22 +171,30 @@ Add the following configuration to your Antigravity MCP settings (`~/.gemini/con
 }
 ```
 
-### 3.3. Key MCP Tools Provided to AI Agents (51 Tools):
+### 3.3. Key MCP Tools Provided to AI Agents (68 Tools):
 1. `browser_open_tab(url, active)`: Opens a new tab (defaults to background to preserve developer focus; groups into `🤖 Agent Pilot`).
 2. `browser_list_tabs()`: Lists all tabs and isolation states.
 3. `browser_navigate(url, tabId)`: Navigates specified or active tab.
 4. `browser_click(x, y, selector, via)`: Moves virtual cursor and clicks element or coordinates. Add `via: "cdp"` for trusted input.
-5. `browser_drag(from, to, fromX, fromY, toX, toY, steps, holdMs, via)`: Drags between elements or coordinates.
+5. `browser_drag(from, to, fromX, fromY, toX, toY, steps, holdMs, via)`: Drags between elements or coordinates; use `via: "cdp"` + `holdMs` for slingshot mechanics.
 6. `browser_type(selector, text, clear, pressEnter)`: Human-like typing into form fields.
 7. `browser_scroll(deltaX, deltaY)`: Smooth horizontal and vertical scrolling.
 8. `browser_get_element(selector)`: Extracts bounding boxes, dimensions, CSS selectors, and XPath.
 9. `browser_screenshot(mode, tabId)`: Captures screenshots (including background tabs via CDP).
 10. `browser_get_devtools_data(tabId, type, limit, clear)`: Retrieves console logs, network requests, and performance metrics (JS Heap, DOM nodes).
 11. `browser_pick_color(x, y)`: Extracts pixel colors across 5 formats (HEX, RGB, RGBA, HSL, OKLCH).
-12. `browser_run_actions(actions, tabId, stopOnError)`: Batch execution engine executing multiple actions in one round-trip, saving 80%+ latency and tokens.
-13. `browser_wait_for_feedback(timeout, tabId)`: Long-polls for human visual feedback submitted via In-Page Feedback Studio.
+12. `browser_list_instances()`: Lists all connected Chrome browser instances across ports.
+13. `browser_select_instance(instanceId)`: Targets a specific browser instance in multi-browser setups.
+14. `browser_start_session(name, tabId)`: Starts an active agent session on the target tab, keeping the virtual cursor and neon status shield continuously visible.
+15. `browser_end_session(tabId, closeTab)`: Ends the active agent session, dismissing the cursor and visual shield (optionally closing the tab).
+16. `browser_set_busy(busy, action)`: Displays subtle glowing neon border and floating status pill with unlock control during complex operations.
+17. `browser_handle_dialog(accept, promptText, tabId)`: Handles JavaScript alert/confirm/prompt dialogs using CDP `Page.handleJavaScriptDialog`.
+18. `browser_resize_page(width, height, deviceScaleFactor, mobile, tabId)`: Dynamically resizes the target page viewport using CDP `Emulation.setDeviceMetricsOverride`.
+19. `browser_run_actions(actions, tabId, stopOnError)`: Batch execution engine executing multiple actions in one round-trip, saving 80%+ latency and tokens.
+20. `browser_get_pending_feedback(limit, sessionId, clear)`: Retrieves human UI feedback sessions recorded via Feedback Studio stored in local inbox.
+21. `browser_wait_for_feedback(timeout, tabId)`: Long-polls for human visual feedback submitted via In-Page Feedback Studio (Channel A live push).
 
-> 📝 *The full tool suite comprises 51 tools, detailed in [Advanced DevTools](DEVTOOLS.md).*
+> 📝 *The full tool suite comprises 68 tools, detailed in [Advanced DevTools](DEVTOOLS.md).*
 
 ---
 
@@ -205,8 +213,8 @@ await window.__AGENT_PILOT__.click(500, 300);
 await window.__AGENT_PILOT__.type("#username-field", "admin@antigravity.ai");
 
 // Inspect element geometry
-const info = window.__AGENT_PILOT__.getElement("#submit-button");
-console.log("Element bounds:", info.rect);
+const info = await window.__AGENT_PILOT__.getElement("#submit-button");
+console.log("Element bounds:", info?.rect);
 
 // Pick pixel color
 const color = await window.__AGENT_PILOT__.pickColor();

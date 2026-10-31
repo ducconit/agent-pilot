@@ -1,3 +1,7 @@
+# Static reference template for Linux systemd user service.
+# NOTE: It is strongly recommended to run 'agent-pilot service install' instead,
+# which automatically detects your user environment, paths, and configures the service correctly.
+
 [Unit]
 Description=Agent Pilot Browser Control Bridge (User Mode)
 Documentation=https://github.com/ducconit/agent-pilot

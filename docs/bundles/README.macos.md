@@ -1,19 +1,19 @@
-# 🍎 Agent Pilot {{VERSION}} — macOS ({{PLATFORM}})
+# 🍎 Agent Pilot — macOS Setup Guide
 
-Dedicated installation bundle for **macOS ({{ARCH}} — Apple Silicon M1-M4 & Intel)**, packaging the Chrome Extension, static MCP Server binary, and Agent Skill:
+Dedicated installation bundle for **macOS (Apple Silicon M1-M4 & Intel)**, packaging the Chrome Extension, static MCP Server binary, and Agent Skill:
 
 ```text
-agent-pilot-{{VERSION}}-{{PLATFORM}}/
+agent-pilot-v1.3.0-macos/
 ├── extensions/            Chrome Extension (Manifest V3) — loaded unpacked in Chrome/Brave/Arc
 ├── install.sh             1-step automated installation script for macOS (clears Gatekeeper quarantine)
-├── skills/agent-pilot/    Agent Skill + scripts/{{BINARY_NAME}} native binary
+├── skills/agent-pilot/    Agent Skill + scripts/agent-pilot native binary
 └── README.md              Documentation for macOS
 ```
 
 ## System Requirements
 - **OS**: macOS 12 Monterey or higher (`darwin-arm64` for M1/M2/M3/M4 or `darwin-amd64` for Intel)
 - **Browser**: Google Chrome 116+, Brave, Arc, or Microsoft Edge (Side Panel API support)
-- **Dependencies**: Zero runtime dependencies (`skills/agent-pilot/scripts/{{BINARY_NAME}}` is statically linked)
+- **Dependencies**: Zero runtime dependencies (`skills/agent-pilot/scripts/agent-pilot` is statically linked)
 
 ---
 
@@ -42,11 +42,11 @@ The `install.sh` script automatically:
 ```bash
 # 1. Clear macOS Gatekeeper quarantine attribute
 xattr -cr .
-chmod +x ./skills/agent-pilot/scripts/{{BINARY_NAME}}
+chmod +x ./skills/agent-pilot/scripts/agent-pilot
 
 # 2. Copy binary to ~/.local/bin
 mkdir -p ~/.local/bin
-cp ./skills/agent-pilot/scripts/{{BINARY_NAME}} ~/.local/bin/agent-pilot
+cp ./skills/agent-pilot/scripts/agent-pilot ~/.local/bin/agent-pilot
 
 # 3. Ensure ~/.local/bin is in PATH (add to ~/.zshrc if needed)
 export PATH="$HOME/.local/bin:$PATH"

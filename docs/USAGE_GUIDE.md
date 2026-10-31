@@ -190,47 +190,258 @@ Add to your AI agent configuration (Antigravity, Claude Desktop, Cursor):
 ```
 
 ### 4.4. CLI Automation Commands
-Engineers can automate Chrome directly from the terminal:
+
+Engineers and AI agents can automate Chrome directly from the terminal using the standalone `agent-pilot` binary. Below is the complete command reference grouped by capability, followed by practical examples, inline wait flag options, trusted CDP operations, and batch execution scripts.
+
+#### 4.4.1. Complete Command Lookup Reference
+
+##### Group 1: Page Interaction Commands (17 Commands)
+
+| Command | Syntax | Description | CDP Required? |
+| :--- | :--- | :--- | :--- |
+| `open` | `agent-pilot open <url>` | Open URL in a background tab inside the `🤖 Agent Pilot` group (or navigate target tab with `--tab`) | ❌ No |
+| `navigate` | `agent-pilot navigate <url\|back\|forward\|reload>` | Navigate tab with history back/forward, cache-bypass, init scripts, or beforeunload handling | ❌ No |
+| `click` | `agent-pilot click <selector>` | Click element or coordinate (`--x`, `--y`); supports `--dblclick`, `--button`, and `--via cdp` | ⚙️ Optional (`--via cdp`) |
+| `type` | `agent-pilot type <selector> <text>` | Type text into input/textarea; supports `--clear` before typing and `--enter` | ❌ No |
+| `fill` | `agent-pilot fill <fields.json>` | Fill multiple form fields and automatically submit in a single round-trip | ❌ No |
+| `scroll` | `agent-pilot scroll [down\|up\|left\|right\|dx dy]` | Scroll page or element by direction (`down`, `up`, `right`, `left`) or pixel delta (`--dx`, `--dy`) | ❌ No |
+| `hover` | `agent-pilot hover <selector>` | Hover virtual cursor over DOM element to trigger `:hover` CSS and dynamic JS tooltips | ❌ No |
+| `drag` | `agent-pilot drag <from> <to>` | Drag element or coordinates (`--from-x`, `--from-y`, `--to-x`, `--to-y`); supports `--hold` and `--via cdp` | ⚙️ Optional (`--via cdp`) |
+| `key` | `agent-pilot key <key1> [key2...]` | Send single keys, shortcuts (`Ctrl+A`, `Ctrl+V`), or sequences (`--delay`, `--repeat`) | ❌ No |
+| `wait` | `agent-pilot wait [selector\|text\|ms]` | Wait for selector, text, state (`visible`, `attached`), or fixed sleep milliseconds | ❌ No |
+| `upload` | `agent-pilot upload <selector> <files...>` | Upload local files to `<input type="file">` via CDP or synthetic `DataTransfer` fallback | ⚙️ Optional (`--via auto`) |
+| `dialog` | `agent-pilot dialog <accept\|dismiss>` | Automatically handle JavaScript dialogs (`alert`, `confirm`, `prompt`) with prompt text | ✅ Yes |
+| `inspect` | `agent-pilot inspect <selector>` | Inspect element bounds, selector, XPath, text, and computed CSS (`--styles`) | ❌ No |
+| `snapshot` | `agent-pilot snapshot` | Extract ultra-compact interactive element map (`@1`, `@2`...) for LLM context | ❌ No |
+| `screenshot` | `agent-pilot screenshot` | Capture high-res screenshot with annotations (`--highlight`, `--step`, `--title`, `--arrow`, `--badge`) | ✅ Yes (bg tabs) |
+| `close` | `agent-pilot close [ids...\|--all]` | Close current tab, specified tab ID(s), or all tabs in the `🤖 Agent Pilot` group | ❌ No |
+| `tabs` | `agent-pilot tabs` | List all open tabs in the `🤖 Agent Pilot` group (Aliases: `list`, `ls`) | ❌ No |
+
+##### Group 2: Evaluation & DevTools Commands (11 Commands)
+
+| Command | Syntax | Description | CDP Required? |
+| :--- | :--- | :--- | :--- |
+| `eval` / `evaluate` | `agent-pilot eval <script>` | Evaluate JavaScript expression in `MAIN` world (access to `window`, React/Vue states) | ❌ No (CDP fallback) |
+| `console` | `agent-pilot console [list\|errors\|clear]` | View console logs, warnings, or page runtime exceptions (`errors`) | ✅ Yes |
+| `network` | `agent-pilot network [list\|get <id>\|clear]` | Inspect network requests/responses, filter by URL/type/navigation, or get response body | ✅ Yes |
+| `metrics` | `agent-pilot metrics` | Measure Core Web Vitals (LCP, CLS, FCP, TTFB, TBT), DOM health, and V8 heap stats | ✅ Yes |
+| `trace` | `agent-pilot trace <start\|stop>` | Record timeline performance trace, detecting long tasks (>=50ms) and reflows | ✅ Yes |
+| `heap` | `agent-pilot heap [snapshot\|baseline\|diff\|gc]` | Capture V8 heap snapshot, measure memory leaks, or trigger garbage collection | ✅ Yes |
+| `resize` | `agent-pilot resize <width> <height>` | Adjust browser viewport dimensions dynamically for responsive layout auditing | ✅ Yes |
+| `emulate` | `agent-pilot emulate` | Emulate network throttling (`slow-3g`, `offline`), CPU throttling, and color theme | ✅ Yes |
+| `webauthn` | `agent-pilot webauthn <action>` | Manage virtual WebAuthn authenticators and passkeys for passwordless auth testing | ✅ Yes |
+| `extensions` | `agent-pilot extensions [list\|toggle]` | Inspect, enable, or disable installed browser extensions | ✅ Yes |
+| `cdp` | `agent-pilot cdp status` | Check if Chrome DevTools debugger is attached and available for trusted CDP input | ✅ Yes |
+
+##### Group 3: Session, Security & Automation Commands (6 Commands)
+
+| Command | Syntax | Description | CDP Required? |
+| :--- | :--- | :--- | :--- |
+| `session` | `agent-pilot session [start\|end\|status]` | Maintain persistent session with visible neon cursor and action lock shield | ❌ No |
+| `busy` | `agent-pilot busy [on\|off]` | Directly toggle the human input lock shield with an optional status banner | ❌ No |
+| `service` | `agent-pilot service <action>` | Manage OS background daemon (`install`, `uninstall`, `start`, `stop`, `restart`, `status`) | ❌ No |
+| `skill` | `agent-pilot skill install` | Install embedded `agent-pilot` skill into agent skills directories (`--agy`, `--path`) | ❌ No |
+| `batch` | `agent-pilot batch <flow.json>` | Execute an ordered workflow of browser actions in a single atomic network call | ❌ No (per step) |
+| `recorder` | `agent-pilot recorder <operation>` | Record, replay, export, import, or measure Chrome DevTools Recorder flows | ❌ No (per step) |
+
+---
+
+#### 4.4.2. Practical CLI Examples
+
 ```bash
-# Open URL
+# === 1. PAGE INTERACTIONS ===
+# Open URL in background and bring to front
 agent-pilot open "https://example.com" --active
 
-# Type text into form input and press Enter
-agent-pilot type "#search-box" "mechanical keyboard" --enter
+# Reload tab bypassing cache
+agent-pilot navigate reload --ignore-cache --tab 12345
 
-# Click element
-agent-pilot click ".btn-search"
+# Capture interactive element snapshot (@1, @2...)
+agent-pilot snapshot --tab 12345
 
-# Inspect DOM element
-agent-pilot inspect "#product-price"
+# Type text into search box and press Enter
+agent-pilot type "#search-box" "mechanical keyboard" --clear --enter
 
-# Capture screenshot to file
-agent-pilot screenshot -o search_results.png --mode visible
+# Click element with visual neon ripple cursor
+agent-pilot click ".btn-search" --tab 12345
 
-# List open tabs
+# Fill an entire form and submit
+agent-pilot fill form_data.json --submit "#btn-submit"
+
+# Scroll down 800px or by direction
+agent-pilot scroll down --tab 12345
+agent-pilot scroll --dy 800 --tab 12345
+
+# Hover over menu dropdown
+agent-pilot hover ".dropdown-menu-trigger" --tab 12345
+
+# Send keyboard shortcuts
+agent-pilot key Ctrl+a Backspace 1 2 3 Enter --selector "#otp-input" --tab 12345
+
+# Wait for selector or text
+agent-pilot wait "#success-banner" --state visible --timeout 5000
+agent-pilot wait --text "Payment Successful" --timeout 5000
+
+# File upload to <input type="file">
+agent-pilot upload "input[type=file]" ./document.pdf --via auto --tab 12345
+
+# Auto-accept JavaScript dialogs
+agent-pilot dialog accept --tab 12345
+
+# Inspect DOM element details
+agent-pilot inspect "#product-price" --styles --tab 12345
+
+# Capture annotated screenshot
+agent-pilot screenshot -o /tmp/checkout.png --step "1/3" --title "Checkout" --highlight "@1" --tab 12345
+
+# Tab management
 agent-pilot tabs
+agent-pilot close --tab 12345
+
+# === 2. EVALUATION & DEVTOOLS ===
+# Run JavaScript in MAIN world (access to window, React/Vue internals)
+agent-pilot eval "document.title" --tab 12345
+agent-pilot eval -f ./extract-data.js -o /tmp/extracted.json --tab 12345
+
+# Inspect console logs and page runtime errors
+agent-pilot console errors --tab 12345
+agent-pilot console list --level warn --limit 20 --tab 12345
+
+# Filter network requests from the current navigation
+agent-pilot network list --current-nav --tab 12345
+agent-pilot network get req_abc123 --tab 12345
+
+# Measure Core Web Vitals & DOM health
+agent-pilot metrics --tab 12345
+
+# Record performance timeline trace
+agent-pilot trace start --tab 12345
+agent-pilot click "#compute-btn" --tab 12345
+agent-pilot trace stop --tab 12345
+
+# Detect memory leaks via heap snapshots
+agent-pilot heap baseline --tab -12345 --file /tmp/base.heapsnapshot
+agent-pilot heap diff --tab -12345 --file /tmp/curr.heapsnapshot
+
+# Viewport resizing for mobile responsiveness
+agent-pilot resize 375 812 --tab 12345
+
+# Emulate network throttling and dark theme
+agent-pilot emulate --network slow-3g --cpu 4x --theme dark --tab 12345
+
+# Virtual WebAuthn / Passkey authenticator
+agent-pilot webauthn enable --tab 12345
+agent-pilot webauthn add --protocol ctap2 --transport internal --tab 12345
+
+# Extension inspection
+agent-pilot extensions list
+
+# === 3. SESSION, SECURITY & AUTOMATION ===
+# Start persistent session with continuous neon cursor
+agent-pilot session start --name "Checkout Automation" --tab 12345
+agent-pilot busy on --action "Processing automated order..." --tab 12345
+agent-pilot busy off --tab 12345
+agent-pilot session end --tab 12345
+
+# Chrome DevTools Recorder flow
+agent-pilot recorder start --title "Login Journey" --tab 12345
+agent-pilot click "#login-button" --tab 12345
+agent-pilot recorder stop --tab 12345
+agent-pilot recorder export --tab 12345 --format json > flow.recorder.json
+agent-pilot recorder replay --file flow.recorder.json --tab 12345
 
 # Execute batch automation workflow from JSON
 agent-pilot batch flow_test.json
-
-# View feedback sessions
-agent-pilot feedback list
 ```
 
-#### CDP Control for Cross-Origin Iframes, Canvas, and Games
-By default, `click` and `drag` use fast synthetic DOM events. For **cross-origin iframes, `<canvas>`, and WebGL/Unity games**, enable trusted CDP input:
+---
+
+#### 4.4.3. Inline Wait Flags (Token & Roundtrip Optimization)
+
+In standard browser automation, chaining actions typically requires 3 separate round-trips:
+1. `click` element -> wait for response.
+2. `wait_for_selector` -> wait for response.
+3. `snapshot` -> wait for response.
+
+Agent Pilot features **Inline Wait Flags**, allowing agents to chain waiting conditions and snapshot retrieval directly onto interaction commands (`open`, `navigate`, `click`, `type`, `fill`, `scroll`, `hover`, `drag`, `key`, `upload`) in a **single atomic call**:
+
+| Inline Wait Flag | Aliases | Description |
+| :--- | :--- | :--- |
+| `--wait <ms>` | `--sleep`, `--wait-ms`, `--sleep-ms` | Sleep for specified milliseconds after the action executes (e.g. `--wait 500` or `--wait 500ms`) |
+| `--wait-for <selector>` | `--wait-selector` | Wait for target CSS selector or `@ref` to be attached/visible in DOM before returning |
+| `--wait-text <text>` | *(none)* | Wait for specified visible text to appear in DOM before returning |
+| `--include-snapshot` | `--snapshot` | Automatically capture and return an interactive DOM snapshot (`@1`, `@2`...) in the same response |
+
+**Why this matters**:
+- **~80% Token Reduction**: Eliminates repeated round-trips and conversational overhead for wait and snapshot commands.
+- **Zero Flakiness**: The browser bridge waits locally before taking the snapshot, avoiding premature assertions.
+
+**Examples**:
+```bash
+# Click submit button, wait for dashboard to appear, and get updated DOM snapshot in 1 command:
+agent-pilot click "#btn-submit" --wait-for "#dashboard-view" --include-snapshot --tab 12345
+
+# Type search query, press Enter, wait 500ms for results to render, and return snapshot:
+agent-pilot type "#search-box" "laptop gaming" --enter --wait 500 --include-snapshot --tab 12345
+
+# Open URL and wait for welcome text:
+agent-pilot open "https://example.com" --wait-text "Welcome back" --include-snapshot
+```
+
+---
+
+#### 4.4.4. Trusted CDP Control for Cross-Origin Iframes, Canvas, and Games
+
+By default, `click` and `drag` use fast synthetic DOM events (with neon cursor effects). For **cross-origin iframes, `<canvas>`, and WebGL/Unity games**, synthetic DOM events cannot penetrate origin barriers. Enable trusted CDP input via `--via cdp`:
+
 ```bash
 # Check CDP debugger availability
 agent-pilot cdp status --tab 12345
 
-# Trusted click by coordinate
-agent-pilot click -x 733 -y 668 --via cdp --tab 12345
+# Trusted click by coordinate (using standard GNU/Cobra flags --x and --y)
+agent-pilot click --x 733 --y 668 --via cdp --tab 12345
 
 # Drag gesture (slingshot aim with 800ms hold)
 agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --hold 800 --via cdp --tab 12345
 
 # Safe auto mode: tries CDP first, falls back to synthetic if debugger is blocked
 agent-pilot click "#play-button" --via auto --tab 12345
+```
+
+- `--via cdp` **does not fall back silently**: if attaching the debugger fails, it returns `CDP_UNAVAILABLE: <reason>` with actionable hints.
+- `--via auto` is ideal when executing workflows across mixed DOM and canvas/iframe interfaces.
+- The visual neon cursor only appears with the synthetic engine; trusted CDP input dispatches native system-level events and does not render virtual cursor overlays.
+
+---
+
+#### 4.4.5. Batch Automation JSON Structure (`flow_test.json`)
+
+Batch automation allows executing an entire sequence of browser operations in a single network call:
+
+```json
+[
+  { "action": "open", "url": "https://google.com", "active": true },
+  { "action": "wait", "ms": 1000 },
+  { "action": "type", "selector": "textarea[name='q']", "text": "Agent Pilot Golang", "pressEnter": true },
+  { "action": "wait", "ms": 2000 },
+  { "action": "screenshot", "label": "google_search_results" }
+]
+```
+
+Or using the structured `actions` object format:
+
+```json
+{
+  "actions": [
+    { "type": "open", "url": "https://example.com/login" },
+    { "type": "wait_for_selector", "selector": "#username", "timeout": 5000 },
+    { "type": "type", "selector": "#username", "text": "tester@example.com" },
+    { "type": "type", "selector": "#password", "text": "Secret123!" },
+    { "type": "click", "selector": "#btn-submit" },
+    { "type": "screenshot", "mode": "visible", "path": "/tmp/step-login.png", "title": "Login Completed" },
+    { "type": "close" }
+  ]
+}
 ```
 
 ---

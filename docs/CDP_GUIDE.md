@@ -113,9 +113,11 @@ await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
 
 > [!IMPORTANT]
 > **When is CDP Input Required?** Normal DOM pages use synthetic events by default. For **cross-origin iframes, `<canvas>`, and WebGL games**, synthetic events cannot cross the origin boundary, making CDP Input required.
-> - CLI commands: `agent-pilot click -x 733 -y 668 --via cdp --tab <id>` and `agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --hold 800 --via cdp --tab <id>`.
+> - CLI commands: `agent-pilot click --x 733 --y 668 --via cdp --tab <id>` and `agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --hold 800 --via cdp --tab <id>`.
 > - Engine flags: `--via synthetic` (default) · `--via cdp` (trusted, no fallback) · `--via auto` (tries CDP, falls back to synthetic).
 > - Diagnostic check: `agent-pilot cdp status --tab <id>`.
+>
+> **Attachment Failure Handling**: `ensureCdpAttached()` checks `chrome.debugger.attach` results and throws an explicit `CDP_UNAVAILABLE: <reason>` error (DevTools open on tab, blocked by policy/permissions) instead of hanging or falling back silently.
 
 > [!NOTE]
 > **Visual Feedback**: The neon cursor and ripple animations are rendered exclusively by the **synthetic engine**. CDP input dispatches native system-level events and does not render virtual cursor overlays.

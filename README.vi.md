@@ -129,6 +129,9 @@ agent-pilot type "@2" "test@example.com" --enter --tab 12345
 # Chụp ảnh màn hình đính kèm khung viền nổi bật
 agent-pilot screenshot -o step1.png --highlight "@1" --title "Đăng nhập"
 
+# Kiểm tra lỗi console & runtime exceptions qua CDP
+agent-pilot console errors --tab 12345
+
 # Đóng tab và giải phóng tài nguyên
 agent-pilot close --tab 12345
 ```

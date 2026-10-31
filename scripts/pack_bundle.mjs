@@ -49,21 +49,21 @@ const ALL_PLATFORMS = [
 const OS_EDITION_ASSETS = {
   linux: {
     editionName: "Ubuntu / Linux",
-    readmeTemplate: path.join(DOCS_BUNDLES_DIR, "README.ubuntu.md"),
+    readmeTemplate: path.join(SCRIPTS_BUNDLES_DIR, "README.ubuntu.template.md"),
     installerSrc: path.join(SCRIPTS_BUNDLES_DIR, "install-ubuntu.sh"),
     installerDest: "install.sh",
     executable: true
   },
   darwin: {
     editionName: "macOS",
-    readmeTemplate: path.join(DOCS_BUNDLES_DIR, "README.macos.md"),
+    readmeTemplate: path.join(SCRIPTS_BUNDLES_DIR, "README.macos.template.md"),
     installerSrc: path.join(SCRIPTS_BUNDLES_DIR, "install-macos.sh"),
     installerDest: "install.sh",
     executable: true
   },
   windows: {
     editionName: "Windows",
-    readmeTemplate: path.join(DOCS_BUNDLES_DIR, "README.windows.md"),
+    readmeTemplate: path.join(SCRIPTS_BUNDLES_DIR, "README.windows.template.md"),
     installerSrc: path.join(SCRIPTS_BUNDLES_DIR, "install-windows.ps1"),
     installerDest: "install.ps1",
     executable: false

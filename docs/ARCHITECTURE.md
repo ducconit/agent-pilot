@@ -21,8 +21,8 @@ flowchart TB
         DualMode{"<b>Dual Mode Engine</b><br/>Port Busy?"}
         Master["<b>Master Mode</b><br/>Binds WebSocket ws://127.0.0.1:58765"]
         Forwarder["<b>Forwarder Mode</b><br/>Forwards Stdio to HTTP POST /api"]
-        VerifyClient["<b>verifyClient Security Guard</b><br/>Validates Origin: chrome-ext & localhost"]
-        ServerRedactor["<b>Secret Redaction Filter</b><br/>Masks 12 Key Patterns with *"]
+        VerifyClient["<b>verifyClient Security Guard</b><br/>WebSocket Origin: chrome-ext & internal loopback"]
+        ServerRedactor["<b>Secret Redaction Filter</b><br/>Masks 13 Dedicated Regex Patterns with *"]
         InboxFS["<b>Local Inbox Storage</b><br/>~/.agent-pilot/inbox/feedback/"]
     end
 
@@ -127,7 +127,7 @@ sequenceDiagram
     Note over Ext,Tab: 4. RELEASE LOCK & SANITIZE SENSITIVE DATA
     Tab->>Content: chrome.tabs.sendMessage("SET_BUSY", { busy: false })
     Content->>DOM: Hide neon border & action indicator pill
-    Ext->>Ext: sanitizeData(result) -> Scan 12 secret & private key patterns
+    Ext->>Ext: sanitizeData(result) -> Scan 13 dedicated regex patterns
     Ext-->>Server: WebSocket Response: { id: 42, result: { ... }, secretFilterEnabled: true }
     Server->>Server: sanitizeServerData(result) (Second security defense layer)
     Server-->>Agent: MCP Tool Response: { success: true, clicked: true }
@@ -153,8 +153,8 @@ sequenceDiagram
         Agent->>Server: browser_wait_for_feedback({ timeout: 120 })
         Server-->>Server: Hold pending waiter (pendingFeedbackWaiters)
         User->>HUD: Select element / Pin region & Click "🚀 Send to Agent"
-        HUD->>Ext: chrome.runtime.sendMessage("FEEDBACK_PUSH_AGENT", payload)
-        Ext->>Server: POST /api/feedback/wait (resolve pending waiter)
+        HUD->>Ext: chrome.runtime.sendMessage({ action: "push_feedback_live", payload })
+        Ext->>Server: POST /api/feedback/push (resolve pending waiter)
         Server->>Inbox: Save session.json + item_*.png
         Server-->>Agent: Immediate return (Component source, line, selector, note, images)
         Agent->>Agent: Automatically patch code at specified file & line
@@ -177,18 +177,20 @@ sequenceDiagram
 
 ## 4. 🛡️ Security Mechanisms & Defense-in-Depth
 
-1. **WebSocket Origin Guard (`verifyClient`)**:
-   - Parses incoming request origins via standard URL parsing (`new URL(origin).hostname`).
-   - Strictly allowlists: `chrome-extension://`, `127.0.0.1`, and `localhost`.
-   - Completely prevents Cross-Site WebSocket Hijacking (CSWSH) from malicious websites the user might browse.
+1. **WebSocket Origin Guard (`IsWebSocketOriginAllowed`)**:
+   - Governed by `IsWebSocketOriginAllowed` in `cli/bridge/connections.go`.
+   - Control WebSocket upgrades strictly block all web origins from browsers including `localhost` and `127.0.0.1` to prevent Cross-Site WebSocket Hijacking (CSWSH).
+   - Only permits Chrome Extension origins (`chrome-extension://<id>`) or internal loopback dialers without an Origin header (`Origin: ""`).
+   - Extension IDs can be optionally pinned via the `AGENT_PILOT_EXTENSION_ID` environment variable.
 2. **Dual-Layer Secret Redaction**:
-   - Automatically detects and masks with asterisks `*` across 12 credential types (OpenAI, Anthropic, Gemini, AWS, Stripe, GitHub, Slack, JWT, Bearer tokens, RSA/SSH/PGP private keys, URL parameters, and sensitive JSON keys).
-   - Defends against infinite recursion using a `WeakSet` (`[Circular]`).
-   - Redacts at the Service Worker level before network transmission and redundantly at the Go server level before returning payloads to LLMs.
+   - Automatically detects and masks with asterisks `*` using **13 dedicated regex patterns** (including Private Keys RSA/EC/SSH/PGP, OpenAI, Anthropic, Google, GitHub, AWS, Stripe, Slack, JWT, Bearer tokens, URL Basic Auth credentials `https://user:password@host` at pattern #11, URL query parameters, and sensitive key-values) along with a dictionary of 23 sensitive property keys (`sensitivePropRegex`).
+   - Defends against infinite recursion using a `WeakSet` (`[Circular]`) and recursion depth limits (`maxSanitizeDepth = 64`).
+   - Redacts at the Service Worker level before network transmission and redundantly at the Go server level (`SanitizeData`) before returning payloads to LLMs.
 3. **Strict Isolation Between Main World & Content Script**:
    - `main-world-bridge.js` runs in the webpage context (`world: "MAIN"`), exposing `window.__AGENT_PILOT__` without any `chrome.*` privilege.
    - Communicates with the extension strictly via custom DOM events (`__AGENT_PILOT_REQ__` and `__AGENT_PILOT_RES__`).
 4. **Tab-Level Mutex Lock**:
    - `runWithTabLock` serializes concurrent operations, preventing race conditions between parallel agent commands and user input on the same tab.
-5. **Bridge Trust Model**:
-   - The Bridge binds strictly to `127.0.0.1:58765`. Its origin allowlist permits `localhost`, `127.0.0.1`, and `chrome-extension://`. However, it does not require an authentication token; any local process on the machine can connect. Run only trusted local software and never expose this port to an external network.
+5. **Bridge Trust & Authentication Model**:
+   - The Bridge binds strictly to `127.0.0.1:58765`. By default, authentication is optional for developer convenience in local development.
+   - For enhanced security, authentication is fully supported via the `AGENT_PILOT_API_KEY` environment variable (verified via `X-Agent-Pilot-Key` or `Authorization: Bearer <token>` for HTTP endpoints, and via the initial `HANDSHAKE` frame for WebSocket connections), along with optional extension ID pinning via `AGENT_PILOT_EXTENSION_ID` (see `cli/bridge/auth.go`).

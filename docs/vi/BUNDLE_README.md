@@ -17,11 +17,11 @@ Mỗi gói phát hành (Release Bundle) của **Agent Pilot** được đóng g�
 Khi chạy `npm run pack:bundle` (hoặc `npm run pack:bundle:ubuntu`, `npm run pack:bundle:macos`, `npm run pack:bundle:windows`), hệ thống tạo ra 3 gói `.zip` tại `dist/bundles/` với cấu trúc:
 
 ```text
-agent-pilot-{{VERSION}}-{{PLATFORM}}/
+agent-pilot-v1.3.0-<os>/
 ├── extensions/            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome (Load unpacked)
 ├── install.sh / .ps1      Script cài đặt 1 lệnh theo đúng hệ điều hành
-├── skills/agent-pilot/    Agent Skill + scripts/{{BINARY_NAME}} native CLI/MCP
-└── README.md              Bản hướng dẫn đã được biên dịch riêng cho {{PLATFORM}}
+├── skills/agent-pilot/    Agent Skill + scripts/agent-pilot(.exe) native CLI/MCP
+└── README.md              Bản hướng dẫn đã được biên dịch riêng cho hệ điều hành tương ứng
 ```
 
 ---

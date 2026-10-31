@@ -1,19 +1,19 @@
-# 🐧 Agent Pilot {{VERSION}} — Ubuntu / Linux ({{PLATFORM}})
+# 🐧 Agent Pilot — Ubuntu / Linux Setup Guide
 
-Dedicated installation bundle for **Ubuntu / Debian / Linux ({{ARCH}})**, packaging the Chrome Extension, static MCP Server binary, and Agent Skill:
+Dedicated installation bundle for **Ubuntu / Debian / Linux (x86_64 / amd64)**, packaging the Chrome Extension, static MCP Server binary, and Agent Skill:
 
 ```text
-agent-pilot-{{VERSION}}-{{PLATFORM}}/
+agent-pilot-v1.3.0-linux/
 ├── extensions/            Chrome Extension (Manifest V3) — loaded unpacked in Chrome/Chromium
 ├── install.sh             1-step automated installation script for Ubuntu/Linux
-├── skills/agent-pilot/    Agent Skill + scripts/{{BINARY_NAME}} native binary
+├── skills/agent-pilot/    Agent Skill + scripts/agent-pilot native binary
 └── README.md              Documentation for Ubuntu/Linux
 ```
 
 ## System Requirements
-- **OS**: Ubuntu 20.04+ / Debian / Linux ({{ARCH}}) with `systemd`
+- **OS**: Ubuntu 20.04+ / Debian / Linux (amd64) with `systemd`
 - **Browser**: Google Chrome 116+, Chromium, Brave, or Microsoft Edge (Side Panel API support)
-- **Dependencies**: Zero runtime dependencies (`skills/agent-pilot/scripts/{{BINARY_NAME}}` is statically linked `CGO_ENABLED=0`)
+- **Dependencies**: Zero runtime dependencies (`skills/agent-pilot/scripts/agent-pilot` is statically linked `CGO_ENABLED=0`)
 
 ---
 
@@ -45,8 +45,8 @@ The `install.sh` script automatically:
 ```bash
 # Make binary executable and copy to ~/.local/bin
 mkdir -p ~/.local/bin
-chmod +x ./skills/agent-pilot/scripts/{{BINARY_NAME}}
-cp ./skills/agent-pilot/scripts/{{BINARY_NAME}} ~/.local/bin/agent-pilot
+chmod +x ./skills/agent-pilot/scripts/agent-pilot
+cp ./skills/agent-pilot/scripts/agent-pilot ~/.local/bin/agent-pilot
 
 # Ensure ~/.local/bin is in PATH
 export PATH="$HOME/.local/bin:$PATH"

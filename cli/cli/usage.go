@@ -24,6 +24,7 @@ CÁC LỆNH HỖ TRỢ:
   server [--port 58765]         Khởi chạy Bridge Server nền lắng nghe kết nối từ Extension
   service <action>              Quản lý service chạy ngầm (install, uninstall, start, stop, restart, status)
   skill install [tùy chọn]      Cài skill agent-pilot vào thư mục skills (~/.agents/skills)
+  export-mcp [output-dir]       Xuất JSON schemas của các công cụ MCP vào thư mục
   version [--json|--short]      Hiển thị thông tin phiên bản Agent Pilot CLI
 
 THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT / AGENT):
@@ -58,6 +59,7 @@ THAO TÁC TRỰC TIẾP TRÊN TRÌNH DUYỆT (DÀNH CHO TESTER / QC / SCRIPT / A
   evaluate <script>             Thực thi mã JavaScript (-f <file>, stdin, hoặc string; Alias: eval)
   tabs                          Liệt kê danh sách tất cả các tab đang mở (Alias: list, ls)
   batch <script.json>           Thực thi chuỗi hành động automation từ file JSON
+  recorder <operation>          Ghi, phát lại và quản lý luồng thao tác (start, stop, replay, export, import, measure)
   feedback [list|wait]          Xem danh sách hoặc chờ phản hồi từ người dùng
 
 TÙY CHỌN BỔ SUNG:
@@ -97,7 +99,7 @@ VÍ DỤ NHANH:
   agent-pilot eval -f script.js --tab 1734672950
   cat script.js | agent-pilot eval --tab 1734672950
   agent-pilot screenshot -o step_1.png --step "1/7" --title "Mở trang chủ" --desc "Kiểm tra giao diện ban đầu" --highlight "@1"
-  agent-pilot click -x 733 -y 668 --via cdp --tab 1734672950
+  agent-pilot click --x 733 --y 668 --via cdp --tab 1734672950
   agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --via cdp --tab 1734672950
   agent-pilot cdp status --tab 1734672950
   agent-pilot skill install

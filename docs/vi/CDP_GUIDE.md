@@ -113,7 +113,7 @@ await sendCdpCommand(tabId, "Input.dispatchMouseEvent", {
 
 > [!IMPORTANT]
 > **Khi nào BẮT BUỘC dùng CDP Input?** Trang thường (DOM) có thể dùng synthetic mặc định. Với **cross-origin iframe / canvas / WebGL**, synthetic event không vượt được ranh giới origin nên phải dùng CDP Input.
-> - CLI: `agent-pilot click -x 733 -y 668 --via cdp --tab <id>` và `agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --hold 800 --via cdp --tab <id>`
+> - CLI: `agent-pilot click --x 733 --y 668 --via cdp --tab <id>` và `agent-pilot drag --from-x 745 --from-y 490 --to-x 745 --to-y 832 --steps 10 --hold 800 --via cdp --tab <id>`
 > - `--via synthetic` (mặc định, giữ nguyên hành vi cũ) · `--via cdp` (trusted, không fallback) · `--via auto` (thử CDP, tự động fallback synthetic).
 > - Kiểm tra trước khi chạy: `agent-pilot cdp status --tab <id>`.
 >

@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Static reference template for macOS launchd agent.
+  NOTE: It is strongly recommended to run 'agent-pilot service install' instead,
+  which automatically detects your user environment, paths, and configures the service correctly.
+-->
 <plist version="1.0">
 <dict>
     <key>Label</key>

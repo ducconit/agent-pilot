@@ -38,7 +38,7 @@ sequenceDiagram
 | **Stage 1** | **Intent Dispatch** | The AI agent translates a natural language prompt into a structured browser action via the standalone CLI or Model Context Protocol (MCP). |
 | **Stage 2** | **Bridge Routing** | The local background daemon receives the action, manages concurrency locks across parallel agents, and routes the instruction to the active Chrome profile. |
 | **Stage 3** | **Dual-Engine Execution** | The Chrome Extension determines the optimal execution strategy: fast in-page DOM simulation (with virtual neon cursor trajectories) for standard web elements, or Chrome DevTools Protocol (CDP) escalation for iframes, Canvas, WebGL, and network/heap profiling. |
-| **Stage 4** | **Sanitization & Feedback** | Before returning data to the AI model, the built-in 29-rule Secret Sanitizer masks API keys, passwords, JWTs, and private keys in both DOM snapshots and console logs. |
+| **Stage 4** | **Sanitization & Feedback** | Before returning data to the AI model, the built-in Secret Sanitizer (13 dedicated regex patterns & 23 sensitive property keys) masks API keys, passwords, JWTs, Basic Auth credentials, and private keys in both DOM snapshots and console logs. |
 
 ---
 
@@ -129,7 +129,7 @@ flowchart LR
    - Maintain bilingual parity (English & Vietnamese) when updating documentation.
 4. **Verify Quality Gates**:
    - **Zero Regressions**: All existing browser automation, CDP, and bridge tests must pass.
-   - **Secret Protection**: All 29 secret redaction rules must remain intact.
+   - **Secret Protection**: All 13 dedicated regex patterns and sensitive key redaction rules must remain intact.
    - **Clean Formatting**: Follow Conventional Commit naming (`feat:`, `fix:`, `docs:`, `refactor:`) for clear release history.
 5. **Submit a Pull Request**: Open a Pull Request against `main` with a clear summary of the problem solved, the approach taken, and verification results.
 

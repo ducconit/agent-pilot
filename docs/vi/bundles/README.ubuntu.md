@@ -1,19 +1,19 @@
-# 🐧 Agent Pilot {{VERSION}} — Bản Ubuntu / Linux ({{PLATFORM}})
+# 🐧 Agent Pilot — Hướng Dẫn Cài Đặt Trên Ubuntu / Linux
 
-Gói cài đặt chuyên biệt dành cho **Ubuntu / Debian / Linux ({{ARCH}})**, tích hợp sẵn Chrome Extension, MCP Server tĩnh và Agent Skill:
+Gói cài đặt chuyên biệt dành cho **Ubuntu / Debian / Linux (x86_64 / amd64)**, tích hợp sẵn Chrome Extension, MCP Server tĩnh và Agent Skill:
 
 ```text
-agent-pilot-{{VERSION}}-{{PLATFORM}}/
+agent-pilot-v1.3.0-linux/
 ├── extensions/            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome/Chromium
 ├── install.sh             Script cài đặt tự động 1 lệnh cho Ubuntu/Linux
-├── skills/agent-pilot/    Agent Skill + scripts/{{BINARY_NAME}} native binary
+├── skills/agent-pilot/    Agent Skill + scripts/agent-pilot native binary
 └── README.md              Tài liệu hướng dẫn cho Ubuntu/Linux
 ```
 
 ## Yêu cầu hệ thống
-- **Hệ điều hành**: Ubuntu 20.04+ / Debian / Linux ({{ARCH}}) có `systemd`
+- **Hệ điều hành**: Ubuntu 20.04+ / Debian / Linux (amd64) có `systemd`
 - **Trình duyệt**: Google Chrome 116+, Chromium, Brave hoặc Microsoft Edge (hỗ trợ Side Panel API)
-- **Phụ thuộc**: Không cần cài Node.js hay Go (`skills/agent-pilot/scripts/{{BINARY_NAME}}` được biên dịch tĩnh `CGO_ENABLED=0`)
+- **Phụ thuộc**: Không cần cài Node.js hay Go (`skills/agent-pilot/scripts/agent-pilot` được biên dịch tĩnh `CGO_ENABLED=0`)
 
 ---
 
@@ -49,8 +49,8 @@ truyền đúng `PATH`.
 ```bash
 # Cấp quyền thực thi và cài vào ~/.local/bin (hoặc /usr/local/bin nếu muốn dùng toàn hệ thống)
 mkdir -p ~/.local/bin
-chmod +x ./skills/agent-pilot/scripts/{{BINARY_NAME}}
-cp ./skills/agent-pilot/scripts/{{BINARY_NAME}} ~/.local/bin/agent-pilot
+chmod +x ./skills/agent-pilot/scripts/agent-pilot
+cp ./skills/agent-pilot/scripts/agent-pilot ~/.local/bin/agent-pilot
 
 # Đảm bảo ~/.local/bin nằm trong PATH (thêm vào ~/.bashrc nếu chưa có)
 export PATH="$HOME/.local/bin:$PATH"
