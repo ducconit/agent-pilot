@@ -1399,8 +1399,20 @@ export async function captureTabScreenshot(tabId, params = {}) {
 
   // If targetTab is running in background or CDP is attached or full page requested, capture via CDP
   if (!isTabActive || attachedTabs.has(tabId) || isFullPage) {
+    let attachRes = null;
     if (!attachedTabs.has(tabId)) {
-      await attachDebugger(tabId).catch((err) => logDebug("attachDebugger in screenshot", err));
+      attachRes = await attachDebugger(tabId).catch((err) => ({
+        success: false,
+        error: err && err.message ? err.message : String(err)
+      }));
+      if (!attachedTabs.has(tabId)) {
+        // Allow transient debugger detach/attach transition to settle
+        await new Promise((r) => setTimeout(r, 200));
+        attachRes = await attachDebugger(tabId).catch((err) => ({
+          success: false,
+          error: err && err.message ? err.message : String(err)
+        }));
+      }
     }
 
     if (attachedTabs.has(tabId)) {
@@ -1469,7 +1481,7 @@ export async function captureTabScreenshot(tabId, params = {}) {
         }
       }
     } else if (!isTabActive) {
-      throw new Error(`Cannot capture background tab ${tabId}: CDP debugger attachment failed`);
+      throw new Error(`Cannot capture background tab ${tabId}: CDP debugger attachment failed${attachRes?.error ? ` (${attachRes.error})` : ""}`);
     }
   }
 

@@ -169,6 +169,22 @@ export async function run(ctx) {
     };
   });
 
+  // Test Reconnect Bridge Button (#btn-reconnect-bridge): triggers loading state and disables
+  const reconnectBtnTest = await sidepanelPage.evaluate(async () => {
+    const btn = document.getElementById("btn-reconnect-bridge");
+    if (!btn) return { exists: false, loadingTriggered: false };
+    const initialText = btn.textContent.trim();
+    btn.click();
+    const loadingText = btn.textContent.trim();
+    const isDisabled = btn.disabled;
+    return {
+      exists: true,
+      initialText,
+      loadingText,
+      loadingTriggered: isDisabled === true && loadingText.includes("Đang nối")
+    };
+  });
+
   const sidepanelOk = sidepanelCheck.brand === "AGENT PILOT" &&
                       sidepanelCheck.hasBetaBadge === true &&
                       sidepanelCheck.brandSub === "Next-Gen AI Browser Companion" &&
@@ -186,8 +202,9 @@ export async function run(ctx) {
                       sidepanelCheck.captureElementText === "🎯 Chụp phần tử" &&
                       sidepanelCheck.hasAutoCopySwitch === true &&
                       guideTest.opened === true &&
-                      guideTest.singleTab === true;
-  record("8. Side Panel Control Center UI (5-Format Eyedropper, Beta Badge, Slogan, Slim Scrollbar & Overview Copy All)", sidepanelOk, `Eyedropper 5 Formats: ${colorFormatTest.success} (OKLCH: ${colorFormatTest.valOklch}), CopyBtns: ${sidepanelCheck.colorFormats.copyBtnsCount}, Slogan: "${sidepanelCheck.brandSub}"`);
+                      guideTest.singleTab === true &&
+                      reconnectBtnTest.loadingTriggered === true;
+  record("8. Side Panel Control Center UI (5-Format Eyedropper, Beta Badge, Slogan, Slim Scrollbar & Overview Copy All)", sidepanelOk, `Eyedropper 5 Formats: ${colorFormatTest.success} (OKLCH: ${colorFormatTest.valOklch}), CopyBtns: ${sidepanelCheck.colorFormats.copyBtnsCount}, Slogan: "${sidepanelCheck.brandSub}", ReconnectBtnLoading: ${reconnectBtnTest.loadingTriggered}`);
 
   // Keep sidepanelPage open to test Extension IPC messaging in later sections.
   ctx.sidepanelPage = sidepanelPage;

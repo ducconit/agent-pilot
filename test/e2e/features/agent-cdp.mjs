@@ -29,4 +29,8 @@ export async function run({ sendAgentCommand, testPage, tabId, record }) {
     statusRes?.attached === true && detachRes?.success === true && postDetachStatus?.attached === false,
     `Initial attached: ${statusRes?.attached}, Detached: ${detachRes?.success}, Post-detach attached: ${postDetachStatus?.attached}`
   );
+
+  // Restore active CDP session on tabId for subsequent background operations
+  await sendAgentCommand("cdp.attach", { tabId });
+  await sleep(200);
 }

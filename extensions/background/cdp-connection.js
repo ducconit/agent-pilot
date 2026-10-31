@@ -132,67 +132,68 @@ export async function attachDebugger(tabId, broadcastFn = null) {
   }
 
   const attachPromise = (async () => {
+    if (attachedTabs.has(tabId)) return { success: true, message: "Already attached" };
+
+    // Guard: reject attaching to restricted internal schemes
     try {
-      if (attachedTabs.has(tabId)) return { success: true, message: "Already attached" };
-
-      // Guard: reject attaching to restricted internal schemes
-      try {
-        if (typeof chrome !== "undefined" && chrome.tabs?.get) {
-          const tab = await chrome.tabs.get(tabId);
-          if (tab?.url && /^(?:chrome|chrome-extension|devtools|edge|brave):/i.test(tab.url)) {
-            return { success: false, error: `Cannot attach debugger to restricted internal page (${tab.url})` };
-          }
+      if (typeof chrome !== "undefined" && chrome.tabs?.get) {
+        const tab = await chrome.tabs.get(tabId);
+        if (tab?.url && /^(?:chrome|chrome-extension|devtools|edge|brave):/i.test(tab.url)) {
+          return { success: false, error: `Cannot attach debugger to restricted internal page (${tab.url})` };
         }
-      } catch (_) {}
-
-      await reconcileDebuggerState();
-      if (attachedTabs.has(tabId)) {
-        return { success: true, message: "Reconciled existing session", reconciled: true };
       }
+    } catch (_) {}
 
-      return await new Promise((resolve) => {
-        chrome.debugger.attach({ tabId }, CDP_PROTOCOL_VERSION, async () => {
-          if (chrome.runtime.lastError) {
-            const errorMessage = chrome.runtime.lastError.message || "Failed to attach debugger";
-            if (/already attached/i.test(errorMessage)) {
-              // Might be our own session surviving a service-worker restart
-              const owned = await probeOwnedDebuggerSession(tabId);
-              if (owned) {
-                attachedTabs.add(tabId);
-                getBuffer(tabId);
-                await enableCdpDomains(tabId);
-                if (typeof broadcastFn === "function") {
-                  broadcastFn({ type: "DEBUGGER_STATUS_CHANGED", tabId, attached: true, reconciled: true });
-                }
-                resolve({ success: true, tabId, reconciled: true });
-                return;
-              }
-            }
-            resolve({ success: false, error: errorMessage });
-            return;
-          }
-
-          attachedTabs.add(tabId);
-          getBuffer(tabId);
-          await enableCdpDomains(tabId);
-
-          if (typeof broadcastFn === "function") {
-            broadcastFn({
-              type: "DEBUGGER_STATUS_CHANGED",
-              tabId,
-              attached: true
-            });
-          }
-
-          resolve({ success: true, tabId });
-        });
-      });
-    } finally {
-      inFlightAttaches.delete(tabId);
+    await reconcileDebuggerState();
+    if (attachedTabs.has(tabId)) {
+      return { success: true, message: "Reconciled existing session", reconciled: true };
     }
+
+    return await new Promise((resolve) => {
+      chrome.debugger.attach({ tabId }, CDP_PROTOCOL_VERSION, async () => {
+        if (chrome.runtime.lastError) {
+          const errorMessage = chrome.runtime.lastError.message || "Failed to attach debugger";
+          if (/already attached/i.test(errorMessage)) {
+            // Might be our own session surviving a service-worker restart
+            const owned = await probeOwnedDebuggerSession(tabId);
+            if (owned) {
+              attachedTabs.add(tabId);
+              getBuffer(tabId);
+              await enableCdpDomains(tabId);
+              if (typeof broadcastFn === "function") {
+                broadcastFn({ type: "DEBUGGER_STATUS_CHANGED", tabId, attached: true, reconciled: true });
+              }
+              resolve({ success: true, tabId, reconciled: true });
+              return;
+            }
+          }
+          resolve({ success: false, error: errorMessage });
+          return;
+        }
+
+        attachedTabs.add(tabId);
+        getBuffer(tabId);
+        await enableCdpDomains(tabId);
+
+        if (typeof broadcastFn === "function") {
+          broadcastFn({
+            type: "DEBUGGER_STATUS_CHANGED",
+            tabId,
+            attached: true
+          });
+        }
+
+        resolve({ success: true, tabId });
+      });
+    });
   })();
 
   inFlightAttaches.set(tabId, attachPromise);
+  attachPromise.finally(() => {
+    if (inFlightAttaches.get(tabId) === attachPromise) {
+      inFlightAttaches.delete(tabId);
+    }
+  });
   return attachPromise;
 }
 
@@ -208,34 +209,35 @@ export async function detachDebugger(tabId, broadcastFn = null) {
   }
 
   const detachPromise = (async () => {
-    try {
-      if (!attachedTabs.has(tabId)) return { success: true };
-      return await new Promise((resolve) => {
-        chrome.debugger.detach({ tabId }, () => {
-          if (chrome.runtime.lastError) {
-            const errorMessage = chrome.runtime.lastError.message || "Failed to detach debugger";
-            if (!/not attached|no debugger/i.test(errorMessage)) {
-              resolve({ success: false, error: errorMessage });
-              return;
-            }
+    if (!attachedTabs.has(tabId)) return { success: true };
+    return await new Promise((resolve) => {
+      chrome.debugger.detach({ tabId }, () => {
+        if (chrome.runtime.lastError) {
+          const errorMessage = chrome.runtime.lastError.message || "Failed to detach debugger";
+          if (!/not attached|no debugger/i.test(errorMessage)) {
+            resolve({ success: false, error: errorMessage });
+            return;
           }
-          cleanupDebuggerState(tabId);
-          if (typeof broadcastFn === "function") {
-            broadcastFn({
-              type: "DEBUGGER_STATUS_CHANGED",
-              tabId,
-              attached: false
-            });
-          }
-          resolve({ success: true });
-        });
+        }
+        cleanupDebuggerState(tabId);
+        if (typeof broadcastFn === "function") {
+          broadcastFn({
+            type: "DEBUGGER_STATUS_CHANGED",
+            tabId,
+            attached: false
+          });
+        }
+        resolve({ success: true });
       });
-    } finally {
-      inFlightDetaches.delete(tabId);
-    }
+    });
   })();
 
   inFlightDetaches.set(tabId, detachPromise);
+  detachPromise.finally(() => {
+    if (inFlightDetaches.get(tabId) === detachPromise) {
+      inFlightDetaches.delete(tabId);
+    }
+  });
   return detachPromise;
 }
 

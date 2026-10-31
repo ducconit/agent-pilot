@@ -429,9 +429,18 @@ const BACKGROUND_ACTION_HANDLERS = {
     return { success: true, authConfigured: Boolean(request.apiKey && String(request.apiKey).trim()) };
   },
 
-  reconnect_agent_bridge: () => {
-    if (agentBridge) agentBridge.reconnect();
-    return { success: true };
+  reconnect_agent_bridge: (request) => {
+    if (agentBridge) {
+      if (request && request.port) {
+        const p = Number(request.port);
+        if (p > 1024 && p < 65536 && p !== agentBridge.port) {
+          agentBridge.setPort(p);
+          return { success: true, status: agentBridge.getStatus() };
+        }
+      }
+      agentBridge.reconnect();
+    }
+    return { success: true, status: agentBridge ? agentBridge.getStatus() : null };
   },
 
   toggle_agent_bridge: (request) => {

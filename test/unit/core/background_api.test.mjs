@@ -2552,6 +2552,72 @@ record(
   `rawXml=${rawXmlIsHtml}(${rawXmlTotalInjected}), xmlViewer=${xmlViewerIsHtml}(init=${xmlViewerInitialInjected},active=${xmlViewerAfterActivate},xhtml=${xmlViewerAllHaveXhtmlNamespace}), htmlInit=${htmlInitialInjected}`
 );
 
+// 48. Agent bridge transport broadcasts AGENT_BRIDGE_STATUS_CHANGED on ws.onopen and ws.onclose
+const broadcastEvents = [];
+const mockWsClient = {
+  port: 58765,
+  enabled: true,
+  connected: false,
+  reconnectDelay: 1000,
+  maxReconnectDelay: 30000,
+  outboundQueue: [],
+  maxQueueSize: 100,
+  ws: null,
+  clearReconnect: () => {},
+  scheduleReconnect: () => {}
+};
+Object.assign(mockWsClient, transportMethods);
+mockWsClient.setBroadcastFn((ev) => broadcastEvents.push(ev));
+
+let createdMockWs = null;
+class MockWebSocket {
+  constructor(url) {
+    this.url = url;
+    this.readyState = 0;
+    createdMockWs = this;
+  }
+  close() {
+    this.readyState = 3;
+    if (this.onclose) this.onclose();
+  }
+}
+MockWebSocket.OPEN = 1;
+MockWebSocket.CONNECTING = 0;
+MockWebSocket.CLOSING = 2;
+MockWebSocket.CLOSED = 3;
+globalThis.WebSocket = MockWebSocket;
+
+mockWsClient.connect();
+const connectCreatedWs = createdMockWs !== null && mockWsClient.ws === createdMockWs;
+
+let openBroadcastReceived = false;
+if (createdMockWs && createdMockWs.onopen) {
+  createdMockWs.readyState = 1;
+  createdMockWs.onopen();
+  openBroadcastReceived = broadcastEvents.some(
+    (e) => e.type === "AGENT_BRIDGE_STATUS_CHANGED" && e.status?.connected === true && e.status?.port === 58765
+  );
+}
+
+let closeBroadcastReceived = false;
+if (createdMockWs && createdMockWs.onclose) {
+  createdMockWs.readyState = 3;
+  createdMockWs.onclose();
+  closeBroadcastReceived = broadcastEvents.some(
+    (e) => e.type === "AGENT_BRIDGE_STATUS_CHANGED" && e.status?.connected === false
+  );
+}
+
+record(
+  "48. Agent bridge transport broadcasts AGENT_BRIDGE_STATUS_CHANGED on ws.onopen (connected: true) and ws.onclose (connected: false)",
+  connectCreatedWs && openBroadcastReceived && closeBroadcastReceived,
+  `createdWs=${connectCreatedWs}, openBroadcast=${openBroadcastReceived}, closeBroadcast=${closeBroadcastReceived}, events=${broadcastEvents.length}`
+);
+
+// Cleanup mock client to prevent any reconnect timers from holding Node event loop
+mockWsClient.enabled = false;
+mockWsClient.clearReconnect();
+
 } catch (err) {
   console.error("❌ Exception during test:", err);
   process.exitCode = 1;

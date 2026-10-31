@@ -252,6 +252,20 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
     }
   });
 
+  // Keep background service worker alive and connected while Side Panel is active
+  function maintainKeepAlivePort() {
+    try {
+      if (!chrome.runtime || !chrome.runtime.connect) return;
+      const port = chrome.runtime.connect({ name: "agent-pilot-keepalive" });
+      port.onDisconnect.addListener(() => {
+        setTimeout(maintainKeepAlivePort, 2000);
+      });
+    } catch (_) {
+      setTimeout(maintainKeepAlivePort, 2000);
+    }
+  }
+  maintainKeepAlivePort();
+
   // =========================================================================
   // 4. Initial Bootstrap
   // =========================================================================

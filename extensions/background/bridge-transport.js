@@ -130,6 +130,7 @@ export const transportMethods = {
         if (this.ws !== ws) return;
         this.connected = true;
         this.reconnectDelay = BRIDGE.RECONNECT_BASE_MS;
+        this.broadcastStatus();
         await platformPromise;
 
         const ua = navigator.userAgent || "";
@@ -147,7 +148,7 @@ export const transportMethods = {
           details: {
             browser: browserName,
             os: currentPlatform,
-            extensionId: chrome.runtime?.id || "",
+            extensionId: (typeof chrome !== "undefined" && chrome.runtime?.id) || "",
             extensionVersion: EXTENSION_VERSION,
             extensionBuildId: EXTENSION_BUILD_ID,
             bridgePort: this.port,
@@ -158,10 +159,10 @@ export const transportMethods = {
           }
         });
 
-        if (chrome.tabs && chrome.tabs.query) {
+        if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.query) {
           chrome.tabs.query({ active: true, lastFocusedWindow: true }, (activeTabs) => {
             const currentTab = activeTabs && activeTabs[0];
-            if (chrome.windows && chrome.windows.getAll) {
+            if (typeof chrome !== "undefined" && chrome.windows && chrome.windows.getAll) {
               chrome.windows.getAll((windows) => {
                 this.send({
                   type: "WINDOW_FOCUS",
@@ -198,6 +199,7 @@ export const transportMethods = {
     } catch (err) {
       this.ws = null;
       this.connected = false;
+      this.broadcastStatus();
       this.scheduleReconnect();
     }
   },
@@ -258,7 +260,9 @@ export const transportMethods = {
 
     // Bounded queue prevents async responses from disappearing during reconnect.
     if (!this.enabled) return;
-    if (this.outboundQueue.length >= this.maxQueueSize) {
+    if (!Array.isArray(this.outboundQueue)) this.outboundQueue = [];
+    const maxQueue = this.maxQueueSize || LIMITS.OUTBOUND_QUEUE_MAX;
+    if (this.outboundQueue.length >= maxQueue) {
       this.outboundQueue.shift();
       console.warn("[AgentPilot] Outbound queue full; dropped oldest message");
     }
@@ -266,7 +270,7 @@ export const transportMethods = {
   },
 
   flushOutboundQueue() {
-    if (!this.outboundQueue.length) return;
+    if (!Array.isArray(this.outboundQueue) || !this.outboundQueue.length) return;
     const queued = this.outboundQueue;
     this.outboundQueue = [];
     for (let index = 0; index < queued.length; index++) {

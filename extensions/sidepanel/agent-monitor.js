@@ -38,6 +38,8 @@ export class AgentMonitor {
 
     this.agentActivityTotal = 0;
     this.rawLogs = [];
+    this.isReconnecting = false;
+    this.reconnectTimeout = null;
 
     this.bindEvents();
 
@@ -103,8 +105,40 @@ export class AgentMonitor {
 
     if (this.btnReconnectBridge) {
       this.btnReconnectBridge.onclick = () => {
-        chrome.runtime.sendMessage({ action: "reconnect_agent_bridge" }, () => {
-          showToast("Đang kết nối lại AI Agent bridge...");
+        if (this.isReconnecting) return;
+        const port = Number(this.inputBridgePort?.value) || 58765;
+        this.isReconnecting = true;
+        this.btnReconnectBridge.disabled = true;
+        this.btnReconnectBridge.textContent = "⏳ Đang nối...";
+
+        if (this.agentBridgeText) {
+          this.agentBridgeText.textContent = `AI Agent: Đang nối (Port ${port})...`;
+          this.agentBridgeText.style.color = "var(--text-muted)";
+        }
+        showToast(`Đang kết nối lại AI Agent bridge (Cổng ${port})...`);
+
+        if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = setTimeout(() => {
+          if (this.isReconnecting) {
+            this.isReconnecting = false;
+            if (this.btnReconnectBridge) {
+              this.btnReconnectBridge.disabled = false;
+              this.btnReconnectBridge.textContent = "⚡ Nối";
+            }
+            showToast(`⚪ Chưa thể kết nối tới AI Agent tại cổng ${port}. Hãy đảm bảo service 'agent-pilot server' đang chạy.`);
+          }
+        }, 4500);
+
+        chrome.runtime.sendMessage({ action: "reconnect_agent_bridge", port }, () => {
+          if (chrome.runtime.lastError) {
+            if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+            this.isReconnecting = false;
+            if (this.btnReconnectBridge) {
+              this.btnReconnectBridge.disabled = false;
+              this.btnReconnectBridge.textContent = "⚡ Nối";
+            }
+            showToast(`✕ Lỗi kết nối Service Worker: ${chrome.runtime.lastError.message}`);
+          }
         });
       };
     }
@@ -219,14 +253,31 @@ export class AgentMonitor {
 
   updateBridgeUI(status) {
     if (!status) return;
+
+    if (this.isReconnecting) {
+      if (status.connected) {
+        if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+        this.isReconnecting = false;
+        if (this.btnReconnectBridge) {
+          this.btnReconnectBridge.disabled = false;
+          this.btnReconnectBridge.textContent = "⚡ Nối";
+        }
+        showToast(`✓ Đã kết nối thành công tới AI Agent (Cổng ${status.port || 58765})`);
+      }
+    } else if (this.btnReconnectBridge && this.btnReconnectBridge.disabled) {
+      this.btnReconnectBridge.disabled = false;
+      this.btnReconnectBridge.textContent = "⚡ Nối";
+    }
+
+    const currentPort = status.port || 58765;
     if (this.agentBridgeDot && this.agentBridgeText) {
       if (status.connected) {
         this.agentBridgeDot.className = "status-dot connected";
-        this.agentBridgeText.textContent = "AI Agent: Đã kết nối";
+        this.agentBridgeText.textContent = `AI Agent: Đã kết nối (Port ${currentPort})`;
         this.agentBridgeText.style.color = "var(--accent-green)";
-      } else {
+      } else if (!this.isReconnecting) {
         this.agentBridgeDot.className = "status-dot disconnected";
-        this.agentBridgeText.textContent = "AI Agent: Chờ kết nối";
+        this.agentBridgeText.textContent = `AI Agent: Chờ kết nối (Port ${currentPort})`;
         this.agentBridgeText.style.color = "var(--text-secondary)";
       }
     }
@@ -237,7 +288,7 @@ export class AgentMonitor {
     if (this.agentInfoPort && status.port) {
       this.agentInfoPort.textContent = `ws://127.0.0.1:${status.port}`;
     }
-    if (this.inputBridgePort && status.port) {
+    if (this.inputBridgePort && status.port && !this.isReconnecting) {
       this.inputBridgePort.value = status.port;
     }
     if (this.inputBridgeApiKey) {
