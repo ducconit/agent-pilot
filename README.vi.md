@@ -64,20 +64,19 @@ Dự án giúp các AI Coding Agent và kỹ sư QA/QC **điều khiển trình 
 
 ---
 
-## 🚀 Cài Đặt Nhanh (3 Bước)
+## 🚀 Cài Đặt & Khởi Động Nhanh
 
-```mermaid
-flowchart LR
-    A["<b>1. Cài Extension</b><br/>Tải thư mục extensions/ vào Chrome"] --> B["<b>2. Cài Đặt CLI</b><br/>Tải binary hoặc cài service"]
-    B --> C["<b>3. Kết Nối AI Agent</b><br/>Cấu hình MCP hoặc npx skills add"]
-```
+Agent Pilot cung cấp ba phương thức cài đặt:
 
-### Bước 1: Nạp Extension vào Chrome
-1. Tải bản phát hành mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot/releases).
-2. Mở Chrome → `chrome://extensions` → bật **Developer mode**.
-3. Bấm **Load unpacked** → chọn thư mục `extensions/` và ghim biểu tượng **Agent Pilot (📌)**.
+1. **🌟 Bộ Cài Đặt Theo Hệ Điều Hành (Khuyến Nghị)**: Tải gói phát hành riêng cho hệ điều hành của bạn kèm script cài đặt 1 bước (`./install.sh` hoặc `.\install.ps1`). Tự động cấu hình PATH và dịch vụ chạy ngầm (`systemd` / `launchd` / Windows service).
+2. **⚡ Cài Đặt Nhanh Cho AI Agent (`npx skills add`)**: Cài đặt tức thì chỉ với 1 dòng lệnh terminal cho các trợ lý AI coding (Claude Code, Cursor, Windsurf, Antigravity, OpenCode, Codex). *Lưu ý:* Gói đa nền tảng này chứa sẵn binary biên dịch cho **cả 3 hệ điều hành** (Linux, macOS, Windows) trong thư mục `skills/agent-pilot/scripts/`.
+3. **🛠️ Tự Biên Dịch Từ Mã Nguồn (Source Code)**: Dành cho lập trình viên muốn nghiên cứu, tùy biến backend Go hoặc tính năng Chrome extension.
 
-### Bước 2: Tải Binary CLI theo Hệ Điều Hành
+---
+
+### Bước 1: Cài Đặt Bằng Bộ Cài Theo Hệ Điều Hành (Khuyên Dùng)
+
+Tải gói cài đặt tối ưu cho hệ điều hành của bạn:
 
 | Hệ Điều Hành | Gói Phát Hành | Lệnh Cài Đặt Tự Động | Hướng Dẫn |
 | :--- | :--- | :--- | :--- |
@@ -85,18 +84,22 @@ flowchart LR
 | 🍎 **macOS** | `agent-pilot-*-macos.zip` | `./install.sh` | [README.macos.md](docs/bundles/README.macos.md) |
 | 🪟 **Windows** | `agent-pilot-*-windows.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` | [README.windows.md](docs/bundles/README.windows.md) |
 
-Khởi động dịch vụ chạy ngầm tự khởi động cùng máy:
+Script cài đặt sẽ đưa binary vào `PATH` và khởi động dịch vụ chạy ngầm:
 ```bash
-agent-pilot service install
 agent-pilot service status
 ```
 
-### Bước 3: Cấu Hình AI Agent
+### Bước 2: Nạp Extension vào Chrome
+1. Mở Chrome → `chrome://extensions` → bật **Developer mode**.
+2. Bấm **Load unpacked** → chọn thư mục `extensions/` và ghim biểu tượng **Agent Pilot (📌)**.
 
-#### Cách A: Cài Đặt Chuẩn Agent Skills ([skills.sh](https://skills.sh/))
+### Bước 3: Kết Nối Với AI Agent
+
+#### Cách A: Cài Đặt Nhanh Chuẩn Agent Skills ([skills.sh](https://skills.sh/))
 ```bash
 npx skills add https://github.com/ducconit/agent-pilot -g --all
 ```
+*(Gói đa nền tảng chứa sẵn binary cho Linux, macOS và Windows).*
 
 #### Cách B: Cấu Hình MCP Server (`stdio`)
 Thêm vào `claude_desktop_config.json`, `~/.gemini/antigravity/mcp/` hoặc Cursor Settings:
@@ -109,6 +112,14 @@ Thêm vào `claude_desktop_config.json`, `~/.gemini/antigravity/mcp/` hoặc Cur
     }
   }
 }
+```
+
+#### Cách C: Tự Biên Dịch Từ Mã Nguồn (Dành Cho Nhà Phát Triển)
+```bash
+git clone https://github.com/ducconit/agent-pilot.git
+cd agent-pilot
+go build -o bin/agent-pilot ./cli/cmd/agent-pilot
+./bin/agent-pilot service install
 ```
 
 ---

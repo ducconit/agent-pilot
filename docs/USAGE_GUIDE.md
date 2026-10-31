@@ -11,22 +11,63 @@ All architecture, Go CLI binaries, Chrome MV3 extension scripts, and MCP tooling
 
 ---
 
-## 1. Google Chrome Installation
+## 1. Installation & Environment Setup
 
-### Method A: Install from Release ZIP (Recommended)
-1. Download the latest release from [GitHub Releases](https://github.com/ducconit/agent-pilot/releases) (e.g. `agent-pilot-v1.3.0-linux.zip`, `agent-pilot-v1.3.0-macos.zip`, or `agent-pilot-v1.3.0-windows.zip`).
+Agent Pilot provides three installation methods suited to different needs:
+
+### Method A: Install from OS Release Bundle (Recommended)
+
+This is the **strongly recommended installation method** for end users and QA engineers. Each bundle is built specifically for your operating system, packaging only the single native binary for your OS, the unpacked Chrome extension, and an automated 1-step installer script:
+
+| Operating System | Release Archive | 1-Step Installer Command | Detailed Guide |
+| :--- | :--- | :--- | :--- |
+| 🐧 **Linux / Ubuntu** | `agent-pilot-*-linux.zip` | `./install.sh` | [README.ubuntu.md](/bundles/README.ubuntu) |
+| 🍎 **macOS** | `agent-pilot-*-macos.zip` | `./install.sh` | [README.macos.md](/bundles/README.macos) |
+| 🪟 **Windows** | `agent-pilot-*-windows.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` | [README.windows.md](/bundles/README.windows) |
+
+1. Download the latest release package matching your OS from [GitHub Releases](https://github.com/ducconit/agent-pilot/releases).
 2. Unpack the `.zip` archive to a permanent directory on your computer.
-3. Open Google Chrome and navigate to: `chrome://extensions`.
-4. Enable **Developer mode** toggle in the top-right corner.
-5. Click **Load unpacked** in the top-left → Select the unpacked folder.
-6. Click the Extensions puzzle icon in the Chrome toolbar and **Pin (📌)** the **Agent Pilot** icon.
+3. Run the OS installer script (`./install.sh` or `.\install.ps1`). This installs the standalone binary to your user `PATH` and registers the auto-starting background service (`systemd` / `launchd` / Windows service).
+4. Open Google Chrome and navigate to: `chrome://extensions`.
+5. Enable **Developer mode** toggle in the top-right corner.
+6. Click **Load unpacked** in the top-left → Select the `extensions/` folder from the unpacked bundle.
+7. Click the Extensions puzzle icon in the Chrome toolbar and **Pin (📌)** the **Agent Pilot** icon.
 
-### Method B: Install from Source Code
+### Method B: Quick Install for AI Agents (`npx skills add`)
+
+If you want to quickly integrate Agent Pilot into your AI coding agent (Claude Code, Cursor, Windsurf, Antigravity, OpenCode, Codex, Roo Code, etc.) without manually downloading archives:
+
+```bash
+# Install globally for all AI assistants on your computer
+npx skills add https://github.com/ducconit/agent-pilot -g --all
+
+# Or install for the current workspace only
+npx skills add https://github.com/ducconit/agent-pilot
+```
+
+> 💡 **Quick Install Note**: This method is tailored for **fast agent bootstrapping**. Because it must support any host machine immediately, the installed skill package contains pre-compiled binaries for **all 3 operating systems** (Linux `agent-pilot`, macOS `agent-pilot`, Windows `agent-pilot.exe`) in `skills/agent-pilot/scripts/`. For a lightweight, single-binary setup with native system daemon registration, prefer **Method A (OS Release Bundle)**.
+
+To load the Chrome extension, load the `extensions/` directory from the installed skill or release download via `chrome://extensions` (Load unpacked).
+
+### Method C: Build & Install from Source Code
+
+For developers, contributors, and those who want to customize Go CLI commands or Chrome MV3 extension scripts:
+
 1. Clone the repository:
    ```bash
    git clone https://github.com/ducconit/agent-pilot.git
+   cd agent-pilot
    ```
-2. Navigate to `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select:
+2. Build the Go CLI binary:
+   ```bash
+   go build -o bin/agent-pilot ./cli/cmd/agent-pilot
+   ```
+3. Install the background service:
+   ```bash
+   ./bin/agent-pilot service install
+   ./bin/agent-pilot service status
+   ```
+4. Navigate to `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select:
    ```
    /path/to/agent-pilot/extensions
    ```
@@ -466,3 +507,17 @@ npx skills add https://github.com/ducconit/agent-pilot
 # Install globally for all assistants on machine
 npx skills add https://github.com/ducconit/agent-pilot -g --all
 ```
+
+> 💡 **Notice on Binaries**: The `npx skills add` package includes pre-compiled binaries for all 3 supported operating systems (Linux, macOS, Windows) inside `skills/agent-pilot/scripts/` to enable rapid zero-configuration agent execution. If you prefer a trimmed single-binary installation with native system service integration, use the [OS Release Bundle](#method-a-install-from-os-release-bundle-recommended).
+
+---
+
+## 6. Questions & Answers (Q&A)
+
+For comprehensive explanations on architecture, token savings, and Web QA/QC testing workflows, consult the [Questions & Answers (Q&A)](/QA) guide.
+
+---
+
+## 7. Common Issues & Troubleshooting
+
+Encountering an issue with the local bridge, CDP debugger attachment, or system PATH? Consult the detailed [Troubleshooting & Diagnostics](/TROUBLESHOOTING) guide for step-by-step solutions.

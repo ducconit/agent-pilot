@@ -17,6 +17,8 @@ export default withMermaid(
           nav: [
             { text: 'Guide', link: '/USAGE_GUIDE' },
             { text: '💡 Prompt Recipes', link: '/PROMPT_RECIPES' },
+            { text: '❓ Q&A', link: '/QA' },
+            { text: '🔍 Troubleshooting', link: '/TROUBLESHOOTING' },
             {
               text: 'Developer 🛠️',
               items: [
@@ -41,6 +43,8 @@ export default withMermaid(
                 { text: '📖 Installation & Features', link: '/USAGE_GUIDE' },
                 { text: '💡 Sample Prompts & Recipes', link: '/PROMPT_RECIPES' },
                 { text: '🤖 AI Agent Setup (Skills, CLI & MCP)', link: '/ANTIGRAVITY_INTEGRATION' },
+                { text: '❓ Questions & Answers (Q&A)', link: '/QA' },
+                { text: '🔍 Troubleshooting & Issues', link: '/TROUBLESHOOTING' },
                 { text: '📦 OS Release Bundles', link: '/BUNDLE_README' },
                 { text: '🐧 Ubuntu / Linux Setup', link: '/bundles/README.ubuntu' },
                 { text: '🍎 macOS Setup', link: '/bundles/README.macos' },
@@ -93,6 +97,8 @@ export default withMermaid(
           nav: [
             { text: 'Hướng Dẫn', link: '/vi/USAGE_GUIDE' },
             { text: '💡 Prompt Mẫu', link: '/vi/PROMPT_RECIPES' },
+            { text: '❓ Hỏi Đáp (Q&A)', link: '/vi/QA' },
+            { text: '🔍 Lỗi Thường Gặp', link: '/vi/TROUBLESHOOTING' },
             {
               text: 'Lập Trình Viên 🛠️',
               items: [
@@ -117,6 +123,8 @@ export default withMermaid(
                 { text: '📖 Hướng Dẫn & Cài Đặt', link: '/vi/USAGE_GUIDE' },
                 { text: '💡 Prompt Mẫu & Kịch Bản AI', link: '/vi/PROMPT_RECIPES' },
                 { text: '🤖 Tích Hợp AI Agent (Skills, CLI & MCP)', link: '/vi/ANTIGRAVITY_INTEGRATION' },
+                { text: '❓ Hỏi & Đáp Thường Gặp (Q&A)', link: '/vi/QA' },
+                { text: '🔍 Lỗi Thường Gặp & Khắc Phục', link: '/vi/TROUBLESHOOTING' },
                 { text: '📦 Gói Cài Đặt Theo Hệ Điều Hành', link: '/vi/BUNDLE_README' },
                 { text: '🐧 Cài Đặt Trên Ubuntu / Linux', link: '/vi/bundles/README.ubuntu' },
                 { text: '🍎 Cài Đặt Trên macOS', link: '/vi/bundles/README.macos' },

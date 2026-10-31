@@ -64,21 +64,17 @@ It provides **effortless, token-efficient browser control**, empowering AI codin
 
 ---
 
-## 🚀 Quick Start (3 Steps)
+## 🚀 Quick Start & Installation
 
-```mermaid
-flowchart LR
-    A["<b>1. Load Extension</b><br/>Unpack extensions/ in Chrome"] --> B["<b>2. Install CLI / Service</b><br/>Download binary & start service"]
-    B --> C["<b>3. Connect AI Agent</b><br/>Configure MCP or npx skills add"]
-```
+Agent Pilot offers three installation methods:
 
-### Step 1: Load the Chrome Extension
-1. Download the latest release from [GitHub Releases](https://github.com/ducconit/agent-pilot/releases).
-2. Open Chrome and navigate to `chrome://extensions`.
-3. Enable **Developer mode** in the top-right corner.
-4. Click **Load unpacked**, select the `extensions/` directory, and pin the **Agent Pilot (📌)** icon.
+1. **🌟 OS-Specific Release Bundle (Recommended)**: Download the trimmed bundle for your OS with 1-step installer script (`./install.sh` or `.\install.ps1`). Sets up PATH and background service (`systemd` / `launchd` / Windows service) automatically.
+2. **⚡ Quick Install for AI Agents (`npx skills add`)**: Single terminal command to equip your AI coding assistant (Claude Code, Cursor, Windsurf, Antigravity, OpenCode, Codex). *Note:* This cross-platform skill package bundles pre-compiled binaries for **all 3 operating systems** (Linux, macOS, Windows) in `skills/agent-pilot/scripts/`.
+3. **🛠️ Build from Source Code**: For developers who want to modify Go backend code or Chrome extension scripts.
 
-### Step 2: Install the CLI & Service
+---
+
+### Step 1: Install via OS Release Bundle (Recommended)
 
 Download the pre-compiled bundle for your operating system:
 
@@ -88,18 +84,24 @@ Download the pre-compiled bundle for your operating system:
 | 🍎 **macOS** | `agent-pilot-*-macos.zip` | `./install.sh` | [README.macos.md](docs/bundles/README.macos.md) |
 | 🪟 **Windows** | `agent-pilot-*-windows.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` | [README.windows.md](docs/bundles/README.windows.md) |
 
-Register the background service to start automatically on login:
+The installer configures user `PATH` and starts the background daemon:
 ```bash
-agent-pilot service install
 agent-pilot service status
 ```
 
+### Step 2: Load the Chrome Extension
+1. Download or extract the `extensions/` directory from your release package.
+2. Open Chrome and navigate to `chrome://extensions`.
+3. Enable **Developer mode** toggle in the top-right corner.
+4. Click **Load unpacked**, select the `extensions/` directory, and pin the **Agent Pilot (📌)** icon.
+
 ### Step 3: Connect to Your AI Agent
 
-#### Option A: Agent Skills Ecosystem ([skills.sh](https://skills.sh/))
+#### Option A: Quick Install via Agent Skills ([skills.sh](https://skills.sh/))
 ```bash
 npx skills add https://github.com/ducconit/agent-pilot -g --all
 ```
+*(Multi-platform package containing binaries for Linux, macOS, and Windows).*
 
 #### Option B: MCP Server (`stdio`)
 Add Agent Pilot to your MCP configuration (`claude_desktop_config.json`, `~/.gemini/antigravity/mcp/`, or Cursor Settings):
@@ -112,6 +114,14 @@ Add Agent Pilot to your MCP configuration (`claude_desktop_config.json`, `~/.gem
     }
   }
 }
+```
+
+#### Option C: Build from Source Code (Developers)
+```bash
+git clone https://github.com/ducconit/agent-pilot.git
+cd agent-pilot
+go build -o bin/agent-pilot ./cli/cmd/agent-pilot
+./bin/agent-pilot service install
 ```
 
 ---

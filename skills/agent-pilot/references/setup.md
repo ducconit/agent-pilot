@@ -10,9 +10,19 @@ Agent Pilot consists of two core components:
 1. **Chrome Extension (Manifest V3)**: Injected into the browser to control DOM, mouse cursor, screenshots, and DevTools via CDP.
 2. **Standalone Go CLI & MCP Server (`agent-pilot`)**: High-performance local bridge running as a user background service on the configured port (default `58765`).
 
-### 1.1 Agent Skills Installation
+### 1.1 Rapid AI Agent Installation (`npx skills add`)
 
-The `agent-pilot` skill (SKILL.md + references + examples) is embedded in the standalone binary. Install it without cloning the repo:
+For quick integration into AI assistants without manual archive downloads:
+
+```bash
+npx skills add https://github.com/ducconit/agent-pilot -g --all
+```
+
+> 💡 **Notice**: The `npx skills add` package includes native binaries for all 3 supported operating systems (Linux, macOS, and Windows) in `skills/agent-pilot/scripts/` to ensure immediate out-of-the-box compatibility on any host machine. For a trimmed single-binary installation with native system daemon configuration (`systemd`/`launchd`/Windows service), use the [OS-Specific Release Bundle](#2-os-specific-all-in-one-bundle-installation-recommended).
+
+### 1.2 Standalone Skill CLI Installation
+
+The `agent-pilot` skill (SKILL.md + references + examples) is also embedded in the standalone binary. If you already have the binary on your PATH, install it without cloning the repo:
 
 ```bash
 agent-pilot skill install                # ~/.agents/skills/agent-pilot (default)

@@ -18,7 +18,7 @@ Chào mừng bạn đến với **Agent Pilot** – Tiện ích mở rộng đi�
 ## 2. Cách Khởi Động Bảng Điều Khiển (Side Panel)
 
 - **Cách 1 (Nhanh & tiện nhất)**: Nhấp chuột trực tiếp vào biểu tượng **Agent Pilot (📌)** trên thanh công cụ trình duyệt. Bảng điều khiển sẽ trượt mở tức thì ở cạnh phải màn hình.
-- **Cách 2 (Menu chuột phải)**: Nhấp chuột phải vào bất kỳ vị trí nào trên trang web $\rightarrow$ Chọn **Mở Agent Pilot (Side Panel)**.
+- **Cách 2 (Menu chuột phải)**: Nhấp chuột phải vào bất kỳ vị trí nào trên trang web → Chọn **Mở Agent Pilot (Side Panel)**.
 
 > 💡 **Tùy chỉnh phím tắt theo ý muốn**: Để tránh xung đột với phím tắt hệ thống (như rofi, i3wm, hệ điều hành), tiện ích không gán phím tắt mặc định. Nếu bạn muốn dùng phím tắt, hãy mở `chrome://extensions/shortcuts` và gán bất kỳ tổ hợp phím nào bạn thuận tay!
 

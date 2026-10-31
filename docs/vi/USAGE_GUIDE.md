@@ -11,24 +11,65 @@ Toàn bộ kiến trúc, mã nguồn Go CLI, script Chrome Extension MV3 và MCP
 
 ---
 
-## 1. Hướng Dẫn Cài Đặt Lên Google Chrome
+## 1. Cài Đặt & Thiết Lập Môi Trường
 
-### Cách A: Cài Đặt Từ Bản Phát Hành ZIP (Khuyên dùng)
-1. Tải bản phát hành mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot/releases) (ví dụ `agent-pilot-v1.3.0-linux.zip`, `agent-pilot-v1.3.0-macos.zip`, hoặc `agent-pilot-v1.3.0-windows.zip`).
+Agent Pilot cung cấp 3 phương thức cài đặt tùy theo nhu cầu và đối tượng sử dụng:
+
+### Cách A: Cài Đặt Qua Bộ Cài Theo Hệ Điều Hành (Khuyến Nghị)
+
+Đây là **phương pháp được khuyến nghị hàng đầu** cho người dùng hàng ngày và kỹ sư QA/QC. Mỗi gói phát hành được đóng gói tối ưu riêng cho từng hệ điều hành, chỉ chứa file nhị phân duy nhất cho OS đó, thư mục tiện ích Chrome và script cài đặt tự động 1 bước:
+
+| Hệ Điều Hành | Gói Cài Đặt | Lệnh Cài Đặt Tự Động | Hướng Dẫn Chi Tiết |
+| :--- | :--- | :--- | :--- |
+| 🐧 **Linux / Ubuntu** | `agent-pilot-*-linux.zip` | `./install.sh` | [Xem hướng dẫn Linux](/vi/bundles/README.ubuntu) |
+| 🍎 **macOS** | `agent-pilot-*-macos.zip` | `./install.sh` | [Xem hướng dẫn macOS](/vi/bundles/README.macos) |
+| 🪟 **Windows** | `agent-pilot-*-windows.zip` | `powershell -ExecutionPolicy Bypass -File .\install.ps1` | [Xem hướng dẫn Windows](/vi/bundles/README.windows) |
+
+1. Tải bản phát hành mới nhất phù hợp với hệ điều hành từ [GitHub Releases](https://github.com/ducconit/agent-pilot/releases).
 2. Giải nén tệp `.zip` ra một thư mục cố định trên máy tính của bạn.
-3. Mở Google Chrome, truy cập: `chrome://extensions`.
-4. Bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải màn hình.
-5. Nhấp nút **Load unpacked** (Tải tiện ích đã giải nén) ở góc trên bên trái → Chọn thư mục vừa giải nén.
-6. Nhấp vào biểu tượng mảnh ghép (Extensions icon) trên thanh công cụ và chọn **Ghim (Pin)** biểu tượng **Agent Pilot (📌)**.
+3. Chạy script cài đặt (`./install.sh` trên Linux/macOS hoặc `powershell -ExecutionPolicy Bypass -File .\install.ps1` trên Windows). Script sẽ tự động đưa CLI vào biến môi trường `PATH` và đăng ký dịch vụ chạy ngầm tự khởi động cùng máy (`systemd` / `launchd` / Windows service).
+4. Mở Google Chrome, truy cập: `chrome://extensions`.
+5. Bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải màn hình.
+6. Nhấp nút **Load unpacked** (Tải tiện ích đã giải nén) ở góc trên bên trái → Chọn thư mục `extensions/` từ gói vừa giải nén.
+7. Nhấp vào biểu tượng mảnh ghép (Extensions icon) trên thanh công cụ và chọn **Ghim (📌)** biểu tượng **Agent Pilot**.
 
-### Cách B: Cài Đặt Từ Mã Nguồn (Source Code)
+### Cách B: Cài Đặt Nhanh Cho AI Agent (`npx skills add`)
+
+Nếu bạn muốn trang bị nhanh kỹ năng điều khiển trình duyệt cho trợ lý AI coding (Claude Code, Cursor, Windsurf, Antigravity, OpenCode, Codex, Roo Code, v.v.) mà không cần tải file zip thủ công:
+
+```bash
+# Cài đặt toàn cục (Global) cho mọi trợ lý trên máy
+npx skills add https://github.com/ducconit/agent-pilot -g --all
+
+# Hoặc cài đặt riêng cho dự án hiện tại
+npx skills add https://github.com/ducconit/agent-pilot
+```
+
+> 💡 **Lưu ý về phương án cài nhanh**: Phương thức này được thiết kế để **bootstrap nhanh cho AI Agent**. Vì cần hỗ trợ mọi loại máy trạm tức thì, gói kỹ năng này chứa sẵn các file nhị phân biên dịch cho **cả 3 hệ điều hành** (Linux `agent-pilot`, macOS `agent-pilot`, Windows `agent-pilot.exe`) nằm trong thư mục `skills/agent-pilot/scripts/`. Để cài đặt tinh gọn dung lượng và tích hợp dịch vụ nền theo chuẩn hệ điều hành, hãy ưu tiên **Cách A (Bộ cài theo hệ điều hành)**.
+
+Để nạp tiện ích vào Chrome, nạp thư mục `extensions/` từ gói skill vừa cài đặt hoặc tải về qua `chrome://extensions` (Load unpacked).
+
+### Cách C: Tự Biên Dịch & Cài Đặt Từ Mã Nguồn (Dành Cho Nhà Phát Triển)
+
+Dành cho lập trình viên muốn chỉnh sửa mã nguồn Go CLI, kiểm thử hoặc phát triển tính năng cho tiện ích mở rộng Chrome:
+
 1. Clone mã nguồn từ GitHub:
    ```bash
    git clone https://github.com/ducconit/agent-pilot.git
+   cd agent-pilot
    ```
-2. Vào `chrome://extensions`, bật **Developer mode**, nhấn **Load unpacked** và chọn thư mục:
+2. Biên dịch file nhị phân Go CLI:
+   ```bash
+   go build -o bin/agent-pilot ./cli/cmd/agent-pilot
    ```
-   /path/to/agent-pilot/extensions
+3. Cài đặt và kiểm tra dịch vụ chạy ngầm:
+   ```bash
+   ./bin/agent-pilot service install
+   ./bin/agent-pilot service status
+   ```
+4. Vào `chrome://extensions`, bật **Developer mode**, nhấn **Load unpacked** và chọn thư mục:
+   ```
+   /đường/dẫn/tới/agent-pilot/extensions
    ```
 
 ---
@@ -468,3 +509,17 @@ npx skills add https://github.com/ducconit/agent-pilot
 # Cài đặt toàn cục (Global) cho mọi trợ lý trên máy
 npx skills add https://github.com/ducconit/agent-pilot -g --all
 ```
+
+> 💡 **Lưu ý về binary**: Gói cài đặt `npx skills add` chứa sẵn binary biên dịch cho cả 3 hệ điều hành (Linux, macOS, Windows) bên trong thư mục `skills/agent-pilot/scripts/` để AI Agent có thể chạy ngay trên mọi máy tính. Nếu bạn muốn cài đặt tinh gọn dung lượng và tự động đăng ký dịch vụ chạy ngầm của hệ điều hành, hãy sử dụng [Bộ cài đặt theo hệ điều hành](#cach-a-cai-dat-qua-bo-cai-theo-he-dieu-hanh-khuyen-nghi).
+
+---
+
+## 6. Hỏi & Đáp Thường Gặp (Q&A)
+
+Để tra cứu các câu hỏi thường gặp về kiến trúc, cách tiết kiệm token và quy trình kiểm thử Web QA/QC chuyên sâu, xem chi tiết tại [Hỏi & Đáp Thường Gặp (Q&A)](/vi/QA).
+
+---
+
+## 7. Lỗi Thường Gặp & Cách Khắc Phục (Troubleshooting)
+
+Nếu gặp sự cố về kết nối cầu nối (Bridge), lỗi gắn kết debugger CDP hoặc cấu hình biến môi trường PATH, hãy tham khảo tài liệu chi tiết tại [Lỗi Thường Gặp & Cách Khắc Phục](/vi/TROUBLESHOOTING).
