@@ -6,18 +6,30 @@
 ### Universal AI Agent Browser Controller • Antigravity-First
 
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-blue?style=flat-square&logo=googlechrome)](extensions/manifest.json)
+[![Documentation](https://img.shields.io/badge/Docs-VitePress-06b6d4?style=flat-square&logo=vitepress)](https://ducconit.github.io/agent-pilot/)
 [![Status: Public Beta](https://img.shields.io/badge/Status-Public%20Beta-amber?style=flat-square&logo=statuspage)](#)
 [![CDP Protocol](https://img.shields.io/badge/Engine-Chrome%20DevTools%20Protocol-06b6d4?style=flat-square)](docs/CDP_GUIDE.md)
 [![Cross-Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blueviolet?style=flat-square)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![100% Vibe Coded](https://img.shields.io/badge/100%25-Vibe%20Coded-purple?style=flat-square&logo=visualstudiocode)](#-disclaimer--vibe-coding-notice)
+[![Built with Antigravity](https://img.shields.io/badge/Built%20with-Google%20Antigravity-4285F4?style=flat-square&logo=google)](#-disclaimer--vibe-coding-notice)
 
-[English](README.md) • [Tiếng Việt](README.vi.md) • [Documentation](docs/) • [Contributing](CONTRIBUTING.md)
+[English](README.md) • [Tiếng Việt](README.vi.md) • [Documentation](https://ducconit.github.io/agent-pilot/) • [Contributing](CONTRIBUTING.md)
 
 <p align="center">
   <b>Agent Pilot</b> is a lightweight, zero-dependency browser controller built for <b>AI Coding Agents</b> (Google Antigravity, Claude Code, Cursor, Codex). It bridges Chrome via a <b>Manifest V3 Extension</b>, a <b>Standalone Go CLI</b>, and a <b>Model Context Protocol (MCP) Server</b>.
 </p>
 
 </div>
+
+> [!WARNING]
+> ### ⚠️ 100% Vibe Coding Notice & Legal Disclaimer
+>
+> **Agent Pilot is an experimental open-source project created 100% via "vibe coding" using Google Antigravity.**
+>
+> - **AI-Authored Codebase**: Every single component (Go CLI binary, Manifest V3 Chrome extension, MCP protocol server, and automated tests) was generated, iterated, and refactored autonomously by AI agents driven by prompt engineering.
+> - **Exercise Caution**: While the repository includes automated test suites, linting, and a 29-rule secret sanitization layer, AI-generated code may contain unexpected edge cases or behavioral quirks. **Always test in sandboxed, isolated browser profiles or non-production environments** before granting autonomous control over sensitive web accounts or production infrastructure.
+> - **Disclaimer of Liability**: This software is provided **"AS IS"**, without warranty of any kind, express or implied. In no event shall the authors, contributors, or maintainers be liable for any claims, damages, data loss, browser corruption, financial loss, or unauthorized actions performed by autonomous AI agents through this controller. Use entirely at your own risk.
 
 ---
 
@@ -40,7 +52,7 @@ flowchart LR
 ```
 
 ### Step 1: Load the Chrome Extension
-1. Download the latest release from [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases).
+1. Download the latest release from [GitHub Releases](https://github.com/ducconit/agent-pilot/releases).
 2. Open Chrome and navigate to `chrome://extensions`.
 3. Enable **Developer mode** in the top-right corner.
 4. Click **Load unpacked**, select the `extensions/` directory, and pin the **Agent Pilot (📌)** icon.
@@ -65,7 +77,7 @@ agent-pilot service status
 
 #### Option A: Agent Skills Ecosystem ([skills.sh](https://skills.sh/))
 ```bash
-npx skills add https://github.com/ducconit/agent-pilot-extension -g --all
+npx skills add https://github.com/ducconit/agent-pilot -g --all
 ```
 
 #### Option B: MCP Server (`stdio`)
@@ -126,6 +138,15 @@ Contributions are warmly welcome! Please check out our community guides:
 - 🛠️ [Contributing Guide (CONTRIBUTING.md)](CONTRIBUTING.md)
 - 📜 [Code of Conduct (CODE_OF_CONDUCT.md)](CODE_OF_CONDUCT.md)
 - 🛡️ [Security Policy (SECURITY.md)](SECURITY.md)
+
+---
+
+## ⚠️ Disclaimer & Vibe Coding Notice
+
+**Agent Pilot is 100% vibe-coded with Google Antigravity.**
+- **No Human-Written Logic**: All code, architecture decisions, CLI commands, and extension scripts were generated autonomously through natural language prompts.
+- **Sandboxed Execution Recommended**: Autonomous agentic actions can navigate websites, trigger state mutations, submit forms, or download files. Always run tests using isolated user profiles (`--user-data-dir`).
+- **No Liability**: The maintainers and contributors assume no liability for unintended purchases, data modification, account actions, or system damages resulting from using Agent Pilot with LLM agents.
 
 ---
 

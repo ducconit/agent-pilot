@@ -1,103 +1,103 @@
-# 📚 Danh Mục Tham Chiếu API (Agent Pilot)
+# 📚 Agent Pilot API Reference
 
-Tài liệu đặc tả toàn bộ các thông điệp tin nhắn (Message Passing Actions), cấu trúc dữ liệu và API toàn cục của **Agent Pilot**.
+Complete specification of message passing actions, data schemas, and the global runtime API of **Agent Pilot**.
 
 ---
 
-## 1. Tin Nhắn Gửi Tới Background Service Worker
+## 1. Messages Sent to Background Service Worker
 
-Các lệnh được gửi qua `chrome.runtime.sendMessage({ action: "...", ... })`:
+Dispatched via `chrome.runtime.sendMessage({ action: "...", ... })`:
 
-### 1.1 Quản Lý Tab & Điều Hướng
-| Action | Tham số yêu cầu | Phản hồi (Response) | Mô tả |
+### 1.1 Tab Management & Navigation
+| Action | Required Parameters | Response | Description |
 | :--- | :--- | :--- | :--- |
-| `get_active_tab` | Không | `{ tab: TabObject }` | Lấy thông tin tab đang hoạt động |
-| `list_tabs` | Không | `{ tabs: TabObject[] }` | Liệt kê tất cả các tab đang mở |
-| `new_tab` | `url?: string` | `{ success: true, tab }` | Mở tab mới với URL chỉ định |
-| `navigate` | `tabId: number, url: string` | `{ success: true, tab }` | Điều hướng tab đến URL mới |
-| `reload_tab` | `tabId: number` | `{ success: true }` | Tải lại trang trên tab chỉ định |
-| `close_tab` | `tabId: number` | `{ success: true }` | Đóng tab chỉ định |
+| `get_active_tab` | None | `{ tab: TabObject }` | Get active tab details |
+| `list_tabs` | None | `{ tabs: TabObject[] }` | List all open tabs |
+| `new_tab` | `url?: string` | `{ success: true, tab }` | Open new tab with target URL |
+| `navigate` | `tabId: number, url: string` | `{ success: true, tab }` | Navigate tab to new URL |
+| `reload_tab` | `tabId: number` | `{ success: true }` | Reload target tab |
+| `close_tab` | `tabId: number` | `{ success: true }` | Close target tab |
 
 ### 1.2 Chrome DevTools Protocol (CDP)
-| Action | Tham số yêu cầu | Phản hồi (Response) | Mô tả |
+| Action | Required Parameters | Response | Description |
 | :--- | :--- | :--- | :--- |
-| `attach_debugger` | `tabId: number` | `{ success: boolean, error?: string }` | Gắn kết nối CDP và kích hoạt các domain Console, Network, Performance |
-| `detach_debugger` | `tabId: number` | `{ success: true }` | Ngắt kết nối CDP khỏi tab |
-| `get_debugger_status` | `tabId: number` | `{ attached: boolean }` | Kiểm tra trạng thái kết nối CDP hiện tại |
-| `get_devtools_data` | `tabId: number` | `{ console: [], network: [], attached }` | Lấy bộ đệm lịch sử logs console và network |
-| `clear_console` | `tabId: number` | `{ success: true }` | Xóa bộ đệm nhật ký console |
-| `clear_network` | `tabId: number` | `{ success: true }` | Xóa danh sách network requests |
-| `get_performance_metrics`| `tabId: number` | `{ success: boolean, metrics: Object }` | Đọc các chỉ số JS Heap, DOM Nodes, Layouts |
+| `attach_debugger` | `tabId: number` | `{ success: boolean, error?: string }` | Attach CDP and enable Console, Network, and Performance domains |
+| `detach_debugger` | `tabId: number` | `{ success: true }` | Detach CDP from tab |
+| `get_debugger_status` | `tabId: number` | `{ attached: boolean }` | Inspect current CDP connection state |
+| `get_devtools_data` | `tabId: number` | `{ console: [], network: [], attached }` | Retrieve buffered console logs and network requests |
+| `clear_console` | `tabId: number` | `{ success: true }` | Clear console buffer |
+| `clear_network` | `tabId: number` | `{ success: true }` | Clear network request history |
+| `get_performance_metrics`| `tabId: number` | `{ success: boolean, metrics: Object }` | Retrieve JS Heap, DOM Node counts, Layout metrics |
 
-### 1.3 Chụp Ảnh Màn Hình
-| Action | Tham số yêu cầu | Phản hồi (Response) | Mô tả |
+### 1.3 Screenshot Capture
+| Action | Required Parameters | Response | Description |
 | :--- | :--- | :--- | :--- |
-| `capture_screenshot` | `mode: "visible"` | `{ success: true, dataUrl: string }` | Chụp toàn bộ khung nhìn hiển thị |
-| `capture_screenshot` | `mode: "element" \| "region", tabId, clip: {x, y, width, height}` | `{ success: true, dataUrl, requiresCrop?: boolean, clip }` | Chụp và cắt ảnh theo tọa độ chữ nhật |
+| `capture_screenshot` | `mode: "visible"` | `{ success: true, dataUrl: string }` | Capture full visible viewport |
+| `capture_screenshot` | `mode: "element" \| "region", tabId, clip: {x, y, width, height}` | `{ success: true, dataUrl, requiresCrop?: boolean, clip }` | Capture and crop to bounding rectangle |
 
-### 1.4 Phương Thức RPC Qua Bridge (WebSocket / HTTP `/api`)
+### 1.4 Bridge RPC Methods (WebSocket / HTTP `/api`)
 
-Các method nhận input có hỗ trợ chọn engine (`via`) và toạ độ cho canvas/game. Mặc định vẫn là synthetic để không phá vỡ hành vi cũ.
+Input methods support engine selection (`via`) and coordinate targeting for Canvas/WebGL:
 
-| Method | Tham số | CDP? | Mô tả |
+| Method | Parameters | CDP Required? | Description |
 | :--- | :--- | :--- | :--- |
-| `page.click` | `selector?`, `x?`, `y?`, `via?: "synthetic" \| "cdp" \| "auto"`, `tabId?` | ⚙️ Tùy chọn | `via: "cdp"` phát trusted click (cross-origin iframe/canvas); `"auto"` tự fallback synthetic |
-| `page.drag` | `from`/`to` (selector) **hoặc** `fromX/fromY/toX/toY`, `steps?`, `holdMs?`, `via?`, `tabId?` | ⚙️ Tùy chọn | Drag trusted cho slingshot/aim; `holdMs` giữ trước khi thả |
-| `page.hover` | `selector`, `tabId?` | ⚙️ Tự động | Ưu tiên CDP `Input.dispatchMouseEvent`, fallback synthetic |
-| `page.pressKey` | `key`, `selector?`, `tabId?` | ⚙️ Tự động | Ưu tiên CDP `Input.dispatchKeyEvent`, fallback synthetic |
-| `cdp.status` | `tabId?` | ✅ | Trả `{ attached: boolean, error?, hint? }` để kiểm tra debugger trước khi dùng `via: "cdp"` |
-| `cdp.send` | `cdpMethod`, `cdpParams`, `tabId?` | ✅ | Gửi lệnh CDP thô; lỗi attach trả `CDP_UNAVAILABLE` rõ ràng |
+| `page.click` | `selector?`, `x?`, `y?`, `via?: "synthetic" \| "cdp" \| "auto"`, `tabId?` | ⚙️ Optional | `via: "cdp"` issues trusted click (cross-origin iframe/canvas); `"auto"` falls back to synthetic |
+| `page.drag` | `from`/`to` (selector) **or** `fromX/fromY/toX/toY`, `steps?`, `holdMs?`, `via?`, `tabId?` | ⚙️ Optional | Trusted drag for slingshot/aim; `holdMs` holds before release |
+| `page.hover` | `selector`, `tabId?` | ⚙️ Auto | Prioritizes CDP `Input.dispatchMouseEvent`, falls back to synthetic |
+| `page.pressKey` | `key`, `selector?`, `tabId?` | ⚙️ Auto | Prioritizes CDP `Input.dispatchKeyEvent`, falls back to synthetic |
+| `cdp.status` | `tabId?` | ✅ Yes | Returns `{ attached: boolean, error?, hint? }` to verify debugger |
+| `cdp.send` | `cdpMethod`, `cdpParams`, `tabId?` | ✅ Yes | Dispatches raw CDP command; returns `CDP_UNAVAILABLE` on failure |
 
-> Các method **bắt buộc CDP**: `page.screenshot` (tab ngầm), `page.uploadFile`, `page.handleDialog`, `emulation.*`, `network.*`, `performance.*`, `memory.*`, `devtools.getData`.
-> Synthetic event **không vượt được cross-origin iframe** và không điều khiển được canvas/WebGL.
-> `memory.heapSnapshot` lưu snapshot V8 ra file `.heapsnapshot`; dùng MCP `browser_analyze_heapsnapshot` để query, xem retainers/retaining paths hoặc compare hai snapshot.
+> **CDP-Mandated Methods**: `page.screenshot` (background tabs), `page.uploadFile`, `page.handleDialog`, `emulation.*`, `network.*`, `performance.*`, `memory.*`, `devtools.getData`.<br/>
+> Synthetic DOM events **cannot pierce cross-origin iframes** or interact with `<canvas>` / WebGL games.<br/>
+> `memory.heapSnapshot` dumps V8 heap snapshots to `.heapsnapshot` files; use MCP tool `browser_analyze_heapsnapshot` to inspect retainers or compare snapshots.
 
 ---
 
-## 2. Tin Nhắn Gửi Tới Content Script (Web Page Context)
+## 2. Messages Sent to Content Script (Web Page Context)
 
-Các lệnh được gửi qua `chrome.tabs.sendMessage(tabId, { action: "...", ... })`:
+Dispatched via `chrome.tabs.sendMessage(tabId, { action: "...", ... })`:
 
-### 2.1 Chuột Ảo & Tương Tác
-| Action | Tham số | Phản hồi | Mô tả |
+### 2.1 Virtual Mouse & Interaction
+| Action | Parameters | Response | Description |
 | :--- | :--- | :--- | :--- |
-| `virtual_mouse_move` | `x: number, y: number, duration?: number` | `{ x, y }` | Di chuyển con trỏ chuột ảo mượt mà đến tọa độ chỉ định |
-| `virtual_mouse_click`| `x?: number, y?: number` | `{ success: boolean, element }` | Kích hoạt hiệu ứng sóng ripple và chuỗi sự kiện click DOM |
-| `virtual_type` | `selector?: string, text: string` | `{ success: boolean, textEntered }` | Tự động gõ từng ký tự vào ô nhập |
-| `virtual_scroll` | `deltaX?: number, deltaY?: number` | `{ success: true, scrollX, scrollY }` | Cuộn trang theo hướng ngang/dọc |
+| `virtual_mouse_move` | `x: number, y: number, duration?: number` | `{ x, y }` | Moves virtual cursor smoothly to target coordinates |
+| `virtual_mouse_click`| `x?: number, y?: number` | `{ success: boolean, element }` | Triggers ripple animation and full DOM click event cascade |
+| `virtual_type` | `selector?: string, text: string` | `{ success: boolean, textEntered }` | Types characters sequentially into form element |
+| `virtual_scroll` | `deltaX?: number, deltaY?: number` | `{ success: true, scrollX, scrollY }` | Smooth page scrolling horizontally/vertically |
 
-### 2.2 Soi Phần Tử, Vùng Cắt & Lấy Màu
-| Action | Tham số | Phản hồi | Mô tả |
+### 2.2 DOM Inspector & Color Eyedropper
+| Action | Parameters | Response | Description |
 | :--- | :--- | :--- | :--- |
-| `toggle_inspector` | `enabled: boolean` | `{ success: true, active }` | Bật hoặc tắt chế độ thanh tra phần tử DOM |
-| `get_element_info` | `selector?: string` | `{ success: boolean, details }` | Lấy chi tiết thông số tọa độ, selector, xpath |
-| `start_region_crop`| Không | `{ success: true }` | Bật lớp phủ kéo thả chữ nhật để chọn vùng chụp |
-| `pick_color` | Không | `{ success: boolean, color: {hex, rgb, rgba, hsl, oklch} }` | Mở công cụ lấy màu pixel trên màn hình với 5 định dạng |
-| `set_busy` | `busy: boolean, action?: string` | `{ success: boolean }` | Bật/tắt viền phát sáng và pill trạng thái hoạt động của Agent |
+| `toggle_inspector` | `enabled: boolean` | `{ success: true, active }` | Toggles DOM element inspector overlay |
+| `get_element_info` | `selector?: string` | `{ success: boolean, details }` | Retrieves selector, XPath, computed dimensions |
+| `start_region_crop`| None | `{ success: true }` | Starts drag-to-select rectangular crop overlay |
+| `pick_color` | None | `{ success: boolean, color: {hex, rgb, rgba, hsl, oklch} }` | Activates 11x11 magnifying eyedropper loupe |
+| `set_busy` | `busy: boolean, action?: string` | `{ success: boolean }` | Toggles glowing neon border and agent status indicator |
 
 ---
 
-## 3. Sự Kiện Phát Sóng Cục Bộ (Broadcast Events)
+## 3. Broadcast Events
 
-Service Worker và Content Script phát sóng các sự kiện sau tới Side Panel:
+Dispatched by the Service Worker and Content Scripts to the Side Panel:
 
-| Tên sự kiện (`type`) | Cấu trúc dữ liệu | Mục đích |
+| Event Name (`type`) | Payload Schema | Purpose |
 | :--- | :--- | :--- |
-| `DEBUGGER_STATUS_CHANGED` | `{ tabId: number, attached: boolean }` | Thông báo thay đổi trạng thái kết nối CDP |
-| `DEVTOOLS_CONSOLE_EVENT` | `{ tabId: number, entry: { type, text, timestamp } }` | Đẩy console log mới xuất hiện |
-| `DEVTOOLS_NETWORK_EVENT` | `{ tabId: number, request: { id, url, method, status } }` | Cập nhật tiến trình của network request |
-| `ELEMENT_SELECTED` | `{ details: ElementDetailsObject }` | Người dùng đã click chọn một phần tử khi soi |
-| `COLOR_PICKED` | `{ color: { hex, rgb, rgba, hsl, oklch, timestamp } }` | Người dùng đã nhặt được một mã màu mới (5 định dạng) |
-| `REGION_CROP_REQUESTED` | `{ clip: { x, y, width, height } }` | Người dùng đã kéo chọn xong vùng cần chụp |
-| `FEEDBACK_ITEMS_UPDATED` | `{ items: FeedbackItem[] }` | Đồng bộ danh sách chú thích UI giữa Web Page và Side Panel |
+| `DEBUGGER_STATUS_CHANGED` | `{ tabId: number, attached: boolean }` | CDP connection status changes |
+| `DEVTOOLS_CONSOLE_EVENT` | `{ tabId: number, entry: { type, text, timestamp } }` | New console log stream event |
+| `DEVTOOLS_NETWORK_EVENT` | `{ tabId: number, request: { id, url, method, status } }` | Network request lifecycle updates |
+| `ELEMENT_SELECTED` | `{ details: ElementDetailsObject }` | User selected an element in inspector |
+| `COLOR_PICKED` | `{ color: { hex, rgb, rgba, hsl, oklch, timestamp } }` | User sampled a color with eyedropper |
+| `REGION_CROP_REQUESTED` | `{ clip: { x, y, width, height } }` | User completed a region crop drag |
+| `FEEDBACK_ITEMS_UPDATED` | `{ items: FeedbackItem[] }` | Synchronizes UI annotations across page & Side Panel |
 
 ---
 
-## 4. API Đối Tượng Toàn Cục `window.__AGENT_PILOT__`
+## 4. Global API Object `window.__AGENT_PILOT__`
 
-Được tích hợp sẵn trong Content Script để phục vụ việc lập trình tự động hóa:
+Available in the webpage context for programmatic automation:
 
-> ⚠️ **Ngữ nghĩa lỗi (Error Semantics)**: Các phương thức trả về `Promise` sẽ **reject kèm một `Error`** khi thao tác thất bại (trước đây resolve `null`). Riêng trường hợp **hết thời gian chờ (timeout)** vẫn resolve `null`.
+> ⚠️ **Error Semantics**: Methods returning a `Promise` **reject with an `Error`** on failure (previously resolved `null`). Only **timeouts** resolve `null`.
 
 ```typescript
 interface AgentPilotBridge {
@@ -112,12 +112,12 @@ interface AgentPilotBridge {
   startRegionCrop(): void;
   pickColor(): Promise<{ hex: string, rgb: string, rgba: string, hsl: string, oklch: string } | null>;
   getCursorPosition(): { x: number, y: number };
-  // Trạng thái tương tác & phiên Agent
+  // Agent interaction state
   isBusy(): Promise<boolean>;
   setBusy(busy: boolean, action?: string): Promise<{ success: boolean, isAgentBusy: boolean }>;
   isAgentTab(): Promise<boolean>;
   setAgentTab(enabled: boolean): Promise<boolean>;
-  // Kênh xuất Feedback (Channel B — Shared Inbox, Channel A — Live Push)
+  // Feedback channels (Channel B — Shared Inbox, Channel A — Live Push)
   saveFeedbackToInbox(): Promise<any>;
   pushFeedbackToAgent(): Promise<any>;
 }

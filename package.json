@@ -39,7 +39,10 @@
     "pack:release": "node scripts/pack_bundle.mjs",
     "export:mcp": "node scripts/export_mcp.mjs",
     "sync:mcp": "npm run export:mcp && npm run sync:agk",
-    "sync:agk": "node scripts/sync_agk.mjs"
+    "sync:agk": "node scripts/sync_agk.mjs",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "keywords": [
     "browser-control",
@@ -56,15 +59,20 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/ducconit/agent-pilot-extension.git"
+    "url": "git+ssh://git@github.com/ducconit/agent-pilot.git"
   },
   "bugs": {
-    "url": "https://github.com/ducconit/agent-pilot-extension/issues"
+    "url": "https://github.com/ducconit/agent-pilot/issues"
   },
-  "homepage": "https://github.com/ducconit/agent-pilot-extension#readme",
+  "homepage": "https://github.com/ducconit/agent-pilot#readme",
   "dependencies": {
     "lighthouse": "^13.5.0",
     "puppeteer-core": "^25.10.0",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "mermaid": "^11.17.2",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17"
   }
 }

@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ducconit/agent-pilot-extension/cli/bridge"
-	"github.com/ducconit/agent-pilot-extension/cli/config"
-	"github.com/ducconit/agent-pilot-extension/cli/feedback"
+	"github.com/ducconit/agent-pilot/cli/bridge"
+	"github.com/ducconit/agent-pilot/cli/config"
+	"github.com/ducconit/agent-pilot/cli/feedback"
 )
 
 var (

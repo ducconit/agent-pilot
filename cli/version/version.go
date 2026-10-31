@@ -3,9 +3,9 @@
 // Values are injected at build time with -ldflags "-X" so there is a single
 // source of truth (package.json) and no version constant to keep in sync:
 //
-//	-X github.com/ducconit/agent-pilot-extension/cli/version.Version=1.0.8-beta
-//	-X github.com/ducconit/agent-pilot-extension/cli/version.Commit=abc1234
-//	-X github.com/ducconit/agent-pilot-extension/cli/version.Date=2026-09-19T10:00:00Z
+//	-X github.com/ducconit/agent-pilot/cli/version.Version=1.0.8-beta
+//	-X github.com/ducconit/agent-pilot/cli/version.Commit=abc1234
+//	-X github.com/ducconit/agent-pilot/cli/version.Date=2026-09-19T10:00:00Z
 //
 // scripts/build_cli.mjs, scripts/pack_bundle.mjs and scripts/export_mcp.mjs
 // pass these flags. A bare `go build` (no flags) reports Version "dev".

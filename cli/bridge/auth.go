@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ducconit/agent-pilot-extension/cli/config"
+	"github.com/ducconit/agent-pilot/cli/config"
 )
 
 // AuthEnabled is intentionally false by default. Setting AGENT_PILOT_API_KEY

@@ -54,7 +54,7 @@ Nếu bạn phát hiện bất kỳ lỗ hổng bảo mật hoặc rủi ro an n
 
 1. **Vui lòng KHÔNG mở GitHub Issue công khai** để bảo vệ cộng đồng người dùng trước khi bản vá được phát hành.
 2. Hãy gửi báo cáo chi tiết đến quản trị viên (**DNT** - [@ducconit](https://github.com/ducconit)) hoặc mở **GitHub Security Advisory** riêng tư tại:
-   - [GitHub Security Advisories](https://github.com/ducconit/agent-pilot-extension/security/advisories)
+   - [GitHub Security Advisories](https://github.com/ducconit/agent-pilot/security/advisories)
 3. Báo cáo của bạn nên bao gồm:
    - Mô tả chi tiết lỗ hổng và phạm vi tác động.
    - Các bước cụ thể để tái hiện (Proof of Concept - PoC).

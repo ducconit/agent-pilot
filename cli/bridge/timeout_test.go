@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ducconit/agent-pilot-extension/cli/config"
+	"github.com/ducconit/agent-pilot/cli/config"
 )
 
 func TestDeriveBatchTimeout(t *testing.T) {

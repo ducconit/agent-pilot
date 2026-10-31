@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ducconit/agent-pilot-extension/cli/config"
+	"github.com/ducconit/agent-pilot/cli/config"
 )
 
 // MaxEvaluateTimeoutMs caps user-supplied page.evaluate timeout parameters to

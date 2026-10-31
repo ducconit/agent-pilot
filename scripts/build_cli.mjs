@@ -5,9 +5,9 @@
  * Builds ./cli from the repository root with CGO_ENABLED=0 (static binary) and
  * injects the build metadata with -ldflags -X, so package.json stays the single
  * source of truth for the version:
- *   -X github.com/ducconit/agent-pilot-extension/cli/version.Version=<pkg.version>
- *   -X github.com/ducconit/agent-pilot-extension/cli/version.Commit=<short sha>
- *   -X github.com/ducconit/agent-pilot-extension/cli/version.Date=<RFC3339 UTC>
+ *   -X github.com/ducconit/agent-pilot/cli/version.Version=<pkg.version>
+ *   -X github.com/ducconit/agent-pilot/cli/version.Commit=<short sha>
+ *   -X github.com/ducconit/agent-pilot/cli/version.Date=<RFC3339 UTC>
  *
  * Works identically on POSIX shells and Windows cmd.exe (env-var prefixes do not).
  */
@@ -39,9 +39,9 @@ const date = new Date().toISOString();
 const ldflags = [
   "-s",
   "-w",
-  `-X github.com/ducconit/agent-pilot-extension/cli/version.Version=${version}`,
-  `-X github.com/ducconit/agent-pilot-extension/cli/version.Commit=${commit}`,
-  `-X github.com/ducconit/agent-pilot-extension/cli/version.Date=${date}`
+  `-X github.com/ducconit/agent-pilot/cli/version.Version=${version}`,
+  `-X github.com/ducconit/agent-pilot/cli/version.Commit=${commit}`,
+  `-X github.com/ducconit/agent-pilot/cli/version.Date=${date}`
 ].join(" ");
 
 await prepareDevtoolsRuntime();

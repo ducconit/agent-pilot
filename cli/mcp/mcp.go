@@ -26,9 +26,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ducconit/agent-pilot-extension/cli/bridge"
-	"github.com/ducconit/agent-pilot-extension/cli/config"
-	"github.com/ducconit/agent-pilot-extension/cli/version"
+	"github.com/ducconit/agent-pilot/cli/bridge"
+	"github.com/ducconit/agent-pilot/cli/config"
+	"github.com/ducconit/agent-pilot/cli/version"
 )
 
 // mcpWriteMu serialises stdout writes so concurrent handlers do not interleave

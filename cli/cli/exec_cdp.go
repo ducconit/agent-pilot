@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ducconit/agent-pilot-extension/cli/bridge"
-	"github.com/ducconit/agent-pilot-extension/cli/config"
+	"github.com/ducconit/agent-pilot/cli/bridge"
+	"github.com/ducconit/agent-pilot/cli/config"
 )
 
 func ExecCdpStatus(tabID interface{}) error {

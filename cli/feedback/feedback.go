@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ducconit/agent-pilot-extension/cli/config"
+	"github.com/ducconit/agent-pilot/cli/config"
 )
 
 type FeedbackItem struct {

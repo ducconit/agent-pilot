@@ -6,18 +6,30 @@
 ### Universal AI Agent Browser Controller • Antigravity-First
 
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-blue?style=flat-square&logo=googlechrome)](extensions/manifest.json)
+[![Documentation](https://img.shields.io/badge/Docs-VitePress-06b6d4?style=flat-square&logo=vitepress)](https://ducconit.github.io/agent-pilot/)
 [![Status: Public Beta](https://img.shields.io/badge/Status-Public%20Beta-amber?style=flat-square&logo=statuspage)](#)
 [![CDP Protocol](https://img.shields.io/badge/Engine-Chrome%20DevTools%20Protocol-06b6d4?style=flat-square)](docs/CDP_GUIDE.md)
 [![Cross-Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blueviolet?style=flat-square)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![100% Vibe Coded](https://img.shields.io/badge/100%25-Vibe%20Coded-purple?style=flat-square&logo=visualstudiocode)](#-tuyen-bo-mien-tru-trach-nhiem--vibe-coding)
+[![Built with Antigravity](https://img.shields.io/badge/Built%20with-Google%20Antigravity-4285F4?style=flat-square&logo=google)](#-tuyen-bo-mien-tru-trach-nhiem--vibe-coding)
 
-[English](README.md) • [Tiếng Việt](README.vi.md) • [Tài liệu chi tiết](docs/) • [Đóng góp](CONTRIBUTING.md)
+[English](README.md) • [Tiếng Việt](README.vi.md) • [Trang tài liệu Public](https://ducconit.github.io/agent-pilot/) • [Đóng góp](CONTRIBUTING.md)
 
 <p align="center">
   <b>Agent Pilot</b> là bộ công cụ điều khiển trình duyệt chuyên sâu cho <b>AI Coding Agent</b> (tối ưu hóa cho Google Antigravity, Claude Code, Cursor, Codex). Kết hợp sức mạnh giữa <b>Chrome Extension (Manifest V3)</b>, <b>Standalone Go CLI</b> và <b>MCP Server</b> (Model Context Protocol).
 </p>
 
 </div>
+
+> [!WARNING]
+> ### ⚠️ Cảnh Báo: Dự Án 100% Vibe Coding & Miễn Trừ Trách Nhiệm
+>
+> **Agent Pilot là dự án thử nghiệm mã nguồn mở được kiến tạo 100% bằng hình thức "Vibe Coding" với Google Antigravity.**
+>
+> - **Mã nguồn hoàn toàn do AI sinh ra**: Mọi thành phần (binary Go CLI, Chrome extension Manifest V3, MCP Server và các bộ kiểm thử tự động) đều do các AI coding agent tự động thiết kế, triển khai và tái cấu trúc thông qua prompt engineering.
+> - **Khuyến cáo cẩn trọng**: Mặc dù dự án đã vượt qua hệ thống kiểm thử tự động, linter và cơ chế lọc che giấu secret 29 quy tắc, mã nguồn AI vẫn có thể tiềm ẩn những lỗi ngoại lệ (edge cases) chưa lường hết. **Luôn thử nghiệm trên profile Chrome riêng biệt (sandbox) hoặc môi trường non-production** trước khi cho phép AI toàn quyền thao tác trên các phiên làm việc hoặc tài khoản quan trọng.
+> - **Tuyên bố miễn trừ trách nhiệm (Disclaimer)**: Phần mềm được cung cấp theo nguyên trạng **"AS IS"**, không có bất kỳ sự đảm bảo nào. Trong mọi trường hợp, tác giả và các cộng tác viên không chịu trách nhiệm pháp lý hay tài chính đối với bất kỳ thiệt hại dữ liệu, lỗi trình duyệt, tài khoản bị khoá hay các thao tác ngoài ý muốn do AI Agent gây ra khi dùng công cụ này.
 
 ---
 
@@ -40,7 +52,7 @@ flowchart LR
 ```
 
 ### Bước 1: Nạp Extension vào Chrome
-1. Tải bản phát hành mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases).
+1. Tải bản phát hành mới nhất từ [GitHub Releases](https://github.com/ducconit/agent-pilot/releases).
 2. Mở Chrome $\to$ `chrome://extensions` $\to$ bật **Developer mode**.
 3. Bấm **Load unpacked** $\to$ chọn thư mục `extensions/` và ghim biểu tượng **Agent Pilot (📌)**.
 
@@ -62,7 +74,7 @@ agent-pilot service status
 
 #### Cách A: Cài Đặt Chuẩn Agent Skills ([skills.sh](https://skills.sh/))
 ```bash
-npx skills add https://github.com/ducconit/agent-pilot-extension -g --all
+npx skills add https://github.com/ducconit/agent-pilot -g --all
 ```
 
 #### Cách B: Cấu Hình MCP Server (`stdio`)
@@ -119,6 +131,15 @@ agent-pilot close --tab 12345
 - 🛠️ [Hướng dẫn đóng góp (CONTRIBUTING.md)](CONTRIBUTING.md)
 - 📜 [Bộ quy tắc ứng xử (CODE_OF_CONDUCT.md)](CODE_OF_CONDUCT.md)
 - 🛡️ [Chính sách bảo mật (SECURITY.md)](SECURITY.md)
+
+---
+
+## ⚠️ Tuyên Bố Miễn Trừ Trách Nhiệm & Vibe Coding
+
+**Agent Pilot được phát triển 100% bằng hình thức Vibe Coding cùng Google Antigravity.**
+- **Không qua code thủ công**: Toàn bộ kiến trúc, dòng lệnh CLI và script extension được AI tổng hợp thông qua các prompt ngôn ngữ tự nhiên.
+- **Khuyến nghị môi trường Sandbox**: Các tác vụ tự động hóa có thể tương tác DOM, thay đổi trạng thái form, gửi request hoặc tải tệp. Hãy luôn chạy trên thư mục người dùng riêng biệt (`--user-data-dir`).
+- **Miễn trừ trách nhiệm**: Nhóm phát triển không chịu trách nhiệm với bất kỳ giao dịch ngoài ý muốn, sửa đổi dữ liệu hay lỗi phát sinh từ hành động của AI Agent khi vận hành Agent Pilot.
 
 ---
 

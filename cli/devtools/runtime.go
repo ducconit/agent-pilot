@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ducconit/agent-pilot-extension/cli/version"
+	"github.com/ducconit/agent-pilot/cli/version"
 )
 
 //go:embed payload

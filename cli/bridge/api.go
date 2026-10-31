@@ -17,9 +17,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ducconit/agent-pilot-extension/cli/config"
-	"github.com/ducconit/agent-pilot-extension/cli/feedback"
-	"github.com/ducconit/agent-pilot-extension/cli/version"
+	"github.com/ducconit/agent-pilot/cli/config"
+	"github.com/ducconit/agent-pilot/cli/feedback"
+	"github.com/ducconit/agent-pilot/cli/version"
 )
 
 var defaultHTTPTransport = &http.Transport{

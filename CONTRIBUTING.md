@@ -22,8 +22,8 @@ Dự án tuân thủ bộ quy tắc [Contributor Covenant Code of Conduct](CODE_
 ### 2. Cài Đặt Mã Nguồn
 ```bash
 # Clone kho lưu trữ
-git clone git@github.com:ducconit/agent-pilot-extension.git
-cd agent-pilot-extension
+git clone git@github.com:ducconit/agent-pilot.git
+cd agent-pilot
 
 # Cài đặt các gói phụ thuộc
 npm install

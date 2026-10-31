@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ducconit/agent-pilot-extension/cli/devtools"
+	"github.com/ducconit/agent-pilot/cli/devtools"
 )
 
 var devtoolsHost = devtools.NewHost(func(method string, params map[string]interface{}) (interface{}, error) {

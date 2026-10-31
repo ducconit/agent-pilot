@@ -7,7 +7,7 @@ package main
 import (
 	"os"
 
-	"github.com/ducconit/agent-pilot-extension/cli/cli"
+	"github.com/ducconit/agent-pilot/cli/cli"
 )
 
 func main() {

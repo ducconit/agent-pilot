@@ -19,7 +19,7 @@ Phiên bản dòng lệnh độc lập (**Single Executable Binary**) viết b�
 ## 🛠️ Biên Dịch & Cài Đặt
 
 ### 1. Tải Binary Dựng Sẵn (Khuyên dùng)
-Tải tệp binary tương ứng với hệ điều hành và CPU của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot-extension/releases):
+Tải tệp binary tương ứng với hệ điều hành và CPU của bạn từ [GitHub Releases](https://github.com/ducconit/agent-pilot/releases):
 
 | Hệ Điều Hành | Kiến Trúc | Tệp Phát Hành | Lệnh Cài Đặt Nhanh |
 | :--- | :--- | :--- | :--- |

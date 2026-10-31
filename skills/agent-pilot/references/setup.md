@@ -64,8 +64,8 @@ Each release provides 3 OS-specific bundles (`agent-pilot-v1.3.0-linux.zip`, `ag
 
 ### Alternative: Build & Pack from Source
 ```bash
-git clone https://github.com/ducconit/agent-pilot-extension.git
-cd agent-pilot-extension
+git clone https://github.com/ducconit/agent-pilot.git
+cd agent-pilot
 npm install
 npm run pack:bundle
 # Outputs OS-specific bundles + universal archive in dist/

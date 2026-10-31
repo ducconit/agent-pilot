@@ -17,13 +17,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ducconit/agent-pilot-extension/cli/bridge"
-	"github.com/ducconit/agent-pilot-extension/cli/config"
-	"github.com/ducconit/agent-pilot-extension/cli/feedback"
-	"github.com/ducconit/agent-pilot-extension/cli/mcp"
-	"github.com/ducconit/agent-pilot-extension/cli/service"
-	"github.com/ducconit/agent-pilot-extension/cli/skill"
-	"github.com/ducconit/agent-pilot-extension/cli/version"
+	"github.com/ducconit/agent-pilot/cli/bridge"
+	"github.com/ducconit/agent-pilot/cli/config"
+	"github.com/ducconit/agent-pilot/cli/feedback"
+	"github.com/ducconit/agent-pilot/cli/mcp"
+	"github.com/ducconit/agent-pilot/cli/service"
+	"github.com/ducconit/agent-pilot/cli/skill"
+	"github.com/ducconit/agent-pilot/cli/version"
 )
 
 // newMCPCommand launches the stdio MCP server. The root command also defaults to

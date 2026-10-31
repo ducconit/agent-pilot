@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ducconit/agent-pilot-extension/cli/bridge"
-	"github.com/ducconit/agent-pilot-extension/cli/config"
+	"github.com/ducconit/agent-pilot/cli/bridge"
+	"github.com/ducconit/agent-pilot/cli/config"
 )
 
 // newRecorderCommand exposes the Chrome DevTools Recorder-style flow lifecycle

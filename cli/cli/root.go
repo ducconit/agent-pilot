@@ -13,13 +13,13 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"github.com/ducconit/agent-pilot-extension/cli/bridge"
-	"github.com/ducconit/agent-pilot-extension/cli/config"
+	"github.com/ducconit/agent-pilot/cli/bridge"
+	"github.com/ducconit/agent-pilot/cli/config"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/ducconit/agent-pilot-extension/cli/mcp"
+	"github.com/ducconit/agent-pilot/cli/mcp"
 	"github.com/spf13/cobra"
 )
 

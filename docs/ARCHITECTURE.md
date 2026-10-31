@@ -1,21 +1,21 @@
-# 🏛️ Tài Liệu Kiến Trúc Hệ Thống Agent Pilot
-**Phiên bản**: v1.3.0
-**Mục tiêu**: Cung cấp giao diện kiểm soát trình duyệt hoàn chỉnh cho AI Coding Agent (Antigravity First), độ trễ thấp, không chiếm quyền focus, hỗ trợ CDP và phản hồi trực quan (Visual Feedback)
-**Tác giả duy trì**: DNT ([github.com/ducconit](https://github.com/ducconit))
+# 🏛️ Agent Pilot System Architecture
+**Version**: v1.3.0<br/>
+**Mission**: Provide a comprehensive, ultra-low latency, focus-preserving browser control interface for AI Coding Agents (Antigravity-First), featuring dual-engine DOM/CDP execution and rich visual feedback.<br/>
+**Maintainer**: DNT ([github.com/ducconit](https://github.com/ducconit))
 
 ---
 
-## 1. 🌐 Sơ Đồ Kiến Trúc Đa Tầng Tổng Thể (End-to-End Architecture)
+## 1. 🌐 End-to-End Multi-Tier Architecture
 
-Agent Pilot xây dựng cầu nối hai chiều khép kín, an toàn giữa các mô hình AI Agent (Antigravity, Claude Code, Cursor, OpenCode) và trình duyệt Chromium:
+Agent Pilot establishes a secure, bidirectional, closed-loop bridge between AI Coding Agents (Google Antigravity, Claude Code, Cursor, OpenCode) and the Chromium browser:
 
 ```mermaid
 flowchart TB
-    subgraph AgentLayer["🤖 1. TẦNG AI AGENT"]
+    subgraph AgentLayer["🤖 1. AI AGENT TIER"]
         Agent["<b>AI Coding Agent</b><br/>(Google Antigravity / Claude Code / Cursor)"]
     end
 
-    subgraph BridgeLayer["🌉 2. TẦNG CẦU NỐI & CLI (GOLANG STANDALONE ENGINE)"]
+    subgraph BridgeLayer["🌉 2. BRIDGE & CLI TIER (GOLANG STANDALONE ENGINE)"]
         direction TB
         ServerEntry["<b>Agent Pilot Engine (cli/agent-pilot)</b><br/>Port 58765 (Local Loopback 127.0.0.1)"]
         DualMode{"<b>Dual Mode Engine</b><br/>Port Busy?"}
@@ -26,7 +26,7 @@ flowchart TB
         InboxFS["<b>Local Inbox Storage</b><br/>~/.agent-pilot/inbox/feedback/"]
     end
 
-    subgraph ExtensionLayer["🧩 3. TẦNG CHROME EXTENSION (MANIFEST V3)"]
+    subgraph ExtensionLayer["🧩 3. CHROME EXTENSION TIER (MANIFEST V3)"]
         direction TB
         SW["<b>Background Service Worker (background.js)</b>"]
         WSClient["<b>Bridge Client</b><br/>(bridge-client.js)"]
@@ -38,7 +38,7 @@ flowchart TB
         SidePanel["<b>Side Panel UI</b><br/>(sidepanel.html/js)<br/>• Agent Monitor & Inspector<br/>• Screenshot Studio & Loupe"]
     end
 
-    subgraph PageLayer["🖥️ 4. TẦNG TRANG WEB & DOM NỘI BỘ"]
+    subgraph PageLayer["🖥️ 4. WEB PAGE & DOM TIER"]
         direction TB
         MainWorld["<b>Main World Bridge</b><br/>(main-world-bridge.js)<br/>Exposes window.__AGENT_PILOT__"]
         ContentScripts["<b>Isolated World Content Scripts</b>"]
@@ -90,9 +90,9 @@ flowchart TB
 
 ---
 
-## 2. ⏱️ Sơ Đồ Tuần Tự (Sequence Diagram) - Vòng Đời Lệnh Của Agent
+## 2. ⏱️ Sequence Diagram: Agent Execution Lifecycle
 
-Dưới đây là luồng thực thi chi tiết từng bước khi AI Agent gửi một lệnh tương tác (ví dụ: `browser_click` hoặc `browser_run_actions`) đến trình duyệt:
+The diagram below details the end-to-end execution flow when an AI Agent sends an interaction command (e.g. `browser_click` or `browser_run_actions`):
 
 ```mermaid
 sequenceDiagram
@@ -105,39 +105,39 @@ sequenceDiagram
     participant CDP as ⚡ Chrome DevTools (CDP)
     participant DOM as 🌐 Web Page DOM
 
-    Note over Agent,Server: 1. KHỞI TẠO HOẶC GỬI LỆNH
+    Note over Agent,Server: 1. INITIALIZE & DISPATCH COMMAND
     Agent->>Server: MCP call: browser_click({ selector: "#submit-btn", tabId: 101 })
-    Server->>Server: Kiểm tra client hợp lệ (activeClientId)
+    Server->>Server: Validate active client (activeClientId)
     Server->>Ext: WebSocket JSON-RPC: { id: 42, method: "page.click", params: { ... } }
 
-    Note over Ext,Tab: 2. PHÂN TÍCH & BẢO VỆ PHIÊN (TAB LOCK)
+    Note over Ext,Tab: 2. SESSION MUTEX (TAB LOCK)
     Ext->>Tab: runWithTabLock(101, "click")
     Tab->>Content: chrome.tabs.sendMessage("SET_BUSY", { busy: true, action: "AI Click" })
-    Content->>DOM: Hiển thị Viền Màn Hình Neon & Pill Hành Động (Subtle Indicator, pointer-events: none)
+    Content->>DOM: Render neon border & action pill (Subtle indicator, pointer-events: none)
 
-    Note over Ext,Content: 3. THAO TÁC CHUỘT ẢO & TƯƠNG TÁC DOM
+    Note over Ext,Content: 3. VIRTUAL CURSOR & DOM INTERACTION
     Ext->>Content: chrome.tabs.sendMessage("simulate_click", { selector: "#submit-btn" })
     Content->>DOM: querySelector("#submit-btn") & getBoundingClientRect()
-    Content->>DOM: Di chuyển con trỏ chuột neon mượt mà (Cubic Ease-Out)
-    Content->>DOM: Kích hoạt sóng lan tỏa (Ripple Effect) & Badge tọa độ (X, Y)
-    Content->>DOM: Phát chuỗi DOM Events: pointerdown -> mousedown -> pointerup -> mouseup -> click
-    DOM-->>Content: Sự kiện click đã được xử lý (Counter tăng)
+    Content->>DOM: Move virtual neon cursor smoothly (Cubic Ease-Out)
+    Content->>DOM: Emit click-ripple animation & (X, Y) coordinate badge
+    Content->>DOM: Dispatch DOM event cascade: pointerdown -> mousedown -> pointerup -> mouseup -> click
+    DOM-->>Content: Click event successfully handled
     Content-->>Ext: { success: true, clicked: true, point: { x: 350, y: 220 } }
 
-    Note over Ext,Tab: 4. NHẢ KHÓA & TRẢ DỮ LIỆU BẢO MẬT
+    Note over Ext,Tab: 4. RELEASE LOCK & SANITIZE SENSITIVE DATA
     Tab->>Content: chrome.tabs.sendMessage("SET_BUSY", { busy: false })
-    Content->>DOM: Ẩn Viền Neon & Thanh Pill Hành Động
-    Ext->>Ext: sanitizeData(result) -> Quét 12 mẫu Secret / Private Key
+    Content->>DOM: Hide neon border & action indicator pill
+    Ext->>Ext: sanitizeData(result) -> Scan 12 secret & private key patterns
     Ext-->>Server: WebSocket Response: { id: 42, result: { ... }, secretFilterEnabled: true }
-    Server->>Server: sanitizeServerData(result) (Lớp lọc bảo mật thứ hai)
+    Server->>Server: sanitizeServerData(result) (Second security defense layer)
     Server-->>Agent: MCP Tool Response: { success: true, clicked: true }
 ```
 
 ---
 
-## 3. 🎨 Sơ Đồ 3 Kênh Phản Hồi Trực Quan (3-Channel Visual Feedback)
+## 3. 🎨 3-Channel Visual Feedback Architecture
 
-Hệ thống cung cấp 3 kênh trao đổi hai chiều giữa người dùng và AI Agent khi kiểm thử giao diện:
+The system provides 3 bidirectional communication channels between human developers/QA testers and AI agents:
 
 ```mermaid
 sequenceDiagram
@@ -149,46 +149,46 @@ sequenceDiagram
     participant Inbox as 💾 Local Inbox (~/.agent-pilot)
     actor Agent as 🤖 AI Agent (Antigravity)
 
-    alt KÊNH A: Reactive Long-Polling (Live Agent Push)
+    alt CHANNEL A: Reactive Long-Polling (Live Agent Push)
         Agent->>Server: browser_wait_for_feedback({ timeout: 120 })
-        Server-->>Server: Giữ kết nối chờ (pendingFeedbackWaiters)
-        User->>HUD: Chọn vùng / Ghim điểm & Bấm "🚀 Gửi Agent"
+        Server-->>Server: Hold pending waiter (pendingFeedbackWaiters)
+        User->>HUD: Select element / Pin region & Click "🚀 Send to Agent"
         HUD->>Ext: chrome.runtime.sendMessage("FEEDBACK_PUSH_AGENT", payload)
         Ext->>Server: POST /api/feedback/wait (resolve pending waiter)
-        Server->>Inbox: Lưu session.json + item_*.png
-        Server-->>Agent: Trả về kết quả tức thì (Component source, line, selector, note, images)
-        Agent->>Agent: Tự động sửa code đúng file & dòng chỉ điểm
-    else KÊNH B: Persistent Shared Inbox
-        User->>HUD: Chọn nhiều vùng / component & Bấm "💾 Lưu Inbox"
+        Server->>Inbox: Save session.json + item_*.png
+        Server-->>Agent: Immediate return (Component source, line, selector, note, images)
+        Agent->>Agent: Automatically patch code at specified file & line
+    else CHANNEL B: Persistent Shared Inbox
+        User->>HUD: Select multiple regions / components & Click "💾 Save to Inbox"
         HUD->>Server: POST /api/feedback/save (session payload)
-        Server->>Inbox: Ghi session.json, prompt.md (sạch, không base64), ảnh PNG
-        Note over Agent,Inbox: Agent rảnh rỗi hoặc được yêu cầu kiểm tra feedback
+        Server->>Inbox: Write session.json, clean prompt.md (no base64), PNG files
+        Note over Agent,Inbox: Agent checks feedback when idle or prompted
         Agent->>Server: browser_get_pending_feedback({ limit: 5 })
-        Server->>Inbox: Đọc các thư mục timestamp mới nhất
-        Server-->>Agent: Trả về danh sách phiên kèm prompt Markdown & đường dẫn ảnh
-    else KÊNH C: 1-Click Clipboard Prompt
-        User->>HUD: Chọn vùng & Bấm "📋 Copy Prompt"
-        HUD->>User: Ghi thẳng Markdown format chuẩn vào System Clipboard
-        User->>Agent: Dán (Ctrl+V) vào khung chat bất kỳ
+        Server->>Inbox: Read latest timestamped session directories
+        Server-->>Agent: Return session list with Markdown prompt & image file paths
+    else CHANNEL C: 1-Click Clipboard Prompt
+        User->>HUD: Select region & Click "📋 Copy Prompt"
+        HUD->>User: Write standardized Markdown format to System Clipboard
+        User->>Agent: Paste (Ctrl+V) into any AI chat window
     end
 ```
 
 ---
 
-## 4. 🛡️ Các Cơ Chế An Ninh & Phòng Thủ Trọng Yếu
+## 4. 🛡️ Security Mechanisms & Defense-in-Depth
 
-1. **Khóa Nguồn Gốc WebSocket Server (`verifyClient`)**:
-   - Sử dụng bộ phân tích URL chuẩn (`new URL(origin).hostname`).
-   - Chỉ cho phép: `chrome-extension://`, `127.0.0.1`, `localhost`.
-   - Ngăn chặn triệt để tấn công Cross-Site WebSocket Hijacking (CSWSH) từ bất kỳ website độc hại nào người dùng truy cập.
-2. **Lớp Lọc Dữ Liệu Nhạy Cảm 2 Tầng (Dual-Layer Secret Redaction)**:
-   - Tự động nhận diện và che dấu bằng dấu sao `*` 12 loại thông tin (OpenAI, Anthropic, Gemini, AWS, Stripe, GitHub, Slack, JWT, Bearer token, Private Keys RSA/SSH/PGP, URL parameters, JSON sensitive keys).
-   - Bảo vệ chống tràn ngăn đệ quy vô tận bằng `WeakSet` (`[Circular]`).
-   - Lọc ở Service Worker trước khi truyền qua mạng và lọc ở Server trước khi trả về cho LLM.
-3. **Cách Ly Tuyệt Đối Giữa Main World & Content Script**:
-   - `main-world-bridge.js` chạy trong ngữ cảnh của trang web (`world: "MAIN"`), cung cấp `window.__AGENT_PILOT__` nhưng hoàn toàn **không có quyền hạn `chrome.*`**.
-   - Giao tiếp với Extension thông qua các sự kiện tùy biến `CustomEvent` (`__AGENT_PILOT_REQ__` và `__AGENT_PILOT_RES__`).
-4. **Bảo Vệ Độc Quyền Theo Tab (Tab-Level Mutex Lock)**:
-   - `runWithTabLock` ngăn chặn hai hành động của Agent hoặc một hành động của Agent và thao tác gõ/click của người dùng xung đột với nhau trên cùng một tab.
-5. **Mô Hình Tin Cậy Của Bridge (Bridge Trust Model)**:
-   - Bridge chỉ mở trên `127.0.0.1:58765`, allowlist nguồn gốc WebSocket gồm `localhost`, `127.0.0.1` và `chrome-extension://`, nhưng **không có token xác thực** — vì vậy bất kỳ tiến trình cục bộ nào cũng có thể điều khiển trình duyệt. Chỉ chạy phần mềm cục bộ đáng tin cậy và không công khai cổng này ra mạng ngoài.
+1. **WebSocket Origin Guard (`verifyClient`)**:
+   - Parses incoming request origins via standard URL parsing (`new URL(origin).hostname`).
+   - Strictly allowlists: `chrome-extension://`, `127.0.0.1`, and `localhost`.
+   - Completely prevents Cross-Site WebSocket Hijacking (CSWSH) from malicious websites the user might browse.
+2. **Dual-Layer Secret Redaction**:
+   - Automatically detects and masks with asterisks `*` across 12 credential types (OpenAI, Anthropic, Gemini, AWS, Stripe, GitHub, Slack, JWT, Bearer tokens, RSA/SSH/PGP private keys, URL parameters, and sensitive JSON keys).
+   - Defends against infinite recursion using a `WeakSet` (`[Circular]`).
+   - Redacts at the Service Worker level before network transmission and redundantly at the Go server level before returning payloads to LLMs.
+3. **Strict Isolation Between Main World & Content Script**:
+   - `main-world-bridge.js` runs in the webpage context (`world: "MAIN"`), exposing `window.__AGENT_PILOT__` without any `chrome.*` privilege.
+   - Communicates with the extension strictly via custom DOM events (`__AGENT_PILOT_REQ__` and `__AGENT_PILOT_RES__`).
+4. **Tab-Level Mutex Lock**:
+   - `runWithTabLock` serializes concurrent operations, preventing race conditions between parallel agent commands and user input on the same tab.
+5. **Bridge Trust Model**:
+   - The Bridge binds strictly to `127.0.0.1:58765`. Its origin allowlist permits `localhost`, `127.0.0.1`, and `chrome-extension://`. However, it does not require an authentication token; any local process on the machine can connect. Run only trusted local software and never expose this port to an external network.

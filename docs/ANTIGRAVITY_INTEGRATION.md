@@ -1,22 +1,22 @@
-# 🚀 Hướng Dẫn Tích Hợp Antigravity-First (Agent Pilot)
+# 🚀 Antigravity-First Integration Guide (Agent Pilot)
 
-**Agent Pilot** được thiết kế với triết lý **Antigravity-First**, cho phép các AI coding & automation agent của Antigravity có thể "nhìn", "hiểu" và "điều khiển" trình duyệt của lập trình viên một cách an toàn, chính xác và trực quan.
+**Agent Pilot** is engineered with an **Antigravity-First** philosophy, empowering Google Antigravity AI coding and automation agents to "see", "understand", and "drive" developers' browsers safely, accurately, and intuitively.
 
 ---
 
-## 1. Mô hình Kết nối Antigravity & Agent Pilot
+## 1. Antigravity & Agent Pilot Architectural Topology
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                            HỆ THỐNG MÁY TÍNH HOST                           │
+│                              HOST WORKSTATION                               │
 │                                                                             │
 │  ┌───────────────────────────┐                ┌──────────────────────────┐  │
-│  │   Antigravity AI Agent    │                │  Lập Trình Viên / User   │  │
-│  │   (Coding Assistant)      │                │  (Quan sát trực tiếp)    │  │
+│  │   Antigravity AI Agent    │                │  Developer / QA Tester   │  │
+│  │   (Coding Assistant)      │                │  (Direct Observer)       │  │
 │  └─────────────┬─────────────┘                └────────────┬─────────────┘  │
 │                │                                           │                │
-│                │ 1. Phát JSON Action                       │ Quan sát chuột │
-│                │    hoặc gọi Script / MCP                  │ ảo & logs      │
+│                │ 1. Dispatches JSON Actions                │ Observes neon  │
+│                │    via CLI or MCP                         │ cursor & logs  │
 │                ▼                                           ▼                │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │                 CHROME BROWSER (AGENT PILOT EXTENSION)                │  │
@@ -29,11 +29,11 @@
 │  │              │                                       │                │  │
 │  │              ▼                                       ▼                │  │
 │  │  ┌─────────────────────────────────────────────────────────────────┐  │  │
-│  │  │ Web Tab (Localhost / App)                                       │  │  │
-│  │  │ - Con trỏ chuột ảo di chuyển mượt mà (X, Y)                     │  │  │
-│  │  │ - Sóng click ripple, tự động điền form                          │  │  │
-│  │  │ - Trích xuất tọa độ DOM & Bounding box                          │  │  │
-│  │  │ - window.__AGENT_PILOT__ Bridge API                             │  │  │
+│  │  │ Web Tab (Localhost / Web Application)                           │  │  │
+│  │  │ - Smooth virtual neon cursor trajectory (X, Y)                  │  │  │
+│  │  │ - Click ripple effects & automated form input                   │  │  │
+│  │  │ - DOM bounding box & framework source extraction                │  │  │
+│  │  │ - window.__AGENT_PILOT__ in-page API                            │  │  │
 │  │  └─────────────────────────────────────────────────────────────────┘  │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -41,11 +41,11 @@
 
 ---
 
-## 2. Giao thức Hành động JSON (Agent Control Protocol - ACP)
+## 2. Agent Control Protocol (ACP) - JSON Action Schema
 
-Antigravity có thể tạo ra các chuỗi lệnh JSON có cấu trúc để nạp vào Agent Pilot thực thi theo kịch bản:
+Antigravity generates structured JSON action pipelines executed sequentially by Agent Pilot:
 
-### Cú pháp mẫu:
+### Action Pipeline Example:
 ```json
 [
   {
@@ -83,39 +83,39 @@ Antigravity có thể tạo ra các chuỗi lệnh JSON có cấu trúc để n�
 ]
 ```
 
-### Danh mục hành động hỗ trợ:
-| Action | Tham số | Mô tả |
+### Supported Actions:
+| Action | Parameters | Description |
 | :--- | :--- | :--- |
-| `navigate` | `url` (string) | Điều hướng tab hiện tại đến địa chỉ mong muốn |
-| `wait` | `ms` (number) | Tạm dừng luồng thực thi trong khoảng thời gian mili-giây |
-| `mouse_move` | `x`, `y`, `duration` (ms) | Di chuyển con trỏ chuột ảo mượt mà đến tọa độ chỉ định |
-| `mouse_click` | `x`, `y`, `via?` ("synthetic" \| "cdp" \| "auto") | Phát hiệu ứng sóng click và chuỗi sự kiện DOM; `via: "cdp"` phát trusted click (bắt buộc cho cross-origin iframe/canvas/WebGL) |
-| `mouse_drag` | `from`/`to` (selector) hoặc `fromX/fromY/toX/toY`, `steps?`, `holdMs?`, `via?` | Kéo thả; dùng tọa độ + `via: "cdp"` cho game canvas (slingshot/aim) |
-| `type` | `selector` (string), `text` (string) | Di chuyển đến ô nhập liệu, kích hoạt focus và tự động gõ ký tự từng bước |
-| `scroll` | `deltaX`, `deltaY` (px) | Cuộn trang mượt mà theo trục X/Y |
-| `screenshot` | `mode` ("visible" \| "element" \| "region" \| "full") | Kích hoạt bộ chụp màn hình |
+| `navigate` | `url` (string) | Navigates the target tab to URL |
+| `wait` | `ms` (number) | Pauses execution for millisecond duration |
+| `mouse_move` | `x`, `y`, `duration` (ms) | Moves virtual cursor smoothly along Bezier curve to coordinates |
+| `mouse_click` | `x`, `y`, `via?` ("synthetic" \| "cdp" \| "auto") | Emits ripple effect and DOM click cascade; `via: "cdp"` issues trusted click (required for cross-origin iframes, Canvas, WebGL) |
+| `mouse_drag` | `from`/`to` (selector) or `fromX/fromY/toX/toY`, `steps?`, `holdMs?`, `via?` | Drag-and-drop gesture; use coordinates + `via: "cdp"` for canvas games |
+| `type` | `selector` (string), `text` (string) | Focuses input element and types text sequentially |
+| `scroll` | `deltaX`, `deltaY` (px) | Smooth scrolling along X/Y axes |
+| `screenshot` | `mode` ("visible" \| "element" \| "region" \| "full") | Triggers screenshot engine |
 
 ---
 
-## 3. Máy Chủ Cầu Nối WebSocket & MCP Server (Cổng 58765)
+## 3. WebSocket Bridge & Model Context Protocol (MCP) Server (Port 58765)
 
-Agent Pilot trang bị sẵn một máy chủ cầu nối hai chiều chuẩn **Model Context Protocol (MCP)** và **WebSocket** tại cổng chuyên dụng **`58765`** (dải cổng riêng tư IANA `49152 – 65535`, chống trùng lặp hoàn toàn với các dịch vụ dev thông thường).
+Agent Pilot operates a dual **Model Context Protocol (MCP)** and **WebSocket** bridge server on private IANA port **`58765`** (`49152 – 65535`, avoiding port collisions with standard development servers).
 
-### 3.1. Khởi chạy Máy chủ Cầu nối (Bridge Server):
+### 3.1. Starting the Bridge Server
 ```bash
-# Sử dụng binary Go (khuyên dùng, không phụ thuộc Node.js):
+# Using the Go standalone binary (recommended):
 agent-pilot server
 
-# Hoặc khởi chạy qua npm script:
+# Or via npm script:
 npm run server
 
-# Hoặc khởi chạy với cổng tùy chỉnh:
+# Or with custom port:
 AGENT_PILOT_PORT=58765 agent-pilot server
 ```
 
-### 3.2. Cấu hình Antigravity MCP Server:
-MCP hiện cung cấp 51 tool; các tool DevTools mở rộng được mô tả trong [DevTools nâng cao](DEVTOOLS.md).
-Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/config/mcp_config.json` hoặc cấu hình MCP dự án) để AI Agent tự động sở hữu toàn bộ 51 công cụ điều khiển trình duyệt. Binary phát hành nhúng sẵn runtime DevTools; máy sử dụng không cần cài Node/npm/FFmpeg hoặc dependency:
+### 3.2. Configuring Antigravity MCP Server
+Add the following configuration to your Antigravity MCP settings (`~/.gemini/config/mcp_config.json` or project MCP config) to grant agents complete browser control:
+
 ```json
 {
   "mcpServers": {
@@ -126,61 +126,55 @@ Thêm cấu hình sau vào tệp cấu hình MCP của Antigravity (`~/.gemini/c
   }
 }
 ```
-*(Nếu cài đặt binary ở đường dẫn riêng, thay `"agent-pilot"` bằng đường dẫn tuyệt đối như `"/home/ubuntu/.agk/bin/agent-pilot"` hoặc `"/usr/local/bin/agent-pilot"`)*.
 
-### 3.3. Bộ Công Cụ MCP Cung Cấp Cho AI Agent (51 Tools — trích lược):
-1. `browser_open_tab(url, active)`: Mở tab trình duyệt mới (mặc định mở nền không cướp focus của người dùng, tự động phân nhóm Chrome Tab Group).
-2. `browser_list_tabs()`: Liệt kê toàn bộ các tab trình duyệt kèm trạng thái tab do Agent quản lý.
-3. `browser_navigate(url, tabId)`: Điều hướng tab đang hoạt động hoặc tab chỉ định.
-4. `browser_click(x, y, selector, via)`: Di chuyển chuột ảo mượt mà và click vào tọa độ (X, Y) hoặc selector CSS. Thêm `via: "cdp"` để phát **trusted CDP input** — bắt buộc khi click bên trong cross-origin iframe hoặc canvas/WebGL; `via: "auto"` tự fallback synthetic.
-4b. `browser_drag(from, to, fromX, fromY, toX, toY, steps, holdMs, via)`: Kéo thả phần tử hoặc kéo giữa tọa độ; `via: "cdp"` + `holdMs` cho cơ chế kéo slingshot trong game.
-   *(Tiền kiểm tra CDP: `browser_run_actions` với action `cdp` gọi `cdp.status`, hoặc CLI `agent-pilot cdp status --tab <id>`.)*
-5. `browser_type(selector, text, clear, pressEnter)`: Tự động gõ phím human-like vào ô nhập liệu.
-6. `browser_scroll(deltaX, deltaY)`: Cuộn trang web mượt mà theo trục X hoặc Y.
-7. `browser_get_element(selector)`: Trích xuất Bounding Box, kích thước, CSS selector và XPath của phần tử DOM.
-8. `browser_screenshot(mode, tabId)`: Chụp ảnh màn hình (hỗ trợ chụp cả tab ngầm trong background mà không cần focus màn hình).
-9. `browser_get_devtools_data(tabId, type, limit, clear)`: Lấy toàn bộ Console logs, Network requests và Performance metrics (JS Heap, DOM Nodes) thời gian thực qua CDP.
-10. `browser_pick_color(x, y)`: Trích xuất mã màu pixel tại vị trí chỉ định (trả về 5 định dạng: HEX, RGB, RGBA, HSL, OKLCH).
-11. `browser_list_instances()`: Liệt kê các phiên bản trình duyệt Chrome đang kết nối đến hệ thống.
-12. `browser_select_instance(instanceId)`: Lựa chọn điều khiển một trình duyệt cụ thể trong môi trường đa trình duyệt.
-13. `browser_set_busy(busy, action)`: Hiển thị viền màn hình sáng tinh tế và thanh trạng thái nổi (floating pill) kèm nút mở khóa khi Agent thực thi thao tác phức tạp.
-14. `browser_run_actions(actions, tabId, stopOnError)`: Bộ máy gom cụm thực thi hàng loạt hành động trong 1 lệnh duy nhất (Batch Execution Engine), giảm 80%+ độ trễ và số token tiêu thụ.
-15. `browser_get_pending_feedback(limit, sessionId, clear)`: Truy vấn danh sách phiên phản hồi UI do người dùng tạo từ Feedback Studio lưu trong hộp thư máy chủ cục bộ.
-16. `browser_wait_for_feedback(timeout, tabId)`: Chế độ chờ phản hồi trực tiếp (Channel A Reactive Long-Polling), phản hồi ngay khi người dùng nhấn 'Gửi Agent'.
+### 3.3. Key MCP Tools Provided to AI Agents (51 Tools):
+1. `browser_open_tab(url, active)`: Opens a new tab (defaults to background to preserve developer focus; groups into `🤖 Agent Pilot`).
+2. `browser_list_tabs()`: Lists all tabs and isolation states.
+3. `browser_navigate(url, tabId)`: Navigates specified or active tab.
+4. `browser_click(x, y, selector, via)`: Moves virtual cursor and clicks element or coordinates. Add `via: "cdp"` for trusted input.
+5. `browser_drag(from, to, fromX, fromY, toX, toY, steps, holdMs, via)`: Drags between elements or coordinates.
+6. `browser_type(selector, text, clear, pressEnter)`: Human-like typing into form fields.
+7. `browser_scroll(deltaX, deltaY)`: Smooth horizontal and vertical scrolling.
+8. `browser_get_element(selector)`: Extracts bounding boxes, dimensions, CSS selectors, and XPath.
+9. `browser_screenshot(mode, tabId)`: Captures screenshots (including background tabs via CDP).
+10. `browser_get_devtools_data(tabId, type, limit, clear)`: Retrieves console logs, network requests, and performance metrics (JS Heap, DOM nodes).
+11. `browser_pick_color(x, y)`: Extracts pixel colors across 5 formats (HEX, RGB, RGBA, HSL, OKLCH).
+12. `browser_run_actions(actions, tabId, stopOnError)`: Batch execution engine executing multiple actions in one round-trip, saving 80%+ latency and tokens.
+13. `browser_wait_for_feedback(timeout, tabId)`: Long-polls for human visual feedback submitted via In-Page Feedback Studio.
 
-> 📝 *Danh sách trên là trích lược — xem `mcp/agent-pilot/` để có đủ 51 tool và [DevTools nâng cao](DEVTOOLS.md) cho CSS, Lighthouse, trace insights, MP4, context riêng, service worker, heap analysis và page-defined developer tools.*
+> 📝 *The full tool suite comprises 51 tools, detailed in [Advanced DevTools](DEVTOOLS.md).*
 
 ---
 
-## 4. Cầu nối In-Page API (`window.__AGENT_PILOT__`)
+## 4. In-Page Bridge API (`window.__AGENT_PILOT__`)
 
-Khi trang web được nạp, Content Script tự động phơi bày đối tượng toàn cục `window.__AGENT_PILOT__`. Các script tự động hóa hoặc test runner (Jest, Playwright, Cypress, Puppeteer) có thể tương tác trực tiếp:
+The extension automatically exposes `window.__AGENT_PILOT__` in the page context for direct programmatic automation:
 
 ```javascript
-// Di chuyển chuột ảo đến tọa độ (500, 300) trong 350ms
+// Move virtual cursor to (500, 300) over 350ms
 await window.__AGENT_PILOT__.moveMouse(500, 300, 350);
 
-// Click ảo tại vị trí hiện tại
+// Perform click with ripple effect
 await window.__AGENT_PILOT__.click(500, 300);
 
-// Tự động gõ chữ vào ô input
+// Type text into form input
 await window.__AGENT_PILOT__.type("#username-field", "admin@antigravity.ai");
 
-// Trích xuất vị trí, kích thước, selector của phần tử
+// Inspect element geometry
 const info = window.__AGENT_PILOT__.getElement("#submit-button");
-console.log("Vị trí phần tử:", info.rect); // { x: 500, y: 300, width: 120, height: 40 }
+console.log("Element bounds:", info.rect);
 
-// Nhặt màu trên màn hình (hỗ trợ 5 định dạng)
+// Pick pixel color
 const color = await window.__AGENT_PILOT__.pickColor();
-console.log("Mã màu đã nhặt:", color.hex, color.rgb, color.rgba, color.hsl, color.oklch);
+console.log("Color codes:", color.hex, color.rgb, color.rgba, color.hsl, color.oklch);
 ```
 
 ---
 
-## 5. Quy trình Antigravity Debug Tự động (End-to-End Workflow)
+## 5. Antigravity Autonomous Debugging Workflow
 
-1. **Khởi chạy ứng dụng dev**: Antigravity chạy server phát triển cục bộ (`http://localhost:3000` hoặc `test-page.html`).
-2. **Mở tab kiểm thử**: Agent gửi lệnh mở tab mới hoặc điều hướng đến trang kiểm thử qua Agent Pilot.
-3. **Gắn kết nối CDP**: Agent Pilot kết nối Chrome DevTools Protocol để lắng nghe lỗi `console.error` và các network request lỗi 4xx/5xx.
-4. **Mô phỏng hành vi người dùng**: Chuột ảo bay đến các nút bấm, điền form đăng ký, gửi dữ liệu.
-5. **Thu thập logs & Screenshot**: Nếu có lỗi phát sinh, Agent Pilot tự động chụp màn hình và trích xuất nguyên nhân lỗi gửi về cho Antigravity phân tích và sửa code tự động.
+1. **Start Dev Server**: Antigravity spins up local application server (`http://localhost:3000`).
+2. **Launch Target Tab**: Agent opens background tab via Agent Pilot.
+3. **Attach CDP Diagnostics**: Agent Pilot monitors `console.error` and HTTP 4xx/5xx network failures.
+4. **Simulate User Journey**: Neon cursor clicks buttons, completes forms, and exercises application flows.
+5. **Collect Diagnostics & Auto-Remediate**: On runtime exceptions, Agent Pilot captures viewport screenshots, stack traces, and framework component sources (`fileName:lineNumber`) for autonomous root-cause remediation.

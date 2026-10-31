@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ducconit/agent-pilot-extension/cli/feedback"
+	"github.com/ducconit/agent-pilot/cli/feedback"
 	"github.com/gorilla/websocket"
 )
 

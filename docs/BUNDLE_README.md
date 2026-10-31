@@ -1,42 +1,42 @@
-# 🚀 Agent Pilot — Tài Liệu Gói Cài Đặt Theo Hệ Điều Hành (OS Bundles)
+# 🚀 Agent Pilot — Operating System Bundles Guide
 
-Mỗi gói phát hành (Release Bundle) của **Agent Pilot** được đóng gói riêng biệt cho từng hệ điều hành với **binary tĩnh (`CGO_ENABLED=0`)**, **script cài đặt tự động 1 lệnh** và **hướng dẫn cấu hình MCP Server / Background Service** chuyên biệt cho hệ điều hành đó:
+Each official release of **Agent Pilot** is packaged specifically for target platforms with **statically linked binaries (`CGO_ENABLED=0`)**, **1-step automated installers**, and **platform-specific MCP / Background Service setup guides**:
 
-## 📚 Chọn Tài Liệu Theo Hệ Điều Hành Của Bạn
+## 📚 Platform-Specific Guides
 
-| Hệ Điều Hành | Kiến Trúc | Tài Liệu Hướng Dẫn Chuyên Biệt | Script Cài Đặt Đi Kèm | Dịch Vụ Chạy Ngầm |
+| Operating System | Architecture | Installation Guide | Included Installer | Background Daemon |
 | :--- | :--- | :--- | :--- | :--- |
-| 🐧 **Ubuntu / Linux** | `linux-amd64` | [**docs/bundles/README.ubuntu.md**](bundles/README.ubuntu.md) | `install.sh` | `systemd --user` (`~/.config/systemd/user/agent-pilot.service`) |
-| 🍎 **macOS** | `darwin-arm64` (Apple Silicon M1-M4) | [**docs/bundles/README.macos.md**](bundles/README.macos.md) | `install.sh` | `launchd` (`~/Library/LaunchAgents/com.agentpilot.bridge.plist`) |
-| 🪟 **Windows** | `windows-amd64` | [**docs/bundles/README.windows.md**](bundles/README.windows.md) | `install.ps1` | `Task Scheduler` (`AgentPilotBridge`) |
+| 🐧 **Ubuntu / Linux** | `linux-amd64` | [**Ubuntu / Linux Guide**](bundles/README.ubuntu) | `install.sh` | `systemd --user` (`~/.config/systemd/user/agent-pilot.service`) |
+| 🍎 **macOS** | `darwin-arm64` (Apple Silicon M1-M4) | [**macOS Guide**](bundles/README.macos) | `install.sh` | `launchd` (`~/Library/LaunchAgents/com.agentpilot.bridge.plist`) |
+| 🪟 **Windows** | `windows-amd64` | [**Windows Guide**](bundles/README.windows) | `install.ps1` | `Task Scheduler` (`AgentPilotBridge`) |
 
 ---
 
-## 📦 Cấu Trúc Của Mỗi Gói Bundle
+## 📦 Bundle Directory Structure
 
-Khi chạy `npm run pack:bundle` (hoặc `npm run pack:bundle:ubuntu`, `npm run pack:bundle:macos`, `npm run pack:bundle:windows`), hệ thống tạo ra 3 gói `.zip` tại `dist/bundles/` với cấu trúc:
+Running `npm run pack:bundle` produces standalone release `.zip` archives under `dist/bundles/`:
 
 ```text
 agent-pilot-{{VERSION}}-{{PLATFORM}}/
-├── extensions/            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome (Load unpacked)
-├── install.sh / .ps1      Script cài đặt 1 lệnh theo đúng hệ điều hành
+├── extensions/            Chrome Extension (Manifest V3) — loaded unpacked in Chrome
+├── install.sh / .ps1      1-step platform installer script
 ├── skills/agent-pilot/    Agent Skill + scripts/{{BINARY_NAME}} native CLI/MCP
-└── README.md              Bản hướng dẫn đã được biên dịch riêng cho {{PLATFORM}}
+└── README.md              OS-specific guide compiled for {{PLATFORM}}
 ```
 
 ---
 
-## 🛠️ Lệnh Đóng Gói Từng Bản Từ Mã Nguồn
+## 🛠️ Build Bundles from Source
 
 ```bash
-# Đóng gói toàn bộ 3 hệ điều hành (linux, macos, windows):
+# Package all platforms (Linux, macOS, Windows):
 npm run pack:bundle
 
-# Hoặc đóng gói riêng từng bản theo hệ điều hành:
-npm run pack:bundle:ubuntu    # Chỉ đóng gói bản Ubuntu/Linux (linux-amd64)
-npm run pack:bundle:macos     # Chỉ đóng gói bản macOS (darwin-arm64)
-npm run pack:bundle:windows   # Chỉ đóng gói bản Windows (windows-amd64)
+# Or package individual platforms:
+npm run pack:bundle:ubuntu    # Ubuntu / Linux (linux-amd64)
+npm run pack:bundle:macos     # macOS Apple Silicon (darwin-arm64)
+npm run pack:bundle:windows   # Windows (windows-amd64)
 ```
 
 ---
-MIT License · Tác giả **DNT** ([@ducconit](https://github.com/ducconit)) · https://github.com/ducconit/agent-pilot-extension
+MIT License · Maintained by **DNT** ([@ducconit](https://github.com/ducconit)) · https://github.com/ducconit/agent-pilot

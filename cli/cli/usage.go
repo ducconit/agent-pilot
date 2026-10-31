@@ -7,14 +7,14 @@ package cli
 import (
 	"fmt"
 
-	"github.com/ducconit/agent-pilot-extension/cli/version"
+	"github.com/ducconit/agent-pilot/cli/version"
 )
 
 // usageTextTemplate is printed by `agent-pilot` with no arguments
 // (interactive), `--help`, `-h` or `help`. The version is injected at build
 // time (see the version package); the rest of the text stays verbatim.
 const usageTextTemplate = `Agent Pilot CLI (%s) - Universal AI Agent Browser Controller
-Mã nguồn & Tài liệu: https://github.com/ducconit/agent-pilot-extension
+Mã nguồn & Tài liệu: https://github.com/ducconit/agent-pilot
 
 SỬ DỤNG:
   agent-pilot [lệnh] [tùy chọn]

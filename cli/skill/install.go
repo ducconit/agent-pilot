@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"strings"
 
-	agentpilot "github.com/ducconit/agent-pilot-extension"
+	agentpilot "github.com/ducconit/agent-pilot"
 )
 
 const skillDirName = "agent-pilot"

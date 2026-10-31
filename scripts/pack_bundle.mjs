@@ -202,9 +202,9 @@ async function buildBinary(platform, outputPath) {
   const ldflags = [
     "-s",
     "-w",
-    `-X github.com/ducconit/agent-pilot-extension/cli/version.Version=${version}`,
-    `-X github.com/ducconit/agent-pilot-extension/cli/version.Commit=${commit}`,
-    `-X github.com/ducconit/agent-pilot-extension/cli/version.Date=${buildDate}`
+    `-X github.com/ducconit/agent-pilot/cli/version.Version=${version}`,
+    `-X github.com/ducconit/agent-pilot/cli/version.Commit=${commit}`,
+    `-X github.com/ducconit/agent-pilot/cli/version.Date=${buildDate}`
   ].join(" ");
   execFileSync("go", ["build", "-ldflags", ldflags, "-o", outputPath, "./cli/cmd/agent-pilot"], {
     cwd: ROOT_DIR,

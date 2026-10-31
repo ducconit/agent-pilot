@@ -1,4 +1,4 @@
-module github.com/ducconit/agent-pilot-extension
+module github.com/ducconit/agent-pilot
 
 go 1.26.7
 

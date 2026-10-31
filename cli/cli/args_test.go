@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ducconit/agent-pilot-extension/cli/config"
+	"github.com/ducconit/agent-pilot/cli/config"
 )
 
 func TestParseBusyArgs_Default(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/ducconit/agent-pilot-extension/cli/config"
+	"github.com/ducconit/agent-pilot/cli/config"
 )
 
 // The service identifiers (config.ServerSubcommand, config.ServiceNameLinux, config.PlistNameDarwin,
@@ -270,7 +270,7 @@ func (m *LinuxServiceManager) Install() error {
 	escapedExec = strings.ReplaceAll(escapedExec, "%", "%%")
 	unitContent := fmt.Sprintf(`[Unit]
 Description=Agent Pilot Browser Control Bridge (User Mode)
-Documentation=https://github.com/ducconit/agent-pilot-extension
+Documentation=https://github.com/ducconit/agent-pilot
 After=network.target
 
 [Service]
