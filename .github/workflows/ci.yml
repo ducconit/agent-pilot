@@ -33,11 +33,14 @@ jobs:
       - name: Run Syntax & Lint Checks
         run: npm run lint
 
-      - name: Run Browserless Unit Tests (Sanitizer, Item Schema, Color Utils, Background API)
-        run: npm run test:secret && npm run test:item-schema && npm run test:color-utils && npm run test:background-api
+      - name: Run JavaScript Unit Tests (Sanitizer, Schema, Color, API, Recorder, Harness)
+        run: npm run test:unit
 
       - name: Run Go Unit Tests (Race Detector)
         run: npm run test:cli
+
+      - name: Verify Windows Installer & Platform Scripts (PowerShell)
+        run: npm run test:group:platform
 
       - name: Test Go CLI Build (Static Binary)
         run: |
@@ -48,7 +51,7 @@ jobs:
         run: npm run test:devtools
 
       - name: Verify Embedded Runtime Without System Node
-        run: node scripts/verify_packaged_devtools.mjs
+        run: npm run test:packaged-devtools
 
       - name: Test Extension Packaging
         run: npm run pack

@@ -97,29 +97,39 @@ export async function run(ctx) {
     };
   });
 
-  // Test clicking guide button: opens guide.html and focuses on repeated clicks
+  // Test clicking guide button: opens GitHub Pages documentation and focuses on repeated clicks
   const guideTest = await sidepanelPage.evaluate(async () => {
     const btn = document.getElementById("btn-open-guide");
     if (!btn) return { opened: false, singleTab: false };
+    const isGuideTab = t => {
+      const u = t.url || t.pendingUrl || "";
+      return u.includes("agent-pilot") && (u.includes("github.io") || u.includes("gnos.cloud"));
+    };
     btn.click();
-    await new Promise(r => setTimeout(r, 300));
-    return new Promise((resolve) => {
-      chrome.tabs.query({}, (tabs) => {
-        const guideTabs = tabs.filter(t => t.url && t.url.includes("guide.html"));
-        // Click again to verify existing tab is focused rather than duplicated
-        btn.click();
-        setTimeout(() => {
-          chrome.tabs.query({}, (tabsAfter) => {
-            const guideTabsAfter = tabsAfter.filter(t => t.url && t.url.includes("guide.html"));
-            resolve({
-              opened: guideTabs.length >= 1,
-              singleTab: guideTabsAfter.length === 1,
-              guideUrl: guideTabs[0]?.url
-            });
-          });
-        }, 300);
-      });
-    });
+    await new Promise(r => setTimeout(r, 600));
+
+    const tabs1 = await new Promise(resolve => chrome.tabs.query({}, resolve));
+    const guideTabs1 = tabs1.filter(isGuideTab);
+    const opened = guideTabs1.length >= 1;
+
+    // Click again to verify existing tab is focused rather than duplicated
+    btn.click();
+    await new Promise(r => setTimeout(r, 600));
+
+    const tabs2 = await new Promise(resolve => chrome.tabs.query({}, resolve));
+    const guideTabs2 = tabs2.filter(isGuideTab);
+    const singleTab = guideTabs2.length === 1;
+
+    // Clean up created tab
+    for (const tab of guideTabs2) {
+      if (tab.id) chrome.tabs.remove(tab.id);
+    }
+
+    return {
+      opened,
+      singleTab,
+      guideUrl: guideTabs1[0]?.url || guideTabs1[0]?.pendingUrl
+    };
   });
 
   // Test Color Eyedropper 5 formats update and 1-click copy

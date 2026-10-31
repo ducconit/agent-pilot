@@ -104,13 +104,28 @@ export function createRecorder({
 export function startStaticServer(port, rootDir = ROOT_DIR) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
+      const rawPath = req.url === "/" ? "/test-page.html" : req.url.split("?")[0];
       const sanitizedUrl = path
-        .normalize(req.url === "/" ? "/test-page.html" : req.url.split("?")[0])
+        .normalize(rawPath)
         .replace(/^(\.\.[\/\\])+/, "");
-      let filePath = path.join(rootDir, sanitizedUrl);
+
+      // Try test/ directory first (e.g. test-page.html -> test/test-page.html)
+      const subPath = sanitizedUrl.replace(/^\/?test\//, "");
+      let filePath = path.join(rootDir, "test", subPath);
+
+      // If not in test/, check relative to rootDir (e.g. assets/...)
       if (!filePath.startsWith(rootDir) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-        filePath = path.join(rootDir, "test-page.html");
+        filePath = path.join(rootDir, sanitizedUrl);
       }
+
+      // Fallback: serve test/test-page.html (or rootDir/test-page.html)
+      if (!filePath.startsWith(rootDir) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+        filePath = path.join(rootDir, "test", "test-page.html");
+        if (!fs.existsSync(filePath)) {
+          filePath = path.join(rootDir, "test-page.html");
+        }
+      }
+
       const ext = path.extname(filePath);
       res.writeHead(200, { "Content-Type": STATIC_CONTENT_TYPES[ext] || "text/plain" });
       res.end(fs.readFileSync(filePath));
@@ -143,7 +158,8 @@ let exitHookInstalled = false;
 function installExitHook() {
   if (exitHookInstalled) return;
   exitHookInstalled = true;
-  process.once("exit", () => {
+
+  const cleanupBrowsers = () => {
     for (const browser of launchedBrowsers) {
       try {
         browser.process()?.kill("SIGKILL");
@@ -151,7 +167,17 @@ function installExitHook() {
         // Best effort only; the process is already exiting.
       }
     }
-  });
+  };
+
+  process.once("exit", cleanupBrowsers);
+
+  for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+    process.once(sig, () => {
+      cleanupBrowsers();
+      const code = 128 + (sig === "SIGINT" ? 2 : sig === "SIGTERM" ? 15 : 1);
+      process.exit(code);
+    });
+  }
 }
 
 /**

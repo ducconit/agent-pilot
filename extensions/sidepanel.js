@@ -154,13 +154,17 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
     };
   }
 
-  // Open / Focus Application Guide Page
+  // Open / Focus Application Guide Page (GitHub Pages Documentation)
   const btnOpenGuide = document.getElementById("btn-open-guide");
   if (btnOpenGuide) {
     btnOpenGuide.onclick = () => {
-      const guideUrl = chrome.runtime.getURL("guide.html");
+      const guideUrl = "https://ducconit.github.io/agent-pilot/";
       chrome.tabs.query({}, (tabs) => {
-        const existingTab = tabs.find(t => t.url && t.url.startsWith(guideUrl));
+        const isGuideTab = (t) => {
+          const u = t.url || t.pendingUrl || "";
+          return u.includes("agent-pilot") && (u.includes("github.io") || u.includes("gnos.cloud"));
+        };
+        const existingTab = tabs.find(isGuideTab);
         if (existingTab && existingTab.id) {
           chrome.tabs.update(existingTab.id, { active: true });
           if (existingTab.windowId) {

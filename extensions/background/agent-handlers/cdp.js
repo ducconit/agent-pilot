@@ -24,21 +24,31 @@ export const cdpHandlers = {
   "cdp.status": async (client, params, respond) => {
     const tabId = await client.getTargetTabId(params.tabId, params.agentId);
     if (!tabId) return respond(null, new Error(NO_TARGET_TAB_ERROR));
-    const status = await attachDebugger(tabId, client.broadcastFn).catch((err) => ({
-      success: false,
-      error: err && err.message ? err.message : String(err)
-    }));
-    if (!status || status.success === false) {
-      respond({
-        success: true,
-        attached: false,
-        tabId,
-        error: (status && status.error) || "unknown",
-        hint: "Close DevTools, allow the debugger permission, or use --via auto/synthetic."
-      });
+    const isAttached = attachedTabs.has(tabId);
+    if (params && (params.probe === true || params.autoAttach === true)) {
+      const status = await attachDebugger(tabId, client.broadcastFn).catch((err) => ({
+        success: false,
+        error: err && err.message ? err.message : String(err)
+      }));
+      if (!status || status.success === false) {
+        respond({
+          success: true,
+          attached: false,
+          tabId,
+          error: (status && status.error) || "unknown",
+          hint: "Close DevTools, allow the debugger permission, or use --via auto/synthetic."
+        });
+        return;
+      }
+      respond({ success: true, attached: true, tabId });
       return;
     }
-    respond({ success: true, attached: true, tabId });
+    respond({
+      success: true,
+      attached: isAttached,
+      tabId,
+      ...(!isAttached ? { hint: "CDP is not currently attached. Call cdp.attach (or 'agent-pilot cdp attach') to attach." } : {})
+    });
   },
 
   "cdp.send": async (client, params, respond) => {

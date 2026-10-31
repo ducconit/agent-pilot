@@ -4,12 +4,19 @@
  * (rgbToHex output is UPPERCASE in both modules to stay aligned).
  */
 
+function clampRgb(v) {
+  return Number.isFinite(v) ? Math.max(0, Math.min(255, Math.round(v))) : 0;
+}
+
 export function srgbToLinear(c) {
-  c = c / 255;
+  c = clampRgb(c) / 255;
   return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 }
 
 export function rgbToOklch(r, g, b) {
+  r = clampRgb(r);
+  g = clampRgb(g);
+  b = clampRgb(b);
   const rLin = srgbToLinear(r);
   const gLin = srgbToLinear(g);
   const bLin = srgbToLinear(b);
@@ -55,13 +62,16 @@ export function hexToRgbNums(hex) {
 
 export function rgbToHex(r, g, b) {
   return "#" + [r, g, b].map((x) => {
-    const h = Math.max(0, Math.min(255, Math.round(x))).toString(16);
+    const num = Number.isFinite(x) ? x : 0;
+    const h = Math.max(0, Math.min(255, Math.round(num))).toString(16);
     return h.length === 1 ? "0" + h : h;
   }).join("").toUpperCase();
 }
 
 export function rgbToHsl(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
+  r = clampRgb(r) / 255;
+  g = clampRgb(g) / 255;
+  b = clampRgb(b) / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
   let h, s, l = (max + min) / 2;
   if (max === min) {
@@ -80,7 +90,11 @@ export function rgbToHsl(r, g, b) {
 }
 
 export function rgbToRgba(r, g, b, a = 1) {
-  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a})`;
+  const rClamped = clampRgb(r);
+  const gClamped = clampRgb(g);
+  const bClamped = clampRgb(b);
+  const aClamped = Number.isFinite(a) ? Math.max(0, Math.min(1, a)) : 1;
+  return `rgba(${rClamped}, ${gClamped}, ${bClamped}, ${aClamped})`;
 }
 
 /**
@@ -93,7 +107,7 @@ export function normalizeColorData(colorObj) {
   // Fast path: if colorObj already contains all 5 pre-calculated formats from eyedropper IPC, use directly
   if (colorObj.hex && colorObj.rgb && colorObj.rgba && colorObj.hsl && colorObj.oklch) {
     let { r, g, b } = colorObj;
-    if (typeof r !== "number" || typeof g !== "number" || typeof b !== "number") {
+    if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) {
       const nums = hexToRgbNums(colorObj.hex);
       r = nums.r; g = nums.g; b = nums.b;
     }
@@ -101,7 +115,7 @@ export function normalizeColorData(colorObj) {
       r,
       g,
       b,
-      hex: colorObj.hex,
+      hex: colorObj.hex.toUpperCase(),
       rgb: colorObj.rgb,
       rgba: colorObj.rgba,
       hsl: colorObj.hsl,
@@ -113,14 +127,16 @@ export function normalizeColorData(colorObj) {
   if (typeof colorObj === "string") {
     const nums = hexToRgbNums(colorObj);
     r = nums.r; g = nums.g; b = nums.b;
-  } else if (typeof colorObj.r === "number" && typeof colorObj.g === "number" && typeof colorObj.b === "number") {
-    r = colorObj.r; g = colorObj.g; b = colorObj.b;
+  } else if (Number.isFinite(colorObj.r) && Number.isFinite(colorObj.g) && Number.isFinite(colorObj.b)) {
+    r = Math.max(0, Math.min(255, Math.round(colorObj.r)));
+    g = Math.max(0, Math.min(255, Math.round(colorObj.g)));
+    b = Math.max(0, Math.min(255, Math.round(colorObj.b)));
   } else if (colorObj.hex) {
     const nums = hexToRgbNums(colorObj.hex);
     r = nums.r; g = nums.g; b = nums.b;
   }
 
-  const hex = colorObj.hex || rgbToHex(r, g, b);
+  const hex = colorObj.hex ? colorObj.hex.toUpperCase() : rgbToHex(r, g, b);
   const rgb = colorObj.rgb || `rgb(${r}, ${g}, ${b})`;
   const rgba = colorObj.rgba || rgbToRgba(r, g, b, 1);
   const hsl = colorObj.hsl || rgbToHsl(r, g, b);

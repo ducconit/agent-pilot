@@ -7,20 +7,18 @@
 export const AGENT_SECURITY_NOTICE = "⚠️ [SECURITY NOTICE FOR AGENT] One or more sensitive credentials (API keys, private keys, or tokens) have been masked with asterisks (*) to protect secrets from leaking to LLM providers. Asterisks are redaction placeholders, NOT the literal key values. Do not attempt to use asterisks as credentials.";
 
 export const SECRET_PATTERNS = [
-  // 1. Private Keys (RSA, EC, OpenSSH, DSA, PGP)
+  // 1. Private Keys (RSA, EC, OpenSSH, DSA, PGP, SSH2)
   {
     name: "Private Key",
-    regex: /-----BEGIN (?:[A-Z0-9_-]+ )?PRIVATE KEY-----[\s\S]+?-----END (?:[A-Z0-9_-]+ )?PRIVATE KEY-----/g,
-    replacer: (match) => {
-      const header = match.split("\n")[0] || "-----BEGIN PRIVATE KEY-----";
-      const footer = match.trim().split("\n").pop() || "-----END PRIVATE KEY-----";
+    regex: /(-----BEGIN (?:[A-Z0-9_-]+ )*PRIVATE KEY(?: BLOCK)?-----)[\s\S]+?(-----END (?:[A-Z0-9_-]+ )*PRIVATE KEY(?: BLOCK)?-----)/g,
+    replacer: (_match, header, footer) => {
       return `${header}\n******************** [MASKED_SECRET: Private Key]\n${footer}`;
     }
   },
-  // 2. OpenAI API Keys (Legacy sk- and newer sk-proj- / sk-admin-)
+  // 2. OpenAI API Keys (Legacy sk-, sk-proj-, sk-admin-, and sk-svcacct-)
   {
     name: "OpenAI API Key",
-    regex: /\b(?:sk-proj-[a-zA-Z0-9_-]{20,}|sk-admin-[a-zA-Z0-9_-]{20,}|sk-[a-zA-Z0-9]{20,48})\b/g,
+    regex: /\b(?:sk-proj-[a-zA-Z0-9_-]{20,}|sk-admin-[a-zA-Z0-9_-]{20,}|sk-svcacct-[a-zA-Z0-9_-]{20,}|sk-[a-zA-Z0-9]{20,48})\b/g,
     replacer: (match) => {
       const prefix = match.slice(0, 7);
       return `${prefix}******************** [MASKED_SECRET: OpenAI API Key]`;
@@ -49,7 +47,7 @@ export const SECRET_PATTERNS = [
     name: "GitHub Token",
     regex: /\b(?:ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{50,82})\b/g,
     replacer: (match) => {
-      const prefix = match.slice(0, 4);
+      const prefix = match.startsWith("github_pat_") ? "github_pat_" : match.slice(0, 4);
       return `${prefix}******************** [MASKED_SECRET: GitHub Token]`;
     }
   },
@@ -106,10 +104,10 @@ export const SECRET_PATTERNS = [
       return `${prefix}******************** [MASKED_SECRET: URL Basic Auth]${suffix}`;
     }
   },
-  // 12. URL Query Parameters (api_key=..., token=..., secret=..., password=...)
+  // 12. URL Query Parameters (api_key=..., token=..., secret=..., password=..., refresh_token=...)
   {
     name: "URL Secret Parameter",
-    regex: /([?&](?:api_key|apikey|access_token|auth_token|token|password|passwd|secret)=)([^&\s]{6,})/gi,
+    regex: /([?&](?:api_?key|apikey|access_?token|auth_?token|token|password|passwd|secret|refresh_?token)=)([^&\s]{6,})/gi,
     replacer: (match, paramKey, secretVal) => {
       return `${paramKey}******************** [MASKED_SECRET: URL Parameter]`;
     }
@@ -117,18 +115,18 @@ export const SECRET_PATTERNS = [
   // 13. JSON / Key-Value Sensitive Properties ("password": "...", "client_secret": "...")
   {
     name: "Sensitive Key-Value",
-    regex: /(["']?(?:password|passwd|secret|client_?secret|access_?token|auth_?token|api_?key|authorization|proxy-authorization|cookie|set-cookie|x-api-key|credentials|token)["']?\s*[:=]\s*["'])([^"'\\,]{4,}?)(["'])/gi,
-    replacer: (match, prefix, secretVal, suffix) => {
+    regex: /(["']?(?:(?:[a-zA-Z0-9_]+_)?(?:password|passwd|passcode|secret|token|credentials)|pin|otp|(?:aws_)?secret(?:_access)?_?key|client_?secret|app_?secret|master_?key|signing_?key|api_?key|x-api-key|access_?token|auth_?token|refresh_?token|id_?token|private_?key|authorization|proxy-authorization|cookie|set-cookie)["']?\s*[:=]\s*(["']))((?:\\[\s\S]|[^"'\r\n\\]){1,}?)(\2)/gi,
+    replacer: (match, prefix, q1, secretVal, q2) => {
       // Never re-mask an already masked value, or the inner marker type is lost
       if (ALREADY_MASKED_REGEX.test(secretVal.trim())) return match;
       const p = secretVal.slice(0, 2);
-      return `${prefix}${p}******************** [MASKED_SECRET: Sensitive Field]${suffix}`;
+      return `${prefix}${p}******************** [MASKED_SECRET: Sensitive Field]${q2}`;
     }
   }
 ];
 
 const ALREADY_MASKED_REGEX = /^[a-zA-Z0-9_-]{0,10}\*{20} \[MASKED_SECRET: [^\]]+\]$/;
-const SENSITIVE_KEY_REGEX = /^(?:password|passwd|passcode|pin|otp|secret|api_?key|x-api-key|access_?token|auth_?token|private_?key|client_?secret|authorization|proxy-authorization|cookie|set-cookie|credentials|token)$/i;
+const SENSITIVE_KEY_REGEX = /^(?:(?:[a-zA-Z0-9_]+_)?(?:password|passwd|passcode|secret|token|credentials)|pin|otp|(?:aws_)?secret(?:_access)?_?key|client_?secret|app_?secret|master_?key|signing_?key|api_?key|x-api-key|access_?token|auth_?token|refresh_?token|id_?token|private_?key|authorization|proxy-authorization|cookie|set-cookie)$/i;
 
 /**
  * Mask a single string by checking all secret patterns.
@@ -172,9 +170,11 @@ export function sanitizeDataWithMeta(data, isEnabled = true) {
 
   let totalMaskedCount = 0;
   const allMaskedTypes = new Set();
+  const memo = new WeakMap();
 
-  function walk(val, keyContext = "", ancestors = new WeakSet()) {
+  function walk(val, keyContext = "", ancestors = new WeakSet(), depth = 0) {
     if (val === null || val === undefined) return val;
+    if (depth > 100) return "[MaxDepthExceeded]";
 
     if (typeof val === "string") {
       // First check if property key context is sensitive
@@ -208,16 +208,21 @@ export function sanitizeDataWithMeta(data, isEnabled = true) {
       return val;
     }
 
+    if (ancestors.has(val)) return "[Circular]";
+    if (memo.has(val)) return memo.get(val);
+
     if (Array.isArray(val)) {
-      if (ancestors.has(val)) return "[Circular]";
       ancestors.add(val);
-      const copy = val.map((item) => walk(item, keyContext, ancestors));
+      const copy = [];
+      memo.set(val, copy);
+      for (const item of val) {
+        copy.push(walk(item, keyContext, ancestors, depth + 1));
+      }
       ancestors.delete(val);
       return copy;
     }
 
     if (typeof val === "object") {
-      if (ancestors.has(val)) return "[Circular]";
       ancestors.add(val);
 
       let entries;
@@ -229,8 +234,9 @@ export function sanitizeDataWithMeta(data, isEnabled = true) {
       }
 
       const copy = {};
+      memo.set(val, copy);
       for (const [k, v] of entries) {
-        copy[k] = walk(v, k, ancestors);
+        copy[k] = walk(v, k, ancestors, depth + 1);
       }
       ancestors.delete(val);
       return copy;

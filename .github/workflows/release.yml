@@ -61,16 +61,19 @@ jobs:
       - name: Run Syntax & Lint Checks
         run: npm run lint
 
-      - name: Run Browserless Unit Tests
-        run: npm run test:secret && npm run test:item-schema && npm run test:color-utils && npm run test:background-api
+      - name: Run Unit Tests (Secret, Schema, Color, API, Recorder, Harness)
+        run: npm run test:unit
 
       - name: Run Go Unit Tests (Race Detector)
         run: npm run test:cli
 
+      - name: Verify Windows Installer & Platform Scripts (PowerShell)
+        run: npm run test:group:platform
+
       - name: Verify Self-Contained MCP Binary (No System Node or FFmpeg)
         run: |
           npm run build:cli
-          node scripts/verify_packaged_devtools.mjs
+          npm run test:packaged-devtools
 
       - name: Verify DevTools Through the Extension
         run: npm run test:devtools

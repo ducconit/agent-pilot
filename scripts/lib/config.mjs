@@ -19,9 +19,10 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Paths ────────────────────────────────────────────────────────────────────
 export const ROOT_DIR = path.resolve(HERE, "..", "..");
+export const TEST_DIR = path.join(ROOT_DIR, "test");
 export const EXTENSIONS_DIR = path.join(ROOT_DIR, "extensions");
 export const ASSETS_DIR = path.join(ROOT_DIR, "assets");
-export const TEST_PAGE = path.join(ROOT_DIR, "test-page.html");
+export const TEST_PAGE = path.join(TEST_DIR, "test-page.html");
 
 // ── Networking ───────────────────────────────────────────────────────────────
 export const LOCAL_HOST = "127.0.0.1";
@@ -81,6 +82,7 @@ function deepFreeze(value) {
 // Aggregate, deep-frozen view of the whole configuration.
 export const config = deepFreeze({
   ROOT_DIR,
+  TEST_DIR,
   EXTENSIONS_DIR,
   ASSETS_DIR,
   TEST_PAGE,

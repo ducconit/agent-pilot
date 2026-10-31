@@ -43,21 +43,42 @@ npm install
 Dự án trang bị hệ thống kiểm thử tự động toàn diện trên trình duyệt thật (Chromium):
 
 ```bash
-# 1. Kiểm tra cú pháp (Syntax & Lint Check trên toàn bộ 25+ tệp mã nguồn)
+# 1. Kiểm tra cú pháp (Syntax & Lint Check trên toàn bộ 160+ tệp mã nguồn)
 npm run lint
 
-# 2. Chạy bộ kiểm thử 15 tính năng cốt lõi của Extension (DOM, Chuột ảo, CDP, Inspector, Eyedropper, Screenshot)
+# 2. Chạy toàn bộ Unit Tests siêu tốc (Browserless: Secret Sanitizer, Schema XSS, Color Utils, Background API, Recorder)
+npm run test:unit
+
+# 3. Chạy bộ kiểm thử 16 tính năng cốt lõi của Extension trên Chromium thật (DOM, Chuột ảo, CDP, Inspector, Eyedropper, Screenshot)
 npm test
 
-# 3. Chạy bộ kiểm thử kết nối AI Agent & 29 kịch bản điều khiển qua cổng 58765
+# 4. Chạy bộ kiểm thử kết nối AI Agent & 29 kịch bản điều khiển qua cổng 58765
 npm run test:agent
 
-# 4. Kiểm thử độc lập lớp lọc Secret & API Key Redaction
-node scripts/verify_secret_sanitizer.mjs
+# 5. Chạy bộ kiểm thử Go CLI & Race Detector
+npm run test:cli
 
-# 5. Kiểm thử đóng gói bản phát hành
+# 6. Kiểm thử đóng gói bản phát hành
 npm run pack
 ```
+
+### 📂 Phân Nhóm Kiểm Thử (Test Groups)
+
+Bộ test suite trong thư mục `./test/` được phân tách theo từng miền chức năng rõ rệt, cho phép chạy độc lập:
+
+| Nhóm Kiểm Thử | Lệnh Chạy | Mô Tả |
+| :--- | :--- | :--- |
+| **Unit (Toàn bộ)** | `npm run test:unit` | 7 tệp kiểm thử đơn vị thuần Node.js, không cần mở trình duyệt (~1s) |
+| **Unit: Security** | `npm run test:unit:security` | Lớp lọc bảo mật Secret/API Key Redaction & Schema chống XSS |
+| **Unit: Core** | `npm run test:unit:core` | Background API handlers, Color Utils, Recorder State Machine |
+| **Unit: Harness** | `npm run test:unit:harness` | Khởi tạo cờ Chrome & dọn dẹp static server |
+| **E2E: Core** | `npm run test:group:core` *(hoặc `npm test`)* | 16 tính năng cốt lõi (DOM, cursor, CDP, sidepanel, tab group isolation) |
+| **E2E: Bridge** | `npm run test:group:bridge` | Kết nối AI Agent WebSocket port 58765 & 29 kịch bản |
+| **E2E: Feedback** | `npm run test:group:feedback` | Feedback Studio, Annotator vẽ hộp/ghim điểm, edit/delete |
+| **E2E: DevTools** | `npm run test:group:devtools` | DevTools protocol, Lighthouse, phân tích JS Heap rò rỉ bộ nhớ |
+| **E2E: Protocols** | `npm run test:group:protocols` | Khai báo & thực thi WebMCP, Chrome PWA Adapter |
+| **Platform** | `npm run test:group:platform` | Cú pháp PowerShell, UTF-8 BOM và xuống dòng CRLF cho Windows |
+| **All-in-One** | `npm run test:all` | Chạy toàn diện Go CLI + Unit Tests + E2E Suites |
 
 > ⚠️ **Nguyên tắc vàng**: Mọi PR bắt buộc phải vượt qua toàn bộ `npm run lint` và `npm test` mà không có bất kỳ lỗi hay cảnh báo nào trước khi được xem xét hợp nhất.
 

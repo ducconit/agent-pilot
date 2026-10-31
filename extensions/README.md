@@ -52,4 +52,4 @@ Chào mừng bạn đến với **Agent Pilot** – Tiện ích mở rộng đi�
 - **🎯 Soi phần tử & Kiểu dáng CSS**: Bắt tọa độ, selector, xpath, xem thông số Computed CSS kèm bộ lọc tìm kiếm và tự động tắt sau khi chọn.
 - **🎨 Kính lúp phóng đại 11x11 pixel**: Kính lúp theo dõi con trỏ chuột, hiển thị lưới điểm ảnh cực nét để lấy màu HEX, RGB, HSL chính xác.
 - **📸 Chụp ảnh màn hình & Auto-Copy**: Chụp toàn màn hình, kéo vùng crop, chụp chọn phần tử (Element Snap) và công tắc tự động sao chép ảnh vào Clipboard.
-- **📖 Trang Hướng Dẫn Responsive**: Tích hợp trang tài liệu offline `guide.html` ngay trong tiện ích, hỗ trợ chuyển focus tab thông minh.
+- **📖 Tài Liệu Hướng Dẫn Trực Tuyến**: Nút mở trang tài liệu VitePress trên GitHub Pages (`https://ducconit.github.io/agent-pilot/`), hỗ trợ chuyển focus tab thông minh tránh mở tab trùng lặp.

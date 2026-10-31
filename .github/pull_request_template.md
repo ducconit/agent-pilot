@@ -14,7 +14,7 @@
 ## 🧪 Quy Trình Xác Minh Đã Thực Hiện (Verification & Testing)
 Vui lòng đánh dấu các bước bạn đã chạy thành công trước khi gửi PR:
 - [ ] `npm run lint`: 0 lỗi cú pháp across all files.
-- [ ] `npm test`: Bộ 14 tính năng cốt lõi chạy thành công 100% trên trình duyệt.
+- [ ] `npm test`: Bộ 16 tính năng cốt lõi chạy thành công 100% trên trình duyệt.
 - [ ] `npm run test:agent`: Toàn bộ kịch bản kiểm thử kết nối Agent đạt 100% PASS.
 - [ ] Đã kiểm tra thực tế trên tiện ích Chrome (`chrome://extensions` - Load unpacked).
 

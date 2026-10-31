@@ -227,7 +227,7 @@ console.log("Mã màu đã nhặt:", color.hex, color.rgb, color.rgba, color.hsl
 
 ## 6. Quy trình Antigravity Debug Tự động (End-to-End Workflow)
 
-1. **Khởi chạy ứng dụng dev**: Antigravity chạy server phát triển cục bộ (`http://localhost:3000` hoặc `test-page.html`).
+1. **Khởi chạy ứng dụng dev**: Antigravity chạy server phát triển cục bộ (`http://localhost:3000` hoặc `test/test-page.html`).
 2. **Mở tab kiểm thử**: Agent gửi lệnh mở tab mới hoặc điều hướng đến trang kiểm thử qua Agent Pilot.
 3. **Gắn kết nối CDP**: Agent Pilot kết nối Chrome DevTools Protocol để lắng nghe lỗi `console.error` và các network request lỗi 4xx/5xx.
 4. **Mô phỏng hành vi người dùng**: Chuột ảo bay đến các nút bấm, điền form đăng ký, gửi dữ liệu.
