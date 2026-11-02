@@ -66,7 +66,7 @@ export default withMermaid(
               text: '🐞 Support & Feedback',
               items: [
                 { text: '🐞 Report Bugs & Feature Requests', link: '/COMMUNITY_SUPPORT' },
-                { text: '🚀 GitHub Releases (v1.3.0)', link: 'https://github.com/ducconit/agent-pilot/releases' },
+                { text: '🚀 GitHub Releases (v1.4.0)', link: 'https://github.com/ducconit/agent-pilot/releases' },
               ]
             }
           ],
@@ -146,7 +146,7 @@ export default withMermaid(
               text: '🐞 Hỗ Trợ & Báo Lỗi',
               items: [
                 { text: '🐞 Báo Lỗi & Đề Xuất', link: '/vi/COMMUNITY_SUPPORT' },
-                { text: '🚀 GitHub Releases (v1.3.0)', link: 'https://github.com/ducconit/agent-pilot/releases' },
+                { text: '🚀 GitHub Releases (v1.4.0)', link: 'https://github.com/ducconit/agent-pilot/releases' },
               ]
             }
           ],

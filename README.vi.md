@@ -40,7 +40,7 @@
 Dự án giúp các AI Coding Agent và kỹ sư QA/QC **điều khiển trình duyệt thuận tiện, tốn ít token nhất**, đồng thời trang bị trọn bộ công cụ chuyên dụng cho **Kiểm thử Web (Web Testing), QA/QC và Debug ứng dụng Web**:
 
 - **Tiết Kiệm Tối Đa Token (>50% Savings)**: Cây DOM tương tác được rút gọn thông minh (`@1`, `@2`) cùng cơ chế thực thi gộp lệnh (Batch Execution) giảm hơn 50% lượng token tiêu thụ trên cả hai chế độ **Skills + CLI** và **MCP**.
-- **Chụp Màn Hình & Ghi Chú Thích (Annotated Screenshots)**: Chụp vùng nhìn thấy, toàn trang (full-page) hoặc từng phần tử; tự động khoanh vùng highlight lỗi và đóng dấu tiêu đề báo cáo QA.
+- **Chụp Màn Hình & Ghi Chú Thích (Annotated Screenshots & Set-of-Marks)**: Chụp vùng nhìn thấy, toàn trang (full-page) hoặc từng phần tử; tự động khoanh vùng highlight lỗi, dán nhãn số Set-of-Marks (@1, @2...) không làm biến dạng DOM, và đóng dấu tiêu đề báo cáo QA.
 - **Quay Video Luồng Thao Tác (Video Recording)**: Ghi lại video `.mp4` toàn bộ quá trình kiểm thử tự động và tái hiện lỗi (bao gồm quỹ đạo chuột ảo neon và hiệu ứng sóng click).
 - **Ghi Nhận, Replay Thao Tác & Xuất Code Playwright**: Ghi lại chuỗi tương tác thực tế của người dùng hoặc AI, phát lại (replay) kịch bản tức thì và xuất trực tiếp ra mã nguồn kiểm thử **Playwright** hoàn chỉnh.
 - **Đo Lường Performance & Kiểm Định Lighthouse**: Chạy kiểm định Lighthouse thực tế, đo các chỉ số Core Web Vitals (LCP, CLS, INP) và phân tích performance trace.

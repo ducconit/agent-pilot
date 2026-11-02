@@ -44,13 +44,38 @@ export const pageQueryHandlers = {
         await waitForTabComplete(tabId, 5000);
       }
       await runInlineWait(client, tabId, { ...params, includeSnapshot: false });
-      return await client.sendTabMessageWithRetry(tabId, {
+      const snapRes = await client.sendTabMessageWithRetry(tabId, {
         action: "get_snapshot",
         maxElements: params.maxElements || LIMITS.SNAPSHOT_MAX_ELEMENTS_DEFAULT,
         format: params.format || "text"
       });
+      const resultData = snapRes?.result !== undefined ? snapRes.result : (snapRes || null);
+      if (params.includeScreenshot || params.screenshot) {
+        const shotRes = await client.captureTabScreenshot(tabId, {
+          mode: "visible",
+          annotateInteractive: true,
+          somColor: params.somColor || "amber",
+          maxElements: params.maxElements || LIMITS.SNAPSHOT_MAX_ELEMENTS_DEFAULT
+        });
+        if (typeof resultData === "string") {
+          return {
+            text: resultData,
+            screenshot: shotRes?.dataUrl || shotRes?.path || null,
+            annotated: Boolean(shotRes?.annotated),
+            interactiveCount: shotRes?.interactiveCount || 0
+          };
+        } else if (resultData && typeof resultData === "object") {
+          return {
+            ...resultData,
+            screenshot: shotRes?.dataUrl || shotRes?.path || null,
+            annotated: Boolean(shotRes?.annotated),
+            interactiveCount: shotRes?.interactiveCount || 0
+          };
+        }
+      }
+      return resultData;
     })
-      .then(res => respond(res?.result !== undefined ? res.result : (res || null)))
+      .then(res => respond(res))
       .catch(err => respond(null, err));
   },
 

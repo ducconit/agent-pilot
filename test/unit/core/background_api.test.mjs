@@ -2484,6 +2484,7 @@ function runContentModulesInSandbox({ contentType = "text/xml", xmlVersion = nul
     "content/lock-shield.js",
     "content/cursor-simulator.js",
     "content/selector-utils.js",
+    "content/snip-annotator.js",
     "content/dom-inspector.js",
     "content/eyedropper.js",
     "content/feedback-studio/constants.js",
@@ -2617,6 +2618,191 @@ record(
 // Cleanup mock client to prevent any reconnect timers from holding Node event loop
 mockWsClient.enabled = false;
 mockWsClient.clearReconnect();
+
+// 49. Snip Annotator drawing engine & cropDataUrlInWorker overlay compositing
+const { cropDataUrlInWorker } = await import("../../../extensions/background/screenshot-service.js");
+
+const compositedOps49 = [];
+const prevOffscreen49 = globalThis.OffscreenCanvas;
+const prevBitmap49 = globalThis.createImageBitmap;
+
+globalThis.OffscreenCanvas = class MockOffscreenCanvas49 {
+  constructor(width, height) {
+    this.width = width;
+    this.height = height;
+  }
+  getContext() {
+    return {
+      drawImage: (img, ...args) => {
+        compositedOps49.push({ op: "drawImage", isOverlay: img._isOverlay, args });
+      }
+    };
+  }
+  async convertToBlob() {
+    return {
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer
+    };
+  }
+};
+
+let bitmapCallCount49 = 0;
+globalThis.createImageBitmap = async () => {
+  bitmapCallCount49++;
+  return {
+    width: 800,
+    height: 600,
+    _isOverlay: bitmapCallCount49 > 1,
+    close: () => {}
+  };
+};
+
+const dummyBaseShot49 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+const dummyOverlay49 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+const cropRes49 = await cropDataUrlInWorker(
+  dummyBaseShot49,
+  {
+    x: 100,
+    y: 100,
+    width: 400,
+    height: 300,
+    pageWidth: 800,
+    pageHeight: 600,
+    overlayDataUrl: dummyOverlay49
+  }
+);
+
+// Test SnipAnnotator module in sandbox
+const snipCode49 = fsNode.readFileSync(pathNode.join(contentRoot47, "content/snip-annotator.js"), "utf8");
+const mockWindow49 = {
+  __AP_INTERNAL__: {},
+  devicePixelRatio: 2,
+  addEventListener: () => {},
+  removeEventListener: () => {}
+};
+const mockDoc49 = {
+  createElement: (tag) => {
+    const el = {
+      tagName: tag.toUpperCase(),
+      className: "",
+      style: {},
+      value: "",
+      focus: () => {},
+      onkeydown: null,
+      onblur: null,
+      parentNode: null,
+      remove: function () {
+        this.parentNode = null;
+      }
+    };
+    return el;
+  }
+};
+vmNode.runInNewContext(snipCode49, { window: mockWindow49, document: mockDoc49 });
+
+const snipEngine49 = mockWindow49.__AP_INTERNAL__.snipAnnotator;
+let dummyCanvasDpr = 1;
+const dummyCtx49 = {
+  resetTransform: () => {},
+  scale: (sx) => { dummyCanvasDpr = sx; },
+  clearRect: () => {},
+  save: () => {},
+  restore: () => {},
+  beginPath: () => {},
+  moveTo: () => {},
+  lineTo: () => {},
+  stroke: () => {},
+  fill: () => {},
+  closePath: () => {},
+  strokeRect: () => {},
+  fillRect: () => {},
+  ellipse: () => {},
+  measureText: () => ({ width: 60 }),
+  fillText: () => {}
+};
+const dummyCanvas49 = {
+  getContext: () => dummyCtx49,
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  getBoundingClientRect: () => ({ left: 0, top: 0, width: 400, height: 300 }),
+  toDataURL: () => "data:image/png;base64,annotatedMockData49",
+  width: 0,
+  height: 0,
+  style: {}
+};
+const dummyContainer49 = {
+  appendChild: () => {}
+};
+
+const annotatorInstance49 = snipEngine49.createSnipAnnotator(dummyCanvas49, dummyContainer49);
+annotatorInstance49.resize(400, 300);
+annotatorInstance49.setTool("arrow");
+annotatorInstance49.setColor("#ef4444");
+annotatorInstance49.actions.push({ type: "arrow", from: { x: 10, y: 10 }, to: { x: 50, y: 50 }, color: "#ef4444", strokeWidth: 3 });
+annotatorInstance49.actions.push({ type: "box", x: 60, y: 60, w: 100, h: 80, color: "#3b82f6", strokeWidth: 2 });
+annotatorInstance49.actions.push({ type: "circle", x: 170, y: 70, w: 50, h: 50, color: "#10b981", strokeWidth: 2 });
+annotatorInstance49.actions.push({ type: "pen", points: [{ x: 1, y: 1 }, { x: 2, y: 2 }], color: "#ffffff", strokeWidth: 2 });
+annotatorInstance49.actions.push({ type: "redact", x: 230, y: 80, w: 60, h: 25 });
+annotatorInstance49.actions.push({ type: "text", x: 10, y: 150, text: "Ghi chú lỗi", color: "#f59e0b" });
+
+const actionCountBeforeUndo = annotatorInstance49.actions.length;
+annotatorInstance49.undo();
+const actionCountAfterUndo = annotatorInstance49.actions.length;
+
+// Verify Finding 1 & 2: Text input commit/cancel safety & no DOMException
+let textMockAppended = null;
+dummyContainer49.appendChild = (el) => { textMockAppended = el; el.parentNode = dummyContainer49; el.remove = () => { el.parentNode = null; }; };
+
+annotatorInstance49.openTextInput(30, 40);
+textMockAppended.value = "  Test Note Finding 1  ";
+// Tool change triggers commitTextInput()
+annotatorInstance49.setTool("circle");
+const actionsAfterToolSwitch = annotatorInstance49.actions.length;
+const lastTextAction = annotatorInstance49.actions[annotatorInstance49.actions.length - 1];
+
+// Opening another text and cancelling
+annotatorInstance49.openTextInput(50, 60);
+textMockAppended.value = "Draft will be cancelled";
+annotatorInstance49.cancelTextInput();
+const actionsAfterCancel = annotatorInstance49.actions.length;
+
+const exportedUrl49 = annotatorInstance49.toDataURL();
+
+// Verify Finding 3: CDP overlay compositing on non-cropped image
+const cdpOverlayRes49 = await cropDataUrlInWorker(
+  dummyBaseShot49,
+  {
+    x: 0,
+    y: 0,
+    width: 800,
+    height: 600,
+    pageWidth: 800,
+    pageHeight: 600,
+    overlayDataUrl: dummyOverlay49
+  }
+);
+
+globalThis.OffscreenCanvas = prevOffscreen49;
+globalThis.createImageBitmap = prevBitmap49;
+
+record(
+  "49. Snip Annotator drawing engine & cropDataUrlInWorker overlay compositing",
+  compositedOps49.length >= 2 &&
+    compositedOps49.some((op) => op.isOverlay === true) &&
+    cropRes49 &&
+    cropRes49.startsWith("data:image/png;base64,") &&
+    cdpOverlayRes49 &&
+    cdpOverlayRes49.startsWith("data:image/png;base64,") &&
+    snipEngine49 &&
+    dummyCanvasDpr === 2 &&
+    actionCountBeforeUndo === 6 &&
+    actionCountAfterUndo === 5 &&
+    actionsAfterToolSwitch === 6 &&
+    lastTextAction.text === "Test Note Finding 1" &&
+    actionsAfterCancel === 6 &&
+    exportedUrl49 === "data:image/png;base64,annotatedMockData49",
+  `compositedDraws=${compositedOps49.length}, hasOverlay=${compositedOps49.some((op) => op.isOverlay === true)}, actions=${actionCountBeforeUndo}->${actionCountAfterUndo}->${actionsAfterToolSwitch}, dpr=${dummyCanvasDpr}`
+);
 
 } catch (err) {
   console.error("❌ Exception during test:", err);

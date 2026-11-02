@@ -99,6 +99,7 @@ When capturing visual evidence, user guides, or step-by-step QA reports, annotat
   - `--arrow "<from->to|target>[|color][:label]"` (`arrows`) and `--callout "<target>:<text>[|color][|top|bottom|left|right]"` (`callouts`).
   - `--badge "<n>:<target>[:label][|color]"` (`badges`, e.g. `--badge "1:@1:Nhập email" --badge "2:@2:Nhập mật khẩu"`).
   - `--icon "<check|error|warn|info|click>:<target>[:label]"` (`icons`), `--redact "<target>"` (`redact` to mask sensitive fields), and `--spotlight` (`spotlight: true` to dim background outside targets).
+  - **Set-of-Marks (SoM) Interactive Overlay**: Pass `--annotate-interactive` / `-i` (with optional `--som-color amber|cyan|green|red|purple`) or MCP `annotateInteractive: true` to automatically overlay `@1`, `@2`, `@3`... high-contrast badge pills and bounding boxes on all interactive elements in the viewport. Or pass `--screenshot` (`includeScreenshot: true`) to `agent-pilot snapshot` / `browser_snapshot` to receive both compact snapshot text and a Set-of-Marks screenshot in a single call. Rendered 100% offscreen with zero page DOM mutations.
 
 ## Bridge
 

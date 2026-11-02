@@ -1,5 +1,5 @@
 # 🏛️ Agent Pilot System Architecture
-**Version**: v1.3.0<br/>
+**Version**: v1.4.0<br/>
 **Mission**: Provide a comprehensive, ultra-low latency, focus-preserving browser control interface for AI Coding Agents (Antigravity-First), featuring dual-engine DOM/CDP execution and rich visual feedback.<br/>
 **Maintainer**: DNT ([github.com/ducconit](https://github.com/ducconit))
 

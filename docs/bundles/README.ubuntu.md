@@ -3,7 +3,7 @@
 Dedicated installation bundle for **Ubuntu / Debian / Linux (x86_64 / amd64)**, packaging the Chrome Extension, static MCP Server binary, and Agent Skill:
 
 ```text
-agent-pilot-v1.3.0-linux/
+agent-pilot-v1.4.0-linux/
 ├── extensions/            Chrome Extension (Manifest V3) — loaded unpacked in Chrome/Chromium
 ├── install.sh             1-step automated installation script for Ubuntu/Linux
 ├── skills/agent-pilot/    Agent Skill + scripts/agent-pilot native binary

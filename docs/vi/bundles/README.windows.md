@@ -3,7 +3,7 @@
 Gói cài đặt chuyên biệt dành cho **Windows 10 / Windows 11 (x86_64 / amd64)**, tích hợp sẵn Chrome Extension, MCP Server tĩnh và Agent Skill:
 
 ```text
-agent-pilot-v1.3.0-windows\
+agent-pilot-v1.4.0-windows\
 ├── extensions\            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome/Edge/Brave
 ├── install.ps1            Script PowerShell cài đặt tự động 1 lệnh cho Windows
 ├── skills\agent-pilot\    Agent Skill + scripts\agent-pilot.exe native binary

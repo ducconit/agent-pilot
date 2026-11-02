@@ -54,8 +54,8 @@ Input methods support engine selection (`via`) and coordinate targeting for Canv
 | `page.fillForm` | `fields: Array<{selector, value}>`, `submitSelector?`, `tabId?` | ❌ No | Fills multiple form inputs in a single round-trip |
 | `page.uploadFile`| `files: string[]`, `selector?`, `via?: "auto" \| "cdp"`, `tabId?` | ⚙️ Optional | Sets file inputs via CDP or synthetic event; files restricted to workspace or `/tmp` |
 | `page.waitFor` | `selector?`, `text?`, `state?`, `timeoutMs?`, `tabId?` | ❌ No | Waits for selector state or text presence |
-| `page.snapshot`| `maxElements?: number, format?: string`, `tabId?` | ❌ No | Retrieves interactive accessibility and DOM snapshot |
-| `page.screenshot`| `mode?: string, format?: "png" \| "jpeg" \| "webp", path?: string, clip?: Object, tabId?` | ⚙️ Background | Captures viewport, element, or full page screenshot |
+| `page.snapshot`| `maxElements?: number, format?: string, includeScreenshot?: boolean`, `tabId?` | ❌ No | Retrieves interactive accessibility and DOM snapshot (supports Set-of-Marks screenshot) |
+| `page.screenshot`| `mode?: string, format?: "png" \| "jpeg" \| "webp", path?: string, clip?: Object, annotateInteractive?: boolean, somColor?: string, tabId?` | ⚙️ Background | Captures viewport, element, or full page screenshot (supports Set-of-Marks overlay) |
 | `page.getElement`| `selector: string, includeStyles?: boolean`, `tabId?` | ❌ No | Retrieves selector, XPath, geometry, computed dimensions |
 | `page.evaluate` | `expression?: string, script?: string, args?: any[], filePath?: string`, `tabId?` | ❌ No | Evaluates JavaScript in MAIN world first with CDP fallback |
 | `page.pickColor`| `x?: number, y?: number`, `tabId?` | ❌ No | Samples pixel color across 5 formats (HEX, RGB, RGBA, HSL, OKLCH) |

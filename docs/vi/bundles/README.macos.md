@@ -3,7 +3,7 @@
 Gói cài đặt chuyên biệt dành cho **macOS (darwin-arm64 — Apple Silicon M1-M4)**, tích hợp sẵn Chrome Extension, MCP Server tĩnh và Agent Skill:
 
 ```text
-agent-pilot-v1.3.0-macos/
+agent-pilot-v1.4.0-macos/
 ├── extensions/            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome/Brave/Arc
 ├── install.sh             Script cài đặt tự động 1 lệnh cho macOS (tự gỡ Gatekeeper quarantine)
 ├── skills/agent-pilot/    Agent Skill + scripts/agent-pilot native binary

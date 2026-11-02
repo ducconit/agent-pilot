@@ -53,6 +53,7 @@ export async function cropDataUrlInWorker(dataUrl, clip, formatOpts = {}) {
     return dataUrl;
   }
   let bitmap = null;
+  let overlayBitmap = null;
   try {
     const blob = dataUrlToBlob(dataUrl);
     bitmap = await createImageBitmap(blob);
@@ -78,6 +79,18 @@ export async function cropDataUrlInWorker(dataUrl, clip, formatOpts = {}) {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh);
 
+    // Composite in-page drawing / annotation overlay if provided
+    const overlayUrl = (clip && clip.overlayDataUrl) || formatOpts.overlayDataUrl;
+    if (overlayUrl && typeof overlayUrl === "string" && overlayUrl.startsWith("data:image/")) {
+      try {
+        const overlayBlob = dataUrlToBlob(overlayUrl);
+        overlayBitmap = await createImageBitmap(overlayBlob);
+        ctx.drawImage(overlayBitmap, 0, 0, sw, sh);
+      } catch (overlayErr) {
+        logDebug("cropDataUrlInWorker overlay draw failed", overlayErr);
+      }
+    }
+
     const croppedBlob = await canvas.convertToBlob({
       type: formatOpts.mimeType || "image/png",
       ...(formatOpts.canvasQuality !== undefined ? { quality: formatOpts.canvasQuality } : {})
@@ -89,6 +102,9 @@ export async function cropDataUrlInWorker(dataUrl, clip, formatOpts = {}) {
   } finally {
     if (bitmap && typeof bitmap.close === "function") {
       bitmap.close();
+    }
+    if (overlayBitmap && typeof overlayBitmap.close === "function") {
+      overlayBitmap.close();
     }
   }
 }
@@ -487,6 +503,8 @@ export async function annotateDataUrlInWorker(dataUrl, annotation = {}, formatOp
   const badges = Array.isArray(annotation.badges) ? annotation.badges : [];
   const icons = Array.isArray(annotation.icons) ? annotation.icons : [];
   const redactRects = Array.isArray(annotation.redactRects) ? annotation.redactRects : [];
+  const interactiveMarks = Array.isArray(annotation.interactiveMarks) ? annotation.interactiveMarks : [];
+  const somColor = annotation.somColor || "amber";
   const spotlight = Boolean(annotation.spotlight);
 
   const hasBanner = Boolean(title || description || step);
@@ -498,7 +516,8 @@ export async function annotateDataUrlInWorker(dataUrl, annotation = {}, formatOp
     callouts.length > 0 ||
     badges.length > 0 ||
     icons.length > 0 ||
-    redactRects.length > 0;
+    redactRects.length > 0 ||
+    interactiveMarks.length > 0;
 
   if (!hasBanner && !hasRichOverlays) {
     return { dataUrl, annotated: false };
@@ -582,6 +601,65 @@ export async function annotateDataUrlInWorker(dataUrl, annotation = {}, formatOp
         if (fr.x + fr.width < imgW) ctx.fillRect(fr.x + fr.width, fr.y, imgW - (fr.x + fr.width), fr.height);
       }
       ctx.restore();
+    }
+
+    // 0c. Set-of-Marks (SoM) Interactive Badges & Bounding Boxes
+    if (interactiveMarks.length > 0) {
+      const somTheme = resolveColorTheme(somColor, "amber");
+      for (const mark of interactiveMarks) {
+        const sr = scaleRectToCanvas(mark.rect, imgW, imgH);
+        if (!sr || sr.width <= 0 || sr.height <= 0) continue;
+
+        ctx.save();
+        // 1. Subtle bounding box border & fill
+        ctx.fillStyle = somTheme.fill || "rgba(245, 158, 11, 0.12)";
+        ctx.fillRect(sr.x, sr.y, sr.width, sr.height);
+        ctx.lineWidth = Math.max(1.5, Math.round(1.5 * scale));
+        ctx.strokeStyle = somTheme.stroke || "#f59e0b";
+        ctx.strokeRect(sr.x, sr.y, sr.width, sr.height);
+
+        // 2. High-contrast compact badge pill at top-left
+        const badgeText = String(mark.ref || `@${mark.index}`);
+        const fontSize = Math.max(10, Math.round(11 * scale));
+        ctx.font = `700 ${fontSize}px monospace, system-ui, sans-serif`;
+        const textMetrics = typeof ctx.measureText === "function" ? ctx.measureText(badgeText) : { width: badgeText.length * 7 };
+        const textWidth = Math.round(textMetrics.width || badgeText.length * 7);
+        const padX = Math.max(3, Math.round(4 * scale));
+        const padY = Math.max(1, Math.round(2 * scale));
+        const pillW = textWidth + padX * 2;
+        const pillH = fontSize + padY * 2 + 1;
+
+        // Position at top-left of element bounding box
+        let pillX = sr.x;
+        let pillY = sr.y - pillH;
+        if (pillY < 2) {
+          pillY = sr.y;
+        }
+        if (pillX + pillW > imgW - 2) {
+          pillX = Math.max(2, imgW - pillW - 2);
+        }
+
+        // Draw pill background
+        ctx.fillStyle = somTheme.solid || "#f59e0b";
+        if (typeof ctx.beginPath === "function" && typeof ctx.roundRect === "function") {
+          ctx.beginPath();
+          ctx.roundRect(pillX, pillY, pillW, pillH, Math.max(2, Math.round(3 * scale)));
+          ctx.fill?.();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = "rgba(0, 0, 0, 0.45)";
+          ctx.stroke?.();
+        } else {
+          ctx.fillRect(pillX, pillY, pillW, pillH);
+        }
+
+        // Draw badge text with high-contrast dark font on solid bright badge
+        ctx.fillStyle = "#0f172a";
+        ctx.textBaseline = "middle";
+        ctx.fillText(badgeText, pillX + padX, pillY + Math.round(pillH / 2));
+        ctx.restore();
+
+        occupiedRects.push({ x: pillX, y: pillY, width: pillW, height: pillH });
+      }
     }
 
     // 1. Primary target element highlight box
@@ -1287,6 +1365,75 @@ async function resolveAnnotationOptions(tabId, params, targetTab, clip, mode) {
     if (rect) redactRects.push({ ...parsed, rect });
   }
 
+  const annotateInteractive = Boolean(
+    params.annotateInteractive ||
+    params.interactive ||
+    params.setOfMarks ||
+    params.som ||
+    params.labels
+  );
+  const somColor = params.somColor || params.somTheme || "amber";
+  const interactiveMarks = [];
+
+  if (annotateInteractive) {
+    try {
+      const snapRes = await sendTabMessageWithRetry(tabId, {
+        action: "get_snapshot",
+        maxElements: Math.min(Number(params.maxInteractiveElements || params.maxElements) || 80, 200),
+        format: "json"
+      });
+      if (snapRes && Array.isArray(snapRes.elements)) {
+        const vpW = snapRes.viewport?.width || targetTab?.width || 1280;
+        const vpH = snapRes.viewport?.height || targetTab?.height || 800;
+        const dpr = snapRes.viewport?.devicePixelRatio || 1;
+        const scrollX = isFullPage ? Number(snapRes.scrollX || 0) : 0;
+        const scrollY = isFullPage ? Number(snapRes.scrollY || 0) : 0;
+
+        for (const it of snapRes.elements) {
+          const bx = it.bounds ? it.bounds.x : (it.rect ? it.rect.x - Math.round(it.rect.width / 2) : 0);
+          const by = it.bounds ? it.bounds.y : (it.rect ? it.rect.y - Math.round(it.rect.height / 2) : 0);
+          const bw = it.bounds ? it.bounds.width : (it.rect ? it.rect.width : 0);
+          const bh = it.bounds ? it.bounds.height : (it.rect ? it.rect.height : 0);
+
+          if (bw <= 0 || bh <= 0) continue;
+
+          // In visible mode, skip elements completely outside the current viewport
+          if (!isFullPage) {
+            if (by + bh <= 0 || by >= vpH || bx + bw <= 0 || bx >= vpW) {
+              continue;
+            }
+          }
+
+          const rectObj = {
+            x: bx + scrollX,
+            y: by + scrollY,
+            width: bw,
+            height: bh,
+            viewportWidth: vpW,
+            viewportHeight: vpH,
+            devicePixelRatio: dpr
+          };
+
+          if ((mode === "element" || mode === "region") && clip) {
+            rectObj.x = Math.max(0, rectObj.x - clip.x);
+            rectObj.y = Math.max(0, rectObj.y - clip.y);
+            rectObj.viewportWidth = clip.width;
+            rectObj.viewportHeight = clip.height;
+          }
+
+          interactiveMarks.push({
+            index: it.index,
+            ref: it.ref || `@${it.index}`,
+            label: it.label || "",
+            rect: rectObj
+          });
+        }
+      }
+    } catch (snapErr) {
+      logDebug("Set-of-Marks snapshot lookup error", snapErr);
+    }
+  }
+
   const hasAny =
     Boolean(title) ||
     Boolean(description) ||
@@ -1298,7 +1445,8 @@ async function resolveAnnotationOptions(tabId, params, targetTab, clip, mode) {
     callouts.length > 0 ||
     badges.length > 0 ||
     icons.length > 0 ||
-    redactRects.length > 0;
+    redactRects.length > 0 ||
+    interactiveMarks.length > 0;
 
   if (!hasAny) {
     return null;
@@ -1316,7 +1464,9 @@ async function resolveAnnotationOptions(tabId, params, targetTab, clip, mode) {
     badges,
     icons,
     redactRects,
-    spotlight
+    spotlight,
+    interactiveMarks,
+    somColor
   };
 }
 
@@ -1453,9 +1603,22 @@ export async function captureTabScreenshot(tabId, params = {}) {
         }
 
         let resultUrl = `data:${formatOpts.mimeType};base64,` + res.data;
+        const overlayUrl = params.overlayDataUrl || (clip && clip.overlayDataUrl) || undefined;
         if (requiresCrop && clip) {
-          resultUrl = await cropDataUrlInWorker(resultUrl, clip, formatOpts);
+          const cropOpts = { ...formatOpts, ...(overlayUrl ? { overlayDataUrl: overlayUrl } : {}) };
+          resultUrl = await cropDataUrlInWorker(resultUrl, clip, cropOpts);
           requiresCrop = false;
+        } else if (overlayUrl) {
+          const compClip = {
+            x: 0,
+            y: 0,
+            width: clip ? clip.width : (targetTab?.width || 1280),
+            height: clip ? clip.height : (targetTab?.height || 800),
+            pageWidth: clip ? clip.width : (targetTab?.width || 1280),
+            pageHeight: clip ? clip.height : (targetTab?.height || 800),
+            overlayDataUrl: overlayUrl
+          };
+          resultUrl = await cropDataUrlInWorker(resultUrl, compClip, { ...formatOpts, overlayDataUrl: overlayUrl });
         }
         let annotated = false;
         if (annotationOpts) {
@@ -1472,7 +1635,8 @@ export async function captureTabScreenshot(tabId, params = {}) {
           dataUrl: resultUrl,
           clip: clip,
           requiresCrop,
-          ...(annotated ? { annotated: true } : {})
+          ...(annotated ? { annotated: true } : {}),
+          ...(annotationOpts?.interactiveMarks?.length ? { interactiveCount: annotationOpts.interactiveMarks.length } : {})
         };
       } catch (cdpErr) {
         logDebug(`CDP screenshot failed on tab ${tabId}`, cdpErr);
@@ -1500,9 +1664,25 @@ export async function captureTabScreenshot(tabId, params = {}) {
     chrome.tabs.captureVisibleTab(winId, visibleOpts, async (rawUrl) => {
       if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
       const needsCrop = Boolean((mode === "element" || mode === "region") && clip);
+      const overlayUrl = params.overlayDataUrl || (clip && clip.overlayDataUrl) || undefined;
+      const cropOpts = {
+        ...formatOpts,
+        ...(overlayUrl ? { overlayDataUrl: overlayUrl } : {})
+      };
       let finalUrl = rawUrl;
       if (needsCrop) {
-        finalUrl = await cropDataUrlInWorker(rawUrl, clip, formatOpts);
+        finalUrl = await cropDataUrlInWorker(rawUrl, clip, cropOpts);
+      } else if (overlayUrl) {
+        const fullClip = {
+          x: 0,
+          y: 0,
+          width: targetTab?.width || 1280,
+          height: targetTab?.height || 800,
+          pageWidth: targetTab?.width || 1280,
+          pageHeight: targetTab?.height || 800,
+          overlayDataUrl: overlayUrl
+        };
+        finalUrl = await cropDataUrlInWorker(rawUrl, fullClip, cropOpts);
       }
       let annotated = false;
       if (annotationOpts) {
@@ -1521,7 +1701,8 @@ export async function captureTabScreenshot(tabId, params = {}) {
         dataUrl: finalUrl,
         clip: clip,
         requiresCrop: false,
-        ...(annotated ? { annotated: true } : {})
+        ...(annotated ? { annotated: true } : {}),
+        ...(annotationOpts?.interactiveMarks?.length ? { interactiveCount: annotationOpts.interactiveMarks.length } : {})
       });
     });
   });

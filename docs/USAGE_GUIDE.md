@@ -253,8 +253,8 @@ Engineers and AI agents can automate Chrome directly from the terminal using the
 | `upload` | `agent-pilot upload <selector> <files...>` | Upload local files to `<input type="file">` via CDP or synthetic `DataTransfer` fallback | ⚙️ Optional (`--via auto`) |
 | `dialog` | `agent-pilot dialog <accept\|dismiss>` | Automatically handle JavaScript dialogs (`alert`, `confirm`, `prompt`) with prompt text | ✅ Yes |
 | `inspect` | `agent-pilot inspect <selector>` | Inspect element bounds, selector, XPath, text, and computed CSS (`--styles`) | ❌ No |
-| `snapshot` | `agent-pilot snapshot` | Extract ultra-compact interactive element map (`@1`, `@2`...) for LLM context | ❌ No |
-| `screenshot` | `agent-pilot screenshot` | Capture high-res screenshot with annotations (`--highlight`, `--step`, `--title`, `--arrow`, `--badge`) | ✅ Yes (bg tabs) |
+| `snapshot` | `agent-pilot snapshot` | Extract ultra-compact interactive element map (`@1`, `@2`...) for LLM context (supports `-s` for SoM screenshot) | ❌ No |
+| `screenshot` | `agent-pilot screenshot` | Capture high-res screenshot with annotations (`-i`/`--annotate-interactive`, `--som-color`, `--highlight`, `--step`) | ✅ Yes (bg tabs) |
 | `close` | `agent-pilot close [ids...\|--all]` | Close current tab, specified tab ID(s), or all tabs in the `🤖 Agent Pilot` group | ❌ No |
 | `tabs` | `agent-pilot tabs` | List all open tabs in the `🤖 Agent Pilot` group (Aliases: `list`, `ls`) | ❌ No |
 

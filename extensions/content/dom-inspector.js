@@ -385,6 +385,34 @@
       if (rect.width <= 0 || rect.height <= 0) continue;
       const style = window.getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden" || parseFloat(style.opacity) === 0) continue;
+      if (style.pointerEvents === "none") continue;
+
+      // Collision / occlusion check for elements within the current viewport
+      const inVp = rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth;
+      if (inVp && typeof document.elementFromPoint === "function") {
+        const cx = Math.min(Math.max(Math.round(rect.left + rect.width / 2), 0), Math.max(0, window.innerWidth - 1));
+        const cy = Math.min(Math.max(Math.round(rect.top + rect.height / 2), 0), Math.max(0, window.innerHeight - 1));
+        const topEl = document.elementFromPoint(cx, cy);
+        if (topEl && topEl !== el && !el.contains(topEl) && !topEl.contains(el)) {
+          // Ignore Agent Pilot's own UI overlays
+          const isAgentPilotOverlay = topEl.closest("[id^='agent-pilot'], .agent-pilot-virtual-cursor, .agent-pilot-toast");
+          if (!isAgentPilotOverlay) {
+            // Also sample corner points to avoid false-positives when an inner decorative element isn't hit
+            const leftX = Math.min(Math.max(Math.round(rect.left + 2), 0), Math.max(0, window.innerWidth - 1));
+            const topY = Math.min(Math.max(Math.round(rect.top + 2), 0), Math.max(0, window.innerHeight - 1));
+            const rightX = Math.min(Math.max(Math.round(rect.right - 2), 0), Math.max(0, window.innerWidth - 1));
+            const botY = Math.min(Math.max(Math.round(rect.bottom - 2), 0), Math.max(0, window.innerHeight - 1));
+            const p1 = document.elementFromPoint(leftX, topY);
+            const p2 = document.elementFromPoint(rightX, botY);
+            const p1Hit = p1 && (p1 === el || el.contains(p1) || p1.contains(el) || p1.closest("[id^='agent-pilot']"));
+            const p2Hit = p2 && (p2 === el || el.contains(p2) || p2.contains(el) || p2.closest("[id^='agent-pilot']"));
+            if (!p1Hit && !p2Hit) {
+              // Completely occluded by backdrop/modal/sticky overlay
+              continue;
+            }
+          }
+        }
+      }
 
       const idx = items.length + 1;
       elementsList.push(el);
@@ -427,6 +455,12 @@
           y: Math.round(rect.top + rect.height / 2),
           width: Math.round(rect.width),
           height: Math.round(rect.height)
+        },
+        bounds: {
+          x: Math.round(rect.left),
+          y: Math.round(rect.top),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
         }
       };
       items.push(item);
@@ -440,6 +474,13 @@
         url: window.location.href,
         title: document.title,
         totalInteractive: items.length,
+        viewport: {
+          width: window.innerWidth || document.documentElement.clientWidth || 1280,
+          height: window.innerHeight || document.documentElement.clientHeight || 800,
+          devicePixelRatio: window.devicePixelRatio || 1
+        },
+        scrollX: window.scrollX || window.pageXOffset || 0,
+        scrollY: window.scrollY || window.pageYOffset || 0,
         elements: items
       };
     }
@@ -758,17 +799,45 @@
   }
 
   // =========================================================================
-  // Region Screenshot Crop Overlay (mounted lazily on HTML pages when crop starts)
+  // Region Screenshot Crop Overlay & Interactive Snip Annotator
   // =========================================================================
 
   const existingCropOverlay = document.getElementById("agent-pilot-crop-overlay");
   if (existingCropOverlay) existingCropOverlay.remove();
   const cropOverlay = createEl("div", `
     <div id="agent-pilot-crop-box" style="display: none;">
+      <canvas id="agent-pilot-crop-canvas" class="agent-pilot-crop-canvas"></canvas>
       <div class="agent-pilot-crop-toolbar">
-        <span class="agent-pilot-crop-dims" id="agent-pilot-crop-dims">0 × 0</span>
-        <div role="button" tabindex="0" class="agent-pilot-crop-btn" id="agent-pilot-crop-confirm">✓ Chụp vùng này</div>
-        <div role="button" tabindex="0" class="agent-pilot-crop-btn cancel" id="agent-pilot-crop-cancel">✕ Hủy</div>
+        <div class="agent-pilot-crop-drag-handle" title="Kích thước vùng chọn">
+          <span class="agent-pilot-crop-dims" id="agent-pilot-crop-dims">0 × 0</span>
+        </div>
+        <div class="agent-pilot-toolbar-divider"></div>
+        <div class="agent-pilot-snip-tools" role="toolbar" aria-label="Công cụ chú thích">
+          <div role="button" tabindex="0" class="agent-pilot-tool-btn" data-tool="select" title="Chọn / Kéo vùng (S)">✂️</div>
+          <div role="button" tabindex="0" class="agent-pilot-tool-btn active" data-tool="arrow" title="Mũi tên chỉ dẫn (A)">↗️</div>
+          <div role="button" tabindex="0" class="agent-pilot-tool-btn" data-tool="box" title="Khung chữ nhật (B)">⬜</div>
+          <div role="button" tabindex="0" class="agent-pilot-tool-btn" data-tool="circle" title="Hình tròn / Elip (C)">⭕</div>
+          <div role="button" tabindex="0" class="agent-pilot-tool-btn" data-tool="pen" title="Bút vẽ tự do (P)">✏️</div>
+          <div role="button" tabindex="0" class="agent-pilot-tool-btn" data-tool="text" title="Chèn chữ ghi chú (T)">🔤</div>
+          <div role="button" tabindex="0" class="agent-pilot-tool-btn" data-tool="redact" title="Che mờ thông tin (R)">⬛</div>
+        </div>
+        <div class="agent-pilot-toolbar-divider"></div>
+        <div class="agent-pilot-snip-palette" title="Chọn màu sắc">
+          <span class="agent-pilot-color-dot active" data-color="#ef4444" style="background:#ef4444;" title="Đỏ"></span>
+          <span class="agent-pilot-color-dot" data-color="#f59e0b" style="background:#f59e0b;" title="Vàng"></span>
+          <span class="agent-pilot-color-dot" data-color="#10b981" style="background:#10b981;" title="Xanh lá"></span>
+          <span class="agent-pilot-color-dot" data-color="#3b82f6" style="background:#3b82f6;" title="Xanh dương"></span>
+          <span class="agent-pilot-color-dot" data-color="#ffffff" style="background:#ffffff;border:1px solid #475569;" title="Trắng"></span>
+          <span class="agent-pilot-color-dot" data-color="#000000" style="background:#000000;border:1px solid #475569;" title="Đen"></span>
+        </div>
+        <div class="agent-pilot-toolbar-divider"></div>
+        <div class="agent-pilot-snip-actions">
+          <div role="button" tabindex="0" class="agent-pilot-tool-btn" id="agent-pilot-snip-undo" title="Hoàn tác nét vẽ (Ctrl+Z)">↩️</div>
+          <div role="button" tabindex="0" class="agent-pilot-tool-btn" id="agent-pilot-snip-clear" title="Xóa hết nét vẽ">🗑️</div>
+          <div role="button" tabindex="0" class="agent-pilot-tool-btn" id="agent-pilot-snip-fullscreen" title="Mở rộng toàn màn hình">🖥️</div>
+          <div role="button" tabindex="0" class="agent-pilot-crop-btn primary" id="agent-pilot-crop-confirm" title="Hoàn tất và chụp (Enter)">✓ Chụp</div>
+          <div role="button" tabindex="0" class="agent-pilot-crop-btn cancel" id="agent-pilot-crop-cancel" title="Hủy bỏ (Esc)">✕ Hủy</div>
+        </div>
       </div>
     </div>
   `);
@@ -776,7 +845,9 @@
   cropOverlay.style.display = "none";
 
   const cropBox = cropOverlay.querySelector("#agent-pilot-crop-box");
+  const cropCanvas = cropOverlay.querySelector("#agent-pilot-crop-canvas");
   const cropDims = cropOverlay.querySelector("#agent-pilot-crop-dims");
+  const cropToolbar = cropOverlay.querySelector(".agent-pilot-crop-toolbar");
   const cropConfirmBtn = cropOverlay.querySelector("#agent-pilot-crop-confirm");
   const cropCancelBtn = cropOverlay.querySelector("#agent-pilot-crop-cancel");
 
@@ -790,16 +861,112 @@
     return true;
   }
 
+  function adjustToolbarPosition() {
+    if (!cropState.currentRect || !cropToolbar) return;
+    const { y, height } = cropState.currentRect;
+    cropToolbar.classList.remove("flipped-top", "inside-bottom");
+    if (y + height + 56 > window.innerHeight) {
+      if (y < 55) {
+        cropToolbar.classList.add("inside-bottom");
+      } else {
+        cropToolbar.classList.add("flipped-top");
+      }
+    }
+  }
+
   function startRegionCrop() {
     if (!ensureCropOverlayMounted()) return;
     if (isElementSnapActive) stopElementSnap(false);
     if (isInspectorActive) toggleInspector(false, false);
+
     cropOverlay.style.display = "block";
     cropBox.style.display = "none";
     cropState.active = false;
+    cropState.currentRect = null;
+
+    let annotator = null;
+    if (window.__AP_INTERNAL__.snipAnnotator && cropCanvas) {
+      annotator = window.__AP_INTERNAL__.snipAnnotator.createSnipAnnotator(cropCanvas, cropBox);
+    }
+
+    const toolBtns = Array.from(cropOverlay.querySelectorAll(".agent-pilot-snip-tools .agent-pilot-tool-btn"));
+    const colorDots = Array.from(cropOverlay.querySelectorAll(".agent-pilot-color-dot"));
+    const btnUndo = cropOverlay.querySelector("#agent-pilot-snip-undo");
+    const btnClear = cropOverlay.querySelector("#agent-pilot-snip-clear");
+    const btnFullscreen = cropOverlay.querySelector("#agent-pilot-snip-fullscreen");
+
+    function setTool(toolName) {
+      if (!annotator) return;
+      annotator.setTool(toolName);
+      toolBtns.forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.tool === toolName);
+      });
+      if (cropCanvas) {
+        cropCanvas.style.pointerEvents = toolName === "select" ? "none" : "auto";
+      }
+    }
+
+    toolBtns.forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        setTool(btn.dataset.tool);
+      };
+    });
+
+    colorDots.forEach((dot) => {
+      dot.onclick = (e) => {
+        e.stopPropagation();
+        colorDots.forEach((d) => d.classList.remove("active"));
+        dot.classList.add("active");
+        if (annotator) {
+          annotator.setColor(dot.dataset.color);
+        }
+      };
+    });
+
+    if (btnUndo) {
+      btnUndo.onclick = (e) => {
+        e.stopPropagation();
+        if (annotator) annotator.undo();
+      };
+    }
+
+    if (btnClear) {
+      btnClear.onclick = (e) => {
+        e.stopPropagation();
+        if (annotator) annotator.clear();
+      };
+    }
+
+    if (btnFullscreen) {
+      btnFullscreen.onclick = (e) => {
+        e.stopPropagation();
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        cropBox.style.left = "0px";
+        cropBox.style.top = "0px";
+        cropBox.style.width = `${w}px`;
+        cropBox.style.height = `${h}px`;
+        cropBox.style.display = "block";
+        cropDims.textContent = `${w} × ${h}`;
+        cropState.currentRect = { x: 0, y: 0, width: w, height: h };
+        if (annotator) {
+          annotator.resize(w, h);
+          setTool("arrow");
+        }
+        adjustToolbarPosition();
+      };
+    }
 
     function onMouseDown(e) {
-      if (e.target.closest(".agent-pilot-crop-toolbar")) return;
+      if (e.target.closest(".agent-pilot-crop-toolbar") || e.target.closest(".agent-pilot-snip-text-input")) {
+        return;
+      }
+      // If box is already visible and annotator is in a drawing tool, let canvas handle drawing
+      if (cropBox.style.display !== "none" && annotator && annotator.activeTool !== "select") {
+        return;
+      }
+
       cropState.active = true;
       cropState.startX = e.clientX;
       cropState.startY = e.clientY;
@@ -808,6 +975,7 @@
       cropBox.style.width = "0px";
       cropBox.style.height = "0px";
       cropBox.style.display = "block";
+      if (annotator) annotator.clear();
     }
 
     function onMouseMove(e) {
@@ -824,33 +992,78 @@
       cropDims.textContent = `${w} × ${h}`;
 
       cropState.currentRect = { x, y, width: w, height: h };
+      adjustToolbarPosition();
     }
 
     function onMouseUp() {
-      cropState.active = false;
+      if (cropState.active) {
+        cropState.active = false;
+        if (cropState.currentRect && cropState.currentRect.width > 10 && cropState.currentRect.height > 10) {
+          if (annotator) {
+            annotator.resize(cropState.currentRect.width, cropState.currentRect.height);
+            setTool("arrow");
+          }
+          adjustToolbarPosition();
+        }
+      }
+    }
+
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        if (document.activeElement && document.activeElement.tagName === "TEXTAREA") return;
+        e.preventDefault();
+        cleanup();
+        showToast("Đã hủy chụp vùng.");
+      } else if (e.key === "Enter" && !e.shiftKey) {
+        if (!document.activeElement || document.activeElement.tagName !== "TEXTAREA") {
+          e.preventDefault();
+          cropConfirmBtn.click();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && document.activeElement?.tagName !== "TEXTAREA") {
+        e.preventDefault();
+        if (annotator) annotator.undo();
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement?.tagName !== "TEXTAREA") {
+        const k = e.key.toLowerCase();
+        if (k === "a") setTool("arrow");
+        else if (k === "b") setTool("box");
+        else if (k === "c") setTool("circle");
+        else if (k === "p") setTool("pen");
+        else if (k === "t") setTool("text");
+        else if (k === "r") setTool("redact");
+        else if (k === "s") setTool("select");
+      }
     }
 
     cropOverlay.addEventListener("mousedown", onMouseDown);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("keydown", onKeyDown);
 
     function cleanup() {
       cropOverlay.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("keydown", onKeyDown);
       cropOverlay.style.display = "none";
+      if (annotator) {
+        annotator.destroy();
+        annotator = null;
+      }
     }
 
-    cropCancelBtn.onclick = () => {
+    cropCancelBtn.onclick = (e) => {
+      e?.stopPropagation();
       cleanup();
       showToast("Đã hủy chụp vùng.");
     };
 
-    cropConfirmBtn.onclick = () => {
+    cropConfirmBtn.onclick = (e) => {
+      e?.stopPropagation();
       if (!cropState.currentRect || cropState.currentRect.width < 5 || cropState.currentRect.height < 5) {
         showToast("Vui lòng kéo chọn vùng lớn hơn!");
         return;
       }
+      const overlayDataUrl = annotator && annotator.actions.length > 0 ? annotator.toDataURL() : null;
       const clip = {
         x: Math.round(cropState.currentRect.x),
         y: Math.round(cropState.currentRect.y),
@@ -865,7 +1078,8 @@
       // Send to side panel / background
       chrome.runtime.sendMessage({
         type: "REGION_CROP_REQUESTED",
-        clip
+        clip,
+        overlayDataUrl
       }).catch(() => {});
     };
   }

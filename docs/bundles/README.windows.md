@@ -3,7 +3,7 @@
 Dedicated installation bundle for **Windows 10 / Windows 11 (x86_64 / amd64)**, packaging the Chrome/Edge Extension, static MCP Server binary, and Agent Skill:
 
 ```text
-agent-pilot-v1.3.0-windows\
+agent-pilot-v1.4.0-windows\
 ├── extensions\            Chrome Extension (Manifest V3) — loaded unpacked in Chrome/Edge/Brave
 ├── install.ps1            1-step automated PowerShell installer for Windows
 ├── skills\agent-pilot\    Agent Skill + scripts\agent-pilot.exe native binary

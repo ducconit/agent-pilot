@@ -811,6 +811,7 @@ func newSnapshotCommand() *cobra.Command {
 			FlagDef{Name: "tab", Aliases: []string{"t"}},
 			FlagDef{Name: "max"},
 			FlagDef{Name: "format"},
+			FlagDef{Name: "screenshot", Aliases: []string{"include-screenshot", "s"}, IsBool: true},
 		))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
@@ -828,6 +829,9 @@ func newSnapshotCommand() *cobra.Command {
 		}
 		format := cmdArgs.String("format", "text")
 		extra := map[string]interface{}{}
+		if cmdArgs.Bool("screenshot") {
+			extra["includeScreenshot"] = true
+		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -841,6 +845,7 @@ func newSnapshotCommand() *cobra.Command {
 	f.IntP("tab", "t", 0, "Target tab ID")
 	f.Int("max", 80, "Max interactive elements to inspect")
 	f.String("format", "text", "Output format: text or json")
+	f.BoolP("screenshot", "s", false, "Also capture and return Set-of-Marks annotated screenshot")
 	registerInlineWaitPflags(cmd)
 	return cmd
 }
@@ -929,6 +934,8 @@ func newScreenshotCommand() *cobra.Command {
 			FlagDef{Name: "icon", Aliases: []string{"icons"}},
 			FlagDef{Name: "redact", Aliases: []string{"redactions"}},
 			FlagDef{Name: "spotlight", Aliases: []string{"dim"}, IsBool: true},
+			FlagDef{Name: "annotate-interactive", Aliases: []string{"interactive", "som", "set-of-marks", "i"}, IsBool: true},
+			FlagDef{Name: "som-color", Aliases: []string{"som-theme"}},
 			FlagDef{Name: "timeout"},
 		))
 		if err != nil {
@@ -1009,6 +1016,12 @@ func newScreenshotCommand() *cobra.Command {
 		if cmdArgs.Bool("spotlight") {
 			extra["spotlight"] = true
 		}
+		if cmdArgs.Bool("annotate-interactive") {
+			extra["annotateInteractive"] = true
+		}
+		if somColor := cmdArgs.String("som-color", ""); somColor != "" {
+			extra["somColor"] = somColor
+		}
 		if err := cmdArgs.ApplyInlineWait(extra); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error: %v\n", err)
 			return errUsage
@@ -1040,6 +1053,8 @@ func newScreenshotCommand() *cobra.Command {
 	f.StringArray("icon", nil, "Draw vector status icon on target (check|error|warn|info|click, e.g. 'check:@1')")
 	f.StringArray("redact", nil, "Mask/redact sensitive element or 'x,y,w,h' region before saving")
 	f.Bool("spotlight", false, "Dim background outside highlighted/annotated elements")
+	f.BoolP("annotate-interactive", "i", false, "Overlay interactive element marks (@1, @2...) and boxes onto screenshot")
+	f.String("som-color", "amber", "Set-of-Marks color theme: amber|cyan|green|red|purple")
 	f.Int("timeout", 0, "Screenshot timeout in milliseconds")
 	registerInlineWaitPflags(cmd)
 	return cmd

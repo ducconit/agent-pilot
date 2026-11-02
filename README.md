@@ -40,7 +40,7 @@
 It provides **effortless, token-efficient browser control**, empowering AI coding agents and QA engineers with a complete native **Web Testing, QA/QC, and Web Debugging** toolkit:
 
 - **Ultra-Low Token Footprint (>50% Savings)**: Compact interactive DOM snapshots (`@1`, `@2`) and single-roundtrip Batch Execution minimize context token consumption across both **Skills + CLI** and **MCP** modes.
-- **Annotated Screenshots & Visual QA**: Capture viewport, full-page, or element screenshots with automatic bounding-box highlights and custom QA title banners.
+- **Annotated Screenshots & Visual QA**: Capture viewport, full-page, or element screenshots with automatic bounding-box highlights, custom QA title banners, and Set-of-Marks interactive badges (@1, @2) with zero DOM mutations.
 - **Workflow Video Recording**: Record smooth `.mp4` screencasts of automated browser runs and bug reproductions (including virtual neon cursor trajectories and click ripples).
 - **Action Recorder, Replay & Playwright Export**: Record live user or AI interactions, replay test flows deterministically, and export directly to production-ready **Playwright** test code.
 - **Performance & Lighthouse Auditing**: Run native Lighthouse audits, measure Core Web Vitals (LCP, CLS, INP), and analyze performance traces.

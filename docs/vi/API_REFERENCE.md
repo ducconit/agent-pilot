@@ -54,8 +54,8 @@ Các method nhận input có hỗ trợ chọn engine (`via`) và toạ độ ch
 | `page.fillForm` | `fields: Array<{selector, value}>`, `submitSelector?`, `tabId?` | ❌ | Điền nhiều trường form trong 1 lần gọi duy nhất |
 | `page.uploadFile`| `files: string[]`, `selector?`, `via?: "auto" \| "cdp"`, `tabId?` | ⚙️ Tùy chọn | Thiết lập file input qua CDP hoặc synthetic event; file giới hạn trong workspace hoặc `/tmp` |
 | `page.waitFor` | `selector?`, `text?`, `state?`, `timeoutMs?`, `tabId?` | ❌ | Chờ đợi trạng thái phần tử hoặc chuỗi văn bản |
-| `page.snapshot`| `maxElements?: number, format?: string`, `tabId?` | ❌ | Lấy bản chụp DOM tương tác và cây khả năng tiếp cận |
-| `page.screenshot`| `mode?: string, format?: "png" \| "jpeg" \| "webp", path?: string, clip?: Object, tabId?` | ⚙️ Tab ngầm | Chụp ảnh màn hình viewport, element, hoặc toàn trang |
+| `page.snapshot`| `maxElements?: number, format?: string, includeScreenshot?: boolean`, `tabId?` | ❌ | Lấy bản chụp DOM tương tác và cây khả năng tiếp cận (hỗ trợ ảnh Set-of-Marks) |
+| `page.screenshot`| `mode?: string, format?: "png" \| "jpeg" \| "webp", path?: string, clip?: Object, annotateInteractive?: boolean, somColor?: string, tabId?` | ⚙️ Tab ngầm | Chụp ảnh màn hình viewport, element, hoặc toàn trang (hỗ trợ overlay Set-of-Marks) |
 | `page.getElement`| `selector: string, includeStyles?: boolean`, `tabId?` | ❌ | Lấy chi tiết thông số tọa độ, selector, XPath, CSS computed |
 | `page.evaluate` | `expression?: string, script?: string, args?: any[], filePath?: string`, `tabId?` | ❌ | Thực thi mã JavaScript trong bối cảnh MAIN world (fallback CDP) |
 | `page.pickColor`| `x?: number, y?: number`, `tabId?` | ❌ | Lấy mẫu màu pixel với 5 định dạng (HEX, RGB, RGBA, HSL, OKLCH) |

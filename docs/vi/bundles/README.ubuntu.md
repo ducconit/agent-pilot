@@ -3,7 +3,7 @@
 Gói cài đặt chuyên biệt dành cho **Ubuntu / Debian / Linux (x86_64 / amd64)**, tích hợp sẵn Chrome Extension, MCP Server tĩnh và Agent Skill:
 
 ```text
-agent-pilot-v1.3.0-linux/
+agent-pilot-v1.4.0-linux/
 ├── extensions/            Chrome Extension (Manifest V3) — nạp trực tiếp vào Chrome/Chromium
 ├── install.sh             Script cài đặt tự động 1 lệnh cho Ubuntu/Linux
 ├── skills/agent-pilot/    Agent Skill + scripts/agent-pilot native binary

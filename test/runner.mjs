@@ -46,7 +46,8 @@ const TEST_GROUPS = Object.freeze({
   "unit:core": [
     "test/unit/core/background_api.test.mjs",
     "test/unit/core/color_utils.test.mjs",
-    "test/unit/core/recorder_regressions.test.mjs"
+    "test/unit/core/recorder_regressions.test.mjs",
+    "test/unit/core/som_annotation.test.mjs"
   ],
   "unit:harness": [
     "test/unit/harness/launch_chrome.test.mjs",

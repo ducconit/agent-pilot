@@ -3,7 +3,7 @@
 Dedicated installation bundle for **macOS (darwin-arm64 — Apple Silicon M1-M4)**, packaging the Chrome Extension, static MCP Server binary, and Agent Skill:
 
 ```text
-agent-pilot-v1.3.0-macos/
+agent-pilot-v1.4.0-macos/
 ├── extensions/            Chrome Extension (Manifest V3) — loaded unpacked in Chrome/Brave/Arc
 ├── install.sh             1-step automated installation script for macOS (clears Gatekeeper quarantine)
 ├── skills/agent-pilot/    Agent Skill + scripts/agent-pilot native binary

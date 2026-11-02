@@ -254,8 +254,8 @@ Kỹ sư kiểm thử tự động và AI Agent có thể điều khiển Chrome
 | `upload` | `agent-pilot upload <selector> <files...>` | Tải file từ máy lên ô input file qua CDP hoặc cơ chế fallback synthetic `DataTransfer` | ⚙️ Tùy chọn (`--via auto`) |
 | `dialog` | `agent-pilot dialog <accept\|dismiss>` | Tự động xử lý các hộp thoại JavaScript (`alert`, `confirm`, `prompt`) kèm nội dung phản hồi | ✅ Có |
 | `inspect` | `agent-pilot inspect <selector>` | Soi tọa độ khung bao (rect), CSS selector, XPath, text và thuộc tính CSS tính toán (`--styles`) | ❌ Không |
-| `snapshot` | `agent-pilot snapshot` | Trích xuất bản đồ tương tác siêu nhẹ (`@1`, `@2`...) tối ưu cho context window của LLM | ❌ Không |
-| `screenshot` | `agent-pilot screenshot` | Chụp ảnh màn hình độ nét cao kèm chú thích (`--highlight`, `--step`, `--title`, `--arrow`, `--badge`) | ✅ Có (tab ngầm) |
+| `snapshot` | `agent-pilot snapshot` | Trích xuất bản đồ tương tác siêu nhẹ (`@1`, `@2`...) tối ưu cho context window của LLM (hỗ trợ `-s` chụp ảnh SoM) | ❌ Không |
+| `screenshot` | `agent-pilot screenshot` | Chụp ảnh màn hình độ nét cao kèm chú thích (`-i`/`--annotate-interactive`, `--som-color`, `--highlight`, `--step`) | ✅ Có (tab ngầm) |
 | `close` | `agent-pilot close [ids...\|--all]` | Đóng tab hiện tại, danh sách tab ID chỉ định hoặc toàn bộ tab trong nhóm `🤖 Agent Pilot` | ❌ Không |
 | `tabs` | `agent-pilot tabs` | Liệt kê danh sách tất cả các tab đang mở trong nhóm `🤖 Agent Pilot` (Alias: `list`, `ls`) | ❌ Không |
 

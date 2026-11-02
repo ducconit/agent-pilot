@@ -213,7 +213,11 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
         action: "capture_screenshot",
         mode: "region",
         tabId: activeTabId,
-        clip: msg.clip
+        clip: {
+          ...msg.clip,
+          overlayDataUrl: msg.overlayDataUrl
+        },
+        overlayDataUrl: msg.overlayDataUrl
       }, (res) => {
         if (chrome.runtime.lastError) {
           showToast("Lỗi chụp vùng: " + chrome.runtime.lastError.message);
@@ -223,7 +227,10 @@ import { FeedbackPanel } from "./sidepanel/feedback-panel.js";
           if (res.requiresCrop && res.clip) {
             screenshotPanel.cropImageViaCanvas(res.dataUrl, res.clip);
           } else {
-            screenshotPanel.displayScreenshot(res.dataUrl, "Đã chụp và cắt vùng thành công!");
+            screenshotPanel.displayScreenshot(
+              res.dataUrl,
+              msg.overlayDataUrl ? "Đã chụp và lưu ảnh chú thích thành công!" : "Đã chụp và cắt vùng thành công!"
+            );
           }
         } else {
           showToast("Lỗi chụp vùng: " + (res ? res.error : ""));

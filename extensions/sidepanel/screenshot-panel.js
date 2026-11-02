@@ -57,7 +57,7 @@ export class ScreenshotPanel {
           failMessage: "Vui lòng làm mới (F5) trang web trước khi chụp!"
         });
         if (res) {
-          showToast("Kéo chuột trên trang để chọn vùng cần chụp.");
+          showToast("✂️ Kéo chuột chọn vùng và vẽ chú thích (Mũi tên, Chữ, Khung...) • Esc để hủy");
         }
       };
     }
