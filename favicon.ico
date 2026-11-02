@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </linearGradient>
+    <linearGradient id="neonCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="accentPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="50%" stop-color="#6366f1"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background Base with rounded square shape -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="url(#neonCyan)" stroke-width="3" stroke-opacity="0.3"/>
+
+  <!-- Subtle Target Radar Rings -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.15" stroke-dasharray="8 8"/>
+  <circle cx="256" cy="256" r="120" fill="none" stroke="#818cf8" stroke-width="1.5" stroke-opacity="0.2"/>
+  <circle cx="256" cy="256" r="60" fill="none" stroke="#c084fc" stroke-width="1.5" stroke-opacity="0.25"/>
+
+  <!-- Radar Crosshairs -->
+  <line x1="256" y1="56" x2="256" y2="116" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <line x1="256" y1="396" x2="256" y2="456" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <line x1="56" y1="256" x2="116" y2="256" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <line x1="396" y1="256" x2="456" y2="256" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Futuristic Agent Cursor Flight Pointer -->
+  <g filter="url(#glow)">
+    <!-- Shadow / Ambient Glow -->
+    <path d="M156 120 L372 268 L264 288 L232 388 Z" fill="#06b6d4" opacity="0.3"/>
+
+    <!-- Main Stealth Pilot Pointer -->
+    <path d="M168 132 L360 264 L260 282 L230 376 Z" 
+          fill="url(#neonCyan)" 
+          stroke="#ffffff" 
+          stroke-width="4" 
+          stroke-linejoin="round"/>
+
+    <!-- Inner Core Wing Light -->
+    <path d="M190 170 L320 258 L256 270 L238 332 Z" 
+          fill="url(#accentPurple)" 
+          opacity="0.9"/>
+  </g>
+
+  <!-- Quantum AI Eye / Node at Core Intersection -->
+  <circle cx="256" cy="256" r="14" fill="#ffffff" filter="url(#glow)"/>
+  <circle cx="256" cy="256" r="7" fill="#06b6d4"/>
+
+  <!-- Orbiting Satellite Data Dots -->
+  <circle cx="340" cy="180" r="5" fill="#38bdf8" opacity="0.8"/>
+  <circle cx="180" cy="340" r="4" fill="#c084fc" opacity="0.8"/>
+  <circle cx="360" cy="340" r="6" fill="#38bdf8" opacity="0.7"/>
+</svg>
